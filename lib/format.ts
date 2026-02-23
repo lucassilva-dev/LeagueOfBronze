@@ -1,3 +1,5 @@
+const BRAZIL_TIME_ZONE = "America/Sao_Paulo";
+
 export function formatDateLabel(
   value?: string | null,
   options?: Intl.DateTimeFormatOptions,
@@ -25,6 +27,8 @@ export function formatDateTimeLabel(value?: string | null) {
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: BRAZIL_TIME_ZONE,
   }).format(date);
 }
 
