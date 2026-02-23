@@ -3,7 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 
-import type { TournamentDataset } from "@/lib/schema";
+import type {
+  Player,
+  PlayerGameStats,
+  SeriesMatch,
+  TournamentDataset,
+} from "@/lib/schema";
 import { getSeriesScore, getSeriesWinnerTeamId } from "@/lib/tournament";
 import { formatDateLabel } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -15,6 +20,268 @@ import { createBlankGame, createBlankSeries, createBlankStatsRow, type MutateDra
 
 function getTeamName(dataset: TournamentDataset, teamId: string) {
   return dataset.teams.find((team) => team.id === teamId)?.name ?? teamId ?? "—";
+}
+
+type RiotImportedParticipant = {
+  participantId: number;
+  side: "BLUE" | "RED";
+  puuid: string;
+  riotIdGameName: string | null;
+  riotIdTagline: string | null;
+  summonerName: string | null;
+  riotId: string;
+  champion: string;
+  kills: number;
+  deaths: number;
+  assists: number;
+  win: boolean;
+};
+
+type RiotImportedMatch = {
+  matchId: string;
+  durationSec: number;
+  durationMin: number;
+  winningSide: "BLUE" | "RED" | null;
+  participants: RiotImportedParticipant[];
+};
+
+type RiotImportApiResponse = {
+  match?: RiotImportedMatch;
+  error?: string;
+};
+
+type RiotImportStatus = {
+  kind: "success" | "error";
+  text: string;
+};
+
+type ApplyRiotImportResult =
+  | {
+      ok: true;
+      gamePatch: {
+        winnerTeamId: string;
+        durationMin: number;
+        mvpPlayerId: string;
+        statsByPlayer: PlayerGameStats[];
+      };
+      message: string;
+    }
+  | {
+      ok: false;
+      error: string;
+    };
+
+function getGameImportKey(seriesId: string, gameIndex: number) {
+  return `${seriesId}:${gameIndex}`;
+}
+
+function normalizeLookup(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function getNameVariants(value: string | null | undefined) {
+  if (!value) return [];
+  const trimmed = value.trim();
+  if (!trimmed) return [];
+
+  const keys = new Set<string>();
+  const normalized = normalizeLookup(trimmed);
+  if (normalized) keys.add(normalized);
+
+  const hashIndex = trimmed.indexOf("#");
+  if (hashIndex > 0) {
+    const beforeHash = normalizeLookup(trimmed.slice(0, hashIndex));
+    if (beforeHash) keys.add(beforeHash);
+  }
+
+  return [...keys];
+}
+
+function getPlayerLookupKeys(player: Player) {
+  const keys = new Set<string>();
+  for (const value of [player.nick, player.slug, player.id]) {
+    for (const key of getNameVariants(value)) keys.add(key);
+  }
+  return [...keys];
+}
+
+function getParticipantLookupKeys(participant: RiotImportedParticipant) {
+  const keys = new Set<string>();
+  for (const value of [participant.riotId, participant.riotIdGameName, participant.summonerName]) {
+    for (const key of getNameVariants(value)) keys.add(key);
+  }
+  return [...keys];
+}
+
+function scoreParticipantsAgainstRoster(participants: RiotImportedParticipant[], roster: Player[]) {
+  const rosterKeys = new Set(roster.flatMap((player) => getPlayerLookupKeys(player)));
+  let score = 0;
+  for (const participant of participants) {
+    if (getParticipantLookupKeys(participant).some((key) => rosterKeys.has(key))) {
+      score += 1;
+    }
+  }
+  return score;
+}
+
+function choosePlayerForParticipant(
+  participant: RiotImportedParticipant,
+  roster: Player[],
+  usedPlayerIds: Set<string>,
+) {
+  const participantKeys = getParticipantLookupKeys(participant);
+  if (participantKeys.length === 0) return null;
+
+  for (const player of roster) {
+    if (usedPlayerIds.has(player.id)) continue;
+    const playerKeys = getPlayerLookupKeys(player);
+    if (participantKeys.some((key) => playerKeys.includes(key))) {
+      return player;
+    }
+  }
+
+  return null;
+}
+
+function inferMvpPlayerId(rows: PlayerGameStats[]) {
+  if (rows.length === 0) return "";
+
+  const ranked = rows
+    .slice()
+    .sort((a, b) => {
+      const aKda = (a.kills + a.assists) / Math.max(1, a.deaths);
+      const bKda = (b.kills + b.assists) / Math.max(1, b.deaths);
+      if (bKda !== aKda) return bKda - aKda;
+      if (b.kills !== a.kills) return b.kills - a.kills;
+      if (b.assists !== a.assists) return b.assists - a.assists;
+      if (a.deaths !== b.deaths) return a.deaths - b.deaths;
+      return a.playerId.localeCompare(b.playerId);
+    });
+
+  return ranked[0]?.playerId ?? "";
+}
+
+function applyRiotMatchToSeriesGame({
+  draft,
+  series,
+  match,
+}: {
+  draft: TournamentDataset;
+  series: SeriesMatch;
+  match: RiotImportedMatch;
+}): ApplyRiotImportResult {
+  if (!series.teamAId || !series.teamBId) {
+    return { ok: false, error: "Selecione Time A e Time B antes de importar da Riot." };
+  }
+
+  const teamAPlayers = draft.players.filter((player) => player.teamId === series.teamAId);
+  const teamBPlayers = draft.players.filter((player) => player.teamId === series.teamBId);
+
+  if (teamAPlayers.length === 0 || teamBPlayers.length === 0) {
+    return {
+      ok: false,
+      error: "Os dois times precisam ter jogadores cadastrados para importar a partida da Riot.",
+    };
+  }
+
+  const blueSide = match.participants.filter((participant) => participant.side === "BLUE");
+  const redSide = match.participants.filter((participant) => participant.side === "RED");
+
+  if (blueSide.length === 0 || redSide.length === 0) {
+    return {
+      ok: false,
+      error: "A partida da Riot nÃ£o retornou os dois lados corretamente (azul/vermelho).",
+    };
+  }
+
+  const blueToAComposite =
+    scoreParticipantsAgainstRoster(blueSide, teamAPlayers) +
+    scoreParticipantsAgainstRoster(redSide, teamBPlayers);
+  const redToAComposite =
+    scoreParticipantsAgainstRoster(redSide, teamAPlayers) +
+    scoreParticipantsAgainstRoster(blueSide, teamBPlayers);
+
+  const teamASide = blueToAComposite >= redToAComposite ? "BLUE" : "RED";
+  const teamBSide = teamASide === "BLUE" ? "RED" : "BLUE";
+
+  const warnings: string[] = [];
+  if (blueToAComposite === redToAComposite) {
+    warnings.push("Mapeamento empatado; assumido Azul = Time A.");
+  }
+
+  const usedPlayerIds = new Set<string>();
+  const statsByPlayer: PlayerGameStats[] = [];
+  const unmatched: string[] = [];
+
+  const mapSide = (participants: RiotImportedParticipant[], roster: Player[]) => {
+    for (const participant of participants) {
+      const mappedPlayer = choosePlayerForParticipant(participant, roster, usedPlayerIds);
+      if (!mappedPlayer) {
+        unmatched.push(participant.riotId || participant.summonerName || participant.puuid);
+        continue;
+      }
+
+      usedPlayerIds.add(mappedPlayer.id);
+      statsByPlayer.push({
+        playerId: mappedPlayer.id,
+        champion: participant.champion,
+        kills: participant.kills,
+        deaths: participant.deaths,
+        assists: participant.assists,
+      });
+    }
+  };
+
+  mapSide(teamASide === "BLUE" ? blueSide : redSide, teamAPlayers);
+  mapSide(teamBSide === "BLUE" ? blueSide : redSide, teamBPlayers);
+
+  if (unmatched.length > 0) {
+    return {
+      ok: false,
+      error: `NÃ£o foi possÃ­vel mapear os nicks: ${unmatched.join(", ")}.`,
+    };
+  }
+
+  const mvpPlayerId = inferMvpPlayerId(statsByPlayer);
+  if (!mvpPlayerId) {
+    return {
+      ok: false,
+      error: "NÃ£o foi possÃ­vel sugerir MVP automaticamente a partir dos dados importados.",
+    };
+  }
+
+  let winnerTeamId = "";
+  if (match.winningSide) {
+    winnerTeamId = match.winningSide === teamASide ? series.teamAId : series.teamBId;
+  } else {
+    const blueWins = blueSide.filter((participant) => participant.win).length;
+    const redWins = redSide.filter((participant) => participant.win).length;
+    if (blueWins === redWins) {
+      return {
+        ok: false,
+        error: "NÃ£o foi possÃ­vel identificar o vencedor da partida importada.",
+      };
+    }
+    winnerTeamId =
+      (blueWins > redWins ? "BLUE" : "RED") === teamASide ? series.teamAId : series.teamBId;
+  }
+
+  const warningText = warnings.length > 0 ? ` Aviso: ${warnings.join(" ")}` : "";
+
+  return {
+    ok: true,
+    gamePatch: {
+      winnerTeamId,
+      durationMin: Math.max(1, match.durationMin || Math.round(match.durationSec / 60)),
+      mvpPlayerId,
+      statsByPlayer,
+    },
+    message: `Partida importada da Riot (${statsByPlayer.length} jogadores). MVP sugerido por KDA.${warningText}`,
+  };
 }
 
 export function AdminSeriesPanel({
@@ -33,6 +300,9 @@ export function AdminSeriesPanel({
   );
 
   const [selectedId, setSelectedId] = useState<string | null>(sortedSeries[0]?.id ?? null);
+  const [riotMatchIdsByGame, setRiotMatchIdsByGame] = useState<Record<string, string>>({});
+  const [riotImportStatusByGame, setRiotImportStatusByGame] = useState<Record<string, RiotImportStatus>>({});
+  const [riotImportingGameKey, setRiotImportingGameKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (selectedId && draft.seriesMatches.some((series) => series.id === selectedId)) return;
@@ -47,6 +317,24 @@ export function AdminSeriesPanel({
     const teamBPlayers = draft.players.filter((player) => player.teamId === selectedSeries.teamBId);
     return { teamAPlayers, teamBPlayers, combined: [...teamAPlayers, ...teamBPlayers] };
   }, [draft.players, selectedSeries]);
+
+  const setRiotMatchIdForGame = (seriesId: string, gameIndex: number, value: string) => {
+    const key = getGameImportKey(seriesId, gameIndex);
+    setRiotMatchIdsByGame((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const setRiotImportStatusForGame = (seriesId: string, gameIndex: number, status?: RiotImportStatus) => {
+    const key = getGameImportKey(seriesId, gameIndex);
+    setRiotImportStatusByGame((prev) => {
+      if (!status) {
+        if (!(key in prev)) return prev;
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      }
+      return { ...prev, [key]: status };
+    });
+  };
 
   const createSeries = () => {
     const series = createBlankSeries();
@@ -87,6 +375,74 @@ export function AdminSeriesPanel({
         }
       }
     });
+  };
+
+  const importGameFromRiot = async (gameIndex: number) => {
+    if (!selectedSeries) return;
+
+    const gameKey = getGameImportKey(selectedSeries.id, gameIndex);
+    const matchId = (riotMatchIdsByGame[gameKey] || "").trim();
+
+    if (!matchId) {
+      setRiotImportStatusForGame(selectedSeries.id, gameIndex, {
+        kind: "error",
+        text: "Informe o ID da partida do LoL (ex.: BR1_1234567890).",
+      });
+      return;
+    }
+
+    setRiotImportStatusForGame(selectedSeries.id, gameIndex);
+    setRiotImportingGameKey(gameKey);
+
+    try {
+      const response = await fetch("/api/admin/riot/match", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ matchId }),
+      });
+      const data = (await response.json()) as RiotImportApiResponse;
+
+      if (!response.ok || !data.match) {
+        throw new Error(data.error || "Falha ao consultar a Riot.");
+      }
+
+      const mapped = applyRiotMatchToSeriesGame({
+        draft,
+        series: selectedSeries,
+        match: data.match,
+      });
+
+      if (!mapped.ok) {
+        setRiotImportStatusForGame(selectedSeries.id, gameIndex, {
+          kind: "error",
+          text: mapped.error,
+        });
+        return;
+      }
+
+      updateSelectedSeries((series) => {
+        const game = series.games[gameIndex];
+        if (!game) return;
+
+        game.winnerTeamId = mapped.gamePatch.winnerTeamId;
+        game.durationMin = mapped.gamePatch.durationMin;
+        game.mvpPlayerId = mapped.gamePatch.mvpPlayerId;
+        game.statsByPlayer = mapped.gamePatch.statsByPlayer;
+      });
+
+      setRiotImportStatusForGame(selectedSeries.id, gameIndex, {
+        kind: "success",
+        text: mapped.message,
+      });
+    } catch (error) {
+      setRiotImportStatusForGame(selectedSeries.id, gameIndex, {
+        kind: "error",
+        text: error instanceof Error ? error.message : "Falha ao importar partida da Riot.",
+      });
+    } finally {
+      setRiotImportingGameKey((prev) => (prev === gameKey ? null : prev));
+    }
   };
 
   return (
@@ -262,7 +618,13 @@ export function AdminSeriesPanel({
                   Nenhum jogo nesta série.
                 </div>
               ) : (
-                selectedSeries.games.map((game, gameIndex) => (
+                selectedSeries.games.map((game, gameIndex) => {
+                  const riotImportKey = getGameImportKey(selectedSeries.id, gameIndex);
+                  const riotImportStatus = riotImportStatusByGame[riotImportKey];
+                  const riotMatchId = riotMatchIdsByGame[riotImportKey] ?? "";
+                  const isImportingRiot = riotImportingGameKey === riotImportKey;
+
+                  return (
                   <Card
                     key={`${selectedSeries.id}-game-${gameIndex}`}
                     className="min-w-0 overflow-hidden border-white/10 p-4"
@@ -293,6 +655,50 @@ export function AdminSeriesPanel({
                           <Trash2 className="h-4 w-4" /> Remover jogo
                         </Button>
                       </div>
+                    </div>
+
+                    <div className="mt-3 rounded-xl border border-white/8 bg-white/[0.02] p-3">
+                      <Label htmlFor={`${selectedSeries.id}-riot-match-${gameIndex}`}>
+                        ID da partida LoL (Riot)
+                      </Label>
+                      <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                        <Input
+                          id={`${selectedSeries.id}-riot-match-${gameIndex}`}
+                          placeholder="Ex.: BR1_1234567890"
+                          value={riotMatchId}
+                          onChange={(e) =>
+                            setRiotMatchIdForGame(selectedSeries.id, gameIndex, e.target.value)
+                          }
+                        />
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="w-full sm:w-auto"
+                          disabled={
+                            isImportingRiot ||
+                            !riotMatchId.trim() ||
+                            !selectedSeries.teamAId ||
+                            !selectedSeries.teamBId
+                          }
+                          onClick={() => void importGameFromRiot(gameIndex)}
+                        >
+                          {isImportingRiot ? "Importando..." : "Importar da Riot"}
+                        </Button>
+                      </div>
+                      <p className="mt-2 text-xs text-muted">
+                        Preenche automaticamente vencedor, duraÃ§Ã£o, campeÃµes e K/D/A. MVP do jogo Ã© sugerido por KDA.
+                      </p>
+                      {riotImportStatus ? (
+                        <p
+                          className={`mt-2 rounded-lg border px-2.5 py-2 text-xs ${
+                            riotImportStatus.kind === "error"
+                              ? "border-red-400/20 bg-red-500/10 text-red-200"
+                              : "border-emerald-400/20 bg-emerald-500/10 text-emerald-200"
+                          }`}
+                        >
+                          {riotImportStatus.text}
+                        </p>
+                      ) : null}
                     </div>
 
                     <div className="mt-3 grid gap-3 sm:grid-cols-3">
@@ -495,7 +901,8 @@ export function AdminSeriesPanel({
                       </div>
                     </div>
                   </Card>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
