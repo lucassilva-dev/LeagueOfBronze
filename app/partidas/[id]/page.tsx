@@ -156,16 +156,19 @@ export default async function PartidaDetalhePage({
                     { teamName: teamA?.name ?? series.teamAId, rows: teamARows },
                     { teamName: teamB?.name ?? series.teamBId, rows: teamBRows },
                   ].map((block) => (
-                    <div key={`${series.id}-${gameIndex}-${block.teamName}`} className="rounded-2xl border border-white/8 bg-white/[0.015] p-3">
+                    <div
+                      key={`${series.id}-${gameIndex}-${block.teamName}`}
+                      className="min-w-0 overflow-hidden rounded-2xl border border-white/8 bg-white/[0.015] p-3"
+                    >
                       <p className="mb-2 text-xs uppercase tracking-[0.14em] text-muted">
                         {block.teamName}
                       </p>
-                      <div className="-mx-1 overflow-x-auto px-1 pb-1 scrollbar-thin">
-                        <Table className="min-w-[520px]">
+                      <div className="max-w-full overflow-x-auto pb-1 scrollbar-thin">
+                        <Table className="min-w-[500px]">
                           <TableHeader>
                             <TableRow>
-                              <TableHeadCell className="min-w-[190px]">Jogador</TableHeadCell>
-                              <TableHeadCell className="min-w-[110px]">
+                              <TableHeadCell className="min-w-[170px]">Jogador</TableHeadCell>
+                              <TableHeadCell className="min-w-[96px]">
                                 <span className="sm:hidden">Camp.</span>
                                 <span className="hidden sm:inline">Campeão</span>
                               </TableHeadCell>
@@ -183,7 +186,7 @@ export default async function PartidaDetalhePage({
                             ) : (
                               block.rows.map((row) => (
                                 <TableRow key={`${gameIndex}-${row.playerId}`}>
-                                  <TableCell className="min-w-[190px]">
+                                  <TableCell className="min-w-[170px]">
                                     <Link
                                       href={`/jogadores/${indexes.playersById.get(row.playerId)?.slug ?? row.playerId}`}
                                       className="block break-all font-semibold hover:text-accent"
