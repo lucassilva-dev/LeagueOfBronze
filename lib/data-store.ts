@@ -148,9 +148,10 @@ async function readSupabaseRow(): Promise<SupabaseRow | null> {
 async function readSupabaseDataset(): Promise<TournamentDataset> {
   const row = await readSupabaseRow();
   if (!row) {
-    throw new Error(
-      `Nenhum registro encontrado no Supabase para id "${getSupabaseDatasetRowId()}". Importe os dados iniciais no /admin.`,
-    );
+    // Bootstrap automático: usa o seed local na primeira execução e cria o registro no Supabase.
+    const localSeed = normalizeDatasetForSave(await readLocalDataset());
+    await saveSupabaseDataset(localSeed);
+    return localSeed;
   }
 
   try {
