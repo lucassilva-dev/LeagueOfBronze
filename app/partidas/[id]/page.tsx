@@ -130,12 +130,24 @@ export default async function PartidaDetalhePage({
                       ) : null}
                     </p>
                   </div>
-                  <div className="rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2 text-sm">
-                    <span className="text-muted">{teamA?.name ?? "A"} </span>
-                    <span className="font-semibold">{kills.teamAKills}</span>
-                    <span className="mx-2 text-muted">x</span>
-                    <span className="font-semibold">{kills.teamBKills}</span>
-                    <span className="text-muted"> {teamB?.name ?? "B"}</span>
+                  <div className="w-full rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2 text-sm sm:w-auto">
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto_minmax(0,1fr)] items-center gap-x-2">
+                      <span
+                        className="truncate text-right text-muted"
+                        title={teamA?.name ?? series.teamAId}
+                      >
+                        {teamA?.name ?? "A"}
+                      </span>
+                      <span className="font-semibold">{kills.teamAKills}</span>
+                      <span className="text-muted">x</span>
+                      <span className="font-semibold">{kills.teamBKills}</span>
+                      <span
+                        className="truncate text-muted"
+                        title={teamB?.name ?? series.teamBId}
+                      >
+                        {teamB?.name ?? "B"}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -148,14 +160,17 @@ export default async function PartidaDetalhePage({
                       <p className="mb-2 text-xs uppercase tracking-[0.14em] text-muted">
                         {block.teamName}
                       </p>
-                      <div className="overflow-x-auto scrollbar-thin">
-                        <Table>
+                      <div className="-mx-1 overflow-x-auto px-1 pb-1 scrollbar-thin">
+                        <Table className="min-w-[520px]">
                           <TableHeader>
                             <TableRow>
-                              <TableHeadCell>Jogador</TableHeadCell>
-                              <TableHeadCell>Campeão</TableHeadCell>
-                              <TableHeadCell>K/D/A</TableHeadCell>
-                              <TableHeadCell className="text-right">KDA</TableHeadCell>
+                              <TableHeadCell className="min-w-[190px]">Jogador</TableHeadCell>
+                              <TableHeadCell className="min-w-[110px]">
+                                <span className="sm:hidden">Camp.</span>
+                                <span className="hidden sm:inline">Campeão</span>
+                              </TableHeadCell>
+                              <TableHeadCell className="whitespace-nowrap">K/D/A</TableHeadCell>
+                              <TableHeadCell className="whitespace-nowrap text-right">KDA</TableHeadCell>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -168,16 +183,23 @@ export default async function PartidaDetalhePage({
                             ) : (
                               block.rows.map((row) => (
                                 <TableRow key={`${gameIndex}-${row.playerId}`}>
-                                  <TableCell>
-                                    <Link href={`/jogadores/${indexes.playersById.get(row.playerId)?.slug ?? row.playerId}`} className="font-semibold hover:text-accent">
+                                  <TableCell className="min-w-[190px]">
+                                    <Link
+                                      href={`/jogadores/${indexes.playersById.get(row.playerId)?.slug ?? row.playerId}`}
+                                      className="block break-all font-semibold hover:text-accent"
+                                    >
                                       {row.playerNick}
                                     </Link>
                                   </TableCell>
-                                  <TableCell>{row.champion || "—"}</TableCell>
-                                  <TableCell>
+                                  <TableCell className="whitespace-nowrap">
+                                    {row.champion || "—"}
+                                  </TableCell>
+                                  <TableCell className="whitespace-nowrap">
                                     {row.kills}/{row.deaths}/{row.assists}
                                   </TableCell>
-                                  <TableCell className="text-right">{formatKda((row.kills + row.assists) / Math.max(1, row.deaths))}</TableCell>
+                                  <TableCell className="whitespace-nowrap text-right">
+                                    {formatKda((row.kills + row.assists) / Math.max(1, row.deaths))}
+                                  </TableCell>
                                 </TableRow>
                               ))
                             )}
