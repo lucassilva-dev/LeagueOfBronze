@@ -1,0 +1,403 @@
+{
+  "tournament": {
+    "name": "Campeonato do Grupo",
+    "lastUpdatedISO": "2026-02-23T14:44:39.457Z",
+    "seriesPointsRule": {
+      "win": 3,
+      "loss": 0
+    },
+    "format": "BO3"
+  },
+  "teams": [
+    {
+      "id": "zenshin",
+      "name": "ZENSHIN GAMING",
+      "slug": "zenshin-gaming"
+    },
+    {
+      "id": "moonrock",
+      "name": "MOONROCK",
+      "slug": "moonrock"
+    },
+    {
+      "id": "punho",
+      "name": "PUNHO DO BARÃO",
+      "slug": "punho-do-barao"
+    },
+    {
+      "id": "pequi",
+      "name": "PEQUI PIKANTE",
+      "slug": "pequi-pikante"
+    },
+    {
+      "id": "semdedos",
+      "name": "SEM DEDOS GAMING",
+      "slug": "sem-dedos-gaming"
+    },
+    {
+      "id": "lov2",
+      "name": "LEAGUE OF VALLEY 2.0",
+      "slug": "league-of-valley-2-0"
+    },
+    {
+      "id": "inss",
+      "name": "INSS GAMING",
+      "slug": "inss-gaming"
+    }
+  ],
+  "players": [
+    {
+      "id": "maxmp",
+      "nick": "Maxmp",
+      "slug": "maxmp",
+      "teamId": "punho",
+      "role1": "SUP",
+      "role2": "JUNG",
+      "elo": "DIAM"
+    },
+    {
+      "id": "ikira",
+      "nick": "Ikira",
+      "slug": "ikira",
+      "teamId": "punho",
+      "role1": "ADC",
+      "role2": "MID",
+      "elo": "PLAT"
+    },
+    {
+      "id": "epicdron",
+      "nick": "EPICDRON",
+      "slug": "epicdron",
+      "teamId": "punho",
+      "role1": "TOP",
+      "role2": "SUP",
+      "elo": "PRAT"
+    },
+    {
+      "id": "onigami-666",
+      "nick": "Onigami #666",
+      "slug": "onigami-666",
+      "teamId": "punho",
+      "role1": "MID",
+      "role2": "ADC",
+      "elo": "ESME"
+    },
+    {
+      "id": "fail-error",
+      "nick": "Fail Error",
+      "slug": "fail-error",
+      "teamId": "punho",
+      "role1": "JUNG",
+      "role2": "TOP",
+      "elo": "OURO"
+    },
+    {
+      "id": "hail-to-deicidal-hell",
+      "nick": "Hail to deicidal#hell",
+      "slug": "hail-to-deicidal-hell",
+      "teamId": "moonrock",
+      "role1": "TOP",
+      "role2": "MID",
+      "elo": "MEST"
+    },
+    {
+      "id": "zac-schwarzenegg",
+      "nick": "Zac Schwarzenegg",
+      "slug": "zac-schwarzenegg",
+      "teamId": "moonrock",
+      "role1": "JUNG",
+      "role2": "ADC",
+      "elo": "ESME"
+    },
+    {
+      "id": "zeus",
+      "nick": "zeus",
+      "slug": "zeus",
+      "teamId": "moonrock",
+      "role1": "SUP",
+      "role2": "JUNG",
+      "elo": "PRAT"
+    },
+    {
+      "id": "el-math",
+      "nick": "El Math",
+      "slug": "el-math",
+      "teamId": "moonrock",
+      "role1": "MID",
+      "role2": "TOP",
+      "elo": "BRON"
+    },
+    {
+      "id": "pai-de-familia",
+      "nick": "PAI DE FAMILIA",
+      "slug": "pai-de-familia",
+      "teamId": "moonrock",
+      "role1": "ADC",
+      "role2": "SUP",
+      "elo": "OURO"
+    },
+    {
+      "id": "vidotti-agiota",
+      "nick": "vidotti agiota",
+      "slug": "vidotti-agiota",
+      "teamId": "inss",
+      "role1": "ADC",
+      "role2": "MID",
+      "elo": "ESME"
+    },
+    {
+      "id": "reimeldinguer",
+      "nick": "REIMelDinguer",
+      "slug": "reimeldinguer",
+      "teamId": "inss",
+      "role1": "SUP",
+      "role2": "MID",
+      "elo": "OURO"
+    },
+    {
+      "id": "luiz6546",
+      "nick": "Luiz6546",
+      "slug": "luiz6546",
+      "teamId": "inss",
+      "role1": "TOP",
+      "role2": "JUNG",
+      "elo": "ESME"
+    },
+    {
+      "id": "x-de-shaco",
+      "nick": "X de shaco",
+      "slug": "x-de-shaco",
+      "teamId": "inss",
+      "role1": "JUNG",
+      "role2": "TOP",
+      "elo": "PLAT"
+    },
+    {
+      "id": "killergoldo",
+      "nick": "KILLERGOLDO",
+      "slug": "killergoldo",
+      "teamId": "inss",
+      "role1": "MID",
+      "role2": "TOP",
+      "elo": "BRONZ"
+    },
+    {
+      "id": "frango-vegano",
+      "nick": "Frango vegano",
+      "slug": "frango-vegano",
+      "teamId": "semdedos",
+      "role1": "SUP",
+      "role2": "JUNG",
+      "elo": "ESME"
+    },
+    {
+      "id": "stormshadow",
+      "nick": "Il StormShadow I",
+      "slug": "il-stormshadow-i",
+      "teamId": "semdedos",
+      "role1": "ADC",
+      "role2": "MID",
+      "elo": "PLAT"
+    },
+    {
+      "id": "calabreso",
+      "nick": "Calabreso",
+      "slug": "calabreso",
+      "teamId": "semdedos",
+      "role1": "TOP",
+      "role2": "ADC",
+      "elo": "OURO"
+    },
+    {
+      "id": "3perna",
+      "nick": "3perna",
+      "slug": "3perna",
+      "teamId": "semdedos",
+      "role1": "JUNG",
+      "role2": "TOP",
+      "elo": "PRAT"
+    },
+    {
+      "id": "alemonstro",
+      "nick": "AleMonStr0",
+      "slug": "alemonstr0",
+      "teamId": "semdedos",
+      "role1": "MID",
+      "role2": "TOP",
+      "elo": "OURO"
+    },
+    {
+      "id": "leao",
+      "nick": "Leão",
+      "slug": "leao",
+      "teamId": "pequi",
+      "role1": "MID",
+      "role2": "TOP",
+      "elo": "MEST"
+    },
+    {
+      "id": "midas",
+      "nick": "MIDAS",
+      "slug": "midas",
+      "teamId": "pequi",
+      "role1": "SUP",
+      "role2": "JUNG",
+      "elo": "PLAT"
+    },
+    {
+      "id": "wrgamer",
+      "nick": "WRGamer",
+      "slug": "wrgamer",
+      "teamId": "pequi",
+      "role1": "ADC",
+      "role2": "SUP",
+      "elo": "PLAT"
+    },
+    {
+      "id": "onlyfans-kindred",
+      "nick": "onlyfans kindred",
+      "slug": "onlyfans-kindred",
+      "teamId": "pequi",
+      "role1": "JUNG",
+      "role2": "SUP",
+      "elo": "PRAT"
+    },
+    {
+      "id": "desliga-cerebro",
+      "nick": "Desliga Cerebro",
+      "slug": "desliga-cerebro",
+      "teamId": "pequi",
+      "role1": "TOP",
+      "role2": "JUNG",
+      "elo": "PRAT"
+    },
+    {
+      "id": "cavalinha-do-job",
+      "nick": "cavalinha do job",
+      "slug": "cavalinha-do-job",
+      "teamId": "lov2",
+      "role1": "MID",
+      "role2": "JUNG",
+      "elo": "ESME"
+    },
+    {
+      "id": "top-lane-666",
+      "nick": "Top Lane 666",
+      "slug": "top-lane-666",
+      "teamId": "lov2",
+      "role1": "TOP",
+      "role2": "JUNG",
+      "elo": "PRAT"
+    },
+    {
+      "id": "shift",
+      "nick": "SHIFT",
+      "slug": "shift",
+      "teamId": "lov2",
+      "role1": "JUNG",
+      "role2": "SUP",
+      "elo": "ESME"
+    },
+    {
+      "id": "gaylord",
+      "nick": "GayLord",
+      "slug": "gaylord",
+      "teamId": "lov2",
+      "role1": "ADC",
+      "role2": "MID",
+      "elo": "OURO"
+    },
+    {
+      "id": "miva",
+      "nick": "MIVA",
+      "slug": "miva",
+      "teamId": "lov2",
+      "role1": "SUP",
+      "role2": "MID",
+      "elo": "PLAT"
+    },
+    {
+      "id": "nak4y",
+      "nick": "nak4y",
+      "slug": "nak4y",
+      "teamId": "zenshin",
+      "role1": "ADC",
+      "role2": "JUNG",
+      "elo": "DIAM"
+    },
+    {
+      "id": "razeral",
+      "nick": "яαzεгαł        ッ #yse",
+      "slug": "razeral",
+      "teamId": "zenshin",
+      "role1": "MID",
+      "role2": "ADC",
+      "elo": "ESME"
+    },
+    {
+      "id": "satoshi",
+      "nick": "Satoshi",
+      "slug": "satoshi",
+      "teamId": "zenshin",
+      "role1": "SUP",
+      "role2": "TOP",
+      "elo": "PLAT"
+    },
+    {
+      "id": "malasarte",
+      "nick": "Malasarte",
+      "slug": "malasarte",
+      "teamId": "zenshin",
+      "role1": "JUNG",
+      "role2": "SUP",
+      "elo": "BRON"
+    },
+    {
+      "id": "thebetamogger",
+      "nick": "TheBetaMogger",
+      "slug": "thebetamogger",
+      "teamId": "zenshin",
+      "role1": "TOP",
+      "role2": "MID",
+      "elo": "PRAT"
+    }
+  ],
+  "seriesMatches": [],
+  "standingsSeed": [
+    {
+      "teamId": "zenshin",
+      "played": 3,
+      "points": 6
+    },
+    {
+      "teamId": "moonrock",
+      "played": 3,
+      "points": 6
+    },
+    {
+      "teamId": "punho",
+      "played": 2,
+      "points": 3
+    },
+    {
+      "teamId": "pequi",
+      "played": 1,
+      "points": 3
+    },
+    {
+      "teamId": "semdedos",
+      "played": 2,
+      "points": 3
+    },
+    {
+      "teamId": "lov2",
+      "played": 2,
+      "points": 0
+    },
+    {
+      "teamId": "inss",
+      "played": 1,
+      "points": 0
+    }
+  ]
+}

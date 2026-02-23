@@ -1,0 +1,98 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: 224 34% 8%;
+  --panel: 224 24% 12%;
+  --panel-2: 224 20% 16%;
+  --text: 210 36% 96%;
+  --muted: 214 18% 66%;
+  --accent: 203 94% 63%;
+  --accent-2: 43 95% 59%;
+  --success: 151 78% 44%;
+  --danger: 0 84% 62%;
+  --border: 220 22% 24%;
+  color-scheme: dark;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  @apply bg-bg text-text antialiased;
+  background-image:
+    radial-gradient(circle at 12% 8%, rgba(77, 171, 247, 0.1), transparent 34%),
+    radial-gradient(circle at 88% 12%, rgba(250, 204, 21, 0.07), transparent 32%),
+    linear-gradient(180deg, rgba(255,255,255,0.01), transparent),
+    linear-gradient(180deg, rgb(12, 15, 24), rgb(8, 10, 17));
+  font-family: var(--font-body), sans-serif;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+*:focus-visible {
+  outline: 2px solid rgba(86, 180, 255, 0.8);
+  outline-offset: 2px;
+}
+
+.glass-panel {
+  @apply border border-border/80 bg-panel/70 backdrop-blur-xl;
+  box-shadow: 0 10px 38px rgba(0, 0, 0, 0.24);
+}
+
+.glow-border {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.02),
+    0 0 0 1px rgba(86, 180, 255, 0.12),
+    0 10px 40px rgba(12, 31, 71, 0.2);
+}
+
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+}
+
+.skeleton {
+  background:
+    linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.03),
+      rgba(255, 255, 255, 0.08),
+      rgba(255, 255, 255, 0.03)
+    )
+    0 0 / 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
