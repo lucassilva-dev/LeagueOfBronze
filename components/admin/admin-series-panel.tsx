@@ -91,7 +91,7 @@ export function AdminSeriesPanel({
 
   return (
     <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-      <Card className="p-4">
+      <Card className="min-w-0 overflow-hidden p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-display text-lg font-bold tracking-wide">Séries (MD3)</h3>
           <Button variant="secondary" size="sm" onClick={createSeries}>
@@ -128,7 +128,7 @@ export function AdminSeriesPanel({
                         {series.id} • {formatDateLabel(series.date)}
                       </p>
                     </div>
-                    <div className="text-right">
+                    <div className="shrink-0 text-right">
                       <p className="font-display text-base font-bold text-accent">
                         {score.teamAWins}-{score.teamBWins}
                       </p>
@@ -144,7 +144,7 @@ export function AdminSeriesPanel({
         </div>
       </Card>
 
-      <Card className="p-4">
+      <Card className="min-w-0 overflow-hidden p-4">
         {!selectedSeries ? (
           <div className="rounded-xl border border-dashed border-white/10 p-6 text-sm text-muted">
             Selecione uma série para editar ou clique em "Nova série".
@@ -153,15 +153,20 @@ export function AdminSeriesPanel({
           <div className="space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="font-display text-lg font-bold tracking-wide">Editar série</h3>
-              <div className="flex flex-wrap gap-2">
-                <Button variant="danger" size="sm" onClick={() => deleteSeries(selectedSeries.id)}>
+              <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+                <Button
+                  variant="danger"
+                  size="sm"
+                  className="max-w-full sm:w-auto"
+                  onClick={() => deleteSeries(selectedSeries.id)}
+                >
                   <Trash2 className="h-4 w-4" /> Excluir série
                 </Button>
               </div>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <div>
+              <div className="min-w-0">
                 <Label htmlFor="series-id">ID da série</Label>
                 <Input
                   id="series-id"
@@ -239,6 +244,7 @@ export function AdminSeriesPanel({
               <Button
                 variant="secondary"
                 size="sm"
+                className="max-w-full"
                 onClick={() =>
                   updateSelectedSeries((series) => {
                     if (series.games.length >= 3) return;
@@ -257,15 +263,19 @@ export function AdminSeriesPanel({
                 </div>
               ) : (
                 selectedSeries.games.map((game, gameIndex) => (
-                  <Card key={`${selectedSeries.id}-game-${gameIndex}`} className="border-white/10 p-4">
+                  <Card
+                    key={`${selectedSeries.id}-game-${gameIndex}`}
+                    className="min-w-0 overflow-hidden border-white/10 p-4"
+                  >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <h4 className="font-display text-base font-bold tracking-wide">
                         Jogo {gameIndex + 1}
                       </h4>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex w-full flex-wrap gap-2 sm:w-auto">
                         <Button
                           variant="ghost"
                           size="sm"
+                          className="max-w-full"
                           onClick={() => fillRosterRowsForGame(gameIndex)}
                         >
                           Preencher elenco
@@ -273,6 +283,7 @@ export function AdminSeriesPanel({
                         <Button
                           variant="danger"
                           size="sm"
+                          className="max-w-full"
                           onClick={() =>
                             updateSelectedSeries((series) => {
                               series.games.splice(gameIndex, 1);
@@ -378,7 +389,7 @@ export function AdminSeriesPanel({
                           game.statsByPlayer.map((row, rowIndex) => (
                             <div
                               key={`${selectedSeries.id}-g${gameIndex}-r${rowIndex}`}
-                              className="grid gap-2 rounded-xl border border-white/8 bg-white/[0.02] p-3 md:grid-cols-[1.4fr_1.1fr_0.55fr_0.55fr_0.55fr_auto]"
+                              className="min-w-0 grid gap-2 rounded-xl border border-white/8 bg-white/[0.02] p-3 md:grid-cols-[1.4fr_1.1fr_0.55fr_0.55fr_0.55fr_auto]"
                             >
                               <div>
                                 <Label className="sr-only">Jogador</Label>

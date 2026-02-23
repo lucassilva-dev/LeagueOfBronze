@@ -27,7 +27,7 @@ export function SegmentedControl<T extends string>({
           {label}
         </p>
       ) : null}
-      <div className="-mx-1 overflow-x-auto px-1 pb-1">
+      <div className="max-w-full overflow-x-auto pb-1">
         <div className="inline-flex w-max min-w-full rounded-2xl border border-border/70 bg-panel/70 p-1 sm:min-w-0 sm:w-auto">
           {options.map((option) => {
             const active = option.value === value;

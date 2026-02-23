@@ -8,7 +8,7 @@ type SiteFrameProps = Readonly<{ children: React.ReactNode }>;
 
 export function SiteFrame({ children }: SiteFrameProps) {
   return (
-    <div className="relative min-h-screen">
+    <div className="relative min-h-screen overflow-x-clip">
       <StarsCanvas />
       <div className="pointer-events-none fixed inset-0 -z-10 bg-grid opacity-20" />
 
