@@ -7,7 +7,7 @@ import { isAdminConfigured, isAuthorizedAdminRequest } from "@/lib/admin-auth";
 export const dynamic = "force-dynamic";
 
 const importRiotMatchSchema = z.object({
-  matchId: z.string().trim().min(3, "ID da partida obrigatÃ³rio."),
+  matchId: z.string().trim().min(3, "ID da partida obrigatório."),
 });
 
 const riotApiParticipantSchema = z.object({
@@ -74,12 +74,12 @@ function toDurationSeconds(value: number) {
 export async function POST(request: NextRequest) {
   if (!isAdminConfigured()) {
     return NextResponse.json(
-      { error: "ADMIN_PASSWORD nÃ£o configurado no ambiente." },
+      { error: "ADMIN_PASSWORD não configurado no ambiente." },
       { status: 500 },
     );
   }
   if (!isAuthorizedAdminRequest(request)) {
-    return NextResponse.json({ error: "NÃ£o autorizado." }, { status: 401 });
+    return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 
   const riotApiKey = getRiotApiKey();
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error:
-          "RIOT_API_KEY nÃ£o configurada. Defina a chave no ambiente para importar partidas do LoL.",
+          "RIOT_API_KEY não configurada. Defina a chave no ambiente para importar partidas do LoL.",
       },
       { status: 500 },
     );
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "NÃ£o foi possÃ­vel inferir a regiÃ£o da Riot pelo matchId. Ex.: BR1_1234567890, NA1_..., EUW1_...",
+            "Não foi possível inferir a região da Riot pelo matchId. Ex.: BR1_1234567890, NA1_..., EUW1_...",
         },
         { status: 400 },
       );
@@ -179,7 +179,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         {
-          error: error.issues.map((issue) => issue.message).join(" | ") || "Payload invÃ¡lido.",
+          error: error.issues.map((issue) => issue.message).join(" | ") || "Payload inválido.",
         },
         { status: 400 },
       );

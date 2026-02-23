@@ -194,7 +194,7 @@ function applyRiotMatchToSeriesGame({
   if (blueSide.length === 0 || redSide.length === 0) {
     return {
       ok: false,
-      error: "A partida da Riot nÃ£o retornou os dois lados corretamente (azul/vermelho).",
+      error: "A partida da Riot não retornou os dois lados corretamente (azul/vermelho).",
     };
   }
 
@@ -242,7 +242,7 @@ function applyRiotMatchToSeriesGame({
   if (unmatched.length > 0) {
     return {
       ok: false,
-      error: `NÃ£o foi possÃ­vel mapear os nicks: ${unmatched.join(", ")}.`,
+      error: `Não foi possível mapear os nicks: ${unmatched.join(", ")}.`,
     };
   }
 
@@ -250,7 +250,7 @@ function applyRiotMatchToSeriesGame({
   if (!mvpPlayerId) {
     return {
       ok: false,
-      error: "NÃ£o foi possÃ­vel sugerir MVP automaticamente a partir dos dados importados.",
+      error: "Não foi possível sugerir MVP automaticamente a partir dos dados importados.",
     };
   }
 
@@ -263,7 +263,7 @@ function applyRiotMatchToSeriesGame({
     if (blueWins === redWins) {
       return {
         ok: false,
-        error: "NÃ£o foi possÃ­vel identificar o vencedor da partida importada.",
+        error: "Não foi possível identificar o vencedor da partida importada.",
       };
     }
     winnerTeamId =
@@ -686,7 +686,7 @@ export function AdminSeriesPanel({
                         </Button>
                       </div>
                       <p className="mt-2 text-xs text-muted">
-                        Preenche automaticamente vencedor, duraÃ§Ã£o, campeÃµes e K/D/A. MVP do jogo Ã© sugerido por KDA.
+                        Preenche automaticamente vencedor, duração, campeões e K/D/A. MVP do jogo é sugerido por KDA.
                       </p>
                       {riotImportStatus ? (
                         <p
