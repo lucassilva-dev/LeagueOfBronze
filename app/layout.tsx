@@ -27,7 +27,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
-      <body className={`${display.variable} ${body.variable}`}>
+      <body suppressHydrationWarning className={`${display.variable} ${body.variable}`}>
         <SiteFrame>{children}</SiteFrame>
       </body>
     </html>

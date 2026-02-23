@@ -5,3 +5,5 @@ coverage
 .env.local
 *.log
 *.tsbuildinfo
+# Evita arquivos acidentais de chave SSH abertos pelo editor na raiz do projeto
+*sshgithub_lob*
