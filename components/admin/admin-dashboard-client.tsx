@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { LogOut, RefreshCcw, Save } from "lucide-react";
 
 import type { TournamentDataset } from "@/lib/schema";
-import { calculateStandings } from "@/lib/tournament";
+import { applyAutoGameMvpsToDataset, calculateStandings } from "@/lib/tournament";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -282,11 +282,12 @@ export function AdminDashboardClient() {
     if (!draft) return;
     runTransitionTask(async () => {
       clearAlerts();
+      const datasetToSave = applyAutoGameMvpsToDataset(draft);
       const response = await fetch("/api/admin/dataset", {
         method: "PUT",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dataset: draft }),
+        body: JSON.stringify({ dataset: datasetToSave }),
       });
       const data = (await response.json()) as DatasetResponse;
       if (!response.ok || !data.dataset) {

@@ -9,7 +9,11 @@ import type {
   SeriesMatch,
   TournamentDataset,
 } from "@/lib/schema";
-import { getSeriesScore, getSeriesWinnerTeamId } from "@/lib/tournament";
+import {
+  getSeriesScore,
+  getSeriesWinnerTeamId,
+  inferGameMvpPlayerId,
+} from "@/lib/tournament";
 import { formatDateLabel } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -147,24 +151,6 @@ function choosePlayerForParticipant(
   return null;
 }
 
-function inferMvpPlayerId(rows: PlayerGameStats[]) {
-  if (rows.length === 0) return "";
-
-  const ranked = rows
-    .slice()
-    .sort((a, b) => {
-      const aKda = (a.kills + a.assists) / Math.max(1, a.deaths);
-      const bKda = (b.kills + b.assists) / Math.max(1, b.deaths);
-      if (bKda !== aKda) return bKda - aKda;
-      if (b.kills !== a.kills) return b.kills - a.kills;
-      if (b.assists !== a.assists) return b.assists - a.assists;
-      if (a.deaths !== b.deaths) return a.deaths - b.deaths;
-      return a.playerId.localeCompare(b.playerId);
-    });
-
-  return ranked[0]?.playerId ?? "";
-}
-
 function applyRiotMatchToSeriesGame({
   draft,
   series,
@@ -246,11 +232,11 @@ function applyRiotMatchToSeriesGame({
     };
   }
 
-  const mvpPlayerId = inferMvpPlayerId(statsByPlayer);
+  const mvpPlayerId = inferGameMvpPlayerId(statsByPlayer);
   if (!mvpPlayerId) {
     return {
       ok: false,
-      error: "Não foi possível sugerir MVP automaticamente a partir dos dados importados.",
+      error: "Não foi possível calcular o MVP automaticamente a partir dos dados importados.",
     };
   }
 
@@ -280,7 +266,7 @@ function applyRiotMatchToSeriesGame({
       mvpPlayerId,
       statsByPlayer,
     },
-    message: `Partida importada da Riot (${statsByPlayer.length} jogadores). MVP sugerido por KDA.${warningText}`,
+    message: `Partida importada da Riot (${statsByPlayer.length} jogadores). MVP calculado automaticamente por KDA.${warningText}`,
   };
 }
 
@@ -623,6 +609,10 @@ export function AdminSeriesPanel({
                   const riotImportStatus = riotImportStatusByGame[riotImportKey];
                   const riotMatchId = riotMatchIdsByGame[riotImportKey] ?? "";
                   const isImportingRiot = riotImportingGameKey === riotImportKey;
+                  const autoMvpPlayerId = inferGameMvpPlayerId(game.statsByPlayer);
+                  const autoMvpPlayer = currentRosters.combined.find(
+                    (player) => player.id === autoMvpPlayerId,
+                  );
 
                   return (
                   <Card
@@ -686,7 +676,7 @@ export function AdminSeriesPanel({
                         </Button>
                       </div>
                       <p className="mt-2 text-xs text-muted">
-                        Preenche automaticamente vencedor, duração, campeões e K/D/A. MVP do jogo é sugerido por KDA.
+                        Preenche automaticamente vencedor, duração, campeões e K/D/A. MVP do jogo é calculado automaticamente por KDA.
                       </p>
                       {riotImportStatus ? (
                         <p
@@ -728,24 +718,19 @@ export function AdminSeriesPanel({
                         </Select>
                       </div>
                       <div>
-                        <Label>MVP do jogo</Label>
-                        <Select
-                          value={game.mvpPlayerId}
-                          onChange={(e) =>
-                            updateSelectedSeries((series) => {
-                              const current = series.games[gameIndex];
-                              if (!current) return;
-                              current.mvpPlayerId = e.target.value;
-                            })
-                          }
-                        >
-                          <option value="">Selecione</option>
-                          {currentRosters.combined.map((player) => (
-                            <option key={player.id} value={player.id}>
-                              {player.nick}
-                            </option>
-                          ))}
-                        </Select>
+                        <Label>MVP do jogo (automático)</Label>
+                        <div className="mt-2 rounded-xl border border-white/8 bg-white/[0.02] px-3 py-2.5 text-sm">
+                          {autoMvpPlayer ? (
+                            <span className="font-semibold text-text">{autoMvpPlayer.nick}</span>
+                          ) : autoMvpPlayerId ? (
+                            <span className="font-semibold text-text">{autoMvpPlayerId}</span>
+                          ) : (
+                            <span className="text-muted">Preencha K/D/A para calcular</span>
+                          )}
+                        </div>
+                        <p className="mt-1 text-xs text-muted">
+                          Critério: maior KDA. Desempate por abates, assistências e menos mortes.
+                        </p>
                       </div>
                       <div>
                         <Label>Duração (min)</Label>

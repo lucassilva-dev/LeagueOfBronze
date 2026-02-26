@@ -18,6 +18,7 @@ import { formatDateLabel, formatKda } from "@/lib/format";
 import { getServerDataset } from "@/lib/server-data";
 import {
   getGameTeamKills,
+  getGameMvpPlayerId,
   getSeriesById,
   getSeriesGamesWithTeamRows,
   getSeriesMvp,
@@ -111,7 +112,8 @@ export default async function PartidaDetalhePage({
         ) : (
           gameRows.map(({ game, gameIndex, teamARows, teamBRows }) => {
             const winnerName = indexes.teamsById.get(game.winnerTeamId)?.name ?? game.winnerTeamId;
-            const gameMvp = indexes.playersById.get(game.mvpPlayerId);
+            const gameMvpPlayerId = getGameMvpPlayerId(game);
+            const gameMvp = indexes.playersById.get(gameMvpPlayerId);
             const kills = getGameTeamKills(game, series, dataset);
 
             return (
@@ -122,7 +124,7 @@ export default async function PartidaDetalhePage({
                     <p className="mt-1 text-sm text-muted">
                       Vencedor: <span className="text-text">{winnerName}</span>
                       {" • "}
-                      MVP: <span className="text-text">{gameMvp?.nick ?? game.mvpPlayerId}</span>
+                      MVP: <span className="text-text">{gameMvp?.nick ?? gameMvpPlayerId}</span>
                       {typeof game.durationMin === "number" ? (
                         <>
                           {" • "}Duração: <span className="text-text">{game.durationMin} min</span>

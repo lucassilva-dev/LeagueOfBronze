@@ -36,6 +36,42 @@ export function getKda(kills: number, deaths: number, assists: number) {
   return (kills + assists) / Math.max(1, deaths);
 }
 
+export function inferGameMvpPlayerId(rows: PlayerGameStats[]) {
+  const eligibleRows = rows.filter((row) => row.playerId.trim().length > 0);
+  if (eligibleRows.length === 0) return "";
+
+  const ranked = eligibleRows
+    .slice()
+    .sort((a, b) => {
+      const aKda = getKda(a.kills, a.deaths, a.assists);
+      const bKda = getKda(b.kills, b.deaths, b.assists);
+      if (bKda !== aKda) return bKda - aKda;
+      if (b.kills !== a.kills) return b.kills - a.kills;
+      if (b.assists !== a.assists) return b.assists - a.assists;
+      if (a.deaths !== b.deaths) return a.deaths - b.deaths;
+      return a.playerId.localeCompare(b.playerId, "pt-BR");
+    });
+
+  return ranked[0]?.playerId ?? "";
+}
+
+export function getGameMvpPlayerId(game: SeriesGame) {
+  return inferGameMvpPlayerId(game.statsByPlayer) || game.mvpPlayerId;
+}
+
+export function applyAutoGameMvpsToDataset(dataset: TournamentDataset): TournamentDataset {
+  return {
+    ...dataset,
+    seriesMatches: dataset.seriesMatches.map((series) => ({
+      ...series,
+      games: series.games.map((game) => ({
+        ...game,
+        mvpPlayerId: getGameMvpPlayerId(game),
+      })),
+    })),
+  };
+}
+
 export function createIndexes(dataset: TournamentDataset): DatasetIndexes {
   const teamsById = new Map(dataset.teams.map((team) => [team.id, team]));
   const teamsBySlug = new Map(dataset.teams.map((team) => [team.slug, team]));
@@ -110,15 +146,16 @@ function buildSeriesPlayerTotals(series: SeriesMatch, dataset: TournamentDataset
   >();
 
   for (const game of series.games) {
-    if (teamPlayerIds.has(game.mvpPlayerId)) {
-      const bucket = totals.get(game.mvpPlayerId) ?? {
+    const gameMvpPlayerId = getGameMvpPlayerId(game);
+    if (teamPlayerIds.has(gameMvpPlayerId)) {
+      const bucket = totals.get(gameMvpPlayerId) ?? {
         kills: 0,
         deaths: 0,
         assists: 0,
         gameMvps: 0,
       };
       bucket.gameMvps += 1;
-      totals.set(game.mvpPlayerId, bucket);
+      totals.set(gameMvpPlayerId, bucket);
     }
 
     for (const stats of game.statsByPlayer) {
@@ -446,7 +483,7 @@ export function calculatePlayerAggregates(
         bucket.gamesPlayed += 1;
       }
 
-      const mvpPlayer = indexes.playersById.get(game.mvpPlayerId);
+      const mvpPlayer = indexes.playersById.get(getGameMvpPlayerId(game));
       if (mvpPlayer && (!filters?.teamId || mvpPlayer.teamId === filters.teamId)) {
         ensureBucket(mvpPlayer.id).gameMvps += 1;
       }
@@ -649,7 +686,7 @@ export function getPlayerGameHistory(
         kills: stat.kills,
         deaths: stat.deaths,
         assists: stat.assists,
-        mvp: game.mvpPlayerId === playerId,
+        mvp: getGameMvpPlayerId(game) === playerId,
       });
     });
   }

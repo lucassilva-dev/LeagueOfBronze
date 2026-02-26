@@ -4,6 +4,7 @@ import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 
 import { tournamentDatasetSchema, type TournamentDataset } from "@/lib/schema";
+import { applyAutoGameMvpsToDataset } from "@/lib/tournament";
 
 export const DATASET_FILENAME = "leagueofbronze.json";
 const SUPABASE_TABLE = "tournament_state";
@@ -30,10 +31,12 @@ function parseAndValidateDataset(json: unknown) {
 }
 
 export function normalizeDatasetForSave(dataset: TournamentDataset): TournamentDataset {
+  const withAutoMvps = applyAutoGameMvpsToDataset(dataset);
+
   return {
-    ...dataset,
+    ...withAutoMvps,
     tournament: {
-      ...dataset.tournament,
+      ...withAutoMvps.tournament,
       lastUpdatedISO: new Date().toISOString(),
     },
   };

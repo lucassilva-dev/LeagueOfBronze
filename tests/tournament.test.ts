@@ -204,4 +204,28 @@ describe("leaderboards and MVP calculation", () => {
     expect(seriesMvp?.playerId).toBeTruthy();
     expect(["a1", "a2"]).toContain(seriesMvp?.playerId);
   });
+
+  it("calcula MVP de jogo automaticamente pelo KDA mesmo se o mvpPlayerId salvo estiver diferente", () => {
+    const dataset = baseDataset();
+    dataset.seriesMatches = [
+      {
+        id: "s-auto-mvp",
+        date: "2026-02-24",
+        teamAId: "a",
+        teamBId: "b",
+        games: [
+          makeGame("a", "b1", [
+            { playerId: "a1", kills: 12, deaths: 1, assists: 8 },
+            { playerId: "a2", kills: 2, deaths: 5, assists: 9 },
+            { playerId: "b1", kills: 4, deaths: 7, assists: 3 },
+            { playerId: "b2", kills: 1, deaths: 6, assists: 2 },
+          ]),
+        ],
+      },
+    ];
+
+    const boards = buildLeaderboards(dataset);
+
+    expect(boards.mvps[0]?.player.playerId).toBe("a1");
+  });
 });
