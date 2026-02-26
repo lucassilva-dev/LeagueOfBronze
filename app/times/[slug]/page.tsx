@@ -17,6 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatKda } from "@/lib/format";
+import { getOpGgMultiSearchUrlFromNicks } from "@/lib/opgg";
 import { getServerDataset } from "@/lib/server-data";
 import {
   calculateStandings,
@@ -42,6 +43,7 @@ export default async function TeamPage({
   const history = getTeamSeriesHistory(dataset, team.id);
   const teamStats = calculateTeamAggregates(dataset).find((row) => row.teamId === team.id);
   const standingsRow = calculateStandings(dataset).rows.find((row) => row.teamId === team.id);
+  const multiOpGg = getOpGgMultiSearchUrlFromNicks(roster.map((player) => player.nick));
 
   return (
     <PageShell className="space-y-6">
@@ -78,8 +80,30 @@ export default async function TeamPage({
           <Card className="p-5">
             <div className="flex items-center justify-between gap-2">
               <h2 className="font-display text-xl font-bold tracking-wide">Elenco</h2>
-              <Badge variant="muted">{roster.length} jogadores</Badge>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <Badge variant="muted">{roster.length} jogadores</Badge>
+                {multiOpGg.ok ? (
+                  <Link
+                    href={multiOpGg.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex h-8 items-center justify-center rounded-lg border border-border/80 bg-panel2/90 px-3 text-xs font-semibold tracking-wide text-text transition hover:bg-panel2"
+                  >
+                    Multi OP.GG (5)
+                  </Link>
+                ) : null}
+              </div>
             </div>
+            {!multiOpGg.ok ? (
+              <div className="mt-3 rounded-xl border border-red-400/20 bg-red-500/10 p-3 text-sm text-red-100">
+                <p className="font-semibold">{multiOpGg.error}</p>
+                {multiOpGg.invalidNicks.length > 0 ? (
+                  <p className="mt-1 text-xs text-red-200/90">
+                    Nicks com problema: {multiOpGg.invalidNicks.join(", ")}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
 
             <div className="mt-4 grid gap-3 md:hidden">
               {roster.map((player) => (
