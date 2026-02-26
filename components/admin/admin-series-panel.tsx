@@ -285,14 +285,15 @@ export function AdminSeriesPanel({
     [draft.seriesMatches],
   );
 
-  const [selectedId, setSelectedId] = useState<string | null>(sortedSeries[0]?.id ?? null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [riotMatchIdsByGame, setRiotMatchIdsByGame] = useState<Record<string, string>>({});
   const [riotImportStatusByGame, setRiotImportStatusByGame] = useState<Record<string, RiotImportStatus>>({});
   const [riotImportingGameKey, setRiotImportingGameKey] = useState<string | null>(null);
 
   useEffect(() => {
-    if (selectedId && draft.seriesMatches.some((series) => series.id === selectedId)) return;
-    setSelectedId(sortedSeries[0]?.id ?? null);
+    if (!selectedId) return;
+    if (draft.seriesMatches.some((series) => series.id === selectedId)) return;
+    setSelectedId(null);
   }, [draft.seriesMatches, selectedId, sortedSeries]);
 
   const selectedSeries = draft.seriesMatches.find((series) => series.id === selectedId) ?? null;
@@ -335,6 +336,16 @@ export function AdminSeriesPanel({
       next.seriesMatches = next.seriesMatches.filter((series) => series.id !== seriesId);
     });
     if (selectedId === seriesId) setSelectedId(null);
+  };
+
+  const confirmDeleteSelectedSeries = () => {
+    if (!selectedSeries) return;
+    const score = getSeriesScore(selectedSeries);
+    const shouldDelete = window.confirm(
+      `Excluir a série ${selectedSeries.id} (${score.teamAWins}-${score.teamBWins})? Essa ação remove os jogos lançados desta série no rascunho.`,
+    );
+    if (!shouldDelete) return;
+    deleteSeries(selectedSeries.id);
   };
 
   const updateSelectedSeries = (recipe: (series: NonNullable<typeof selectedSeries>) => void) => {
@@ -500,7 +511,7 @@ export function AdminSeriesPanel({
                   variant="danger"
                   size="sm"
                   className="max-w-full sm:w-auto"
-                  onClick={() => deleteSeries(selectedSeries.id)}
+                  onClick={confirmDeleteSelectedSeries}
                 >
                   <Trash2 className="h-4 w-4" /> Excluir série
                 </Button>
