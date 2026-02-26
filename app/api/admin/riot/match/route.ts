@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import type { NextRequest } from "next/server";
+import { z } from "zod";
 
 import { isAdminConfigured, isAuthorizedAdminRequest } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
+
+const DEFAULT_RIOT_PLATFORM = "BR1";
 
 const importRiotMatchSchema = z.object({
   matchId: z.string().trim().min(3, "ID da partida obrigatório."),
@@ -38,6 +40,20 @@ type RiotRegionalRouting = "americas" | "europe" | "asia" | "sea";
 
 function getRiotApiKey() {
   return process.env.RIOT_API_KEY?.trim() || "";
+}
+
+function getDefaultRiotPlatform() {
+  return (process.env.RIOT_DEFAULT_PLATFORM?.trim().toUpperCase() || DEFAULT_RIOT_PLATFORM);
+}
+
+function normalizeMatchIdInput(input: string) {
+  const trimmed = input.trim().toUpperCase();
+
+  if (/^\d+$/.test(trimmed)) {
+    return `${getDefaultRiotPlatform()}_${trimmed}`;
+  }
+
+  return trimmed;
 }
 
 function inferRegionalRoutingFromMatchId(matchId: string): RiotRegionalRouting | null {
@@ -78,6 +94,7 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
+
   if (!isAuthorizedAdminRequest(request)) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
@@ -95,21 +112,23 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = importRiotMatchSchema.parse(await request.json());
-    const regionalRouting = inferRegionalRoutingFromMatchId(body.matchId);
+    const normalizedMatchId = normalizeMatchIdInput(body.matchId);
+    const regionalRouting = inferRegionalRoutingFromMatchId(normalizedMatchId);
 
     if (!regionalRouting) {
       return NextResponse.json(
         {
           error:
-            "Não foi possível inferir a região da Riot pelo matchId. Ex.: BR1_1234567890, NA1_..., EUW1_...",
+            "Não foi possível inferir a região da Riot pelo ID informado. Use `BR1_123...` ou apenas o número do jogo.",
         },
         { status: 400 },
       );
     }
 
     const url = `https://${regionalRouting}.api.riotgames.com/lol/match/v5/matches/${encodeURIComponent(
-      body.matchId,
+      normalizedMatchId,
     )}`;
+
     const response = await fetch(url, {
       method: "GET",
       headers: {
@@ -133,7 +152,7 @@ export async function POST(request: NextRequest) {
         {
           error:
             `Falha ao consultar Riot (${response.status}). ` +
-            (riotError || "Confira o matchId e a RIOT_API_KEY."),
+            (riotError || "Confira o ID do jogo e a RIOT_API_KEY."),
         },
         { status: response.status >= 400 && response.status < 600 ? response.status : 502 },
       );

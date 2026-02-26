@@ -15,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDateLabel, formatKda } from "@/lib/format";
+import { getOpGgSummonerUrlFromNick } from "@/lib/opgg";
 import { getServerDataset } from "@/lib/server-data";
 import {
   calculatePlayerAggregates,
@@ -39,6 +40,7 @@ export default async function PlayerPage({
   const history = getPlayerGameHistory(dataset, player.id);
   const positions = getPlayerLeaderboardPositions(dataset, player.id);
   const team = indexes.teamsById.get(player.teamId);
+  const opggUrl = getOpGgSummonerUrlFromNick(player.nick);
 
   return (
     <PageShell className="space-y-6">
@@ -61,6 +63,16 @@ export default async function PlayerPage({
               <Link href={`/times/${team.slug}`} className="inline-flex items-center rounded-full border border-white/10 px-3 py-1 text-xs font-semibold hover:border-accent/30 hover:text-accent">
                 Ver time
               </Link>
+            ) : null}
+            {opggUrl ? (
+              <a
+                href={opggUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center rounded-full border border-white/10 px-3 py-1 text-xs font-semibold hover:border-accent/30 hover:text-accent"
+              >
+                Ver no OP.GG
+              </a>
             ) : null}
           </div>
         }

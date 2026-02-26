@@ -386,7 +386,7 @@ export function AdminSeriesPanel({
     if (!matchId) {
       setRiotImportStatusForGame(selectedSeries.id, gameIndex, {
         kind: "error",
-        text: "Informe o ID da partida do LoL (ex.: BR1_1234567890).",
+        text: "Informe o ID da partida do LoL (ex.: 3210692404 ou BR1_3210692404).",
       });
       return;
     }
@@ -664,7 +664,7 @@ export function AdminSeriesPanel({
                       <div className="mt-2 flex flex-col gap-2 sm:flex-row">
                         <Input
                           id={`${selectedSeries.id}-riot-match-${gameIndex}`}
-                          placeholder="Ex.: BR1_1234567890"
+                          placeholder="Ex.: 3210692404 ou BR1_3210692404"
                           value={riotMatchId}
                           onChange={(e) =>
                             setRiotMatchIdForGame(selectedSeries.id, gameIndex, e.target.value)
