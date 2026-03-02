@@ -52,17 +52,17 @@ export default async function PartidaDetalhePage({
   return (
     <PageShell className="space-y-6">
       <PageHero
-        badge="Detalhe da SÃ©rie"
-        title={`${teamA?.name ?? series.teamAId} ${score.teamAWins}â€“${score.teamBWins} ${teamB?.name ?? series.teamBId}`}
-        description={`SÃ©rie ${series.id} â€¢ ${formatDateLabel(series.date)}`}
+        badge="Detalhe da Série"
+        title={`${teamA?.name ?? series.teamAId} ${score.teamAWins}–${score.teamBWins} ${teamB?.name ?? series.teamBId}`}
+        description={`Série ${series.id} • ${formatDateLabel(series.date)}`}
         extra={
           <div className="flex flex-wrap gap-2">
             <Badge variant={winner ? "success" : "muted"}>
               {isWalkover
                 ? "Série encerrada por W.O."
                 : winner
-                  ? "SÃ©rie finalizada"
-                  : "SÃ©rie em andamento"}
+                  ? "Série finalizada"
+                  : "Série em andamento"}
             </Badge>
             {isWalkover ? (
               <Badge variant="accent">
@@ -70,10 +70,10 @@ export default async function PartidaDetalhePage({
               </Badge>
             ) : seriesMvp ? (
               <Badge variant="accent">
-                MVP da sÃ©rie: {indexes.playersById.get(seriesMvp.playerId)?.nick ?? seriesMvp.playerId}
+                MVP da série: {indexes.playersById.get(seriesMvp.playerId)?.nick ?? seriesMvp.playerId}
               </Badge>
             ) : (
-              <Badge variant="muted">MVP da sÃ©rie: â€”</Badge>
+              <Badge variant="muted">MVP da série: —</Badge>
             )}
           </div>
         }
@@ -81,7 +81,7 @@ export default async function PartidaDetalhePage({
 
       <section className="grid gap-4 md:grid-cols-2">
         <Card className="p-5">
-          <p className="text-xs uppercase tracking-[0.14em] text-muted">Abates por time na sÃ©rie</p>
+          <p className="text-xs uppercase tracking-[0.14em] text-muted">Abates por time na série</p>
           <div className="mt-3 grid grid-cols-2 gap-3">
             <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
               <p className="text-xs text-muted">{teamA?.name ?? series.teamAId}</p>
@@ -99,7 +99,7 @@ export default async function PartidaDetalhePage({
         </Card>
 
         <Card className="p-5">
-          <p className="text-xs uppercase tracking-[0.14em] text-muted">Links rÃ¡pidos</p>
+          <p className="text-xs uppercase tracking-[0.14em] text-muted">Links rápidos</p>
           <div className="mt-3 grid gap-2">
             {teamA ? (
               <TeamLink href={`/times/${teamA.slug}`} name={`Ver time: ${teamA.name}`} />
@@ -119,7 +119,7 @@ export default async function PartidaDetalhePage({
           <Card className="p-5 text-sm text-muted">
             {isWalkover
               ? `Esta série foi encerrada por W.O.${series.walkoverReason ? ` ${series.walkoverReason}` : ""}`
-              : "Esta sÃ©rie ainda nÃ£o possui jogos lanÃ§ados."}
+              : "Esta série ainda não possui jogos lançados."}
           </Card>
         ) : (
           gameRows.map(({ game, gameIndex, teamARows, teamBRows }) => {
@@ -135,11 +135,11 @@ export default async function PartidaDetalhePage({
                     <p className="font-display text-lg font-bold tracking-wide">Jogo {gameIndex}</p>
                     <p className="mt-1 text-sm text-muted">
                       Vencedor: <span className="text-text">{winnerName}</span>
-                      {" â€¢ "}
+                      {" • "}
                       MVP: <span className="text-text">{gameMvp?.nick ?? gameMvpPlayerId}</span>
                       {typeof game.durationMin === "number" ? (
                         <>
-                          {" â€¢ "}DuraÃ§Ã£o: <span className="text-text">{game.durationMin} min</span>
+                          {" • "}Duração: <span className="text-text">{game.durationMin} min</span>
                         </>
                       ) : null}
                     </p>
@@ -184,7 +184,7 @@ export default async function PartidaDetalhePage({
                               <TableHeadCell className="min-w-[170px]">Jogador</TableHeadCell>
                               <TableHeadCell className="min-w-[96px]">
                                 <span className="sm:hidden">Camp.</span>
-                                <span className="hidden sm:inline">CampeÃ£o</span>
+                                <span className="hidden sm:inline">Campeão</span>
                               </TableHeadCell>
                               <TableHeadCell className="whitespace-nowrap">K/D/A</TableHeadCell>
                               <TableHeadCell className="whitespace-nowrap text-right">KDA</TableHeadCell>
@@ -194,7 +194,7 @@ export default async function PartidaDetalhePage({
                             {block.rows.length === 0 ? (
                               <TableRow>
                                 <TableCell colSpan={4} className="text-muted">
-                                  Sem estatÃ­sticas neste jogo.
+                                  Sem estatísticas neste jogo.
                                 </TableCell>
                               </TableRow>
                             ) : (
@@ -209,7 +209,7 @@ export default async function PartidaDetalhePage({
                                     </Link>
                                   </TableCell>
                                   <TableCell className="whitespace-nowrap">
-                                    {row.champion || "â€”"}
+                                    {row.champion || "—"}
                                   </TableCell>
                                   <TableCell className="whitespace-nowrap">
                                     {row.kills}/{row.deaths}/{row.assists}

@@ -60,7 +60,7 @@ function validateDatasetUniqueness(
     dataset.seriesMatches,
     "id",
     ["seriesMatches"],
-    "IDs de sÃ©ries duplicados.",
+    "IDs de séries duplicados.",
   );
 }
 
@@ -89,7 +89,7 @@ function validateStandingsSeedReferences(
     addCustomIssue(
       ctx,
       ["standingsSeed", index, "teamId"],
-      `ClassificaÃ§Ã£o inicial referencia teamId inexistente (${seed.teamId}).`,
+      `Classificação inicial referencia teamId inexistente (${seed.teamId}).`,
     );
   }
 }
@@ -108,7 +108,7 @@ function validateGameReferences(
     addCustomIssue(
       ctx,
       ["seriesMatches", seriesIndex, "games", gameIndex, "winnerTeamId"],
-      `Jogo ${gameIndex + 1} da sÃ©rie ${series.id} possui winnerTeamId invÃ¡lido.`,
+      `Jogo ${gameIndex + 1} da série ${series.id} possui winnerTeamId inválido.`,
     );
   }
 
@@ -116,7 +116,7 @@ function validateGameReferences(
     addCustomIssue(
       ctx,
       ["seriesMatches", seriesIndex, "games", gameIndex, "mvpPlayerId"],
-      `Jogo ${gameIndex + 1} da sÃ©rie ${series.id} possui MVP invÃ¡lido.`,
+      `Jogo ${gameIndex + 1} da série ${series.id} possui MVP inválido.`,
     );
   }
 
@@ -134,7 +134,7 @@ function validateGameReferences(
           statIndex,
           "playerId",
         ],
-        `EstatÃ­stica com playerId invÃ¡lido (${stats.playerId}) na sÃ©rie ${series.id}.`,
+        `Estatística com playerId inválido (${stats.playerId}) na série ${series.id}.`,
       );
     }
 
@@ -150,7 +150,7 @@ function validateGameReferences(
           statIndex,
           "playerId",
         ],
-        `Jogador repetido nas estatÃ­sticas do jogo ${gameIndex + 1} da sÃ©rie ${series.id}.`,
+        `Jogador repetido nas estatísticas do jogo ${gameIndex + 1} da série ${series.id}.`,
       );
       continue;
     }
@@ -170,7 +170,7 @@ function validateSeriesReferences(
       addCustomIssue(
         ctx,
         ["seriesMatches", seriesIndex],
-        `SÃ©rie ${series.id} referencia time inexistente.`,
+        `Série ${series.id} referencia time inexistente.`,
       );
     }
 
@@ -178,7 +178,7 @@ function validateSeriesReferences(
       addCustomIssue(
         ctx,
         ["seriesMatches", seriesIndex],
-        `SÃ©rie ${series.id} possui times repetidos.`,
+        `Série ${series.id} possui times repetidos.`,
       );
     }
 
@@ -189,7 +189,7 @@ function validateSeriesReferences(
         addCustomIssue(
           ctx,
           ["seriesMatches", seriesIndex, "walkoverWinnerTeamId"],
-          `SÃ©rie ${series.id} possui vencedor de W.O. invÃ¡lido.`,
+          `Série ${series.id} possui vencedor de W.O. inválido.`,
         );
       }
 
@@ -197,7 +197,7 @@ function validateSeriesReferences(
         addCustomIssue(
           ctx,
           ["seriesMatches", seriesIndex, "games"],
-          `SÃ©rie ${series.id} marcada como W.O. nÃ£o pode ter jogos registrados.`,
+          `Série ${series.id} marcada como W.O. não pode ter jogos registrados.`,
         );
       }
 
@@ -287,7 +287,7 @@ export const tournamentDatasetSchema = z
   });
 
 export const adminLoginSchema = z.object({
-  password: z.string().min(1, "Senha obrigatÃ³ria."),
+  password: z.string().min(1, "Senha obrigatória."),
 });
 
 export type TournamentDataset = z.infer<typeof tournamentDatasetSchema>;
