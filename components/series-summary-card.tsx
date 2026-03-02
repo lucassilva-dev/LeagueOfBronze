@@ -27,11 +27,13 @@ export function SeriesSummaryCard({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant={summary.isComplete ? "success" : "muted"}>
-                {summary.isComplete ? "Finalizada" : "Em andamento"}
+                {summary.isWalkover
+                  ? "W.O."
+                  : summary.isComplete
+                    ? "Finalizada"
+                    : "Em andamento"}
               </Badge>
-              <span className="text-xs text-muted">
-                {formatDateLabel(summary.series.date)}
-              </span>
+              <span className="text-xs text-muted">{formatDateLabel(summary.series.date)}</span>
             </div>
             <p className="mt-2 line-clamp-2 font-semibold">
               {teamA?.name ?? summary.series.teamAId}{" "}
@@ -39,7 +41,11 @@ export function SeriesSummaryCard({
               {teamB?.name ?? summary.series.teamBId}
             </p>
             <p className="mt-1 text-xs text-muted">
-              {mvpPlayer ? `MVP da série: ${mvpPlayer.nick}` : "MVP da série: —"}
+              {summary.isWalkover
+                ? `Vitória por W.O.${summary.series.walkoverReason ? ` ${summary.series.walkoverReason}` : ""}`
+                : mvpPlayer
+                  ? `MVP da série: ${mvpPlayer.nick}`
+                  : "MVP da série: —"}
             </p>
           </div>
 
@@ -50,7 +56,7 @@ export function SeriesSummaryCard({
                 {summary.score.teamBWins}
               </p>
               <p className="text-[10px] uppercase tracking-[0.16em] text-muted">
-                Série MD3
+                {summary.isWalkover ? "Série por W.O." : "Série MD3"}
               </p>
             </div>
             <ArrowRight className="h-4 w-4 text-muted transition group-hover:text-accent" />

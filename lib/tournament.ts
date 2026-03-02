@@ -64,10 +64,12 @@ export function applyAutoGameMvpsToDataset(dataset: TournamentDataset): Tourname
     ...dataset,
     seriesMatches: dataset.seriesMatches.map((series) => ({
       ...series,
-      games: series.games.map((game) => ({
-        ...game,
-        mvpPlayerId: getGameMvpPlayerId(game),
-      })),
+      games: isWalkoverSeries(series)
+        ? []
+        : series.games.map((game) => ({
+            ...game,
+            mvpPlayerId: getGameMvpPlayerId(game),
+          })),
     })),
   };
 }
@@ -93,6 +95,13 @@ export function createIndexes(dataset: TournamentDataset): DatasetIndexes {
 }
 
 export function getSeriesScore(series: SeriesMatch): SeriesScore {
+  if (series.walkoverWinnerTeamId === series.teamAId) {
+    return { teamAWins: 2, teamBWins: 0 };
+  }
+  if (series.walkoverWinnerTeamId === series.teamBId) {
+    return { teamAWins: 0, teamBWins: 2 };
+  }
+
   let teamAWins = 0;
   let teamBWins = 0;
 
@@ -104,7 +113,12 @@ export function getSeriesScore(series: SeriesMatch): SeriesScore {
   return { teamAWins, teamBWins };
 }
 
+export function isWalkoverSeries(series: SeriesMatch) {
+  return Boolean(series.walkoverWinnerTeamId);
+}
+
 export function getSeriesWinnerTeamId(series: SeriesMatch): string | null {
+  if (series.walkoverWinnerTeamId) return series.walkoverWinnerTeamId;
   const score = getSeriesScore(series);
   if (score.teamAWins >= 2) return series.teamAId;
   if (score.teamBWins >= 2) return series.teamBId;
@@ -112,7 +126,7 @@ export function getSeriesWinnerTeamId(series: SeriesMatch): string | null {
 }
 
 export function isSeriesComplete(series: SeriesMatch) {
-  return getSeriesWinnerTeamId(series) !== null;
+  return isWalkoverSeries(series) || getSeriesWinnerTeamId(series) !== null;
 }
 
 function compareDateDesc(a: string, b: string) {
@@ -180,6 +194,7 @@ export function getSeriesMvp(
   series: SeriesMatch,
   dataset: TournamentDataset,
 ): SeriesMvpResult | null {
+  if (isWalkoverSeries(series)) return null;
   if (series.games.length === 0) return null;
 
   const { totals, indexes } = buildSeriesPlayerTotals(series, dataset);
@@ -432,6 +447,7 @@ export function getSeriesSummaries(dataset: TournamentDataset): SeriesSummary[] 
     score: getSeriesScore(series),
     winnerTeamId: getSeriesWinnerTeamId(series),
     isComplete: isSeriesComplete(series),
+    isWalkover: isWalkoverSeries(series),
     mvp: getSeriesMvp(series, dataset),
   }));
 }

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
@@ -13,6 +13,7 @@ import {
   getSeriesScore,
   getSeriesWinnerTeamId,
   inferGameMvpPlayerId,
+  isWalkoverSeries,
 } from "@/lib/tournament";
 import { formatDateLabel } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,7 @@ import { Select } from "@/components/ui/select";
 import { createBlankGame, createBlankSeries, createBlankStatsRow, type MutateDraft } from "@/components/admin/shared";
 
 function getTeamName(dataset: TournamentDataset, teamId: string) {
-  return dataset.teams.find((team) => team.id === teamId)?.name ?? teamId ?? "—";
+  return dataset.teams.find((team) => team.id === teamId)?.name ?? teamId ?? "â€”";
 }
 
 type RiotImportedParticipant = {
@@ -180,7 +181,7 @@ function applyRiotMatchToSeriesGame({
   if (blueSide.length === 0 || redSide.length === 0) {
     return {
       ok: false,
-      error: "A partida da Riot não retornou os dois lados corretamente (azul/vermelho).",
+      error: "A partida da Riot nÃ£o retornou os dois lados corretamente (azul/vermelho).",
     };
   }
 
@@ -228,7 +229,7 @@ function applyRiotMatchToSeriesGame({
   if (unmatched.length > 0) {
     return {
       ok: false,
-      error: `Não foi possível mapear os nicks: ${unmatched.join(", ")}.`,
+      error: `NÃ£o foi possÃ­vel mapear os nicks: ${unmatched.join(", ")}.`,
     };
   }
 
@@ -236,7 +237,7 @@ function applyRiotMatchToSeriesGame({
   if (!mvpPlayerId) {
     return {
       ok: false,
-      error: "Não foi possível calcular o MVP automaticamente a partir dos dados importados.",
+      error: "NÃ£o foi possÃ­vel calcular o MVP automaticamente a partir dos dados importados.",
     };
   }
 
@@ -249,7 +250,7 @@ function applyRiotMatchToSeriesGame({
     if (blueWins === redWins) {
       return {
         ok: false,
-        error: "Não foi possível identificar o vencedor da partida importada.",
+        error: "NÃ£o foi possÃ­vel identificar o vencedor da partida importada.",
       };
     }
     winnerTeamId =
@@ -304,6 +305,7 @@ export function AdminSeriesPanel({
     const teamBPlayers = draft.players.filter((player) => player.teamId === selectedSeries.teamBId);
     return { teamAPlayers, teamBPlayers, combined: [...teamAPlayers, ...teamBPlayers] };
   }, [draft.players, selectedSeries]);
+  const selectedSeriesIsWalkover = selectedSeries ? isWalkoverSeries(selectedSeries) : false;
 
   const setRiotMatchIdForGame = (seriesId: string, gameIndex: number, value: string) => {
     const key = getGameImportKey(seriesId, gameIndex);
@@ -321,6 +323,17 @@ export function AdminSeriesPanel({
       }
       return { ...prev, [key]: status };
     });
+  };
+
+  const clearRiotStateForSeries = (seriesId: string) => {
+    const prefix = `${seriesId}:`;
+    setRiotMatchIdsByGame((prev) =>
+      Object.fromEntries(Object.entries(prev).filter(([key]) => !key.startsWith(prefix))),
+    );
+    setRiotImportStatusByGame((prev) =>
+      Object.fromEntries(Object.entries(prev).filter(([key]) => !key.startsWith(prefix))),
+    );
+    setRiotImportingGameKey((prev) => (prev?.startsWith(prefix) ? null : prev));
   };
 
   const createSeries = () => {
@@ -342,10 +355,35 @@ export function AdminSeriesPanel({
     if (!selectedSeries) return;
     const score = getSeriesScore(selectedSeries);
     const shouldDelete = window.confirm(
-      `Excluir a série ${selectedSeries.id} (${score.teamAWins}-${score.teamBWins})? Essa ação remove os jogos lançados desta série no rascunho.`,
+      `Excluir a sÃ©rie ${selectedSeries.id} (${score.teamAWins}-${score.teamBWins})? Essa aÃ§Ã£o remove os jogos lanÃ§ados desta sÃ©rie no rascunho.`,
     );
     if (!shouldDelete) return;
     deleteSeries(selectedSeries.id);
+  };
+
+  const updateWalkoverWinner = (winnerTeamId: string) => {
+    if (!selectedSeries) return;
+
+    if (!winnerTeamId) {
+      updateSelectedSeries((series) => {
+        delete series.walkoverWinnerTeamId;
+        delete series.walkoverReason;
+      });
+      return;
+    }
+
+    if (selectedSeries.games.length > 0) {
+      const shouldConvert = window.confirm(
+        "Marcar esta sÃ©rie como W.O. vai remover os jogos e stats jÃ¡ lanÃ§ados no rascunho. Deseja continuar?",
+      );
+      if (!shouldConvert) return;
+    }
+
+    updateSelectedSeries((series) => {
+      series.walkoverWinnerTeamId = winnerTeamId;
+      series.games = [];
+    });
+    clearRiotStateForSeries(selectedSeries.id);
   };
 
   const updateSelectedSeries = (recipe: (series: NonNullable<typeof selectedSeries>) => void) => {
@@ -446,21 +484,22 @@ export function AdminSeriesPanel({
     <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
       <Card className="min-w-0 overflow-hidden p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="font-display text-lg font-bold tracking-wide">Séries (MD3)</h3>
+          <h3 className="font-display text-lg font-bold tracking-wide">SÃ©ries (MD3)</h3>
           <Button variant="secondary" size="sm" onClick={createSeries}>
-            <Plus className="h-4 w-4" /> Nova série
+            <Plus className="h-4 w-4" /> Nova sÃ©rie
           </Button>
         </div>
 
         <div className="mt-4 grid max-h-[680px] gap-2 overflow-y-auto pr-1 scrollbar-thin">
           {sortedSeries.length === 0 ? (
             <p className="rounded-xl border border-white/8 bg-white/[0.02] p-3 text-sm text-muted">
-              Nenhuma série cadastrada.
+              Nenhuma sÃ©rie cadastrada.
             </p>
           ) : (
             sortedSeries.map((series) => {
               const score = getSeriesScore(series);
               const winner = getSeriesWinnerTeamId(series);
+              const isWalkover = isWalkoverSeries(series);
               const teamA = getTeamName(draft, series.teamAId);
               const teamB = getTeamName(draft, series.teamBId);
               return (
@@ -478,7 +517,7 @@ export function AdminSeriesPanel({
                     <div className="min-w-0">
                       <p className="truncate font-semibold">{teamA} vs {teamB}</p>
                       <p className="text-xs text-muted">
-                        {series.id} • {formatDateLabel(series.date)}
+                        {series.id} â€¢ {formatDateLabel(series.date)}
                       </p>
                     </div>
                     <div className="shrink-0 text-right">
@@ -486,7 +525,7 @@ export function AdminSeriesPanel({
                         {score.teamAWins}-{score.teamBWins}
                       </p>
                       <p className="text-[10px] uppercase tracking-[0.16em] text-muted">
-                        {winner ? "Finalizada" : "Em andamento"}
+                        {isWalkover ? "W.O." : winner ? "Finalizada" : "Em andamento"}
                       </p>
                     </div>
                   </div>
@@ -500,12 +539,12 @@ export function AdminSeriesPanel({
       <Card className="min-w-0 overflow-hidden p-4">
         {!selectedSeries ? (
           <div className="rounded-xl border border-dashed border-white/10 p-6 text-sm text-muted">
-            Selecione uma série para editar ou clique em "Nova série".
+            Selecione uma sÃ©rie para editar ou clique em "Nova sÃ©rie".
           </div>
         ) : (
           <div className="space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="font-display text-lg font-bold tracking-wide">Editar série</h3>
+              <h3 className="font-display text-lg font-bold tracking-wide">Editar sÃ©rie</h3>
               <div className="flex w-full flex-wrap gap-2 sm:w-auto">
                 <Button
                   variant="danger"
@@ -513,14 +552,14 @@ export function AdminSeriesPanel({
                   className="max-w-full sm:w-auto"
                   onClick={confirmDeleteSelectedSeries}
                 >
-                  <Trash2 className="h-4 w-4" /> Excluir série
+                  <Trash2 className="h-4 w-4" /> Excluir sÃ©rie
                 </Button>
               </div>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="min-w-0">
-                <Label htmlFor="series-id">ID da série</Label>
+                <Label htmlFor="series-id">ID da sÃ©rie</Label>
                 <Input
                   id="series-id"
                   value={selectedSeries.id}
@@ -555,6 +594,14 @@ export function AdminSeriesPanel({
                   onChange={(e) =>
                     updateSelectedSeries((series) => {
                       series.teamAId = e.target.value;
+                      if (
+                        series.walkoverWinnerTeamId &&
+                        series.walkoverWinnerTeamId !== series.teamAId &&
+                        series.walkoverWinnerTeamId !== series.teamBId
+                      ) {
+                        delete series.walkoverWinnerTeamId;
+                        delete series.walkoverReason;
+                      }
                     })
                   }
                 >
@@ -574,6 +621,14 @@ export function AdminSeriesPanel({
                   onChange={(e) =>
                     updateSelectedSeries((series) => {
                       series.teamBId = e.target.value;
+                      if (
+                        series.walkoverWinnerTeamId &&
+                        series.walkoverWinnerTeamId !== series.teamAId &&
+                        series.walkoverWinnerTeamId !== series.teamBId
+                      ) {
+                        delete series.walkoverWinnerTeamId;
+                        delete series.walkoverReason;
+                      }
                     })
                   }
                 >
@@ -587,17 +642,63 @@ export function AdminSeriesPanel({
               </div>
             </div>
 
+            <div className="rounded-xl border border-white/8 bg-white/[0.02] p-4">
+              <p className="font-display text-base font-bold tracking-wide">Resultado por W.O.</p>
+              <p className="mt-1 text-xs text-muted">
+                Use quando a série não foi jogada. O sistema conta automaticamente como vitória por 2-0, sem gerar stats de jogadores.
+              </p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="series-walkover">Situação da série</Label>
+                  <Select
+                    id="series-walkover"
+                    value={selectedSeries.walkoverWinnerTeamId ?? ""}
+                    onChange={(e) => updateWalkoverWinner(e.target.value)}
+                  >
+                    <option value="">Série jogada normalmente</option>
+                    {selectedSeries.teamAId ? (
+                      <option value={selectedSeries.teamAId}>
+                        W.O. para {getTeamName(draft, selectedSeries.teamAId)}
+                      </option>
+                    ) : null}
+                    {selectedSeries.teamBId ? (
+                      <option value={selectedSeries.teamBId}>
+                        W.O. para {getTeamName(draft, selectedSeries.teamBId)}
+                      </option>
+                    ) : null}
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="series-walkover-reason">Observação do W.O. (opcional)</Label>
+                  <Input
+                    id="series-walkover-reason"
+                    disabled={!selectedSeriesIsWalkover}
+                    placeholder="Ex.: time não compareceu no horário"
+                    value={selectedSeries.walkoverReason ?? ""}
+                    onChange={(e) =>
+                      updateSelectedSeries((series) => {
+                        series.walkoverReason = e.target.value;
+                      })
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <p className="font-display text-base font-bold tracking-wide">Jogos da série</p>
+                <p className="font-display text-base font-bold tracking-wide">Jogos da sÃ©rie</p>
                 <p className="text-xs text-muted">
-                  Até 3 jogos. A tabela pública só conta a série quando houver vencedor (2 vitórias).
+                  {selectedSeriesIsWalkover
+                    ? "Série encerrada por W.O.; os jogos e stats ficam desabilitados."
+                    : "AtÃ© 3 jogos. A tabela pÃºblica sÃ³ conta a sÃ©rie quando houver vencedor (2 vitÃ³rias)."}
                 </p>
               </div>
               <Button
                 variant="secondary"
                 size="sm"
                 className="max-w-full"
+                disabled={selectedSeriesIsWalkover}
                 onClick={() =>
                   updateSelectedSeries((series) => {
                     if (series.games.length >= 3) return;
@@ -610,9 +711,17 @@ export function AdminSeriesPanel({
             </div>
 
             <div className="space-y-4">
-              {selectedSeries.games.length === 0 ? (
+              {selectedSeriesIsWalkover ? (
                 <div className="rounded-xl border border-dashed border-white/10 p-4 text-sm text-muted">
-                  Nenhum jogo nesta série.
+                  Série encerrada por W.O. com placar automático de 2-0 para{" "}
+                  <span className="font-semibold text-text">
+                    {getTeamName(draft, selectedSeries.walkoverWinnerTeamId ?? "")}
+                  </span>
+                  {selectedSeries.walkoverReason ? ` • ${selectedSeries.walkoverReason}` : ""}
+                </div>
+              ) : selectedSeries.games.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-white/10 p-4 text-sm text-muted">
+                  Nenhum jogo nesta sÃ©rie.
                 </div>
               ) : (
                 selectedSeries.games.map((game, gameIndex) => {
@@ -687,7 +796,7 @@ export function AdminSeriesPanel({
                         </Button>
                       </div>
                       <p className="mt-2 text-xs text-muted">
-                        Preenche automaticamente vencedor, duração, campeões e K/D/A. MVP do jogo é calculado automaticamente por KDA.
+                        Preenche automaticamente vencedor, duraÃ§Ã£o, campeÃµes e K/D/A. MVP do jogo Ã© calculado automaticamente por KDA.
                       </p>
                       {riotImportStatus ? (
                         <p
@@ -729,7 +838,7 @@ export function AdminSeriesPanel({
                         </Select>
                       </div>
                       <div>
-                        <Label>MVP do jogo (automático)</Label>
+                        <Label>MVP do jogo (automÃ¡tico)</Label>
                         <div className="mt-2 rounded-xl border border-white/8 bg-white/[0.02] px-3 py-2.5 text-sm">
                           {autoMvpPlayer ? (
                             <span className="font-semibold text-text">{autoMvpPlayer.nick}</span>
@@ -740,11 +849,11 @@ export function AdminSeriesPanel({
                           )}
                         </div>
                         <p className="mt-1 text-xs text-muted">
-                          Critério: maior KDA. Desempate por abates, assistências e menos mortes.
+                          CritÃ©rio: maior KDA. Desempate por abates, assistÃªncias e menos mortes.
                         </p>
                       </div>
                       <div>
-                        <Label>Duração (min)</Label>
+                        <Label>DuraÃ§Ã£o (min)</Label>
                         <Input
                           type="number"
                           min={1}
@@ -765,7 +874,7 @@ export function AdminSeriesPanel({
                     <div className="mt-4 space-y-3">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
-                          Estatísticas por jogador (K/D/A)
+                          EstatÃ­sticas por jogador (K/D/A)
                         </p>
                         <Button
                           variant="secondary"
@@ -815,10 +924,10 @@ export function AdminSeriesPanel({
                                 </Select>
                               </div>
                               <div>
-                                <Label className="sr-only">Campeão</Label>
+                                <Label className="sr-only">CampeÃ£o</Label>
                                 <Input
-                                  aria-label={`Campeão linha ${rowIndex + 1}`}
-                                  placeholder="Campeão"
+                                  aria-label={`CampeÃ£o linha ${rowIndex + 1}`}
+                                  placeholder="CampeÃ£o"
                                   value={row.champion ?? ""}
                                   onChange={(e) =>
                                     updateSelectedSeries((series) => {
@@ -862,9 +971,9 @@ export function AdminSeriesPanel({
                                 />
                               </div>
                               <div>
-                                <Label className="sr-only">Assistências</Label>
+                                <Label className="sr-only">AssistÃªncias</Label>
                                 <Input
-                                  aria-label={`Assistências linha ${rowIndex + 1}`}
+                                  aria-label={`AssistÃªncias linha ${rowIndex + 1}`}
                                   type="number"
                                   min={0}
                                   value={row.assists}
@@ -907,3 +1016,4 @@ export function AdminSeriesPanel({
     </div>
   );
 }
+

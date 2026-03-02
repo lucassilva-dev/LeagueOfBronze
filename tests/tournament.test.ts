@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { TournamentDataset } from "../lib/schema";
-import { buildLeaderboards, calculateStandings, getSeriesMvp } from "../lib/tournament";
+import { buildLeaderboards, calculateStandings, getSeriesMvp, getSeriesScore } from "../lib/tournament";
 
 function baseDataset(): TournamentDataset {
   return {
@@ -227,5 +227,31 @@ describe("leaderboards and MVP calculation", () => {
     const boards = buildLeaderboards(dataset);
 
     expect(boards.mvps[0]?.player.playerId).toBe("a1");
+  });
+});
+
+describe("walkover series", () => {
+  it("conta W.O. como 2-0 sem gerar MVP de série", () => {
+    const dataset = baseDataset();
+    dataset.seriesMatches = [
+      {
+        id: "s-wo",
+        date: "2026-02-25",
+        teamAId: "a",
+        teamBId: "b",
+        walkoverWinnerTeamId: "a",
+        walkoverReason: "Time B não compareceu",
+        games: [],
+      },
+    ];
+
+    const score = getSeriesScore(dataset.seriesMatches[0]!);
+    const standings = calculateStandings(dataset);
+    const seriesMvp = getSeriesMvp(dataset.seriesMatches[0]!, dataset);
+
+    expect(score).toEqual({ teamAWins: 2, teamBWins: 0 });
+    expect(standings.rows.find((row) => row.teamId === "a")?.points).toBe(3);
+    expect(standings.rows.find((row) => row.teamId === "a")?.gameDiff).toBe(2);
+    expect(seriesMvp).toBeNull();
   });
 });

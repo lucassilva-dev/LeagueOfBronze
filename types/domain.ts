@@ -42,6 +42,7 @@ export interface SeriesSummary {
   score: SeriesScore;
   winnerTeamId: string | null;
   isComplete: boolean;
+  isWalkover: boolean;
   mvp: SeriesMvpResult | null;
 }
 

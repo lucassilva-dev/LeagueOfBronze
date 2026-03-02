@@ -1,4 +1,4 @@
-import { z } from "zod";
+﻿import { z } from "zod";
 
 const nonEmpty = z.string().trim().min(1);
 type IssuePath = Array<string | number>;
@@ -60,7 +60,7 @@ function validateDatasetUniqueness(
     dataset.seriesMatches,
     "id",
     ["seriesMatches"],
-    "IDs de séries duplicados.",
+    "IDs de sÃ©ries duplicados.",
   );
 }
 
@@ -89,7 +89,7 @@ function validateStandingsSeedReferences(
     addCustomIssue(
       ctx,
       ["standingsSeed", index, "teamId"],
-      `Classificação inicial referencia teamId inexistente (${seed.teamId}).`,
+      `ClassificaÃ§Ã£o inicial referencia teamId inexistente (${seed.teamId}).`,
     );
   }
 }
@@ -108,7 +108,7 @@ function validateGameReferences(
     addCustomIssue(
       ctx,
       ["seriesMatches", seriesIndex, "games", gameIndex, "winnerTeamId"],
-      `Jogo ${gameIndex + 1} da série ${series.id} possui winnerTeamId inválido.`,
+      `Jogo ${gameIndex + 1} da sÃ©rie ${series.id} possui winnerTeamId invÃ¡lido.`,
     );
   }
 
@@ -116,7 +116,7 @@ function validateGameReferences(
     addCustomIssue(
       ctx,
       ["seriesMatches", seriesIndex, "games", gameIndex, "mvpPlayerId"],
-      `Jogo ${gameIndex + 1} da série ${series.id} possui MVP inválido.`,
+      `Jogo ${gameIndex + 1} da sÃ©rie ${series.id} possui MVP invÃ¡lido.`,
     );
   }
 
@@ -134,7 +134,7 @@ function validateGameReferences(
           statIndex,
           "playerId",
         ],
-        `Estatística com playerId inválido (${stats.playerId}) na série ${series.id}.`,
+        `EstatÃ­stica com playerId invÃ¡lido (${stats.playerId}) na sÃ©rie ${series.id}.`,
       );
     }
 
@@ -150,7 +150,7 @@ function validateGameReferences(
           statIndex,
           "playerId",
         ],
-        `Jogador repetido nas estatísticas do jogo ${gameIndex + 1} da série ${series.id}.`,
+        `Jogador repetido nas estatÃ­sticas do jogo ${gameIndex + 1} da sÃ©rie ${series.id}.`,
       );
       continue;
     }
@@ -170,7 +170,7 @@ function validateSeriesReferences(
       addCustomIssue(
         ctx,
         ["seriesMatches", seriesIndex],
-        `Série ${series.id} referencia time inexistente.`,
+        `SÃ©rie ${series.id} referencia time inexistente.`,
       );
     }
 
@@ -178,8 +178,30 @@ function validateSeriesReferences(
       addCustomIssue(
         ctx,
         ["seriesMatches", seriesIndex],
-        `Série ${series.id} possui times repetidos.`,
+        `SÃ©rie ${series.id} possui times repetidos.`,
       );
+    }
+
+    if (series.walkoverWinnerTeamId) {
+      const allowedWinners = new Set([series.teamAId, series.teamBId]);
+
+      if (!allowedWinners.has(series.walkoverWinnerTeamId)) {
+        addCustomIssue(
+          ctx,
+          ["seriesMatches", seriesIndex, "walkoverWinnerTeamId"],
+          `SÃ©rie ${series.id} possui vencedor de W.O. invÃ¡lido.`,
+        );
+      }
+
+      if (series.games.length > 0) {
+        addCustomIssue(
+          ctx,
+          ["seriesMatches", seriesIndex, "games"],
+          `SÃ©rie ${series.id} marcada como W.O. nÃ£o pode ter jogos registrados.`,
+        );
+      }
+
+      continue;
     }
 
     for (const [gameIndex, game] of series.games.entries()) {
@@ -234,6 +256,8 @@ export const seriesMatchSchema = z.object({
   date: nonEmpty,
   teamAId: nonEmpty,
   teamBId: nonEmpty,
+  walkoverWinnerTeamId: z.string().trim().optional(),
+  walkoverReason: z.string().trim().optional(),
   games: z.array(seriesGameSchema).max(3),
 });
 
@@ -263,7 +287,7 @@ export const tournamentDatasetSchema = z
   });
 
 export const adminLoginSchema = z.object({
-  password: z.string().min(1, "Senha obrigatória."),
+  password: z.string().min(1, "Senha obrigatÃ³ria."),
 });
 
 export type TournamentDataset = z.infer<typeof tournamentDatasetSchema>;
@@ -274,3 +298,4 @@ export type PlayerGameStats = z.infer<typeof playerGameStatsSchema>;
 export type SeriesGame = z.infer<typeof seriesGameSchema>;
 export type SeriesMatch = z.infer<typeof seriesMatchSchema>;
 export type StandingsSeedRow = z.infer<typeof standingsSeedRowSchema>;
+
