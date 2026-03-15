@@ -84,7 +84,7 @@ function getTeamTitleHeroData(
   teamsById: Map<string, Team>,
   playersById: Map<string, Player>,
 ): TeamTitleHeroData | null {
-  if (!championship || championship.championTeamId !== team.id) return null;
+  if (championship?.championTeamId !== team.id) return null;
 
   const finalMvpNick = championship.summary.mvp
     ? playersById.get(championship.summary.mvp.playerId)?.nick ?? null
@@ -106,6 +106,9 @@ function TeamHeaderExtra({
   points,
   seriesRecord,
 }: TeamHeaderExtraProps) {
+  const hasStandingsPosition = standingsPosition !== null;
+  const hasPoints = points !== null;
+
   return (
     <div className="flex flex-wrap gap-2">
       {isChampion ? (
@@ -113,8 +116,8 @@ function TeamHeaderExtra({
           Campeão do campeonato
         </Badge>
       ) : null}
-      {standingsPosition !== null ? <Badge variant="accent">#{standingsPosition} na tabela</Badge> : null}
-      {points !== null ? <Badge variant="outline">{points} pts</Badge> : null}
+      {hasStandingsPosition ? <Badge variant="accent">#{standingsPosition} na tabela</Badge> : null}
+      {hasPoints ? <Badge variant="outline">{points} pts</Badge> : null}
       {seriesRecord ? <Badge variant="outline">Séries {seriesRecord}</Badge> : null}
     </div>
   );
@@ -216,6 +219,8 @@ function TeamRosterNotice({ error, invalidNicks }: TeamRosterNoticeProps) {
 }
 
 function TeamRosterCard({ roster, multiOpGg }: TeamRosterCardProps) {
+  const showRosterNotice = multiOpGg.ok === false;
+
   return (
     <Card className="p-5">
       <div className="flex items-center justify-between gap-2">
@@ -235,7 +240,7 @@ function TeamRosterCard({ roster, multiOpGg }: TeamRosterCardProps) {
         </div>
       </div>
 
-      {!multiOpGg.ok ? (
+      {showRosterNotice ? (
         <TeamRosterNotice error={multiOpGg.error} invalidNicks={multiOpGg.invalidNicks} />
       ) : null}
 

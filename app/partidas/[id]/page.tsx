@@ -135,7 +135,8 @@ function getFinalSummaryText(isWalkover: boolean, seriesMvpNick: string | null) 
 
 function getEmptyGamesText(isWalkover: boolean, walkoverReason: string | undefined) {
   if (!isWalkover) return "Esta série ainda não possui jogos lançados.";
-  return `Esta série foi encerrada por W.O.${walkoverReason ? ` ${walkoverReason}` : ""}`;
+  const reasonText = walkoverReason ? ` ${walkoverReason}` : "";
+  return `Esta série foi encerrada por W.O.${reasonText}`;
 }
 
 function SeriesExtraBadges({
@@ -473,3 +474,4 @@ export default async function PartidaDetalhePage({ params }: PartidaDetalhePageP
     </PageShell>
   );
 }
+

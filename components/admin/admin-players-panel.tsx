@@ -18,6 +18,20 @@ type PlayerEditorCardProps = Readonly<{
   onDelete: () => void;
 }>;
 
+function removePlayerFromSeriesMatches(
+  seriesMatches: TournamentDataset["seriesMatches"],
+  playerId: string,
+) {
+  return seriesMatches.map((series) => ({
+    ...series,
+    games: series.games.map((game) => ({
+      ...game,
+      mvpPlayerId: game.mvpPlayerId === playerId ? "" : game.mvpPlayerId,
+      statsByPlayer: game.statsByPlayer.filter((row) => row.playerId !== playerId),
+    })),
+  }));
+}
+
 function PlayerEditorCard({
   initialPlayer,
   isEditing,
@@ -158,14 +172,7 @@ export function AdminPlayersPanel({
   const deletePlayer = (playerId: string) => {
     mutateDraft((next) => {
       next.players = next.players.filter((player) => player.id !== playerId);
-      next.seriesMatches = next.seriesMatches.map((series) => ({
-        ...series,
-        games: series.games.map((game) => ({
-          ...game,
-          mvpPlayerId: game.mvpPlayerId === playerId ? "" : game.mvpPlayerId,
-          statsByPlayer: game.statsByPlayer.filter((row) => row.playerId !== playerId),
-        })),
-      }));
+      next.seriesMatches = removePlayerFromSeriesMatches(next.seriesMatches, playerId);
     });
     setSelectedId(null);
   };

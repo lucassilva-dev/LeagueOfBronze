@@ -26,7 +26,8 @@ export async function GET(request: NextRequest) {
         "Content-Disposition": `attachment; filename="leagueofbronze-backup-${new Date()
           .toISOString()
           .slice(0, 19)
-          .replace(/[:T]/g, "-")}.json"`,
+          .replaceAll(":", "-")
+          .replaceAll("T", "-")}.json"`,
       },
     });
   } catch (error) {

@@ -26,9 +26,15 @@ import { formatDateLabel } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Label, LabelText } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { createBlankGame, createBlankSeries, createBlankStatsRow, type MutateDraft } from "@/components/admin/shared";
+import {
+  createBlankGame,
+  createBlankSeries,
+  createBlankStatsRow,
+  slugifyValue,
+  type MutateDraft,
+} from "@/components/admin/shared";
 
 function getTeamName(dataset: TournamentDataset, teamId: string) {
   return dataset.teams.find((team) => team.id === teamId)?.name ?? teamId ?? "—";
@@ -168,16 +174,184 @@ type ApplyRiotImportResult =
       error: string;
     };
 
+type TeamSide = "BLUE" | "RED";
+
+type ImportSeriesRostersResult =
+  | {
+      ok: true;
+      teamAPlayers: Player[];
+      teamBPlayers: Player[];
+    }
+  | {
+      ok: false;
+      error: string;
+    };
+
+type ImportSideMappingResult =
+  | {
+      ok: true;
+      blueSide: RiotImportedParticipant[];
+      redSide: RiotImportedParticipant[];
+      teamASide: TeamSide;
+      teamBSide: TeamSide;
+      warnings: string[];
+    }
+  | {
+      ok: false;
+      error: string;
+    };
+
+type ImportedStatsMappingResult =
+  | {
+      ok: true;
+      statsByPlayer: PlayerGameStats[];
+    }
+  | {
+      ok: false;
+      error: string;
+    };
+
 function getGameImportKey(seriesId: string, gameIndex: number) {
   return `${seriesId}:${gameIndex}`;
 }
 
 function normalizeLookup(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "");
+  return slugifyValue(value).replaceAll("-", "");
+}
+
+function getImportSeriesRosters(
+  draft: TournamentDataset,
+  series: SeriesMatch,
+): ImportSeriesRostersResult {
+  if (!series.teamAId || !series.teamBId) {
+    return { ok: false, error: "Selecione Time A e Time B antes de importar da Riot." };
+  }
+
+  const teamAPlayers = draft.players.filter((player) => player.teamId === series.teamAId);
+  const teamBPlayers = draft.players.filter((player) => player.teamId === series.teamBId);
+
+  if (teamAPlayers.length === 0 || teamBPlayers.length === 0) {
+    return {
+      ok: false,
+      error: "Os dois times precisam ter jogadores cadastrados para importar a partida da Riot.",
+    };
+  }
+
+  return { ok: true, teamAPlayers, teamBPlayers };
+}
+
+function getImportedParticipantSides(
+  match: RiotImportedMatch,
+  teamAPlayers: Player[],
+  teamBPlayers: Player[],
+): ImportSideMappingResult {
+  const blueSide = match.participants.filter((participant) => participant.side === "BLUE");
+  const redSide = match.participants.filter((participant) => participant.side === "RED");
+
+  if (blueSide.length === 0 || redSide.length === 0) {
+    return {
+      ok: false,
+      error: "A partida da Riot não retornou os dois lados corretamente (azul/vermelho).",
+    };
+  }
+
+  const blueToAComposite =
+    scoreParticipantsAgainstRoster(blueSide, teamAPlayers) +
+    scoreParticipantsAgainstRoster(redSide, teamBPlayers);
+  const redToAComposite =
+    scoreParticipantsAgainstRoster(redSide, teamAPlayers) +
+    scoreParticipantsAgainstRoster(blueSide, teamBPlayers);
+
+  const teamASide: TeamSide = blueToAComposite >= redToAComposite ? "BLUE" : "RED";
+
+  return {
+    ok: true,
+    blueSide,
+    redSide,
+    teamASide,
+    teamBSide: teamASide === "BLUE" ? "RED" : "BLUE",
+    warnings: blueToAComposite === redToAComposite ? ["Mapeamento empatado; assumido Azul = Time A."] : [],
+  };
+}
+
+function mapImportedStatsByPlayer(
+  teamAParticipants: RiotImportedParticipant[],
+  teamAPlayers: Player[],
+  teamBParticipants: RiotImportedParticipant[],
+  teamBPlayers: Player[],
+): ImportedStatsMappingResult {
+  const usedPlayerIds = new Set<string>();
+  const statsByPlayer: PlayerGameStats[] = [];
+  const unmatched: string[] = [];
+
+  const mapSideParticipants = (participants: RiotImportedParticipant[], roster: Player[]) => {
+    for (const participant of participants) {
+      const mappedPlayer = choosePlayerForParticipant(participant, roster, usedPlayerIds);
+      if (!mappedPlayer) {
+        unmatched.push(participant.riotId || participant.summonerName || participant.puuid);
+        continue;
+      }
+
+      usedPlayerIds.add(mappedPlayer.id);
+      statsByPlayer.push({
+        playerId: mappedPlayer.id,
+        champion: participant.champion,
+        kills: participant.kills,
+        deaths: participant.deaths,
+        assists: participant.assists,
+      });
+    }
+  };
+
+  mapSideParticipants(teamAParticipants, teamAPlayers);
+  mapSideParticipants(teamBParticipants, teamBPlayers);
+
+  if (unmatched.length > 0) {
+    return {
+      ok: false,
+      error: `Não foi possível mapear os nicks: ${unmatched.join(", ")}.`,
+    };
+  }
+
+  return { ok: true, statsByPlayer };
+}
+
+function getWinningImportedSide(
+  match: RiotImportedMatch,
+  blueSide: RiotImportedParticipant[],
+  redSide: RiotImportedParticipant[],
+): TeamSide | null {
+  if (match.winningSide) return match.winningSide;
+
+  const blueWins = blueSide.filter((participant) => participant.win).length;
+  const redWins = redSide.filter((participant) => participant.win).length;
+
+  if (blueWins === redWins) return null;
+  return blueWins > redWins ? "BLUE" : "RED";
+}
+
+function getAutoMvpDisplay(game: SeriesMatch["games"][number], roster: Player[]) {
+  const autoMvpPlayerId = inferGameMvpPlayerId(game.statsByPlayer);
+  const autoMvpPlayer = roster.find((player) => player.id === autoMvpPlayerId) ?? null;
+
+  if (autoMvpPlayer) {
+    return {
+      text: autoMvpPlayer.nick,
+      muted: false,
+    };
+  }
+
+  if (autoMvpPlayerId) {
+    return {
+      text: autoMvpPlayerId,
+      muted: false,
+    };
+  }
+
+  return {
+    text: "Preencha K/D/A para calcular",
+    muted: true,
+  };
 }
 
 function getNameVariants(value: string | null | undefined) {
@@ -253,79 +427,23 @@ function applyRiotMatchToSeriesGame({
   series: SeriesMatch;
   match: RiotImportedMatch;
 }): ApplyRiotImportResult {
-  if (!series.teamAId || !series.teamBId) {
-    return { ok: false, error: "Selecione Time A e Time B antes de importar da Riot." };
-  }
+  const rosters = getImportSeriesRosters(draft, series);
+  if (!rosters.ok) return rosters;
 
-  const teamAPlayers = draft.players.filter((player) => player.teamId === series.teamAId);
-  const teamBPlayers = draft.players.filter((player) => player.teamId === series.teamBId);
+  const sideMapping = getImportedParticipantSides(match, rosters.teamAPlayers, rosters.teamBPlayers);
+  if (!sideMapping.ok) return sideMapping;
 
-  if (teamAPlayers.length === 0 || teamBPlayers.length === 0) {
-    return {
-      ok: false,
-      error: "Os dois times precisam ter jogadores cadastrados para importar a partida da Riot.",
-    };
-  }
+  const teamAParticipants = sideMapping.teamASide === "BLUE" ? sideMapping.blueSide : sideMapping.redSide;
+  const teamBParticipants = sideMapping.teamBSide === "BLUE" ? sideMapping.blueSide : sideMapping.redSide;
+  const importedStats = mapImportedStatsByPlayer(
+    teamAParticipants,
+    rosters.teamAPlayers,
+    teamBParticipants,
+    rosters.teamBPlayers,
+  );
+  if (!importedStats.ok) return importedStats;
 
-  const blueSide = match.participants.filter((participant) => participant.side === "BLUE");
-  const redSide = match.participants.filter((participant) => participant.side === "RED");
-
-  if (blueSide.length === 0 || redSide.length === 0) {
-    return {
-      ok: false,
-      error: "A partida da Riot não retornou os dois lados corretamente (azul/vermelho).",
-    };
-  }
-
-  const blueToAComposite =
-    scoreParticipantsAgainstRoster(blueSide, teamAPlayers) +
-    scoreParticipantsAgainstRoster(redSide, teamBPlayers);
-  const redToAComposite =
-    scoreParticipantsAgainstRoster(redSide, teamAPlayers) +
-    scoreParticipantsAgainstRoster(blueSide, teamBPlayers);
-
-  const teamASide = blueToAComposite >= redToAComposite ? "BLUE" : "RED";
-  const teamBSide = teamASide === "BLUE" ? "RED" : "BLUE";
-
-  const warnings: string[] = [];
-  if (blueToAComposite === redToAComposite) {
-    warnings.push("Mapeamento empatado; assumido Azul = Time A.");
-  }
-
-  const usedPlayerIds = new Set<string>();
-  const statsByPlayer: PlayerGameStats[] = [];
-  const unmatched: string[] = [];
-
-  const mapSide = (participants: RiotImportedParticipant[], roster: Player[]) => {
-    for (const participant of participants) {
-      const mappedPlayer = choosePlayerForParticipant(participant, roster, usedPlayerIds);
-      if (!mappedPlayer) {
-        unmatched.push(participant.riotId || participant.summonerName || participant.puuid);
-        continue;
-      }
-
-      usedPlayerIds.add(mappedPlayer.id);
-      statsByPlayer.push({
-        playerId: mappedPlayer.id,
-        champion: participant.champion,
-        kills: participant.kills,
-        deaths: participant.deaths,
-        assists: participant.assists,
-      });
-    }
-  };
-
-  mapSide(teamASide === "BLUE" ? blueSide : redSide, teamAPlayers);
-  mapSide(teamBSide === "BLUE" ? blueSide : redSide, teamBPlayers);
-
-  if (unmatched.length > 0) {
-    return {
-      ok: false,
-      error: `Não foi possível mapear os nicks: ${unmatched.join(", ")}.`,
-    };
-  }
-
-  const mvpPlayerId = inferGameMvpPlayerId(statsByPlayer);
+  const mvpPlayerId = inferGameMvpPlayerId(importedStats.statsByPlayer);
   if (!mvpPlayerId) {
     return {
       ok: false,
@@ -333,23 +451,17 @@ function applyRiotMatchToSeriesGame({
     };
   }
 
-  let winnerTeamId = "";
-  if (match.winningSide) {
-    winnerTeamId = match.winningSide === teamASide ? series.teamAId : series.teamBId;
-  } else {
-    const blueWins = blueSide.filter((participant) => participant.win).length;
-    const redWins = redSide.filter((participant) => participant.win).length;
-    if (blueWins === redWins) {
-      return {
-        ok: false,
-        error: "Não foi possível identificar o vencedor da partida importada.",
-      };
-    }
-    winnerTeamId =
-      (blueWins > redWins ? "BLUE" : "RED") === teamASide ? series.teamAId : series.teamBId;
+  const winningSide = getWinningImportedSide(match, sideMapping.blueSide, sideMapping.redSide);
+  if (!winningSide) {
+    return {
+      ok: false,
+      error: "Não foi possível identificar o vencedor da partida importada.",
+    };
   }
+  const winnerTeamId = winningSide === sideMapping.teamASide ? series.teamAId : series.teamBId;
 
-  const warningText = warnings.length > 0 ? ` Aviso: ${warnings.join(" ")}` : "";
+  const warningText =
+    sideMapping.warnings.length > 0 ? ` Aviso: ${sideMapping.warnings.join(" ")}` : "";
 
   return {
     ok: true,
@@ -357,9 +469,9 @@ function applyRiotMatchToSeriesGame({
       winnerTeamId,
       durationMin: Math.max(1, match.durationMin || Math.round(match.durationSec / 60)),
       mvpPlayerId,
-      statsByPlayer,
+      statsByPlayer: importedStats.statsByPlayer,
     },
-    message: `Partida importada da Riot (${statsByPlayer.length} jogadores). MVP calculado automaticamente por KDA.${warningText}`,
+    message: `Partida importada da Riot (${importedStats.statsByPlayer.length} jogadores). MVP calculado automaticamente por KDA.${warningText}`,
   };
 }
 
@@ -528,6 +640,49 @@ export function AdminSeriesPanel({
     });
   };
 
+  const updateGameWinner = (gameIndex: number, winnerTeamId: string) => {
+    updateSelectedSeries((series) => {
+      const current = series.games[gameIndex];
+      if (!current) return;
+      current.winnerTeamId = winnerTeamId;
+    });
+  };
+
+  const updateGameDuration = (gameIndex: number, value: string) => {
+    updateSelectedSeries((series) => {
+      const current = series.games[gameIndex];
+      if (!current) return;
+      current.durationMin = value ? Number(value) : undefined;
+    });
+  };
+
+  const addStatsRowToGame = (gameIndex: number) => {
+    updateSelectedSeries((series) => {
+      const current = series.games[gameIndex];
+      if (!current) return;
+      current.statsByPlayer.push(createBlankStatsRow());
+    });
+  };
+
+  const updateStatsRowField = <K extends keyof PlayerGameStats>(
+    gameIndex: number,
+    rowIndex: number,
+    field: K,
+    value: PlayerGameStats[K],
+  ) => {
+    updateSelectedSeries((series) => {
+      const current = series.games[gameIndex]?.statsByPlayer[rowIndex];
+      if (!current) return;
+      current[field] = value;
+    });
+  };
+
+  const removeStatsRowFromGame = (gameIndex: number, rowIndex: number) => {
+    updateSelectedSeries((series) => {
+      series.games[gameIndex]?.statsByPlayer.splice(rowIndex, 1);
+    });
+  };
+
   const importGameFromRiot = async (gameIndex: number) => {
     if (!selectedSeries) return;
 
@@ -670,10 +825,9 @@ export function AdminSeriesPanel({
         const riotImportStatus = riotImportStatusByGame[riotImportKey];
         const riotMatchId = riotMatchIdsByGame[riotImportKey] ?? "";
         const isImportingRiot = riotImportingGameKey === riotImportKey;
-        const autoMvpPlayerId = inferGameMvpPlayerId(game.statsByPlayer);
-        const autoMvpPlayer = currentRosters.combined.find(
-          (player) => player.id === autoMvpPlayerId,
-        );
+        const autoMvpDisplay = getAutoMvpDisplay(game, currentRosters.combined);
+        const winnerSelectId = `${selectedSeries.id}-game-${gameIndex}-winner`;
+        const durationInputId = `${selectedSeries.id}-game-${gameIndex}-duration`;
 
         return (
           <Card
@@ -754,16 +908,11 @@ export function AdminSeriesPanel({
 
             <div className="mt-3 grid gap-3 sm:grid-cols-3">
               <div>
-                <Label>Time vencedor</Label>
+                <Label htmlFor={winnerSelectId}>Time vencedor</Label>
                 <Select
+                  id={winnerSelectId}
                   value={game.winnerTeamId}
-                  onChange={(e) =>
-                    updateSelectedSeries((series) => {
-                      const current = series.games[gameIndex];
-                      if (!current) return;
-                      current.winnerTeamId = e.target.value;
-                    })
-                  }
+                  onChange={(e) => updateGameWinner(gameIndex, e.target.value)}
                 >
                   <option value="">Selecione</option>
                   {selectedSeries.teamAId ? (
@@ -779,33 +928,24 @@ export function AdminSeriesPanel({
                 </Select>
               </div>
               <div>
-                <Label>MVP do jogo (automático)</Label>
+                <LabelText>MVP do jogo (automático)</LabelText>
                 <div className="mt-2 rounded-xl border border-white/8 bg-white/[0.02] px-3 py-2.5 text-sm">
-                  {autoMvpPlayer ? (
-                    <span className="font-semibold text-text">{autoMvpPlayer.nick}</span>
-                  ) : autoMvpPlayerId ? (
-                    <span className="font-semibold text-text">{autoMvpPlayerId}</span>
-                  ) : (
-                    <span className="text-muted">Preencha K/D/A para calcular</span>
-                  )}
+                  <span className={autoMvpDisplay.muted ? "text-muted" : "font-semibold text-text"}>
+                    {autoMvpDisplay.text}
+                  </span>
                 </div>
                 <p className="mt-1 text-xs text-muted">
                   Critério: maior KDA. Desempate por abates, assistências e menos mortes.
                 </p>
               </div>
               <div>
-                <Label>Duração (min)</Label>
+                <Label htmlFor={durationInputId}>Duração (min)</Label>
                 <Input
+                  id={durationInputId}
                   type="number"
                   min={1}
                   value={game.durationMin ?? ""}
-                  onChange={(e) =>
-                    updateSelectedSeries((series) => {
-                      const current = series.games[gameIndex];
-                      if (!current) return;
-                      current.durationMin = e.target.value ? Number(e.target.value) : undefined;
-                    })
-                  }
+                  onChange={(e) => updateGameDuration(gameIndex, e.target.value)}
                 />
               </div>
             </div>
@@ -818,13 +958,7 @@ export function AdminSeriesPanel({
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() =>
-                    updateSelectedSeries((series) => {
-                      const current = series.games[gameIndex];
-                      if (!current) return;
-                      current.statsByPlayer.push(createBlankStatsRow());
-                    })
-                  }
+                  onClick={() => addStatsRowToGame(gameIndex)}
                 >
                   <Plus className="h-4 w-4" /> Linha
                 </Button>
@@ -842,16 +976,12 @@ export function AdminSeriesPanel({
                       className="min-w-0 grid gap-2 rounded-xl border border-white/8 bg-white/[0.02] p-3 md:grid-cols-[1.4fr_1.1fr_0.55fr_0.55fr_0.55fr_auto]"
                     >
                       <div>
-                        <Label className="sr-only">Jogador</Label>
+                        <LabelText className="sr-only">Jogador</LabelText>
                         <Select
                           aria-label={`Jogador linha ${rowIndex + 1}`}
                           value={row.playerId}
                           onChange={(e) =>
-                            updateSelectedSeries((series) => {
-                              const current = series.games[gameIndex]?.statsByPlayer[rowIndex];
-                              if (!current) return;
-                              current.playerId = e.target.value;
-                            })
+                            updateStatsRowField(gameIndex, rowIndex, "playerId", e.target.value)
                           }
                         >
                           <option value="">Jogador</option>
@@ -863,65 +993,49 @@ export function AdminSeriesPanel({
                         </Select>
                       </div>
                       <div>
-                        <Label className="sr-only">Campeão</Label>
+                        <LabelText className="sr-only">Campeão</LabelText>
                         <Input
                           aria-label={`Campeão linha ${rowIndex + 1}`}
                           placeholder="Campeão"
                           value={row.champion ?? ""}
                           onChange={(e) =>
-                            updateSelectedSeries((series) => {
-                              const current = series.games[gameIndex]?.statsByPlayer[rowIndex];
-                              if (!current) return;
-                              current.champion = e.target.value;
-                            })
+                            updateStatsRowField(gameIndex, rowIndex, "champion", e.target.value)
                           }
                         />
                       </div>
                       <div>
-                        <Label className="sr-only">Abates</Label>
+                        <LabelText className="sr-only">Abates</LabelText>
                         <Input
                           aria-label={`Abates linha ${rowIndex + 1}`}
                           type="number"
                           min={0}
                           value={row.kills}
                           onChange={(e) =>
-                            updateSelectedSeries((series) => {
-                              const current = series.games[gameIndex]?.statsByPlayer[rowIndex];
-                              if (!current) return;
-                              current.kills = Number(e.target.value || 0);
-                            })
+                            updateStatsRowField(gameIndex, rowIndex, "kills", Number(e.target.value || 0))
                           }
                         />
                       </div>
                       <div>
-                        <Label className="sr-only">Mortes</Label>
+                        <LabelText className="sr-only">Mortes</LabelText>
                         <Input
                           aria-label={`Mortes linha ${rowIndex + 1}`}
                           type="number"
                           min={0}
                           value={row.deaths}
                           onChange={(e) =>
-                            updateSelectedSeries((series) => {
-                              const current = series.games[gameIndex]?.statsByPlayer[rowIndex];
-                              if (!current) return;
-                              current.deaths = Number(e.target.value || 0);
-                            })
+                            updateStatsRowField(gameIndex, rowIndex, "deaths", Number(e.target.value || 0))
                           }
                         />
                       </div>
                       <div>
-                        <Label className="sr-only">Assistências</Label>
+                        <LabelText className="sr-only">Assistências</LabelText>
                         <Input
                           aria-label={`Assistências linha ${rowIndex + 1}`}
                           type="number"
                           min={0}
                           value={row.assists}
                           onChange={(e) =>
-                            updateSelectedSeries((series) => {
-                              const current = series.games[gameIndex]?.statsByPlayer[rowIndex];
-                              if (!current) return;
-                              current.assists = Number(e.target.value || 0);
-                            })
+                            updateStatsRowField(gameIndex, rowIndex, "assists", Number(e.target.value || 0))
                           }
                         />
                       </div>
@@ -929,11 +1043,7 @@ export function AdminSeriesPanel({
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() =>
-                            updateSelectedSeries((series) => {
-                              series.games[gameIndex]?.statsByPlayer.splice(rowIndex, 1);
-                            })
-                          }
+                          onClick={() => removeStatsRowFromGame(gameIndex, rowIndex)}
                           aria-label={`Remover linha ${rowIndex + 1}`}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -966,7 +1076,7 @@ export function AdminSeriesPanel({
       </Card>
 
       <Card className="min-w-0 overflow-hidden p-4">
-        {!selectedSeries ? (
+        {selectedSeries === null ? (
           <div className="rounded-xl border border-dashed border-white/10 p-6 text-sm text-muted">
             Selecione uma série para editar ou clique em &quot;Nova série&quot;.
           </div>

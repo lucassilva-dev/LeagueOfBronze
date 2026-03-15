@@ -97,8 +97,9 @@ function getDatasetPeriodLabel(dataset: TournamentDataset) {
   if (dataset.seriesMatches.length === 0) return null;
 
   const dates = dataset.seriesMatches.map((series) => series.date).sort((a, b) => a.localeCompare(b));
-  const from = dates[0];
-  const to = dates[dates.length - 1];
+  const from = dates.at(0);
+  const to = dates.at(-1);
+  if (!from || !to) return null;
 
   return `Período com dados disponíveis: ${formatDateLabel(from)} até ${formatDateLabel(to)}`;
 }

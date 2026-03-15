@@ -11,14 +11,42 @@ import type {
 export type AdminTab = "overview" | "teams" | "players" | "series" | "backup";
 export type MutateDraft = (recipe: (draft: TournamentDataset) => void) => void;
 
+function isCombiningMark(char: string) {
+  const code = char.codePointAt(0) ?? 0;
+  return code >= 0x0300 && code <= 0x036f;
+}
+
+function isSlugChar(char: string) {
+  const code = char.codePointAt(0) ?? 0;
+  const isDigit = code >= 48 && code <= 57;
+  const isLowercaseLetter = code >= 97 && code <= 122;
+  return isDigit || isLowercaseLetter;
+}
+
 export function slugifyValue(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+  const normalized = Array.from(value.normalize("NFD"))
+    .filter((char) => !isCombiningMark(char))
+    .join("")
     .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+    .trim();
+
+  let slug = "";
+  let previousWasHyphen = false;
+
+  for (const char of normalized) {
+    if (isSlugChar(char)) {
+      slug += char;
+      previousWasHyphen = false;
+      continue;
+    }
+
+    if (!previousWasHyphen && slug.length > 0) {
+      slug += "-";
+      previousWasHyphen = true;
+    }
+  }
+
+  return slug.endsWith("-") ? slug.slice(0, -1) : slug;
 }
 
 export function createBlankTeam(): Team {
