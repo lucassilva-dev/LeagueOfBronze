@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Crown } from "lucide-react";
 
 import { PageHero } from "@/components/page-hero";
 import { PageShell } from "@/components/page-shell";
@@ -19,6 +20,7 @@ import { getOpGgSummonerUrlFromNick } from "@/lib/opgg";
 import { getServerDataset } from "@/lib/server-data";
 import {
   calculatePlayerAggregates,
+  getChampionshipResult,
   getPlayerBySlug,
   getPlayerGameHistory,
   getPlayerLeaderboardPositions,
@@ -41,15 +43,22 @@ export default async function PlayerPage({
   const positions = getPlayerLeaderboardPositions(dataset, player.id);
   const team = indexes.teamsById.get(player.teamId);
   const opggUrl = getOpGgSummonerUrlFromNick(player.nick);
+  const championship = getChampionshipResult(dataset);
+  const isChampion = championship?.championTeamId === player.teamId;
 
   return (
     <PageShell className="space-y-6">
       <PageHero
-        badge="Jogador"
+        badge={isChampion ? "Campeão" : "Jogador"}
         title={player.nick}
         description={`Time: ${team?.name ?? player.teamId} • Rotas: ${player.role1}${player.role2 ? ` / ${player.role2}` : ""} • Elo: ${player.elo}`}
         extra={
           <div className="flex flex-wrap gap-2">
+            {isChampion ? (
+              <Badge className="border-amber-300/30 bg-amber-300/15 text-amber-100" variant="outline">
+                Elenco campeão
+              </Badge>
+            ) : null}
             {typeof positions.kills === "number" ? (
               <Badge variant="accent">#{positions.kills} em abates</Badge>
             ) : null}
@@ -60,7 +69,10 @@ export default async function PlayerPage({
               <Badge variant="outline">#{positions.mvps} em MVPs</Badge>
             ) : null}
             {team ? (
-              <Link href={`/times/${team.slug}`} className="inline-flex items-center rounded-full border border-white/10 px-3 py-1 text-xs font-semibold hover:border-accent/30 hover:text-accent">
+              <Link
+                href={`/times/${team.slug}`}
+                className="inline-flex items-center rounded-full border border-white/10 px-3 py-1 text-xs font-semibold hover:border-accent/30 hover:text-accent"
+              >
                 Ver time
               </Link>
             ) : null}
@@ -77,6 +89,54 @@ export default async function PlayerPage({
           </div>
         }
       />
+
+      {isChampion && championship && team ? (
+        <section>
+          <Card className="champion-panel champion-glow overflow-hidden p-5 sm:p-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="max-w-3xl">
+                <div className="flex items-start gap-3">
+                  <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/10 text-amber-100">
+                    <Crown className="h-6 w-6" />
+                  </span>
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.18em] text-amber-100/75">
+                      Jogador campeão
+                    </p>
+                    <h2 className="mt-1 font-display text-2xl font-black tracking-wide sm:text-3xl">
+                      {team.name}
+                    </h2>
+                    <p className="mt-2 text-sm text-slate-200/80 sm:text-base">
+                      Este jogador faz parte do elenco campeão. Título confirmado na{" "}
+                      {championship.summary.stageLabel.toLowerCase()} por{" "}
+                      {championship.championTeamId === championship.summary.series.teamAId
+                        ? championship.summary.score.teamAWins
+                        : championship.summary.score.teamBWins}
+                      -
+                      {championship.championTeamId === championship.summary.series.teamAId
+                        ? championship.summary.score.teamBWins
+                        : championship.summary.score.teamAWins}
+                      .
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:w-[18rem]">
+                <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4 text-center">
+                  <p className="text-xs uppercase tracking-[0.16em] text-muted">
+                    Conquista
+                  </p>
+                  <p className="mt-2 font-display text-3xl font-black tracking-wide text-amber-100">
+                    Campeão
+                  </p>
+                  <p className="mt-1 text-xs text-muted">{championship.summary.formatLabel}</p>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </section>
+      ) : null}
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <StatChip label="Abates" value={aggregate?.kills ?? 0} />
@@ -152,7 +212,10 @@ export default async function PlayerPage({
                     <TableRow key={`${row.seriesId}-${row.gameIndex}`}>
                       <TableCell>{formatDateLabel(row.date)}</TableCell>
                       <TableCell>
-                        <Link href={`/partidas/${row.seriesId}`} className="font-semibold hover:text-accent">
+                        <Link
+                          href={`/partidas/${row.seriesId}`}
+                          className="font-semibold hover:text-accent"
+                        >
                           {row.seriesId}
                         </Link>
                       </TableCell>
@@ -160,9 +223,7 @@ export default async function PlayerPage({
                       <TableCell>{row.opponentTeamName}</TableCell>
                       <TableCell>
                         {row.champion || "—"}{" "}
-                        {row.mvp ? (
-                          <span className="text-xs text-accent">(MVP)</span>
-                        ) : null}
+                        {row.mvp ? <span className="text-xs text-accent">(MVP)</span> : null}
                       </TableCell>
                       <TableCell>
                         {row.kills}/{row.deaths}/{row.assists}

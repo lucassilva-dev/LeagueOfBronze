@@ -312,7 +312,7 @@ export function AdminSeriesPanel({
     if (!selectedId) return;
     if (draft.seriesMatches.some((series) => series.id === selectedId)) return;
     setSelectedId(null);
-  }, [draft.seriesMatches, selectedId, sortedSeries]);
+  }, [draft.seriesMatches, selectedId]);
 
   const selectedSeries = draft.seriesMatches.find((series) => series.id === selectedId) ?? null;
 
@@ -321,7 +321,7 @@ export function AdminSeriesPanel({
     const teamAPlayers = draft.players.filter((player) => player.teamId === selectedSeries.teamAId);
     const teamBPlayers = draft.players.filter((player) => player.teamId === selectedSeries.teamBId);
     return { teamAPlayers, teamBPlayers, combined: [...teamAPlayers, ...teamBPlayers] };
-  }, [draft.players, selectedSeries]);
+  }, [draft, selectedSeries]);
   const selectedSeriesIsWalkover = selectedSeries ? isWalkoverSeries(selectedSeries) : false;
   const selectedSeriesFormat = selectedSeries
     ? getSeriesFormat(selectedSeries, draft)
@@ -591,7 +591,7 @@ export function AdminSeriesPanel({
       <Card className="min-w-0 overflow-hidden p-4">
         {!selectedSeries ? (
           <div className="rounded-xl border border-dashed border-white/10 p-6 text-sm text-muted">
-            Selecione uma série para editar ou clique em "Nova série".
+            Selecione uma série para editar ou clique em &quot;Nova série&quot;.
           </div>
         ) : (
           <div className="space-y-5">
