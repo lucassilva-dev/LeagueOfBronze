@@ -19,7 +19,7 @@ const body = Rajdhani({
 
 export const metadata: Metadata = {
   title: "League of Bronze",
-  description: "Acompanhamento de campeonato amador de League of Legends (MD3)",
+  description: "Acompanhamento de campeonato amador de League of Legends com séries MD3 e MD5",
 };
 
 export default function RootLayout({

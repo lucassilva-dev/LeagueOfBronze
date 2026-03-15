@@ -13,8 +13,8 @@ export default async function PartidasPage() {
     <PageShell className="space-y-6">
       <PageHero
         badge="Séries"
-        title="Partidas (MD3)"
-        description="Lista de confrontos em formato MD3, com placar da série e MVP da série calculado automaticamente."
+        title="Partidas"
+        description="Lista de confrontos por série, incluindo fase regular, semifinal e final em MD3 ou MD5."
       />
 
       {overview.seriesSummaries.length === 0 ? (

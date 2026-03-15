@@ -34,6 +34,7 @@ export function SeriesSummaryCard({
                     : "Em andamento"}
               </Badge>
               <span className="text-xs text-muted">{formatDateLabel(summary.series.date)}</span>
+              <span className="text-xs text-muted">{summary.stageLabel}</span>
             </div>
             <p className="mt-2 line-clamp-2 font-semibold">
               {teamA?.name ?? summary.series.teamAId}{" "}
@@ -56,7 +57,9 @@ export function SeriesSummaryCard({
                 {summary.score.teamBWins}
               </p>
               <p className="text-[10px] uppercase tracking-[0.16em] text-muted">
-                {summary.isWalkover ? "Série por W.O." : "Série MD3"}
+                {summary.isWalkover
+                  ? `${summary.formatLabel} por W.O.`
+                  : `Série ${summary.formatLabel}`}
               </p>
             </div>
             <ArrowRight className="h-4 w-4 text-muted transition group-hover:text-accent" />

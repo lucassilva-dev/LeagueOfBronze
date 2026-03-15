@@ -6,11 +6,18 @@ import { Plus, Trash2 } from "lucide-react";
 import type {
   Player,
   PlayerGameStats,
+  SeriesFormat,
+  SeriesStage,
   SeriesMatch,
   TournamentDataset,
 } from "@/lib/schema";
 import {
+  getSeriesFormat,
+  getSeriesFormatLabel,
+  getSeriesMaxGames,
   getSeriesScore,
+  getSeriesStageLabel,
+  getSeriesTargetWins,
   getSeriesWinnerTeamId,
   inferGameMvpPlayerId,
   isWalkoverSeries,
@@ -25,6 +32,16 @@ import { createBlankGame, createBlankSeries, createBlankStatsRow, type MutateDra
 
 function getTeamName(dataset: TournamentDataset, teamId: string) {
   return dataset.teams.find((team) => team.id === teamId)?.name ?? teamId ?? "—";
+}
+
+function getFormatOptionLabel(format: SeriesFormat) {
+  return format === "BO5" ? "MD5" : "MD3";
+}
+
+function getStageOptionLabel(stage: SeriesStage) {
+  if (stage === "SEMIFINAL") return "Semifinal";
+  if (stage === "FINAL") return "Final";
+  return "Fase regular";
 }
 
 type RiotImportedParticipant = {
@@ -306,6 +323,22 @@ export function AdminSeriesPanel({
     return { teamAPlayers, teamBPlayers, combined: [...teamAPlayers, ...teamBPlayers] };
   }, [draft.players, selectedSeries]);
   const selectedSeriesIsWalkover = selectedSeries ? isWalkoverSeries(selectedSeries) : false;
+  const selectedSeriesFormat = selectedSeries
+    ? getSeriesFormat(selectedSeries, draft)
+    : draft.tournament.format;
+  const selectedSeriesFormatLabel = selectedSeries
+    ? getSeriesFormatLabel(selectedSeries, draft)
+    : getFormatOptionLabel(draft.tournament.format);
+  const selectedSeriesMaxGames = selectedSeries
+    ? getSeriesMaxGames(selectedSeries, draft)
+    : draft.tournament.format === "BO5"
+      ? 5
+      : 3;
+  const selectedSeriesTargetWins = selectedSeries
+    ? getSeriesTargetWins(selectedSeries, draft)
+    : draft.tournament.format === "BO5"
+      ? 3
+      : 2;
 
   const setRiotMatchIdForGame = (seriesId: string, gameIndex: number, value: string) => {
     const key = getGameImportKey(seriesId, gameIndex);
@@ -337,7 +370,7 @@ export function AdminSeriesPanel({
   };
 
   const createSeries = () => {
-    const series = createBlankSeries();
+    const series = createBlankSeries(draft.tournament.format);
     mutateDraft((next) => {
       next.seriesMatches.push(series);
     });
@@ -353,7 +386,7 @@ export function AdminSeriesPanel({
 
   const confirmDeleteSelectedSeries = () => {
     if (!selectedSeries) return;
-    const score = getSeriesScore(selectedSeries);
+    const score = getSeriesScore(selectedSeries, draft);
     const shouldDelete = window.confirm(
       `Excluir a série ${selectedSeries.id} (${score.teamAWins}-${score.teamBWins})? Essa ação remove os jogos lançados desta série no rascunho.`,
     );
@@ -392,6 +425,25 @@ export function AdminSeriesPanel({
       const series = next.seriesMatches.find((row) => row.id === selectedSeries.id);
       if (!series) return;
       recipe(series);
+    });
+  };
+
+  const updateSeriesFormat = (nextFormat: SeriesFormat) => {
+    if (!selectedSeries) return;
+    const nextMaxGames = nextFormat === "BO5" ? 5 : 3;
+
+    if (selectedSeries.games.length > nextMaxGames) {
+      const shouldTrim = window.confirm(
+        `Trocar esta série para ${getFormatOptionLabel(nextFormat)} vai remover os jogos excedentes acima de ${nextMaxGames}. Deseja continuar?`,
+      );
+      if (!shouldTrim) return;
+    }
+
+    updateSelectedSeries((series) => {
+      series.format = nextFormat;
+      if (series.games.length > nextMaxGames) {
+        series.games = series.games.slice(0, nextMaxGames);
+      }
     });
   };
 
@@ -484,7 +536,7 @@ export function AdminSeriesPanel({
     <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
       <Card className="min-w-0 overflow-hidden p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="font-display text-lg font-bold tracking-wide">Séries (MD3)</h3>
+          <h3 className="font-display text-lg font-bold tracking-wide">Séries</h3>
           <Button variant="secondary" size="sm" onClick={createSeries}>
             <Plus className="h-4 w-4" /> Nova série
           </Button>
@@ -497,8 +549,8 @@ export function AdminSeriesPanel({
             </p>
           ) : (
             sortedSeries.map((series) => {
-              const score = getSeriesScore(series);
-              const winner = getSeriesWinnerTeamId(series);
+              const score = getSeriesScore(series, draft);
+              const winner = getSeriesWinnerTeamId(series, draft);
               const isWalkover = isWalkoverSeries(series);
               const teamA = getTeamName(draft, series.teamAId);
               const teamB = getTeamName(draft, series.teamBId);
@@ -517,7 +569,7 @@ export function AdminSeriesPanel({
                     <div className="min-w-0">
                       <p className="truncate font-semibold">{teamA} vs {teamB}</p>
                       <p className="text-xs text-muted">
-                        {series.id} • {formatDateLabel(series.date)}
+                        {getSeriesStageLabel(series)} • {getSeriesFormatLabel(series, draft)} • {formatDateLabel(series.date)}
                       </p>
                     </div>
                     <div className="shrink-0 text-right">
@@ -587,6 +639,36 @@ export function AdminSeriesPanel({
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
+                <Label htmlFor="series-stage">Etapa</Label>
+                <Select
+                  id="series-stage"
+                  value={selectedSeries.stage ?? "REGULAR_SEASON"}
+                  onChange={(e) =>
+                    updateSelectedSeries((series) => {
+                      series.stage = e.target.value as SeriesStage;
+                    })
+                  }
+                >
+                  <option value="REGULAR_SEASON">{getStageOptionLabel("REGULAR_SEASON")}</option>
+                  <option value="SEMIFINAL">{getStageOptionLabel("SEMIFINAL")}</option>
+                  <option value="FINAL">{getStageOptionLabel("FINAL")}</option>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="series-format">Formato da série</Label>
+                <Select
+                  id="series-format"
+                  value={selectedSeriesFormat}
+                  onChange={(e) => updateSeriesFormat(e.target.value as SeriesFormat)}
+                >
+                  <option value="BO3">{getFormatOptionLabel("BO3")}</option>
+                  <option value="BO5">{getFormatOptionLabel("BO5")}</option>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
                 <Label htmlFor="series-team-a">Time A</Label>
                 <Select
                   id="series-team-a"
@@ -645,7 +727,7 @@ export function AdminSeriesPanel({
             <div className="rounded-xl border border-white/8 bg-white/[0.02] p-4">
               <p className="font-display text-base font-bold tracking-wide">Resultado por W.O.</p>
               <p className="mt-1 text-xs text-muted">
-                Use quando a série não foi jogada. O sistema conta automaticamente como vitória por 2-0, sem gerar stats de jogadores.
+                Use quando a série não foi jogada. O sistema conta automaticamente como vitória por {selectedSeriesTargetWins}-0, sem gerar stats de jogadores.
               </p>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 <div>
@@ -691,17 +773,17 @@ export function AdminSeriesPanel({
                 <p className="text-xs text-muted">
                   {selectedSeriesIsWalkover
                     ? "Série encerrada por W.O.; os jogos e stats ficam desabilitados."
-                    : "Até 3 jogos. A tabela pública só conta a série quando houver vencedor (2 vitórias)."}
+                    : `${selectedSeriesFormatLabel} com até ${selectedSeriesMaxGames} jogos. A série fecha quando um time alcançar ${selectedSeriesTargetWins} vitórias.`}
                 </p>
               </div>
               <Button
                 variant="secondary"
                 size="sm"
                 className="max-w-full"
-                disabled={selectedSeriesIsWalkover}
+                disabled={selectedSeriesIsWalkover || selectedSeries.games.length >= selectedSeriesMaxGames}
                 onClick={() =>
                   updateSelectedSeries((series) => {
-                    if (series.games.length >= 3) return;
+                    if (series.games.length >= selectedSeriesMaxGames) return;
                     series.games.push(createBlankGame());
                   })
                 }
@@ -713,7 +795,7 @@ export function AdminSeriesPanel({
             <div className="space-y-4">
               {selectedSeriesIsWalkover ? (
                 <div className="rounded-xl border border-dashed border-white/10 p-4 text-sm text-muted">
-                  Série encerrada por W.O. com placar automático de 2-0 para{" "}
+                  Série encerrada por W.O. com placar automático de {selectedSeriesTargetWins}-0 para{" "}
                   <span className="font-semibold text-text">
                     {getTeamName(draft, selectedSeries.walkoverWinnerTeamId ?? "")}
                   </span>

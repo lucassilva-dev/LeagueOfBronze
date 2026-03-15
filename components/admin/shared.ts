@@ -1,6 +1,7 @@
 import type {
   Player,
   PlayerGameStats,
+  SeriesFormat,
   SeriesGame,
   SeriesMatch,
   Team,
@@ -59,7 +60,7 @@ export function createBlankGame(): SeriesGame {
   };
 }
 
-export function createBlankSeries(): SeriesMatch {
+export function createBlankSeries(defaultFormat: SeriesFormat = "BO3"): SeriesMatch {
   const now = new Date();
   const isoDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
     now.getDate(),
@@ -69,6 +70,8 @@ export function createBlankSeries(): SeriesMatch {
     date: isoDate,
     teamAId: "",
     teamBId: "",
+    stage: "REGULAR_SEASON",
+    format: defaultFormat,
     games: [],
   };
 }

@@ -1,6 +1,7 @@
 import type {
   Player,
   PlayerGameStats,
+  SeriesFormat,
   SeriesGame,
   SeriesMatch,
   Team,
@@ -59,6 +60,33 @@ export function getGameMvpPlayerId(game: SeriesGame) {
   return inferGameMvpPlayerId(game.statsByPlayer) || game.mvpPlayerId;
 }
 
+export function getSeriesFormat(series: SeriesMatch, dataset: TournamentDataset): SeriesFormat {
+  return series.format ?? dataset.tournament.format;
+}
+
+export function getSeriesFormatLabel(series: SeriesMatch, dataset: TournamentDataset) {
+  return getSeriesFormat(series, dataset) === "BO5" ? "MD5" : "MD3";
+}
+
+export function getSeriesTargetWins(series: SeriesMatch, dataset: TournamentDataset) {
+  return getSeriesFormat(series, dataset) === "BO5" ? 3 : 2;
+}
+
+export function getSeriesMaxGames(series: SeriesMatch, dataset: TournamentDataset) {
+  return getSeriesFormat(series, dataset) === "BO5" ? 5 : 3;
+}
+
+export function isRegularSeasonSeries(series: SeriesMatch) {
+  return (series.stage ?? "REGULAR_SEASON") === "REGULAR_SEASON";
+}
+
+export function getSeriesStageLabel(series: SeriesMatch) {
+  const stage = series.stage ?? "REGULAR_SEASON";
+  if (stage === "SEMIFINAL") return "Semifinal";
+  if (stage === "FINAL") return "Final";
+  return "Fase regular";
+}
+
 export function applyAutoGameMvpsToDataset(dataset: TournamentDataset): TournamentDataset {
   return {
     ...dataset,
@@ -94,12 +122,14 @@ export function createIndexes(dataset: TournamentDataset): DatasetIndexes {
   return { teamsById, teamsBySlug, playersById, playersBySlug, playersByTeamId };
 }
 
-export function getSeriesScore(series: SeriesMatch): SeriesScore {
+export function getSeriesScore(series: SeriesMatch, dataset?: TournamentDataset): SeriesScore {
+  const targetWins = dataset ? getSeriesTargetWins(series, dataset) : 2;
+
   if (series.walkoverWinnerTeamId === series.teamAId) {
-    return { teamAWins: 2, teamBWins: 0 };
+    return { teamAWins: targetWins, teamBWins: 0 };
   }
   if (series.walkoverWinnerTeamId === series.teamBId) {
-    return { teamAWins: 0, teamBWins: 2 };
+    return { teamAWins: 0, teamBWins: targetWins };
   }
 
   let teamAWins = 0;
@@ -117,16 +147,20 @@ export function isWalkoverSeries(series: SeriesMatch) {
   return Boolean(series.walkoverWinnerTeamId);
 }
 
-export function getSeriesWinnerTeamId(series: SeriesMatch): string | null {
+export function getSeriesWinnerTeamId(
+  series: SeriesMatch,
+  dataset?: TournamentDataset,
+): string | null {
   if (series.walkoverWinnerTeamId) return series.walkoverWinnerTeamId;
-  const score = getSeriesScore(series);
-  if (score.teamAWins >= 2) return series.teamAId;
-  if (score.teamBWins >= 2) return series.teamBId;
+  const score = getSeriesScore(series, dataset);
+  const targetWins = dataset ? getSeriesTargetWins(series, dataset) : 2;
+  if (score.teamAWins >= targetWins) return series.teamAId;
+  if (score.teamBWins >= targetWins) return series.teamBId;
   return null;
 }
 
-export function isSeriesComplete(series: SeriesMatch) {
-  return isWalkoverSeries(series) || getSeriesWinnerTeamId(series) !== null;
+export function isSeriesComplete(series: SeriesMatch, dataset?: TournamentDataset) {
+  return isWalkoverSeries(series) || getSeriesWinnerTeamId(series, dataset) !== null;
 }
 
 function compareDateDesc(a: string, b: string) {
@@ -278,19 +312,19 @@ function compareHeadToHead(teamAId: string, teamBId: string, dataset: Tournament
   let aGamesWon = 0;
   let bGamesWon = 0;
 
-  for (const series of dataset.seriesMatches) {
+  for (const series of getStandingsSeries(dataset)) {
     const isMatchup =
       (series.teamAId === teamAId && series.teamBId === teamBId) ||
       (series.teamAId === teamBId && series.teamBId === teamAId);
     if (!isMatchup) continue;
 
-    const winner = getSeriesWinnerTeamId(series);
+    const winner = getSeriesWinnerTeamId(series, dataset);
     if (!winner) continue;
 
     if (winner === teamAId) aSeriesWins += 1;
     if (winner === teamBId) bSeriesWins += 1;
 
-    const score = getSeriesScore(series);
+    const score = getSeriesScore(series, dataset);
     const aWinsInSeries = series.teamAId === teamAId ? score.teamAWins : score.teamBWins;
     const bWinsInSeries = series.teamAId === teamAId ? score.teamBWins : score.teamAWins;
     aGamesWon += aWinsInSeries;
@@ -372,6 +406,10 @@ function buildSeedStandingsRows(dataset: TournamentDataset): StandingsRow[] {
   return sortStandingsRows(rows, dataset);
 }
 
+function getStandingsSeries(dataset: TournamentDataset) {
+  return dataset.seriesMatches.filter((series) => isRegularSeasonSeries(series));
+}
+
 function buildSeriesStandingsRows(dataset: TournamentDataset): StandingsRow[] {
   const rowsByTeamId = new Map<string, StandingsRow>();
   for (const team of dataset.teams) {
@@ -392,8 +430,8 @@ function buildSeriesStandingsRows(dataset: TournamentDataset): StandingsRow[] {
     });
   }
 
-  for (const series of dataset.seriesMatches) {
-    const winnerTeamId = getSeriesWinnerTeamId(series);
+  for (const series of getStandingsSeries(dataset)) {
+    const winnerTeamId = getSeriesWinnerTeamId(series, dataset);
     if (!winnerTeamId) continue;
     const loserTeamId = winnerTeamId === series.teamAId ? series.teamBId : series.teamAId;
 
@@ -401,7 +439,7 @@ function buildSeriesStandingsRows(dataset: TournamentDataset): StandingsRow[] {
     const rowB = rowsByTeamId.get(series.teamBId);
     if (!rowA || !rowB) continue;
 
-    const score = getSeriesScore(series);
+    const score = getSeriesScore(series, dataset);
     rowA.seriesPlayed += 1;
     rowB.seriesPlayed += 1;
     rowA.gamesWon += score.teamAWins;
@@ -434,7 +472,7 @@ export function calculateStandings(dataset: TournamentDataset): {
   source: StandingsSource;
   rows: StandingsRow[];
 } {
-  if (dataset.seriesMatches.length === 0) {
+  if (getStandingsSeries(dataset).length === 0) {
     return { source: "seed", rows: buildSeedStandingsRows(dataset) };
   }
 
@@ -444,11 +482,13 @@ export function calculateStandings(dataset: TournamentDataset): {
 export function getSeriesSummaries(dataset: TournamentDataset): SeriesSummary[] {
   return sortSeriesByDateDesc(dataset.seriesMatches).map((series) => ({
     series,
-    score: getSeriesScore(series),
-    winnerTeamId: getSeriesWinnerTeamId(series),
-    isComplete: isSeriesComplete(series),
+    score: getSeriesScore(series, dataset),
+    winnerTeamId: getSeriesWinnerTeamId(series, dataset),
+    isComplete: isSeriesComplete(series, dataset),
     isWalkover: isWalkoverSeries(series),
     mvp: getSeriesMvp(series, dataset),
+    formatLabel: getSeriesFormatLabel(series, dataset),
+    stageLabel: getSeriesStageLabel(series),
   }));
 }
 
@@ -580,8 +620,23 @@ export function buildLeaderboards(
 
 export function calculateTeamAggregates(dataset: TournamentDataset): TeamAggregate[] {
   const playerAggs = calculatePlayerAggregates(dataset);
-  const standings = calculateStandings(dataset).rows;
-  const gameDiffByTeam = new Map(standings.map((row) => [row.teamId, row.gameDiff]));
+  const gameDiffByTeam = new Map<string, number>();
+
+  for (const team of dataset.teams) {
+    gameDiffByTeam.set(team.id, 0);
+  }
+
+  for (const series of dataset.seriesMatches) {
+    const score = getSeriesScore(series, dataset);
+    gameDiffByTeam.set(
+      series.teamAId,
+      (gameDiffByTeam.get(series.teamAId) ?? 0) + (score.teamAWins - score.teamBWins),
+    );
+    gameDiffByTeam.set(
+      series.teamBId,
+      (gameDiffByTeam.get(series.teamBId) ?? 0) + (score.teamBWins - score.teamAWins),
+    );
+  }
 
   const acc = new Map<
     string,

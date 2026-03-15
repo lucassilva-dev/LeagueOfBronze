@@ -20,18 +20,18 @@ export default async function HomePage() {
   const leader = overview.standings.rows[0];
   const topKills = overview.leaderboards.kills[0];
   const latestSeries = overview.seriesSummaries.slice(0, 3);
+  const hasBo5 = dataset.seriesMatches.some((series) => series.format === "BO5");
+  const tournamentFormatsLabel = hasBo5 || dataset.tournament.format === "BO5" ? "MD3 / MD5" : "MD3";
 
   return (
     <PageShell className="space-y-6">
       <PageHero
         badge="Campeonato"
         title={dataset.tournament.name}
-        description="Acompanhe tabela, séries MD3, MVPs e os rankings (abates, KDA, assistências e mais) em tempo real."
+        description="Acompanhe tabela da fase regular, séries, MVPs e os rankings em tempo real."
         extra={
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="muted">
-              Formato: {dataset.tournament.format === "BO3" ? "MD3" : dataset.tournament.format}
-            </Badge>
+            <Badge variant="muted">Formato: {tournamentFormatsLabel}</Badge>
             <Badge variant="outline">
               Atualizado em {formatDateTimeLabel(dataset.tournament.lastUpdatedISO)}
             </Badge>
@@ -54,7 +54,7 @@ export default async function HomePage() {
           </div>
           {leader ? (
             <p className="mt-3 text-sm text-muted">
-              {leader.points} pts • {leader.seriesWon}-{leader.seriesLost} em séries
+              {leader.points} pts • {leader.seriesWon}-{leader.seriesLost} na fase regular
             </p>
           ) : (
             <p className="mt-3 text-sm text-muted">Sem times cadastrados.</p>
@@ -83,7 +83,7 @@ export default async function HomePage() {
         <StatChip
           label="Séries registradas"
           value={dataset.seriesMatches.length}
-          hint="MD3 (até 3 jogos por série)"
+          hint="Inclui fase regular, semifinal e final"
         />
         <StatChip
           label="Jogadores"
@@ -96,12 +96,12 @@ export default async function HomePage() {
         <div className="space-y-4">
           <SectionTitle
             title="Últimas Séries"
-            subtitle="As 3 séries mais recentes aparecem aqui com placar e MVP da série."
+            subtitle="As 3 séries mais recentes aparecem aqui com placar, etapa e MVP da série."
           />
           {latestSeries.length === 0 ? (
             <EmptyState
               title="Nenhuma série registrada"
-              description="Use o painel /admin para lançar as primeiras séries MD3. As páginas públicas já estão prontas para atualizar automaticamente."
+              description="Use o painel /admin para lançar as primeiras séries. As páginas públicas já estão prontas para atualizar automaticamente."
             />
           ) : (
             <div className="space-y-3">
@@ -126,12 +126,12 @@ export default async function HomePage() {
             <QuickLinkCard
               href="/tabela"
               title="Tabela"
-              description="Classificação simples e avançada, filtros e busca por time."
+              description="Classificação da fase regular com filtros e busca por time."
             />
             <QuickLinkCard
               href="/partidas"
               title="Partidas"
-              description="Lista de séries MD3 com placar e detalhe jogo a jogo."
+              description="Lista de séries MD3 e MD5 com placar e detalhe jogo a jogo."
             />
             <QuickLinkCard
               href="/stats"
@@ -146,9 +146,9 @@ export default async function HomePage() {
                 <Swords className="h-4 w-4" />
               </span>
               <div>
-                <p className="font-semibold">Admin Fase 1</p>
+                <p className="font-semibold">Admin</p>
                 <p className="mt-1 text-sm text-muted">
-                  Lançamento de séries, times e jogadores via JSON local com validação.
+                  Lançamento de séries, times e jogadores com suporte a fase regular, semifinal, final, MD3 e MD5.
                 </p>
                 <Link href="/admin" className="mt-2 inline-flex text-sm font-semibold text-accent hover:underline">
                   Abrir painel admin

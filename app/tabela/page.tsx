@@ -13,7 +13,7 @@ export default async function TabelaPage() {
       <PageHero
         badge="Classificação"
         title="Tabela do Campeonato"
-        description="Classificação baseada em séries (MD3), com critérios de desempate automáticos: pontos, séries vencidas, saldo de jogos, confronto direto (apenas empate entre 2) e ordem alfabética."
+        description="Classificação da fase regular baseada em séries, com desempate automático por pontos, séries vencidas, saldo de jogos, confronto direto e ordem alfabética."
       />
       <StandingsPageClient rows={overview.standings.rows} source={overview.standings.source} />
     </PageShell>

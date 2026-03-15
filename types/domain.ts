@@ -44,6 +44,8 @@ export interface SeriesSummary {
   isComplete: boolean;
   isWalkover: boolean;
   mvp: SeriesMvpResult | null;
+  formatLabel: string;
+  stageLabel: string;
 }
 
 export interface PlayerAggregate {

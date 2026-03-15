@@ -20,9 +20,11 @@ import {
   getGameTeamKills,
   getGameMvpPlayerId,
   getSeriesById,
+  getSeriesFormatLabel,
   getSeriesGamesWithTeamRows,
   getSeriesMvp,
   getSeriesScore,
+  getSeriesStageLabel,
   getSeriesTeamKillTotals,
   getSeriesWinnerTeamId,
   isWalkoverSeries,
@@ -42,21 +44,25 @@ export default async function PartidaDetalhePage({
 
   const teamA = indexes.teamsById.get(series.teamAId);
   const teamB = indexes.teamsById.get(series.teamBId);
-  const score = getSeriesScore(series);
-  const winner = getSeriesWinnerTeamId(series);
+  const score = getSeriesScore(series, dataset);
+  const winner = getSeriesWinnerTeamId(series, dataset);
   const isWalkover = isWalkoverSeries(series);
   const seriesMvp = getSeriesMvp(series, dataset);
   const seriesKillTotals = getSeriesTeamKillTotals(series, dataset);
   const gameRows = getSeriesGamesWithTeamRows(series, dataset);
+  const seriesFormatLabel = getSeriesFormatLabel(series, dataset);
+  const stageLabel = getSeriesStageLabel(series);
 
   return (
     <PageShell className="space-y-6">
       <PageHero
         badge="Detalhe da Série"
         title={`${teamA?.name ?? series.teamAId} ${score.teamAWins}–${score.teamBWins} ${teamB?.name ?? series.teamBId}`}
-        description={`Série ${series.id} • ${formatDateLabel(series.date)}`}
+        description={`${stageLabel} • ${seriesFormatLabel} • Série ${series.id} • ${formatDateLabel(series.date)}`}
         extra={
           <div className="flex flex-wrap gap-2">
+            <Badge variant="outline">{seriesFormatLabel}</Badge>
+            <Badge variant="muted">{stageLabel}</Badge>
             <Badge variant={winner ? "success" : "muted"}>
               {isWalkover
                 ? "Série encerrada por W.O."

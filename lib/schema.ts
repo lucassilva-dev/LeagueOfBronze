@@ -2,6 +2,8 @@
 
 const nonEmpty = z.string().trim().min(1);
 type IssuePath = Array<string | number>;
+const seriesFormats = ["BO3", "BO5"] as const;
+const seriesStages = ["REGULAR_SEASON", "SEMIFINAL", "FINAL"] as const;
 
 function addCustomIssue(
   ctx: z.RefinementCtx,
@@ -166,6 +168,9 @@ function validateSeriesReferences(
   playerIds: Set<string>,
 ) {
   for (const [seriesIndex, series] of dataset.seriesMatches.entries()) {
+    const seriesFormat = series.format ?? dataset.tournament.format;
+    const maxGames = seriesFormat === "BO5" ? 5 : 3;
+
     if (!teamIds.has(series.teamAId) || !teamIds.has(series.teamBId)) {
       addCustomIssue(
         ctx,
@@ -179,6 +184,14 @@ function validateSeriesReferences(
         ctx,
         ["seriesMatches", seriesIndex],
         `Série ${series.id} possui times repetidos.`,
+      );
+    }
+
+    if (series.games.length > maxGames) {
+      addCustomIssue(
+        ctx,
+        ["seriesMatches", seriesIndex, "games"],
+        `Série ${series.id} no formato ${seriesFormat} não pode ter mais de ${maxGames} jogos.`,
       );
     }
 
@@ -210,6 +223,9 @@ function validateSeriesReferences(
   }
 }
 
+export const seriesFormatSchema = z.enum(seriesFormats);
+export const seriesStageSchema = z.enum(seriesStages);
+
 export const tournamentSchema = z.object({
   name: nonEmpty,
   lastUpdatedISO: nonEmpty,
@@ -217,7 +233,7 @@ export const tournamentSchema = z.object({
     win: z.number().int().nonnegative(),
     loss: z.number().int().nonnegative(),
   }),
-  format: z.literal("BO3"),
+  format: seriesFormatSchema,
 });
 
 export const teamSchema = z.object({
@@ -256,9 +272,11 @@ export const seriesMatchSchema = z.object({
   date: nonEmpty,
   teamAId: nonEmpty,
   teamBId: nonEmpty,
+  format: seriesFormatSchema.optional(),
+  stage: seriesStageSchema.optional(),
   walkoverWinnerTeamId: z.string().trim().optional(),
   walkoverReason: z.string().trim().optional(),
-  games: z.array(seriesGameSchema).max(3),
+  games: z.array(seriesGameSchema).max(5),
 });
 
 export const standingsSeedRowSchema = z.object({
@@ -298,4 +316,6 @@ export type PlayerGameStats = z.infer<typeof playerGameStatsSchema>;
 export type SeriesGame = z.infer<typeof seriesGameSchema>;
 export type SeriesMatch = z.infer<typeof seriesMatchSchema>;
 export type StandingsSeedRow = z.infer<typeof standingsSeedRowSchema>;
+export type SeriesFormat = z.infer<typeof seriesFormatSchema>;
+export type SeriesStage = z.infer<typeof seriesStageSchema>;
 
