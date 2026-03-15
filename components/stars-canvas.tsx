@@ -79,7 +79,7 @@ export function StarsCanvas() {
   return (
     <canvas
       ref={canvasRef}
-      aria-hidden
+      role="presentation"
       className="pointer-events-none fixed inset-0 -z-10 opacity-70"
     />
   );

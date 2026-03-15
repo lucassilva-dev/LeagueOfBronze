@@ -23,11 +23,87 @@ const metricLabels: Record<LeaderboardMetric, string> = {
   deathsLeast: "Menos Mortes",
 };
 
-export function StatsPageClient({
-  dataset,
-}: {
+type StatsPageClientProps = Readonly<{
   dataset: TournamentDataset;
-}) {
+}>;
+type LeaderboardValueProps = Readonly<{
+  metric: LeaderboardMetric;
+  value: number;
+}>;
+
+function LeaderboardValue({ metric, value }: LeaderboardValueProps) {
+  const label = metric === "kda" ? formatKda(value) : value;
+  return <span className="font-display font-bold text-accent">{label}</span>;
+}
+
+function PlayerLinkCell({ row }: Readonly<{ row: LeaderboardRow }>) {
+  return (
+    <div>
+      <Link href={`/jogadores/${row.player.playerSlug}`} className="font-semibold hover:text-accent">
+        {row.player.playerNick}
+      </Link>
+      <p className="text-xs text-muted">
+        <Link href={`/times/${row.player.teamSlug}`} className="hover:text-text">
+          {row.player.teamName}
+        </Link>
+      </p>
+    </div>
+  );
+}
+
+function createColumns(metric: LeaderboardMetric): ColumnDef<LeaderboardRow>[] {
+  return [
+    {
+      accessorKey: "position",
+      header: "Pos",
+      cell: ({ row }) => (
+        <span className="font-semibold text-accent">#{row.original.position}</span>
+      ),
+    },
+    {
+      accessorKey: "player.playerNick",
+      header: "Jogador",
+      cell: ({ row }) => <PlayerLinkCell row={row.original} />,
+    },
+    {
+      id: "gamesPlayed",
+      header: "Jogos",
+      accessorFn: (row) => row.player.gamesPlayed,
+      cell: ({ row }) => row.original.player.gamesPlayed,
+    },
+    {
+      id: "value",
+      header: metricLabels[metric],
+      accessorFn: (row) => row.value,
+      cell: ({ row }) => <LeaderboardValue metric={metric} value={row.original.value} />,
+    },
+    {
+      id: "kda",
+      header: "KDA",
+      accessorFn: (row) => row.player.kda,
+      cell: ({ row }) => formatKda(row.original.player.kda),
+    },
+    {
+      id: "kda-raw",
+      header: "K/D/A",
+      accessorFn: (row) => row.player.kills + row.player.assists - row.player.deaths,
+      cell: ({ row }) =>
+        `${row.original.player.kills}/${row.original.player.deaths}/${row.original.player.assists}`,
+    },
+  ];
+}
+
+function getDatasetPeriodLabel(dataset: TournamentDataset) {
+  if (dataset.seriesMatches.length === 0) return null;
+
+  const dates = dataset.seriesMatches.map((series) => series.date).sort((a, b) => a.localeCompare(b));
+  const from = dates[0];
+  const to = dates[dates.length - 1];
+
+  return `Período com dados disponíveis: ${formatDateLabel(from)} até ${formatDateLabel(to)}`;
+}
+
+export function StatsPageClient({ dataset }: StatsPageClientProps) {
   const [teamId, setTeamId] = useState<string>("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -44,66 +120,8 @@ export function StatsPageClient({
   );
 
   const rows = boards[metric];
-
-  const columns = useMemo<ColumnDef<LeaderboardRow>[]>(
-    () => [
-      {
-        accessorKey: "position",
-        header: "Pos",
-        cell: ({ row }) => <span className="font-semibold text-accent">#{row.original.position}</span>,
-      },
-      {
-        accessorKey: "player.playerNick",
-        header: "Jogador",
-        cell: ({ row }) => (
-          <div>
-            <Link
-              href={`/jogadores/${row.original.player.playerSlug}`}
-              className="font-semibold hover:text-accent"
-            >
-              {row.original.player.playerNick}
-            </Link>
-            <p className="text-xs text-muted">
-              <Link href={`/times/${row.original.player.teamSlug}`} className="hover:text-text">
-                {row.original.player.teamName}
-              </Link>
-            </p>
-          </div>
-        ),
-      },
-      {
-        id: "gamesPlayed",
-        header: "Jogos",
-        accessorFn: (row) => row.player.gamesPlayed,
-        cell: ({ row }) => row.original.player.gamesPlayed,
-      },
-      {
-        id: "value",
-        header: metricLabels[metric],
-        accessorFn: (row) => row.value,
-        cell: ({ row }) =>
-          metric === "kda" ? (
-            <span className="font-display font-bold text-accent">{formatKda(row.original.value)}</span>
-          ) : (
-            <span className="font-display font-bold text-accent">{row.original.value}</span>
-          ),
-      },
-      {
-        id: "kda",
-        header: "KDA",
-        accessorFn: (row) => row.player.kda,
-        cell: ({ row }) => formatKda(row.original.player.kda),
-      },
-      {
-        id: "kda-raw",
-        header: "K/D/A",
-        accessorFn: (row) => row.player.kills + row.player.assists - row.player.deaths,
-        cell: ({ row }) =>
-          `${row.original.player.kills}/${row.original.player.deaths}/${row.original.player.assists}`,
-      },
-    ],
-    [metric],
-  );
+  const columns = useMemo(() => createColumns(metric), [metric]);
+  const datasetPeriodLabel = getDatasetPeriodLabel(dataset);
 
   return (
     <div className="space-y-4">
@@ -124,7 +142,12 @@ export function StatsPageClient({
         </div>
         <div>
           <Label htmlFor="stats-from">Data inicial</Label>
-          <Input id="stats-from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+          <Input
+            id="stats-from"
+            type="date"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+          />
         </div>
         <div>
           <Label htmlFor="stats-to">Data final</Label>
@@ -159,7 +182,10 @@ export function StatsPageClient({
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-display text-lg font-bold text-accent">#{row.position}</p>
-                  <Link href={`/jogadores/${row.player.playerSlug}`} className="font-semibold hover:text-accent">
+                  <Link
+                    href={`/jogadores/${row.player.playerSlug}`}
+                    className="font-semibold hover:text-accent"
+                  >
                     {row.player.playerNick}
                   </Link>
                   <p className="text-xs text-muted">{row.player.teamName}</p>
@@ -182,22 +208,7 @@ export function StatsPageClient({
         <DataTable columns={columns} data={rows} emptyMessage="Sem jogos no filtro selecionado." />
       </Card>
 
-      {dataset.seriesMatches.length > 0 ? (
-        <p className="text-xs text-muted">
-          Período com dados disponíveis:{" "}
-          {formatDateLabel(
-            dataset.seriesMatches
-              .slice()
-              .sort((a, b) => a.date.localeCompare(b.date))[0]?.date,
-          )}{" "}
-          até{" "}
-          {formatDateLabel(
-            dataset.seriesMatches
-              .slice()
-              .sort((a, b) => b.date.localeCompare(a.date))[0]?.date,
-          )}
-        </p>
-      ) : null}
+      {datasetPeriodLabel ? <p className="text-xs text-muted">{datasetPeriodLabel}</p> : null}
     </div>
   );
 }

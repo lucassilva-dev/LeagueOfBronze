@@ -7,7 +7,7 @@ import { calculateStandings, buildLeaderboards } from "@/lib/tournament";
 import { Card } from "@/components/ui/card";
 import { formatKda } from "@/lib/format";
 
-export function AdminOverviewPanel({ draft }: { draft: TournamentDataset }) {
+export function AdminOverviewPanel({ draft }: Readonly<{ draft: TournamentDataset }>) {
   const standings = calculateStandings(draft);
   const topKills = buildLeaderboards(draft).kills[0];
 

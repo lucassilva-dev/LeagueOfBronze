@@ -85,10 +85,10 @@ function TeamEditorCard({
 export function AdminTeamsPanel({
   draft,
   mutateDraft,
-}: {
+}: Readonly<{
   draft: TournamentDataset;
   mutateDraft: MutateDraft;
-}) {
+}>) {
   const [selectedId, setSelectedId] = useState<string | null>(draft.teams[0]?.id ?? null);
   const selectedTeam = draft.teams.find((team) => team.id === selectedId) ?? null;
 

@@ -1,12 +1,12 @@
-import type {
+import type { SeriesMatch as SchemaSeriesMatch } from "@/lib/schema";
+
+export type {
   Player,
   SeriesGame,
   SeriesMatch,
   Team,
   TournamentDataset,
 } from "@/lib/schema";
-
-export type { Player, SeriesGame, SeriesMatch, Team, TournamentDataset };
 
 export type StandingsSource = "seed" | "series";
 
@@ -38,7 +38,7 @@ export interface SeriesMvpResult {
 }
 
 export interface SeriesSummary {
-  series: SeriesMatch;
+  series: SchemaSeriesMatch;
   score: SeriesScore;
   winnerTeamId: string | null;
   isComplete: boolean;

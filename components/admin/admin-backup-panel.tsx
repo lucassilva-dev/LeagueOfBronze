@@ -11,11 +11,11 @@ export function AdminBackupPanel({
   onImportText,
   onImportFile,
   importing,
-}: {
+}: Readonly<{
   onImportText: (text: string) => Promise<void>;
   onImportFile: (file: File) => Promise<void>;
   importing?: boolean;
-}) {
+}>) {
   const [text, setText] = useState("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 

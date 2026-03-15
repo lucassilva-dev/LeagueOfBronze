@@ -249,21 +249,29 @@ export function getSeriesMvp(
       continue;
     }
 
-    if (candidate.gameMvpCount !== best.gameMvpCount) {
-      if (candidate.gameMvpCount > best.gameMvpCount) best = candidate;
-      continue;
-    }
-    if (candidate.kda !== best.kda) {
-      if (candidate.kda > best.kda) best = candidate;
-      continue;
-    }
-
-    const candidateNick = indexes.playersById.get(candidate.playerId)?.nick ?? candidate.playerId;
-    const bestNick = indexes.playersById.get(best.playerId)?.nick ?? best.playerId;
-    if (candidateNick.localeCompare(bestNick, "pt-BR") < 0) best = candidate;
+    best = pickBestSeriesMvpCandidate(indexes, best, candidate);
   }
 
   return best;
+}
+
+function pickBestSeriesMvpCandidate(
+  indexes: DatasetIndexes,
+  current: SeriesMvpResult,
+  candidate: SeriesMvpResult,
+) {
+  if (candidate.gameMvpCount !== current.gameMvpCount) {
+    return candidate.gameMvpCount > current.gameMvpCount ? candidate : current;
+  }
+
+  if (candidate.kda !== current.kda) {
+    return candidate.kda > current.kda ? candidate : current;
+  }
+
+  const candidateNick = indexes.playersById.get(candidate.playerId)?.nick ?? candidate.playerId;
+  const currentNick = indexes.playersById.get(current.playerId)?.nick ?? current.playerId;
+
+  return candidateNick.localeCompare(currentNick, "pt-BR") < 0 ? candidate : current;
 }
 
 export function getSeriesTeamKillTotals(
@@ -308,10 +316,12 @@ function compareStandingsBase(a: StandingsRow, b: StandingsRow) {
 }
 
 function compareHeadToHead(teamAId: string, teamBId: string, dataset: TournamentDataset) {
-  let aSeriesWins = 0;
-  let bSeriesWins = 0;
-  let aGamesWon = 0;
-  let bGamesWon = 0;
+  const totals = {
+    aSeriesWins: 0,
+    bSeriesWins: 0,
+    aGamesWon: 0,
+    bGamesWon: 0,
+  };
 
   for (const series of getStandingsSeries(dataset)) {
     const isMatchup =
@@ -322,23 +332,43 @@ function compareHeadToHead(teamAId: string, teamBId: string, dataset: Tournament
     const winner = getSeriesWinnerTeamId(series, dataset);
     if (!winner) continue;
 
-    if (winner === teamAId) aSeriesWins += 1;
-    if (winner === teamBId) bSeriesWins += 1;
-
-    const score = getSeriesScore(series, dataset);
-    const aWinsInSeries = series.teamAId === teamAId ? score.teamAWins : score.teamBWins;
-    const bWinsInSeries = series.teamAId === teamAId ? score.teamBWins : score.teamAWins;
-    aGamesWon += aWinsInSeries;
-    bGamesWon += bWinsInSeries;
+    applyHeadToHeadSeriesTotals(totals, series, winner, dataset, teamAId, teamBId);
   }
 
-  if (aSeriesWins !== bSeriesWins) return bSeriesWins - aSeriesWins;
+  if (totals.aSeriesWins !== totals.bSeriesWins) {
+    return totals.bSeriesWins - totals.aSeriesWins;
+  }
 
-  const aGameDiff = aGamesWon - bGamesWon;
-  const bGameDiff = bGamesWon - aGamesWon;
+  const aGameDiff = totals.aGamesWon - totals.bGamesWon;
+  const bGameDiff = totals.bGamesWon - totals.aGamesWon;
   if (aGameDiff !== bGameDiff) return bGameDiff - aGameDiff;
 
   return 0;
+}
+
+function applyHeadToHeadSeriesTotals(
+  totals: {
+    aSeriesWins: number;
+    bSeriesWins: number;
+    aGamesWon: number;
+    bGamesWon: number;
+  },
+  series: SeriesMatch,
+  winner: string,
+  dataset: TournamentDataset,
+  teamAId: string,
+  teamBId: string,
+) {
+  if (winner === teamAId) totals.aSeriesWins += 1;
+  if (winner === teamBId) totals.bSeriesWins += 1;
+
+  const score = getSeriesScore(series, dataset);
+  const teamAPlayedOnSideA = series.teamAId === teamAId;
+  const aWinsInSeries = teamAPlayedOnSideA ? score.teamAWins : score.teamBWins;
+  const bWinsInSeries = teamAPlayedOnSideA ? score.teamBWins : score.teamAWins;
+
+  totals.aGamesWon += aWinsInSeries;
+  totals.bGamesWon += bWinsInSeries;
 }
 
 function sortStandingsRows(rows: StandingsRow[], dataset: TournamentDataset) {
@@ -524,6 +554,98 @@ type PlayerAccumulator = {
   seriesMvps: number;
 };
 
+function ensurePlayerAccumulator(
+  accumulators: Map<string, PlayerAccumulator>,
+  playerId: string,
+): PlayerAccumulator {
+  const existing = accumulators.get(playerId);
+  if (existing) return existing;
+
+  const created: PlayerAccumulator = {
+    kills: 0,
+    deaths: 0,
+    assists: 0,
+    gamesPlayed: 0,
+    gameMvps: 0,
+    seriesMvps: 0,
+  };
+  accumulators.set(playerId, created);
+  return created;
+}
+
+function applyPlayerGameStats(
+  accumulators: Map<string, PlayerAccumulator>,
+  indexes: DatasetIndexes,
+  filters: AggregationFilters | undefined,
+  game: SeriesGame,
+) {
+  for (const stats of game.statsByPlayer) {
+    const player = indexes.playersById.get(stats.playerId);
+    if (!player) continue;
+    if (filters?.teamId && player.teamId !== filters.teamId) continue;
+
+    const bucket = ensurePlayerAccumulator(accumulators, player.id);
+    bucket.kills += stats.kills;
+    bucket.deaths += stats.deaths;
+    bucket.assists += stats.assists;
+    bucket.gamesPlayed += 1;
+  }
+}
+
+function applyGameMvpToAccumulators(
+  accumulators: Map<string, PlayerAccumulator>,
+  indexes: DatasetIndexes,
+  filters: AggregationFilters | undefined,
+  game: SeriesGame,
+) {
+  const mvpPlayer = indexes.playersById.get(getGameMvpPlayerId(game));
+  if (mvpPlayer && (!filters?.teamId || mvpPlayer.teamId === filters.teamId)) {
+    ensurePlayerAccumulator(accumulators, mvpPlayer.id).gameMvps += 1;
+  }
+}
+
+function applySeriesMvpToAccumulators(
+  accumulators: Map<string, PlayerAccumulator>,
+  indexes: DatasetIndexes,
+  filters: AggregationFilters | undefined,
+  series: SeriesMatch,
+  dataset: TournamentDataset,
+) {
+  const seriesMvp = getSeriesMvp(series, dataset);
+  if (!seriesMvp) return;
+
+  const player = indexes.playersById.get(seriesMvp.playerId);
+  if (player && (!filters?.teamId || player.teamId === filters.teamId)) {
+    ensurePlayerAccumulator(accumulators, player.id).seriesMvps += 1;
+  }
+}
+
+function toPlayerAggregate(
+  indexes: DatasetIndexes,
+  player: Player,
+  bucket: PlayerAccumulator | undefined,
+): PlayerAggregate {
+  const kills = bucket?.kills ?? 0;
+  const deaths = bucket?.deaths ?? 0;
+  const assists = bucket?.assists ?? 0;
+
+  return {
+    playerId: player.id,
+    playerNick: player.nick,
+    playerSlug: player.slug,
+    teamId: player.teamId,
+    teamName: indexes.teamsById.get(player.teamId)?.name ?? player.teamId,
+    teamSlug: indexes.teamsById.get(player.teamId)?.slug ?? player.teamId,
+    kills,
+    deaths,
+    assists,
+    gamesPlayed: bucket?.gamesPlayed ?? 0,
+    gameMvps: bucket?.gameMvps ?? 0,
+    seriesMvps: bucket?.seriesMvps ?? 0,
+    kda: getKda(kills, deaths, assists),
+  };
+}
+
 export function calculatePlayerAggregates(
   dataset: TournamentDataset,
   filters?: AggregationFilters,
@@ -531,75 +653,20 @@ export function calculatePlayerAggregates(
   const indexes = createIndexes(dataset);
   const accumulators = new Map<string, PlayerAccumulator>();
 
-  const ensureBucket = (playerId: string): PlayerAccumulator => {
-    const existing = accumulators.get(playerId);
-    if (existing) return existing;
-    const created: PlayerAccumulator = {
-      kills: 0,
-      deaths: 0,
-      assists: 0,
-      gamesPlayed: 0,
-      gameMvps: 0,
-      seriesMvps: 0,
-    };
-    accumulators.set(playerId, created);
-    return created;
-  };
-
   for (const series of dataset.seriesMatches) {
     if (!seriesInRange(series, filters)) continue;
 
     for (const game of series.games) {
-      for (const stats of game.statsByPlayer) {
-        const player = indexes.playersById.get(stats.playerId);
-        if (!player) continue;
-        if (filters?.teamId && player.teamId !== filters.teamId) continue;
-
-        const bucket = ensureBucket(player.id);
-        bucket.kills += stats.kills;
-        bucket.deaths += stats.deaths;
-        bucket.assists += stats.assists;
-        bucket.gamesPlayed += 1;
-      }
-
-      const mvpPlayer = indexes.playersById.get(getGameMvpPlayerId(game));
-      if (mvpPlayer && (!filters?.teamId || mvpPlayer.teamId === filters.teamId)) {
-        ensureBucket(mvpPlayer.id).gameMvps += 1;
-      }
+      applyPlayerGameStats(accumulators, indexes, filters, game);
+      applyGameMvpToAccumulators(accumulators, indexes, filters, game);
     }
 
-    const seriesMvp = getSeriesMvp(series, dataset);
-    if (seriesMvp) {
-      const player = indexes.playersById.get(seriesMvp.playerId);
-      if (player && (!filters?.teamId || player.teamId === filters.teamId)) {
-        ensureBucket(player.id).seriesMvps += 1;
-      }
-    }
+    applySeriesMvpToAccumulators(accumulators, indexes, filters, series, dataset);
   }
 
   return dataset.players
     .filter((player) => !filters?.teamId || player.teamId === filters.teamId)
-    .map<PlayerAggregate>((player) => {
-      const bucket = accumulators.get(player.id);
-      const kills = bucket?.kills ?? 0;
-      const deaths = bucket?.deaths ?? 0;
-      const assists = bucket?.assists ?? 0;
-      return {
-        playerId: player.id,
-        playerNick: player.nick,
-        playerSlug: player.slug,
-        teamId: player.teamId,
-        teamName: indexes.teamsById.get(player.teamId)?.name ?? player.teamId,
-        teamSlug: indexes.teamsById.get(player.teamId)?.slug ?? player.teamId,
-        kills,
-        deaths,
-        assists,
-        gamesPlayed: bucket?.gamesPlayed ?? 0,
-        gameMvps: bucket?.gameMvps ?? 0,
-        seriesMvps: bucket?.seriesMvps ?? 0,
-        kda: getKda(kills, deaths, assists),
-      };
-    });
+    .map<PlayerAggregate>((player) => toPlayerAggregate(indexes, player, accumulators.get(player.id)));
 }
 
 export function buildLeaderboards(

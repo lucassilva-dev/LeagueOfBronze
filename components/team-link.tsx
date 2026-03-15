@@ -6,11 +6,11 @@ export function TeamLink({
   href,
   name,
   className,
-}: {
+}: Readonly<{
   href: string;
   name: string;
   className?: string;
-}) {
+}>) {
   return (
     <Link href={href} className={cn("font-semibold hover:text-accent", className)}>
       {name}

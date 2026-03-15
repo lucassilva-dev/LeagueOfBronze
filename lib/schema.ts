@@ -161,6 +161,73 @@ function validateGameReferences(
   }
 }
 
+function validateSeriesTeams(
+  series: SeriesMatch,
+  seriesIndex: number,
+  ctx: z.RefinementCtx,
+  teamIds: Set<string>,
+) {
+  if (!teamIds.has(series.teamAId) || !teamIds.has(series.teamBId)) {
+    addCustomIssue(
+      ctx,
+      ["seriesMatches", seriesIndex],
+      `Série ${series.id} referencia time inexistente.`,
+    );
+  }
+
+  if (series.teamAId === series.teamBId) {
+    addCustomIssue(
+      ctx,
+      ["seriesMatches", seriesIndex],
+      `Série ${series.id} possui times repetidos.`,
+    );
+  }
+}
+
+function validateSeriesGameLimit(
+  series: SeriesMatch,
+  seriesIndex: number,
+  ctx: z.RefinementCtx,
+  maxGames: number,
+  seriesFormat: "BO3" | "BO5",
+) {
+  if (series.games.length <= maxGames) return;
+
+  addCustomIssue(
+    ctx,
+    ["seriesMatches", seriesIndex, "games"],
+    `Série ${series.id} no formato ${seriesFormat} não pode ter mais de ${maxGames} jogos.`,
+  );
+}
+
+function validateWalkoverSeries(
+  series: SeriesMatch,
+  seriesIndex: number,
+  ctx: z.RefinementCtx,
+) {
+  if (!series.walkoverWinnerTeamId) return false;
+
+  const allowedWinners = new Set([series.teamAId, series.teamBId]);
+
+  if (!allowedWinners.has(series.walkoverWinnerTeamId)) {
+    addCustomIssue(
+      ctx,
+      ["seriesMatches", seriesIndex, "walkoverWinnerTeamId"],
+      `Série ${series.id} possui vencedor de W.O. inválido.`,
+    );
+  }
+
+  if (series.games.length > 0) {
+    addCustomIssue(
+      ctx,
+      ["seriesMatches", seriesIndex, "games"],
+      `Série ${series.id} marcada como W.O. não pode ter jogos registrados.`,
+    );
+  }
+
+  return true;
+}
+
 function validateSeriesReferences(
   dataset: TournamentDataset,
   ctx: z.RefinementCtx,
@@ -171,49 +238,10 @@ function validateSeriesReferences(
     const seriesFormat = series.format ?? dataset.tournament.format;
     const maxGames = seriesFormat === "BO5" ? 5 : 3;
 
-    if (!teamIds.has(series.teamAId) || !teamIds.has(series.teamBId)) {
-      addCustomIssue(
-        ctx,
-        ["seriesMatches", seriesIndex],
-        `Série ${series.id} referencia time inexistente.`,
-      );
-    }
+    validateSeriesTeams(series, seriesIndex, ctx, teamIds);
+    validateSeriesGameLimit(series, seriesIndex, ctx, maxGames, seriesFormat);
 
-    if (series.teamAId === series.teamBId) {
-      addCustomIssue(
-        ctx,
-        ["seriesMatches", seriesIndex],
-        `Série ${series.id} possui times repetidos.`,
-      );
-    }
-
-    if (series.games.length > maxGames) {
-      addCustomIssue(
-        ctx,
-        ["seriesMatches", seriesIndex, "games"],
-        `Série ${series.id} no formato ${seriesFormat} não pode ter mais de ${maxGames} jogos.`,
-      );
-    }
-
-    if (series.walkoverWinnerTeamId) {
-      const allowedWinners = new Set([series.teamAId, series.teamBId]);
-
-      if (!allowedWinners.has(series.walkoverWinnerTeamId)) {
-        addCustomIssue(
-          ctx,
-          ["seriesMatches", seriesIndex, "walkoverWinnerTeamId"],
-          `Série ${series.id} possui vencedor de W.O. inválido.`,
-        );
-      }
-
-      if (series.games.length > 0) {
-        addCustomIssue(
-          ctx,
-          ["seriesMatches", seriesIndex, "games"],
-          `Série ${series.id} marcada como W.O. não pode ter jogos registrados.`,
-        );
-      }
-
+    if (validateWalkoverSeries(series, seriesIndex, ctx)) {
       continue;
     }
 

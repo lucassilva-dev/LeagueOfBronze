@@ -4,11 +4,11 @@ export function StatChip({
   label,
   value,
   hint,
-}: {
+}: Readonly<{
   label: string;
   value: string | number;
   hint?: string;
-}) {
+}>) {
   return (
     <Card className="p-4">
       <p className="text-xs uppercase tracking-[0.14em] text-muted">{label}</p>

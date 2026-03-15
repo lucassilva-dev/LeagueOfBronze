@@ -7,11 +7,11 @@ export function QuickLinkCard({
   href,
   title,
   description,
-}: {
+}: Readonly<{
   href: string;
   title: string;
   description: string;
-}) {
+}>) {
   return (
     <Link href={href} className="block">
       <Card className="group h-full p-4 transition hover:-translate-y-0.5 hover:shadow-glow-strong">

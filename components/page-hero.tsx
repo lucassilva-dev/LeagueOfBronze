@@ -6,12 +6,12 @@ export function PageHero({
   title,
   description,
   extra,
-}: {
+}: Readonly<{
   badge?: string;
   title: string;
   description?: string;
   extra?: React.ReactNode;
-}) {
+}>) {
   return (
     <Card className="relative overflow-hidden p-5 sm:p-7">
       <div className="pointer-events-none absolute inset-0 bg-hero-radial opacity-90" />

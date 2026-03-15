@@ -43,16 +43,14 @@ function getRiotApiKey() {
 }
 
 function getDefaultRiotPlatform() {
-  return (process.env.RIOT_DEFAULT_PLATFORM?.trim().toUpperCase() || DEFAULT_RIOT_PLATFORM);
+  return process.env.RIOT_DEFAULT_PLATFORM?.trim().toUpperCase() || DEFAULT_RIOT_PLATFORM;
 }
 
 function normalizeMatchIdInput(input: string) {
   const trimmed = input.trim().toUpperCase();
-
   if (/^\d+$/.test(trimmed)) {
     return `${getDefaultRiotPlatform()}_${trimmed}`;
   }
-
   return trimmed;
 }
 
@@ -85,6 +83,24 @@ function inferRegionalRoutingFromMatchId(matchId: string): RiotRegionalRouting |
 function toDurationSeconds(value: number) {
   // Match-V5 retorna segundos; partidas antigas podem vir em ms.
   return value > 10_000 ? Math.round(value / 1000) : Math.round(value);
+}
+
+function getRiotApiErrorMessage(raw: unknown) {
+  if (
+    typeof raw === "object" &&
+    raw !== null &&
+    "status" in raw &&
+    typeof (raw as { status?: unknown }).status === "object"
+  ) {
+    return (raw as { status?: { message?: string } }).status?.message;
+  }
+
+  return undefined;
+}
+
+function getWinningSide(blueWins: number, redWins: number) {
+  if (blueWins === redWins) return null;
+  return blueWins > redWins ? ("BLUE" as const) : ("RED" as const);
 }
 
 export async function POST(request: NextRequest) {
@@ -140,13 +156,7 @@ export async function POST(request: NextRequest) {
     const raw = (await response.json().catch(() => ({}))) as unknown;
 
     if (!response.ok) {
-      const riotError =
-        typeof raw === "object" &&
-        raw !== null &&
-        "status" in raw &&
-        typeof (raw as { status?: unknown }).status === "object"
-          ? (raw as { status?: { message?: string } }).status?.message
-          : undefined;
+      const riotError = getRiotApiErrorMessage(raw);
 
       return NextResponse.json(
         {
@@ -181,16 +191,19 @@ export async function POST(request: NextRequest) {
         win: participant.win,
       }));
 
-    const blueWins = participants.filter((participant) => participant.side === "BLUE" && participant.win).length;
-    const redWins = participants.filter((participant) => participant.side === "RED" && participant.win).length;
+    const blueWins = participants.filter(
+      (participant) => participant.side === "BLUE" && participant.win,
+    ).length;
+    const redWins = participants.filter(
+      (participant) => participant.side === "RED" && participant.win,
+    ).length;
 
     return NextResponse.json({
       match: {
         matchId: parsed.metadata.matchId,
         durationSec: toDurationSeconds(parsed.info.gameDuration),
         durationMin: Math.max(1, Math.round(toDurationSeconds(parsed.info.gameDuration) / 60)),
-        winningSide:
-          blueWins === redWins ? null : blueWins > redWins ? ("BLUE" as const) : ("RED" as const),
+        winningSide: getWinningSide(blueWins, redWins),
         participants,
       },
     });

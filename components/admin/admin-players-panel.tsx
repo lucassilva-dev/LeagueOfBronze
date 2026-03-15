@@ -129,10 +129,10 @@ function PlayerEditorCard({
 export function AdminPlayersPanel({
   draft,
   mutateDraft,
-}: {
+}: Readonly<{
   draft: TournamentDataset;
   mutateDraft: MutateDraft;
-}) {
+}>) {
   const [selectedId, setSelectedId] = useState<string | null>(draft.players[0]?.id ?? null);
   const [teamFilter, setTeamFilter] = useState<string>("all");
   const selectedPlayer = draft.players.find((player) => player.id === selectedId) ?? null;

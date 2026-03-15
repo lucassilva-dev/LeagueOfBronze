@@ -8,10 +8,10 @@ import { cn } from "@/lib/utils";
 export function PageShell({
   children,
   className,
-}: {
+}: Readonly<{
   children: ReactNode;
   className?: string;
-}) {
+}>) {
   return (
     <motion.main
       initial={{ opacity: 0, y: 12 }}
