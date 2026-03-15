@@ -9,7 +9,9 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "sonar": "sonar"
   },
   "keywords": [],
   "author": "",
@@ -29,6 +31,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@sonar/scan": "^4.3.5",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^25.3.0",

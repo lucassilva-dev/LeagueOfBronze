@@ -55,6 +55,28 @@ npm run build
 npm run start
 npm run typecheck
 npm run test
+npm run test:coverage
+npm run sonar
+```
+
+## Sonar via CLI
+
+O projeto agora tem configuracao de scanner em `sonar-project.properties` e usa o pacote oficial `@sonar/scan`.
+
+Antes de rodar, defina as variaveis no terminal:
+
+```powershell
+$env:SONAR_HOST_URL="http://localhost:9000"
+$env:SONAR_TOKEN="seu-token"
+```
+
+Se o projeto no Sonar usar outra chave, ajuste `sonar.projectKey` em `sonar-project.properties`.
+
+Fluxo recomendado:
+
+```powershell
+npm run test:coverage
+npm run sonar
 ```
 
 ## Como funciona o JSON local (Fase 1)
