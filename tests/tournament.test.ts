@@ -4,6 +4,7 @@ import type { TournamentDataset } from "../lib/schema";
 import {
   buildLeaderboards,
   calculateStandings,
+  getChampionshipResult,
   getSeriesMvp,
   getSeriesScore,
 } from "../lib/tournament";
@@ -362,5 +363,79 @@ describe("playoffs and MD5", () => {
     expect(standings.rows.find((row) => row.teamId === "a")?.points).toBe(3);
     expect(standings.rows.find((row) => row.teamId === "b")?.points).toBe(0);
     expect(standings.rows.find((row) => row.teamId === "c")?.points).toBe(0);
+  });
+
+  it("detects the champion from the latest completed final", () => {
+    const dataset = baseDataset();
+    dataset.seriesMatches = [
+      {
+        id: "old-final",
+        date: "2026-03-01",
+        teamAId: "a",
+        teamBId: "b",
+        stage: "FINAL",
+        format: "BO5",
+        games: [
+          makeGame("a", "a1", [
+            { playerId: "a1", kills: 8, deaths: 2, assists: 6 },
+            { playerId: "a2", kills: 3, deaths: 4, assists: 9 },
+            { playerId: "b1", kills: 4, deaths: 6, assists: 3 },
+            { playerId: "b2", kills: 2, deaths: 7, assists: 4 },
+          ]),
+          makeGame("a", "a1", [
+            { playerId: "a1", kills: 9, deaths: 2, assists: 5 },
+            { playerId: "a2", kills: 2, deaths: 4, assists: 10 },
+            { playerId: "b1", kills: 5, deaths: 6, assists: 2 },
+            { playerId: "b2", kills: 1, deaths: 7, assists: 5 },
+          ]),
+          makeGame("a", "a2", [
+            { playerId: "a1", kills: 7, deaths: 3, assists: 8 },
+            { playerId: "a2", kills: 4, deaths: 3, assists: 12 },
+            { playerId: "b1", kills: 4, deaths: 6, assists: 5 },
+            { playerId: "b2", kills: 2, deaths: 6, assists: 7 },
+          ]),
+        ],
+      },
+      {
+        id: "current-final",
+        date: "2026-03-10",
+        teamAId: "b",
+        teamBId: "c",
+        stage: "FINAL",
+        format: "BO5",
+        games: [
+          makeGame("c", "c1", [
+            { playerId: "b1", kills: 4, deaths: 6, assists: 3 },
+            { playerId: "b2", kills: 2, deaths: 7, assists: 5 },
+            { playerId: "c1", kills: 9, deaths: 2, assists: 4 },
+            { playerId: "c2", kills: 3, deaths: 3, assists: 8 },
+          ]),
+          makeGame("c", "c1", [
+            { playerId: "b1", kills: 5, deaths: 6, assists: 4 },
+            { playerId: "b2", kills: 1, deaths: 7, assists: 6 },
+            { playerId: "c1", kills: 10, deaths: 2, assists: 5 },
+            { playerId: "c2", kills: 4, deaths: 3, assists: 7 },
+          ]),
+          makeGame("b", "b1", [
+            { playerId: "b1", kills: 11, deaths: 3, assists: 5 },
+            { playerId: "b2", kills: 3, deaths: 4, assists: 10 },
+            { playerId: "c1", kills: 6, deaths: 5, assists: 4 },
+            { playerId: "c2", kills: 2, deaths: 5, assists: 8 },
+          ]),
+          makeGame("c", "c2", [
+            { playerId: "b1", kills: 4, deaths: 6, assists: 4 },
+            { playerId: "b2", kills: 2, deaths: 7, assists: 7 },
+            { playerId: "c1", kills: 7, deaths: 4, assists: 5 },
+            { playerId: "c2", kills: 5, deaths: 2, assists: 11 },
+          ]),
+        ],
+      },
+    ];
+
+    const championship = getChampionshipResult(dataset);
+
+    expect(championship?.summary.series.id).toBe("current-final");
+    expect(championship?.championTeamId).toBe("c");
+    expect(championship?.runnerUpTeamId).toBe("b");
   });
 });

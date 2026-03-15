@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ArrowRight, Crown } from "lucide-react";
 
 import { EmptyState } from "@/components/empty-state";
 import { PageHero } from "@/components/page-hero";
@@ -16,12 +17,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatKda } from "@/lib/format";
+import { formatDateLabel, formatKda } from "@/lib/format";
 import { getOpGgMultiSearchUrlFromNicks } from "@/lib/opgg";
 import { getServerDataset } from "@/lib/server-data";
 import {
   calculateStandings,
   calculateTeamAggregates,
+  getChampionshipResult,
   getPlayersForTeam,
   getTeamBySlug,
   getTeamSeriesHistory,
@@ -44,32 +46,133 @@ export default async function TeamPage({
   const teamStats = calculateTeamAggregates(dataset).find((row) => row.teamId === team.id);
   const standingsRow = calculateStandings(dataset).rows.find((row) => row.teamId === team.id);
   const multiOpGg = getOpGgMultiSearchUrlFromNicks(roster.map((player) => player.nick));
+  const championship = getChampionshipResult(dataset);
+  const isChampion = championship?.championTeamId === team.id;
+  const runnerUpTeam = championship
+    ? indexes.teamsById.get(championship.runnerUpTeamId)
+    : null;
+  const finalMvp = championship?.summary.mvp
+    ? indexes.playersById.get(championship.summary.mvp.playerId)
+    : null;
+  const championWins = championship
+    ? championship.championTeamId === championship.summary.series.teamAId
+      ? championship.summary.score.teamAWins
+      : championship.summary.score.teamBWins
+    : 0;
+  const runnerUpWins = championship
+    ? championship.championTeamId === championship.summary.series.teamAId
+      ? championship.summary.score.teamBWins
+      : championship.summary.score.teamAWins
+    : 0;
 
   return (
     <PageShell className="space-y-6">
       <PageHero
-        badge="Time"
+        badge={isChampion ? "Campe\u00e3o" : "Time"}
         title={team.name}
-        description="Elenco, histórico de séries e estatísticas agregadas calculadas automaticamente a partir dos jogos."
+        description="Elenco, hist\u00f3rico de s\u00e9ries e estat\u00edsticas agregadas calculadas automaticamente a partir dos jogos."
         extra={
-          standingsRow ? (
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="accent">#{standingsRow.position} na tabela</Badge>
-              <Badge variant="outline">{standingsRow.points} pts</Badge>
-              <Badge variant="outline">
-                Séries {standingsRow.seriesWon}-{standingsRow.seriesLost}
+          <div className="flex flex-wrap gap-2">
+            {isChampion ? (
+              <Badge className="border-amber-300/30 bg-amber-300/15 text-amber-100" variant="outline">
+                Campe\u00e3o do campeonato
               </Badge>
-            </div>
-          ) : null
+            ) : null}
+            {standingsRow ? (
+              <>
+                <Badge variant="accent">#{standingsRow.position} na tabela</Badge>
+                <Badge variant="outline">{standingsRow.points} pts</Badge>
+                <Badge variant="outline">
+                  S\u00e9ries {standingsRow.seriesWon}-{standingsRow.seriesLost}
+                </Badge>
+              </>
+            ) : null}
+          </div>
         }
       />
+
+      {isChampion && championship ? (
+        <section>
+          <Card className="champion-panel champion-glow overflow-hidden p-5 sm:p-6">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+              <div className="max-w-3xl">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge className="border-amber-300/30 bg-amber-300/15 text-amber-100" variant="outline">
+                    T\u00edtulo confirmado
+                  </Badge>
+                  <Badge variant="outline">{championship.summary.formatLabel}</Badge>
+                  <Badge variant="outline">
+                    {formatDateLabel(championship.summary.series.date)}
+                  </Badge>
+                </div>
+
+                <div className="mt-4 flex items-start gap-3">
+                  <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/10 text-amber-100">
+                    <Crown className="h-6 w-6" />
+                  </span>
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.18em] text-amber-100/75">
+                      Momento do t\u00edtulo
+                    </p>
+                    <h2 className="mt-1 font-display text-2xl font-black tracking-wide sm:text-3xl">
+                      {team.name}
+                    </h2>
+                    <p className="mt-2 text-sm text-slate-200/80 sm:text-base">
+                      Venceu a grande final contra{" "}
+                      {runnerUpTeam?.name ?? championship.runnerUpTeamId} por{" "}
+                      {championWins}-{runnerUpWins}.
+                      {championship.summary.isWalkover
+                        ? " S\u00e9rie encerrada por W.O."
+                        : finalMvp
+                          ? ` MVP da final: ${finalMvp.nick}.`
+                          : ""}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 lg:w-[22rem]">
+                <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4 text-center">
+                  <p className="text-xs uppercase tracking-[0.16em] text-muted">
+                    Placar da final
+                  </p>
+                  <p className="mt-2 font-display text-4xl font-black tracking-wide text-amber-100">
+                    {championWins}
+                    <span className="mx-2 text-white/35">-</span>
+                    {runnerUpWins}
+                  </p>
+                  <p className="mt-1 text-xs text-muted">{championship.summary.stageLabel}</p>
+                </div>
+
+                <div className="flex flex-col justify-between rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.16em] text-muted">
+                      Grande final
+                    </p>
+                    <p className="mt-2 text-sm text-slate-200/80">
+                      Abra o detalhe completo da decis\u00e3o do campeonato.
+                    </p>
+                  </div>
+                  <Link
+                    href={`/partidas/${championship.summary.series.id}`}
+                    className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-amber-100 transition hover:text-white"
+                  >
+                    Ver final completa
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </section>
+      ) : null}
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatChip label="Abates" value={teamStats?.kills ?? 0} />
         <StatChip label="Mortes" value={teamStats?.deaths ?? 0} />
-        <StatChip label="Assistências" value={teamStats?.assists ?? 0} />
+        <StatChip label="Assist\u00eancias" value={teamStats?.assists ?? 0} />
         <StatChip
-          label="KDA médio"
+          label="KDA m\u00e9dio"
           value={formatKda(teamStats?.kda ?? 0)}
           hint={`MVPs (jogo): ${teamStats?.gameMvps ?? 0} • Saldo de jogos: ${teamStats?.gameDiff ?? 0}`}
         />
@@ -139,7 +242,7 @@ export default async function TeamPage({
                           </Link>
                         </TableCell>
                         <TableCell>{player.role1}</TableCell>
-                        <TableCell>{player.role2 || "—"}</TableCell>
+                        <TableCell>{player.role2 || "\u2014"}</TableCell>
                         <TableCell>{player.elo}</TableCell>
                       </TableRow>
                     ))}
@@ -151,11 +254,11 @@ export default async function TeamPage({
         </div>
 
         <div className="space-y-4">
-          <h2 className="font-display text-xl font-bold tracking-wide">Histórico de Séries</h2>
+          <h2 className="font-display text-xl font-bold tracking-wide">Hist\u00f3rico de S\u00e9ries</h2>
           {history.length === 0 ? (
             <EmptyState
-              title="Sem séries ainda"
-              description="Quando você lançar séries no admin, o histórico deste time aparecerá aqui."
+              title="Sem s\u00e9ries ainda"
+              description="Quando voc\u00ea lan\u00e7ar s\u00e9ries no admin, o hist\u00f3rico deste time aparecer\u00e1 aqui."
             />
           ) : (
             <div className="space-y-3">

@@ -52,6 +52,29 @@ body {
     0 10px 40px rgba(12, 31, 71, 0.2);
 }
 
+.champion-panel {
+  background-image:
+    radial-gradient(circle at 10% 14%, rgba(250, 204, 21, 0.16), transparent 32%),
+    radial-gradient(circle at 88% 18%, rgba(86, 180, 255, 0.18), transparent 28%),
+    linear-gradient(135deg, rgba(250, 204, 21, 0.08), transparent 42%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0));
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+    0 0 0 1px rgba(250, 204, 21, 0.18),
+    0 20px 70px rgba(13, 22, 46, 0.46);
+}
+
+.champion-glow {
+  animation: championPulse 4.8s ease-in-out infinite;
+}
+
+.final-card {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+    0 0 0 1px rgba(250, 204, 21, 0.14),
+    0 16px 48px rgba(11, 19, 43, 0.32);
+}
+
 .bg-grid {
   background-image:
     linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
@@ -84,6 +107,22 @@ body {
     )
     0 0 / 200% 100%;
   animation: shimmer 1.4s linear infinite;
+}
+
+@keyframes championPulse {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+      0 0 0 1px rgba(250, 204, 21, 0.18),
+      0 20px 70px rgba(13, 22, 46, 0.46);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+      0 0 0 1px rgba(250, 204, 21, 0.28),
+      0 24px 82px rgba(20, 33, 66, 0.58);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

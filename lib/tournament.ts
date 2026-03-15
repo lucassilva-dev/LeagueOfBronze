@@ -9,6 +9,7 @@ import type {
 } from "@/lib/schema";
 import { toDateEnd, toDateStart } from "@/lib/format";
 import type {
+  ChampionshipResult,
   DateRangeFilter,
   LeaderboardMetric,
   LeaderboardRow,
@@ -492,6 +493,28 @@ export function getSeriesSummaries(dataset: TournamentDataset): SeriesSummary[] 
   }));
 }
 
+export function getChampionshipResult(
+  dataset: TournamentDataset,
+): ChampionshipResult | null {
+  for (const summary of getSeriesSummaries(dataset)) {
+    if ((summary.series.stage ?? "REGULAR_SEASON") !== "FINAL") continue;
+    if (!summary.isComplete || !summary.winnerTeamId) continue;
+
+    const runnerUpTeamId =
+      summary.winnerTeamId === summary.series.teamAId
+        ? summary.series.teamBId
+        : summary.series.teamAId;
+
+    return {
+      summary,
+      championTeamId: summary.winnerTeamId,
+      runnerUpTeamId,
+    };
+  }
+
+  return null;
+}
+
 type PlayerAccumulator = {
   kills: number;
   deaths: number;
@@ -792,6 +815,7 @@ export function getDatasetOverview(dataset: TournamentDataset) {
     teamAggregates: calculateTeamAggregates(dataset),
     leaderboards: buildLeaderboards(dataset),
     seriesSummaries: getSeriesSummaries(dataset),
+    championship: getChampionshipResult(dataset),
   };
 }
 

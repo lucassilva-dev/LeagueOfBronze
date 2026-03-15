@@ -48,6 +48,12 @@ export interface SeriesSummary {
   stageLabel: string;
 }
 
+export interface ChampionshipResult {
+  summary: SeriesSummary;
+  championTeamId: string;
+  runnerUpTeamId: string;
+}
+
 export interface PlayerAggregate {
   playerId: string;
   playerNick: string;

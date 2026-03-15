@@ -1,5 +1,6 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Crown } from "lucide-react";
 
 import { PageHero } from "@/components/page-hero";
 import { PageShell } from "@/components/page-shell";
@@ -17,8 +18,8 @@ import {
 import { formatDateLabel, formatKda } from "@/lib/format";
 import { getServerDataset } from "@/lib/server-data";
 import {
-  getGameTeamKills,
   getGameMvpPlayerId,
+  getGameTeamKills,
   getSeriesById,
   getSeriesFormatLabel,
   getSeriesGamesWithTeamRows,
@@ -46,48 +47,136 @@ export default async function PartidaDetalhePage({
   const teamB = indexes.teamsById.get(series.teamBId);
   const score = getSeriesScore(series, dataset);
   const winner = getSeriesWinnerTeamId(series, dataset);
+  const winnerTeam = winner ? indexes.teamsById.get(winner) : null;
   const isWalkover = isWalkoverSeries(series);
   const seriesMvp = getSeriesMvp(series, dataset);
   const seriesKillTotals = getSeriesTeamKillTotals(series, dataset);
   const gameRows = getSeriesGamesWithTeamRows(series, dataset);
   const seriesFormatLabel = getSeriesFormatLabel(series, dataset);
   const stageLabel = getSeriesStageLabel(series);
+  const isGrandFinal = (series.stage ?? "REGULAR_SEASON") === "FINAL";
+  const championWins = winner
+    ? winner === series.teamAId
+      ? score.teamAWins
+      : score.teamBWins
+    : 0;
+  const runnerUpWins = winner
+    ? winner === series.teamAId
+      ? score.teamBWins
+      : score.teamAWins
+    : 0;
 
   return (
     <PageShell className="space-y-6">
       <PageHero
-        badge="Detalhe da Série"
+        badge={isGrandFinal ? "Grande Final" : "Detalhe da S\u00e9rie"}
         title={`${teamA?.name ?? series.teamAId} ${score.teamAWins}–${score.teamBWins} ${teamB?.name ?? series.teamBId}`}
-        description={`${stageLabel} • ${seriesFormatLabel} • Série ${series.id} • ${formatDateLabel(series.date)}`}
+        description={`${stageLabel} • ${seriesFormatLabel} • S\u00e9rie ${series.id} • ${formatDateLabel(series.date)}`}
         extra={
           <div className="flex flex-wrap gap-2">
             <Badge variant="outline">{seriesFormatLabel}</Badge>
-            <Badge variant="muted">{stageLabel}</Badge>
+            <Badge
+              variant="muted"
+              className={isGrandFinal ? "border-amber-300/20 bg-amber-300/10 text-amber-100" : undefined}
+            >
+              {stageLabel}
+            </Badge>
             <Badge variant={winner ? "success" : "muted"}>
               {isWalkover
-                ? "Série encerrada por W.O."
+                ? "S\u00e9rie encerrada por W.O."
                 : winner
-                  ? "Série finalizada"
-                  : "Série em andamento"}
+                  ? "S\u00e9rie finalizada"
+                  : "S\u00e9rie em andamento"}
             </Badge>
             {isWalkover ? (
               <Badge variant="accent">
-                Vencedor por W.O.: {indexes.teamsById.get(winner ?? "")?.name ?? winner ?? "—"}
+                Vencedor por W.O.: {winnerTeam?.name ?? winner ?? "\u2014"}
               </Badge>
             ) : seriesMvp ? (
               <Badge variant="accent">
-                MVP da série: {indexes.playersById.get(seriesMvp.playerId)?.nick ?? seriesMvp.playerId}
+                MVP da s\u00e9rie: {indexes.playersById.get(seriesMvp.playerId)?.nick ?? seriesMvp.playerId}
               </Badge>
             ) : (
-              <Badge variant="muted">MVP da série: —</Badge>
+              <Badge variant="muted">MVP da s\u00e9rie: \u2014</Badge>
             )}
           </div>
         }
       />
 
+      {isGrandFinal && winnerTeam ? (
+        <section>
+          <Card className="champion-panel champion-glow overflow-hidden p-5 sm:p-6">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+              <div className="max-w-3xl">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge className="border-amber-300/30 bg-amber-300/15 text-amber-100" variant="outline">
+                    Campe\u00e3o do campeonato
+                  </Badge>
+                  <Badge variant="outline">{seriesFormatLabel}</Badge>
+                  <Badge variant="outline">{formatDateLabel(series.date)}</Badge>
+                </div>
+
+                <div className="mt-4 flex items-start gap-3">
+                  <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/10 text-amber-100">
+                    <Crown className="h-6 w-6" />
+                  </span>
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.18em] text-amber-100/75">
+                      T\u00edtulo confirmado
+                    </p>
+                    <h2 className="mt-1 font-display text-2xl font-black tracking-wide sm:text-3xl">
+                      {winnerTeam.name}
+                    </h2>
+                    <p className="mt-2 text-sm text-slate-200/80 sm:text-base">
+                      Fechou a grande final por {championWins}-{runnerUpWins}.
+                      {isWalkover
+                        ? " O resultado foi definido por W.O."
+                        : seriesMvp
+                          ? ` MVP da final: ${indexes.playersById.get(seriesMvp.playerId)?.nick ?? seriesMvp.playerId}.`
+                          : ""}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 lg:w-[22rem]">
+                <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4 text-center">
+                  <p className="text-xs uppercase tracking-[0.16em] text-muted">
+                    Placar da final
+                  </p>
+                  <p className="mt-2 font-display text-4xl font-black tracking-wide text-amber-100">
+                    {championWins}
+                    <span className="mx-2 text-white/35">-</span>
+                    {runnerUpWins}
+                  </p>
+                  <p className="mt-1 text-xs text-muted">{stageLabel}</p>
+                </div>
+
+                <div className="flex flex-col justify-between rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.16em] text-muted">
+                      Time campe\u00e3o
+                    </p>
+                    <p className="mt-2 text-sm text-slate-200/80">
+                      Abra a p\u00e1gina do campe\u00e3o para ver elenco, campanha e estat\u00edsticas.
+                    </p>
+                  </div>
+                  <Link
+                    href={`/times/${winnerTeam.slug}`}
+                    className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-amber-100 transition hover:text-white"
+                  >
+                    Ver time campe\u00e3o
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </section>
+      ) : null}
+
       <section className="grid gap-4 md:grid-cols-2">
         <Card className="p-5">
-          <p className="text-xs uppercase tracking-[0.14em] text-muted">Abates por time na série</p>
+          <p className="text-xs uppercase tracking-[0.14em] text-muted">Abates por time na s\u00e9rie</p>
           <div className="mt-3 grid grid-cols-2 gap-3">
             <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
               <p className="text-xs text-muted">{teamA?.name ?? series.teamAId}</p>
@@ -105,7 +194,7 @@ export default async function PartidaDetalhePage({
         </Card>
 
         <Card className="p-5">
-          <p className="text-xs uppercase tracking-[0.14em] text-muted">Links rápidos</p>
+          <p className="text-xs uppercase tracking-[0.14em] text-muted">Links r\u00e1pidos</p>
           <div className="mt-3 grid gap-2">
             {teamA ? (
               <TeamLink href={`/times/${teamA.slug}`} name={`Ver time: ${teamA.name}`} />
@@ -124,8 +213,8 @@ export default async function PartidaDetalhePage({
         {gameRows.length === 0 ? (
           <Card className="p-5 text-sm text-muted">
             {isWalkover
-              ? `Esta série foi encerrada por W.O.${series.walkoverReason ? ` ${series.walkoverReason}` : ""}`
-              : "Esta série ainda não possui jogos lançados."}
+              ? `Esta s\u00e9rie foi encerrada por W.O.${series.walkoverReason ? ` ${series.walkoverReason}` : ""}`
+              : "Esta s\u00e9rie ainda n\u00e3o possui jogos lan\u00e7ados."}
           </Card>
         ) : (
           gameRows.map(({ game, gameIndex, teamARows, teamBRows }) => {
@@ -145,7 +234,7 @@ export default async function PartidaDetalhePage({
                       MVP: <span className="text-text">{gameMvp?.nick ?? gameMvpPlayerId}</span>
                       {typeof game.durationMin === "number" ? (
                         <>
-                          {" • "}Duração: <span className="text-text">{game.durationMin} min</span>
+                          {" • "}Dura\u00e7\u00e3o: <span className="text-text">{game.durationMin} min</span>
                         </>
                       ) : null}
                     </p>
@@ -190,7 +279,7 @@ export default async function PartidaDetalhePage({
                               <TableHeadCell className="min-w-[170px]">Jogador</TableHeadCell>
                               <TableHeadCell className="min-w-[96px]">
                                 <span className="sm:hidden">Camp.</span>
-                                <span className="hidden sm:inline">Campeão</span>
+                                <span className="hidden sm:inline">Campe\u00e3o</span>
                               </TableHeadCell>
                               <TableHeadCell className="whitespace-nowrap">K/D/A</TableHeadCell>
                               <TableHeadCell className="whitespace-nowrap text-right">KDA</TableHeadCell>
@@ -200,7 +289,7 @@ export default async function PartidaDetalhePage({
                             {block.rows.length === 0 ? (
                               <TableRow>
                                 <TableCell colSpan={4} className="text-muted">
-                                  Sem estatísticas neste jogo.
+                                  Sem estat\u00edsticas neste jogo.
                                 </TableCell>
                               </TableRow>
                             ) : (
@@ -215,7 +304,7 @@ export default async function PartidaDetalhePage({
                                     </Link>
                                   </TableCell>
                                   <TableCell className="whitespace-nowrap">
-                                    {row.champion || "—"}
+                                    {row.champion || "\u2014"}
                                   </TableCell>
                                   <TableCell className="whitespace-nowrap">
                                     {row.kills}/{row.deaths}/{row.assists}
@@ -240,5 +329,3 @@ export default async function PartidaDetalhePage({
     </PageShell>
   );
 }
-
-
