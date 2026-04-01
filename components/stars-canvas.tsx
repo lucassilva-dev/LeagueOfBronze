@@ -86,5 +86,5 @@ export function StarsCanvas() {
     };
   }, []);
 
-  return <canvas ref={canvasRef} aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 opacity-70" />;
+  return <canvas ref={canvasRef} className="pointer-events-none fixed inset-0 -z-10 opacity-70" />;
 }

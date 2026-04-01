@@ -259,6 +259,66 @@ describe("tournament helpers", () => {
     expect(normalized.seriesMatches[3]?.games).toEqual([]);
   });
 
+  it("covers helper edge cases for BO3, W.O. do time B e série incompleta", () => {
+    const dataset = createDataset();
+    const bo3Series = dataset.seriesMatches[0]!;
+    const incompleteBo5Series = {
+      id: "sf-incomplete",
+      date: "2026-03-28",
+      teamAId: "a",
+      teamBId: "b",
+      stage: "SEMIFINAL" as const,
+      format: "BO5" as const,
+      games: [
+        {
+          winnerTeamId: "a",
+          mvpPlayerId: "",
+          durationMin: 30,
+          statsByPlayer: [
+            { playerId: "a1", kills: 8, deaths: 2, assists: 6 },
+            { playerId: "a2", kills: 2, deaths: 3, assists: 9 },
+            { playerId: "b1", kills: 4, deaths: 6, assists: 3 },
+            { playerId: "b2", kills: 1, deaths: 7, assists: 5 },
+          ],
+        },
+        {
+          winnerTeamId: "b",
+          mvpPlayerId: "",
+          durationMin: 31,
+          statsByPlayer: [
+            { playerId: "a1", kills: 5, deaths: 4, assists: 4 },
+            { playerId: "a2", kills: 2, deaths: 5, assists: 8 },
+            { playerId: "b1", kills: 7, deaths: 3, assists: 5 },
+            { playerId: "b2", kills: 3, deaths: 4, assists: 10 },
+          ],
+        },
+      ],
+    };
+    const walkoverForTeamB = {
+      id: "wo-b",
+      date: "2026-04-02",
+      teamAId: "a",
+      teamBId: "b",
+      walkoverWinnerTeamId: "b",
+      games: [],
+    };
+
+    expect(getSeriesFormatLabel(bo3Series, dataset)).toBe("MD3");
+    expect(getSeriesTargetWins(bo3Series, dataset)).toBe(2);
+    expect(getSeriesMaxGames(bo3Series, dataset)).toBe(3);
+
+    expect(getSeriesScore(walkoverForTeamB, dataset)).toEqual({ teamAWins: 0, teamBWins: 2 });
+    expect(getSeriesWinnerTeamId(incompleteBo5Series, dataset)).toBeNull();
+    expect(isSeriesComplete(incompleteBo5Series, dataset)).toBe(false);
+
+    const sameDateOrdered = sortSeriesByDateDesc([
+      { ...bo3Series, id: "series-a", date: "2026-03-20" },
+      { ...bo3Series, id: "series-b", date: "2026-03-20" },
+    ]).map((series) => series.id);
+
+    expect(sameDateOrdered).toEqual(["series-b", "series-a"]);
+  });
+
   it("covers sorting, summaries, standings and championship result", () => {
     const dataset = createDataset();
     const orderedIds = sortSeriesByDateDesc([
@@ -284,6 +344,56 @@ describe("tournament helpers", () => {
     expect(championship?.runnerUpTeamId).toBe("a");
 
     expect(getLatestSeries(dataset, 2).map((row) => row.series.id)).toEqual(["s4", "s3"]);
+  });
+
+  it("covers championship fallback branches when finals are incomplete or missing", () => {
+    const dataset = createDataset();
+
+    dataset.seriesMatches = [
+      dataset.seriesMatches[0]!,
+      {
+        id: "final-incomplete",
+        date: "2026-04-01",
+        teamAId: "a",
+        teamBId: "c",
+        stage: "FINAL",
+        format: "BO5",
+        games: [
+          {
+            winnerTeamId: "a",
+            mvpPlayerId: "",
+            durationMin: 35,
+            statsByPlayer: [
+              { playerId: "a1", kills: 8, deaths: 2, assists: 4 },
+              { playerId: "a2", kills: 2, deaths: 3, assists: 10 },
+              { playerId: "c1", kills: 4, deaths: 5, assists: 4 },
+              { playerId: "c2", kills: 1, deaths: 6, assists: 6 },
+            ],
+          },
+          {
+            winnerTeamId: "c",
+            mvpPlayerId: "",
+            durationMin: 33,
+            statsByPlayer: [
+              { playerId: "a1", kills: 5, deaths: 4, assists: 5 },
+              { playerId: "a2", kills: 1, deaths: 4, assists: 8 },
+              { playerId: "c1", kills: 7, deaths: 3, assists: 6 },
+              { playerId: "c2", kills: 3, deaths: 3, assists: 9 },
+            ],
+          },
+        ],
+      },
+      dataset.seriesMatches[2]!,
+    ];
+
+    const championship = getChampionshipResult(dataset);
+    expect(championship?.summary.series.id).toBe("s3");
+
+    const noFinalDataset = {
+      ...dataset,
+      seriesMatches: dataset.seriesMatches.filter((series) => series.stage !== "FINAL"),
+    };
+    expect(getChampionshipResult(noFinalDataset)).toBeNull();
   });
 
   it("covers aggregates, lookups and per-game histories", () => {
