@@ -172,6 +172,203 @@ describe("calculateStandings", () => {
     const bPos = standings.rows.find((row) => row.teamId === "b")?.position;
     expect(aPos).toBeLessThan(bPos!);
   });
+
+  it("aplica confronto direto quando só 2 times ficam empatados em tudo mais", () => {
+    const dataset = baseDataset();
+    dataset.teams.push({ id: "d", name: "Delta", slug: "delta" });
+    dataset.players.push(
+      { id: "d1", nick: "D1", slug: "d1", teamId: "d", role1: "TOP", role2: "MID", elo: "OURO" },
+      { id: "d2", nick: "D2", slug: "d2", teamId: "d", role1: "JUNG", role2: "SUP", elo: "OURO" },
+    );
+
+    dataset.seriesMatches = [
+      {
+        id: "ab",
+        date: "2026-02-20",
+        teamAId: "a",
+        teamBId: "b",
+        games: [
+          makeGame("a", "a1", [
+            { playerId: "a1", kills: 8, deaths: 2, assists: 6 },
+            { playerId: "a2", kills: 2, deaths: 3, assists: 10 },
+            { playerId: "b1", kills: 4, deaths: 6, assists: 2 },
+            { playerId: "b2", kills: 1, deaths: 7, assists: 4 },
+          ]),
+          makeGame("b", "b1", [
+            { playerId: "a1", kills: 3, deaths: 5, assists: 4 },
+            { playerId: "a2", kills: 2, deaths: 4, assists: 8 },
+            { playerId: "b1", kills: 7, deaths: 2, assists: 5 },
+            { playerId: "b2", kills: 2, deaths: 3, assists: 10 },
+          ]),
+          makeGame("a", "a2", [
+            { playerId: "a1", kills: 6, deaths: 2, assists: 7 },
+            { playerId: "a2", kills: 4, deaths: 2, assists: 11 },
+            { playerId: "b1", kills: 5, deaths: 5, assists: 4 },
+            { playerId: "b2", kills: 1, deaths: 6, assists: 6 },
+          ]),
+        ],
+      },
+      {
+        id: "ad",
+        date: "2026-02-21",
+        teamAId: "a",
+        teamBId: "d",
+        games: [
+          makeGame("d", "d1", [
+            { playerId: "a1", kills: 4, deaths: 5, assists: 4 },
+            { playerId: "a2", kills: 2, deaths: 5, assists: 7 },
+            { playerId: "d1", kills: 8, deaths: 2, assists: 4 },
+            { playerId: "d2", kills: 3, deaths: 3, assists: 9 },
+          ]),
+          makeGame("a", "a1", [
+            { playerId: "a1", kills: 7, deaths: 3, assists: 5 },
+            { playerId: "a2", kills: 2, deaths: 3, assists: 10 },
+            { playerId: "d1", kills: 4, deaths: 6, assists: 4 },
+            { playerId: "d2", kills: 1, deaths: 6, assists: 8 },
+          ]),
+          makeGame("d", "d1", [
+            { playerId: "a1", kills: 3, deaths: 6, assists: 3 },
+            { playerId: "a2", kills: 1, deaths: 5, assists: 6 },
+            { playerId: "d1", kills: 7, deaths: 3, assists: 5 },
+            { playerId: "d2", kills: 2, deaths: 3, assists: 10 },
+          ]),
+        ],
+      },
+      {
+        id: "bc",
+        date: "2026-02-22",
+        teamAId: "b",
+        teamBId: "c",
+        games: [
+          makeGame("c", "c1", [
+            { playerId: "b1", kills: 5, deaths: 5, assists: 5 },
+            { playerId: "b2", kills: 2, deaths: 6, assists: 6 },
+            { playerId: "c1", kills: 8, deaths: 3, assists: 4 },
+            { playerId: "c2", kills: 3, deaths: 3, assists: 9 },
+          ]),
+          makeGame("b", "b1", [
+            { playerId: "b1", kills: 9, deaths: 2, assists: 5 },
+            { playerId: "b2", kills: 2, deaths: 3, assists: 11 },
+            { playerId: "c1", kills: 4, deaths: 6, assists: 4 },
+            { playerId: "c2", kills: 1, deaths: 6, assists: 8 },
+          ]),
+          makeGame("b", "b2", [
+            { playerId: "b1", kills: 7, deaths: 3, assists: 6 },
+            { playerId: "b2", kills: 4, deaths: 2, assists: 12 },
+            { playerId: "c1", kills: 5, deaths: 6, assists: 4 },
+            { playerId: "c2", kills: 2, deaths: 5, assists: 7 },
+          ]),
+        ],
+      },
+      {
+        id: "dc",
+        date: "2026-02-23",
+        teamAId: "d",
+        teamBId: "c",
+        games: [
+          makeGame("d", "d1", [
+            { playerId: "d1", kills: 8, deaths: 2, assists: 5 },
+            { playerId: "d2", kills: 2, deaths: 3, assists: 11 },
+            { playerId: "c1", kills: 4, deaths: 6, assists: 4 },
+            { playerId: "c2", kills: 1, deaths: 6, assists: 7 },
+          ]),
+          makeGame("d", "d2", [
+            { playerId: "d1", kills: 6, deaths: 3, assists: 7 },
+            { playerId: "d2", kills: 4, deaths: 2, assists: 12 },
+            { playerId: "c1", kills: 3, deaths: 6, assists: 5 },
+            { playerId: "c2", kills: 2, deaths: 5, assists: 6 },
+          ]),
+        ],
+      },
+    ];
+
+    const standings = calculateStandings(dataset);
+
+    const aRow = standings.rows.find((row) => row.teamId === "a");
+    const bRow = standings.rows.find((row) => row.teamId === "b");
+    const cRow = standings.rows.find((row) => row.teamId === "c");
+    const dRow = standings.rows.find((row) => row.teamId === "d");
+
+    expect(aRow).toMatchObject({ points: 3, seriesWon: 1, gameDiff: 0 });
+    expect(bRow).toMatchObject({ points: 3, seriesWon: 1, gameDiff: 0 });
+    expect(cRow).toMatchObject({ points: 0 });
+    expect(dRow).toMatchObject({ points: 6, seriesWon: 2 });
+    expect(aRow?.position).toBeLessThan(bRow!.position);
+  });
+
+  it("cai no fallback alfabético quando o confronto direto também empata", () => {
+    const dataset = baseDataset();
+
+    dataset.seriesMatches = [
+      {
+        id: "ab-1",
+        date: "2026-02-20",
+        teamAId: "a",
+        teamBId: "b",
+        games: [
+          makeGame("a", "a1", [
+            { playerId: "a1", kills: 8, deaths: 2, assists: 6 },
+            { playerId: "a2", kills: 2, deaths: 3, assists: 10 },
+            { playerId: "b1", kills: 4, deaths: 6, assists: 2 },
+            { playerId: "b2", kills: 1, deaths: 7, assists: 4 },
+          ]),
+          makeGame("b", "b1", [
+            { playerId: "a1", kills: 3, deaths: 5, assists: 4 },
+            { playerId: "a2", kills: 2, deaths: 4, assists: 8 },
+            { playerId: "b1", kills: 7, deaths: 2, assists: 5 },
+            { playerId: "b2", kills: 2, deaths: 3, assists: 10 },
+          ]),
+          makeGame("a", "a2", [
+            { playerId: "a1", kills: 6, deaths: 2, assists: 7 },
+            { playerId: "a2", kills: 4, deaths: 2, assists: 11 },
+            { playerId: "b1", kills: 5, deaths: 5, assists: 4 },
+            { playerId: "b2", kills: 1, deaths: 6, assists: 6 },
+          ]),
+        ],
+      },
+      {
+        id: "ab-2",
+        date: "2026-02-21",
+        teamAId: "b",
+        teamBId: "a",
+        games: [
+          makeGame("b", "b1", [
+            { playerId: "b1", kills: 8, deaths: 2, assists: 6 },
+            { playerId: "b2", kills: 2, deaths: 3, assists: 10 },
+            { playerId: "a1", kills: 4, deaths: 6, assists: 2 },
+            { playerId: "a2", kills: 1, deaths: 7, assists: 4 },
+          ]),
+          makeGame("a", "a1", [
+            { playerId: "b1", kills: 3, deaths: 5, assists: 4 },
+            { playerId: "b2", kills: 2, deaths: 4, assists: 8 },
+            { playerId: "a1", kills: 7, deaths: 2, assists: 5 },
+            { playerId: "a2", kills: 2, deaths: 3, assists: 10 },
+          ]),
+          makeGame("b", "b2", [
+            { playerId: "b1", kills: 6, deaths: 2, assists: 7 },
+            { playerId: "b2", kills: 4, deaths: 2, assists: 11 },
+            { playerId: "a1", kills: 5, deaths: 5, assists: 4 },
+            { playerId: "a2", kills: 1, deaths: 6, assists: 6 },
+          ]),
+        ],
+      },
+    ];
+
+    const standings = calculateStandings(dataset);
+
+    expect(standings.rows.find((row) => row.teamId === "a")).toMatchObject({
+      points: 3,
+      seriesWon: 1,
+      gameDiff: 0,
+      position: 1,
+    });
+    expect(standings.rows.find((row) => row.teamId === "b")).toMatchObject({
+      points: 3,
+      seriesWon: 1,
+      gameDiff: 0,
+      position: 2,
+    });
+  });
 });
 
 describe("leaderboards and MVP calculation", () => {
@@ -233,6 +430,52 @@ describe("leaderboards and MVP calculation", () => {
     const boards = buildLeaderboards(dataset);
 
     expect(boards.mvps[0]?.player.playerId).toBe("a1");
+  });
+
+  it("desempata leaderboard de KDA por quantidade de jogos", () => {
+    const dataset = baseDataset();
+    dataset.seriesMatches = [
+      {
+        id: "s-kda-a",
+        date: "2026-02-24",
+        teamAId: "a",
+        teamBId: "b",
+        games: [
+          makeGame("a", "a1", [
+            { playerId: "a1", kills: 4, deaths: 1, assists: 0 },
+            { playerId: "a2", kills: 1, deaths: 4, assists: 5 },
+            { playerId: "b1", kills: 2, deaths: 5, assists: 1 },
+            { playerId: "b2", kills: 1, deaths: 5, assists: 3 },
+          ]),
+          makeGame("a", "a1", [
+            { playerId: "a1", kills: 4, deaths: 1, assists: 0 },
+            { playerId: "a2", kills: 1, deaths: 4, assists: 5 },
+            { playerId: "b1", kills: 2, deaths: 5, assists: 1 },
+            { playerId: "b2", kills: 1, deaths: 5, assists: 3 },
+          ]),
+        ],
+      },
+      {
+        id: "s-kda-c",
+        date: "2026-02-25",
+        teamAId: "c",
+        teamBId: "b",
+        games: [
+          makeGame("c", "c1", [
+            { playerId: "c1", kills: 8, deaths: 2, assists: 0 },
+            { playerId: "c2", kills: 2, deaths: 4, assists: 6 },
+            { playerId: "b1", kills: 3, deaths: 6, assists: 2 },
+            { playerId: "b2", kills: 1, deaths: 5, assists: 4 },
+          ]),
+        ],
+      },
+    ];
+
+    const boards = buildLeaderboards(dataset);
+
+    expect(boards.kda[0]?.player.playerId).toBe("a1");
+    expect(boards.kda[1]?.player.playerId).toBe("c1");
+    expect(boards.kda[0]?.value).toBe(boards.kda[1]?.value);
   });
 });
 
