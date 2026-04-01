@@ -54,7 +54,7 @@ export function inferGameMvpPlayerId(rows: PlayerGameStats[]) {
       return a.playerId.localeCompare(b.playerId, "pt-BR");
     });
 
-  return ranked[0]!.playerId;
+  return ranked[0].playerId;
 }
 
 export function getGameMvpPlayerId(game: SeriesGame) {
