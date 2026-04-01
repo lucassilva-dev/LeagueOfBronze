@@ -5,8 +5,11 @@ import {
   buildLeaderboards,
   calculateStandings,
   getChampionshipResult,
+  inferGameMvpPlayerId,
   getSeriesMvp,
   getSeriesScore,
+  getSeriesTeamKillTotals,
+  getSeriesWinnerTeamId,
 } from "../lib/tournament";
 
 function baseDataset(): TournamentDataset {
@@ -68,6 +71,141 @@ describe("calculateStandings", () => {
     expect(standings.rows[0]?.teamId).toBe("a");
     expect(standings.rows[0]?.points).toBe(9);
     expect(standings.rows[0]?.fromSeed).toBe(true);
+  });
+
+  it("preenche seed faltante com zero e nao infere vitorias quando a regra de derrota pontua", () => {
+    const dataset = baseDataset();
+    dataset.tournament.seriesPointsRule = { win: 3, loss: 1 };
+    dataset.standingsSeed = [
+      { teamId: "a", played: 2, points: 4 },
+      { teamId: "b", played: 1, points: 1 },
+    ];
+
+    const standings = calculateStandings(dataset);
+
+    expect(standings.source).toBe("seed");
+    expect(standings.rows.find((row) => row.teamId === "a")).toMatchObject({
+      seriesPlayed: 2,
+      seriesWon: 0,
+      points: 4,
+    });
+    expect(standings.rows.find((row) => row.teamId === "c")).toMatchObject({
+      seriesPlayed: 0,
+      points: 0,
+      seriesWinRate: 0,
+    });
+  });
+
+  it("desempata por series vencidas quando a regra de derrota tambem pontua", () => {
+    const dataset = baseDataset();
+    dataset.teams.push({ id: "d", name: "Delta", slug: "delta" });
+    dataset.players.push(
+      { id: "d1", nick: "D1", slug: "d1", teamId: "d", role1: "TOP", role2: "MID", elo: "OURO" },
+      { id: "d2", nick: "D2", slug: "d2", teamId: "d", role1: "JUNG", role2: "SUP", elo: "OURO" },
+    );
+    dataset.tournament.seriesPointsRule = { win: 1, loss: 1 };
+    dataset.seriesMatches = [
+      {
+        id: "a-d",
+        date: "2026-02-20",
+        teamAId: "a",
+        teamBId: "d",
+        games: [
+          makeGame("a", "a1", [
+            { playerId: "a1", kills: 8, deaths: 2, assists: 5 },
+            { playerId: "a2", kills: 2, deaths: 3, assists: 9 },
+            { playerId: "d1", kills: 4, deaths: 6, assists: 3 },
+            { playerId: "d2", kills: 1, deaths: 6, assists: 6 },
+          ]),
+          makeGame("a", "a2", [
+            { playerId: "a1", kills: 6, deaths: 2, assists: 7 },
+            { playerId: "a2", kills: 4, deaths: 2, assists: 11 },
+            { playerId: "d1", kills: 5, deaths: 6, assists: 4 },
+            { playerId: "d2", kills: 2, deaths: 6, assists: 7 },
+          ]),
+        ],
+      },
+      {
+        id: "b-c",
+        date: "2026-02-21",
+        teamAId: "b",
+        teamBId: "c",
+        games: [
+          makeGame("c", "c1", [
+            { playerId: "b1", kills: 5, deaths: 5, assists: 4 },
+            { playerId: "b2", kills: 1, deaths: 6, assists: 6 },
+            { playerId: "c1", kills: 8, deaths: 2, assists: 5 },
+            { playerId: "c2", kills: 3, deaths: 3, assists: 9 },
+          ]),
+          makeGame("c", "c2", [
+            { playerId: "b1", kills: 4, deaths: 6, assists: 3 },
+            { playerId: "b2", kills: 2, deaths: 7, assists: 5 },
+            { playerId: "c1", kills: 7, deaths: 3, assists: 4 },
+            { playerId: "c2", kills: 4, deaths: 3, assists: 10 },
+          ]),
+        ],
+      },
+      {
+        id: "a-c",
+        date: "2026-02-22",
+        teamAId: "a",
+        teamBId: "c",
+        games: [
+          makeGame("c", "c1", [
+            { playerId: "a1", kills: 4, deaths: 5, assists: 4 },
+            { playerId: "a2", kills: 1, deaths: 5, assists: 8 },
+            { playerId: "c1", kills: 8, deaths: 2, assists: 4 },
+            { playerId: "c2", kills: 2, deaths: 3, assists: 10 },
+          ]),
+          makeGame("c", "c1", [
+            { playerId: "a1", kills: 3, deaths: 5, assists: 5 },
+            { playerId: "a2", kills: 2, deaths: 4, assists: 7 },
+            { playerId: "c1", kills: 7, deaths: 2, assists: 6 },
+            { playerId: "c2", kills: 3, deaths: 3, assists: 8 },
+          ]),
+        ],
+      },
+      {
+        id: "b-d",
+        date: "2026-02-23",
+        teamAId: "b",
+        teamBId: "d",
+        games: [
+          makeGame("d", "d1", [
+            { playerId: "b1", kills: 4, deaths: 6, assists: 4 },
+            { playerId: "b2", kills: 1, deaths: 6, assists: 7 },
+            { playerId: "d1", kills: 8, deaths: 2, assists: 5 },
+            { playerId: "d2", kills: 3, deaths: 3, assists: 9 },
+          ]),
+          makeGame("b", "b1", [
+            { playerId: "b1", kills: 10, deaths: 3, assists: 4 },
+            { playerId: "b2", kills: 3, deaths: 4, assists: 10 },
+            { playerId: "d1", kills: 5, deaths: 6, assists: 5 },
+            { playerId: "d2", kills: 2, deaths: 5, assists: 8 },
+          ]),
+          makeGame("d", "d1", [
+            { playerId: "b1", kills: 5, deaths: 6, assists: 5 },
+            { playerId: "b2", kills: 2, deaths: 6, assists: 8 },
+            { playerId: "d1", kills: 7, deaths: 3, assists: 6 },
+            { playerId: "d2", kills: 3, deaths: 4, assists: 10 },
+          ]),
+        ],
+      },
+    ];
+
+    const standings = calculateStandings(dataset);
+
+    expect(standings.rows.find((row) => row.teamId === "a")).toMatchObject({
+      points: 2,
+      seriesWon: 1,
+    });
+    expect(standings.rows.find((row) => row.teamId === "b")).toMatchObject({
+      points: 2,
+      seriesWon: 0,
+    });
+    expect(standings.rows.find((row) => row.teamId === "a")?.position).toBeLessThan(
+      standings.rows.find((row) => row.teamId === "b")!.position,
+    );
   });
 
   it("ignores standingsSeed once at least one series exists and applies head-to-head tie-break for 2 teams", () => {
@@ -372,6 +510,32 @@ describe("calculateStandings", () => {
 });
 
 describe("leaderboards and MVP calculation", () => {
+  it("retorna nulo para MVP da serie quando a serie nao tem jogos ou nao tem stats do elenco", () => {
+    const dataset = baseDataset();
+    const emptySeries = {
+      id: "s-empty",
+      date: "2026-02-23",
+      teamAId: "a",
+      teamBId: "b",
+      games: [],
+    };
+    const offRosterSeries = {
+      id: "s-off-roster",
+      date: "2026-02-24",
+      teamAId: "a",
+      teamBId: "b",
+      games: [
+        makeGame("a", "", [
+          { playerId: "ghost-a", kills: 5, deaths: 1, assists: 3 },
+          { playerId: "ghost-b", kills: 2, deaths: 4, assists: 1 },
+        ]),
+      ],
+    };
+
+    expect(getSeriesMvp(emptySeries, dataset)).toBeNull();
+    expect(getSeriesMvp(offRosterSeries, dataset)).toBeNull();
+  });
+
   it("builds leaderboards and series MVP using game MVP count then KDA", () => {
     const dataset = baseDataset();
     dataset.seriesMatches = [
@@ -476,6 +640,256 @@ describe("leaderboards and MVP calculation", () => {
     expect(boards.kda[0]?.player.playerId).toBe("a1");
     expect(boards.kda[1]?.player.playerId).toBe("c1");
     expect(boards.kda[0]?.value).toBe(boards.kda[1]?.value);
+  });
+
+  it("desempata MVP de jogo por assistencias, menos mortes e playerId", () => {
+    expect(
+      inferGameMvpPlayerId([
+        { playerId: "p2", kills: 4, deaths: 1, assists: 1 },
+        { playerId: "p1", kills: 4, deaths: 2, assists: 6 },
+      ]),
+    ).toBe("p1");
+
+    expect(
+      inferGameMvpPlayerId([
+        { playerId: "p2", kills: 0, deaths: 2, assists: 0 },
+        { playerId: "p1", kills: 0, deaths: 1, assists: 0 },
+      ]),
+    ).toBe("p1");
+
+    expect(
+      inferGameMvpPlayerId([
+        { playerId: "p2", kills: 5, deaths: 2, assists: 5 },
+        { playerId: "p1", kills: 5, deaths: 2, assists: 5 },
+      ]),
+    ).toBe("p1");
+
+    expect(
+      inferGameMvpPlayerId([
+        { playerId: "p1", kills: 4, deaths: 1, assists: 1 },
+        { playerId: "p2", kills: 4, deaths: 2, assists: 6 },
+      ]),
+    ).toBe("p2");
+
+    expect(
+      inferGameMvpPlayerId([
+        { playerId: "p1", kills: 0, deaths: 2, assists: 0 },
+        { playerId: "p2", kills: 0, deaths: 1, assists: 0 },
+      ]),
+    ).toBe("p2");
+  });
+
+  it("desempata MVP da serie por nick quando KDA e MVPs de jogo empatam", () => {
+    const dataset = baseDataset();
+    dataset.players.push({
+      id: "a3",
+      nick: "A0",
+      slug: "a0",
+      teamId: "a",
+      role1: "ADC",
+      role2: "SUP",
+      elo: "OURO",
+    });
+
+    dataset.seriesMatches = [
+      {
+        id: "s-tie-series-mvp",
+        date: "2026-02-26",
+        teamAId: "a",
+        teamBId: "b",
+        games: [
+          makeGame("a", "a1", [
+            { playerId: "a1", kills: 5, deaths: 1, assists: 5 },
+            { playerId: "a3", kills: 4, deaths: 1, assists: 5 },
+            { playerId: "b1", kills: 2, deaths: 5, assists: 2 },
+            { playerId: "b2", kills: 1, deaths: 6, assists: 3 },
+          ]),
+          makeGame("a", "a3", [
+            { playerId: "a1", kills: 4, deaths: 1, assists: 5 },
+            { playerId: "a3", kills: 5, deaths: 1, assists: 5 },
+            { playerId: "b1", kills: 3, deaths: 5, assists: 2 },
+            { playerId: "b2", kills: 1, deaths: 6, assists: 4 },
+          ]),
+        ],
+      },
+    ];
+
+    const seriesMvp = getSeriesMvp(dataset.seriesMatches[0]!, dataset);
+
+    expect(seriesMvp?.playerId).toBe("a3");
+  });
+
+  it("mantem o MVP atual quando o proximo candidato tem menos MVPs, menor KDA ou nick posterior", () => {
+    const dataset = baseDataset();
+    dataset.players.push({
+      id: "a3",
+      nick: "Z9",
+      slug: "z9",
+      teamId: "a",
+      role1: "ADC",
+      role2: "SUP",
+      elo: "OURO",
+    });
+
+    const lowerMvpSeries = {
+      id: "s-lower-mvp",
+      date: "2026-02-25",
+      teamAId: "a",
+      teamBId: "b",
+      games: [
+        makeGame("a", "a1", [
+          { playerId: "a1", kills: 7, deaths: 1, assists: 5 },
+          { playerId: "a2", kills: 3, deaths: 3, assists: 8 },
+          { playerId: "b1", kills: 2, deaths: 5, assists: 2 },
+          { playerId: "b2", kills: 1, deaths: 6, assists: 3 },
+        ]),
+        makeGame("a", "a1", [
+          { playerId: "a1", kills: 6, deaths: 1, assists: 6 },
+          { playerId: "a2", kills: 2, deaths: 3, assists: 9 },
+          { playerId: "b1", kills: 3, deaths: 5, assists: 2 },
+          { playerId: "b2", kills: 1, deaths: 6, assists: 4 },
+        ]),
+      ],
+    };
+
+    const lowerKdaSeries = {
+      id: "s-lower-kda",
+      date: "2026-02-26",
+      teamAId: "a",
+      teamBId: "b",
+      games: [
+        makeGame("a", "a1", [
+          { playerId: "a1", kills: 5, deaths: 1, assists: 5 },
+          { playerId: "a2", kills: 2, deaths: 4, assists: 7 },
+          { playerId: "b1", kills: 3, deaths: 5, assists: 2 },
+          { playerId: "b2", kills: 1, deaths: 6, assists: 3 },
+        ]),
+        makeGame("a", "a3", [
+          { playerId: "a1", kills: 4, deaths: 1, assists: 5 },
+          { playerId: "a3", kills: 4, deaths: 2, assists: 4 },
+          { playerId: "b1", kills: 2, deaths: 5, assists: 2 },
+          { playerId: "b2", kills: 1, deaths: 6, assists: 4 },
+        ]),
+      ],
+    };
+
+    const laterNickSeries = {
+      id: "s-later-nick",
+      date: "2026-02-27",
+      teamAId: "a",
+      teamBId: "b",
+      games: [
+        makeGame("a", "a1", [
+          { playerId: "a1", kills: 5, deaths: 1, assists: 5 },
+          { playerId: "a3", kills: 4, deaths: 1, assists: 5 },
+          { playerId: "b1", kills: 2, deaths: 5, assists: 2 },
+          { playerId: "b2", kills: 1, deaths: 6, assists: 3 },
+        ]),
+        makeGame("a", "a3", [
+          { playerId: "a1", kills: 4, deaths: 1, assists: 5 },
+          { playerId: "a3", kills: 5, deaths: 1, assists: 5 },
+          { playerId: "b1", kills: 3, deaths: 5, assists: 2 },
+          { playerId: "b2", kills: 1, deaths: 6, assists: 4 },
+        ]),
+      ],
+    };
+
+    expect(getSeriesMvp(lowerMvpSeries, dataset)?.playerId).toBe("a1");
+    expect(getSeriesMvp(lowerKdaSeries, dataset)?.playerId).toBe("a1");
+    expect(getSeriesMvp(laterNickSeries, dataset)?.playerId).toBe("a1");
+  });
+
+  it("troca o MVP da serie quando um candidato posterior acumula mais MVPs de jogo", () => {
+    const dataset = baseDataset();
+    dataset.players.push({
+      id: "a3",
+      nick: "A3",
+      slug: "a3",
+      teamId: "a",
+      role1: "ADC",
+      role2: "SUP",
+      elo: "OURO",
+    });
+
+    const series = {
+      id: "s-more-game-mvps",
+      date: "2026-02-27",
+      teamAId: "a",
+      teamBId: "b",
+      games: [
+        makeGame("a", "a1", [
+          { playerId: "a1", kills: 7, deaths: 1, assists: 5 },
+          { playerId: "a3", kills: 4, deaths: 2, assists: 4 },
+          { playerId: "b1", kills: 2, deaths: 5, assists: 2 },
+          { playerId: "b2", kills: 1, deaths: 6, assists: 3 },
+        ]),
+        makeGame("a", "a3", [
+          { playerId: "a1", kills: 4, deaths: 2, assists: 4 },
+          { playerId: "a3", kills: 8, deaths: 1, assists: 5 },
+          { playerId: "b1", kills: 3, deaths: 5, assists: 2 },
+          { playerId: "b2", kills: 1, deaths: 6, assists: 4 },
+        ]),
+        makeGame("a", "a3", [
+          { playerId: "a1", kills: 5, deaths: 2, assists: 5 },
+          { playerId: "a3", kills: 9, deaths: 1, assists: 4 },
+          { playerId: "b1", kills: 2, deaths: 6, assists: 2 },
+          { playerId: "b2", kills: 1, deaths: 6, assists: 5 },
+        ]),
+      ],
+    };
+
+    expect(getSeriesMvp(series, dataset)?.playerId).toBe("a3");
+  });
+
+  it("ignora jogadores desconhecidos ao somar kills por time na serie", () => {
+    const dataset = baseDataset();
+    const series = {
+      id: "s-kills-unknown",
+      date: "2026-02-28",
+      teamAId: "a",
+      teamBId: "b",
+      games: [
+        makeGame("a", "a1", [
+          { playerId: "a1", kills: 7, deaths: 1, assists: 5 },
+          { playerId: "a2", kills: 3, deaths: 2, assists: 8 },
+          { playerId: "b1", kills: 4, deaths: 5, assists: 2 },
+          { playerId: "b2", kills: 2, deaths: 6, assists: 4 },
+          { playerId: "ghost", kills: 99, deaths: 99, assists: 99 },
+        ]),
+      ],
+    };
+
+    expect(getSeriesTeamKillTotals(series, dataset)).toEqual({
+      a: 10,
+      b: 6,
+    });
+  });
+
+  it("usa alvo padrao de MD3 quando score e vencedor sao calculados sem dataset", () => {
+    const series = {
+      id: "s-no-dataset",
+      date: "2026-03-01",
+      teamAId: "a",
+      teamBId: "b",
+      format: "BO5" as const,
+      games: [
+        makeGame("a", "a1", [
+          { playerId: "a1", kills: 8, deaths: 2, assists: 5 },
+          { playerId: "a2", kills: 2, deaths: 3, assists: 9 },
+          { playerId: "b1", kills: 4, deaths: 6, assists: 3 },
+          { playerId: "b2", kills: 1, deaths: 6, assists: 6 },
+        ]),
+        makeGame("a", "a2", [
+          { playerId: "a1", kills: 6, deaths: 2, assists: 7 },
+          { playerId: "a2", kills: 4, deaths: 2, assists: 11 },
+          { playerId: "b1", kills: 5, deaths: 6, assists: 4 },
+          { playerId: "b2", kills: 2, deaths: 6, assists: 7 },
+        ]),
+      ],
+    };
+
+    expect(getSeriesScore(series)).toEqual({ teamAWins: 2, teamBWins: 0 });
+    expect(getSeriesWinnerTeamId(series)).toBe("a");
   });
 });
 
@@ -612,6 +1026,26 @@ describe("playoffs and MD5", () => {
     const dataset = baseDataset();
     dataset.seriesMatches = [
       {
+        id: "regular-late",
+        date: "2026-03-11",
+        teamAId: "a",
+        teamBId: "c",
+        games: [
+          makeGame("a", "a1", [
+            { playerId: "a1", kills: 6, deaths: 2, assists: 5 },
+            { playerId: "a2", kills: 2, deaths: 3, assists: 9 },
+            { playerId: "c1", kills: 4, deaths: 5, assists: 4 },
+            { playerId: "c2", kills: 1, deaths: 6, assists: 6 },
+          ]),
+          makeGame("a", "a2", [
+            { playerId: "a1", kills: 5, deaths: 3, assists: 6 },
+            { playerId: "a2", kills: 3, deaths: 2, assists: 11 },
+            { playerId: "c1", kills: 4, deaths: 6, assists: 4 },
+            { playerId: "c2", kills: 2, deaths: 6, assists: 7 },
+          ]),
+        ],
+      },
+      {
         id: "old-final",
         date: "2026-03-01",
         teamAId: "a",
@@ -680,5 +1114,292 @@ describe("playoffs and MD5", () => {
     expect(championship?.summary.series.id).toBe("current-final");
     expect(championship?.championTeamId).toBe("c");
     expect(championship?.runnerUpTeamId).toBe("b");
+  });
+
+  it("detects the champion when team A wins the final", () => {
+    const dataset = baseDataset();
+    dataset.seriesMatches = [
+      {
+        id: "team-a-final",
+        date: "2026-03-12",
+        teamAId: "a",
+        teamBId: "b",
+        stage: "FINAL",
+        format: "BO5",
+        games: [
+          makeGame("a", "a1", [
+            { playerId: "a1", kills: 8, deaths: 2, assists: 6 },
+            { playerId: "a2", kills: 2, deaths: 3, assists: 10 },
+            { playerId: "b1", kills: 4, deaths: 6, assists: 3 },
+            { playerId: "b2", kills: 1, deaths: 6, assists: 5 },
+          ]),
+          makeGame("a", "a1", [
+            { playerId: "a1", kills: 9, deaths: 2, assists: 5 },
+            { playerId: "a2", kills: 3, deaths: 4, assists: 11 },
+            { playerId: "b1", kills: 4, deaths: 7, assists: 3 },
+            { playerId: "b2", kills: 2, deaths: 6, assists: 6 },
+          ]),
+          makeGame("a", "a2", [
+            { playerId: "a1", kills: 7, deaths: 3, assists: 7 },
+            { playerId: "a2", kills: 4, deaths: 2, assists: 12 },
+            { playerId: "b1", kills: 5, deaths: 7, assists: 4 },
+            { playerId: "b2", kills: 1, deaths: 6, assists: 7 },
+          ]),
+        ],
+      },
+    ];
+
+    const championship = getChampionshipResult(dataset);
+
+    expect(championship?.championTeamId).toBe("a");
+    expect(championship?.runnerUpTeamId).toBe("b");
+  });
+
+  it("ignora serie completa com time fora do cadastro ao calcular a tabela", () => {
+    const dataset = baseDataset();
+    dataset.seriesMatches = [
+      {
+        id: "known-vs-phantom",
+        date: "2026-03-13",
+        teamAId: "a",
+        teamBId: "phantom-team",
+        walkoverWinnerTeamId: "a",
+        games: [],
+      },
+    ];
+
+    const standings = calculateStandings(dataset);
+
+    expect(standings.source).toBe("series");
+    expect(standings.rows.find((row) => row.teamId === "a")).toMatchObject({
+      seriesPlayed: 0,
+      points: 0,
+    });
+  });
+
+  it("ignora confronto direto incompleto e cai no fallback seguinte", () => {
+    const dataset = baseDataset();
+    dataset.seriesMatches = [
+      {
+        id: "ab-open",
+        date: "2026-02-20",
+        teamAId: "a",
+        teamBId: "b",
+        games: [
+          makeGame("a", "a1", [
+            { playerId: "a1", kills: 5, deaths: 2, assists: 4 },
+            { playerId: "a2", kills: 2, deaths: 3, assists: 8 },
+            { playerId: "b1", kills: 3, deaths: 5, assists: 2 },
+            { playerId: "b2", kills: 1, deaths: 6, assists: 4 },
+          ]),
+        ],
+      },
+      {
+        id: "a-c",
+        date: "2026-02-21",
+        teamAId: "a",
+        teamBId: "c",
+        games: [
+          makeGame("a", "a1", [
+            { playerId: "a1", kills: 8, deaths: 2, assists: 4 },
+            { playerId: "a2", kills: 2, deaths: 3, assists: 10 },
+            { playerId: "c1", kills: 4, deaths: 6, assists: 2 },
+            { playerId: "c2", kills: 1, deaths: 6, assists: 5 },
+          ]),
+          makeGame("a", "a2", [
+            { playerId: "a1", kills: 6, deaths: 2, assists: 7 },
+            { playerId: "a2", kills: 4, deaths: 2, assists: 11 },
+            { playerId: "c1", kills: 5, deaths: 6, assists: 4 },
+            { playerId: "c2", kills: 2, deaths: 6, assists: 7 },
+          ]),
+        ],
+      },
+      {
+        id: "b-c",
+        date: "2026-02-22",
+        teamAId: "b",
+        teamBId: "c",
+        games: [
+          makeGame("b", "b1", [
+            { playerId: "b1", kills: 8, deaths: 2, assists: 5 },
+            { playerId: "b2", kills: 2, deaths: 3, assists: 9 },
+            { playerId: "c1", kills: 4, deaths: 6, assists: 4 },
+            { playerId: "c2", kills: 1, deaths: 6, assists: 6 },
+          ]),
+          makeGame("b", "b1", [
+            { playerId: "b1", kills: 7, deaths: 3, assists: 6 },
+            { playerId: "b2", kills: 3, deaths: 3, assists: 10 },
+            { playerId: "c1", kills: 5, deaths: 6, assists: 4 },
+            { playerId: "c2", kills: 2, deaths: 6, assists: 7 },
+          ]),
+        ],
+      },
+    ];
+
+    const standings = calculateStandings(dataset);
+    const aRow = standings.rows.find((row) => row.teamId === "a");
+    const bRow = standings.rows.find((row) => row.teamId === "b");
+
+    expect(aRow).toMatchObject({ points: 3, seriesWon: 1, gameDiff: 2 });
+    expect(bRow).toMatchObject({ points: 3, seriesWon: 1, gameDiff: 2 });
+    expect(aRow?.position).toBeLessThan(bRow!.position);
+  });
+
+  it("usa saldo de jogos do H2H quando pontos, series vencidas e saldo geral empatam", () => {
+    const dataset = baseDataset();
+    dataset.teams.push({ id: "d", name: "Delta", slug: "delta" });
+    dataset.players.push(
+      { id: "d1", nick: "D1", slug: "d1", teamId: "d", role1: "TOP", role2: "MID", elo: "OURO" },
+      { id: "d2", nick: "D2", slug: "d2", teamId: "d", role1: "JUNG", role2: "SUP", elo: "OURO" },
+    );
+    dataset.tournament.seriesPointsRule = { win: 1, loss: 0 };
+    dataset.seriesMatches = [
+      {
+        id: "ab-1",
+        date: "2026-02-21",
+        teamAId: "a",
+        teamBId: "b",
+        games: [
+          makeGame("a", "a1", [
+            { playerId: "a1", kills: 8, deaths: 2, assists: 4 },
+            { playerId: "a2", kills: 2, deaths: 3, assists: 10 },
+            { playerId: "b1", kills: 4, deaths: 6, assists: 2 },
+            { playerId: "b2", kills: 1, deaths: 6, assists: 5 },
+          ]),
+          makeGame("a", "a2", [
+            { playerId: "a1", kills: 6, deaths: 2, assists: 7 },
+            { playerId: "a2", kills: 4, deaths: 2, assists: 11 },
+            { playerId: "b1", kills: 5, deaths: 6, assists: 4 },
+            { playerId: "b2", kills: 2, deaths: 6, assists: 7 },
+          ]),
+        ],
+      },
+      {
+        id: "ba-1",
+        date: "2026-02-22",
+        teamAId: "b",
+        teamBId: "a",
+        games: [
+          makeGame("b", "b1", [
+            { playerId: "b1", kills: 8, deaths: 2, assists: 5 },
+            { playerId: "b2", kills: 2, deaths: 3, assists: 9 },
+            { playerId: "a1", kills: 4, deaths: 6, assists: 4 },
+            { playerId: "a2", kills: 1, deaths: 6, assists: 6 },
+          ]),
+          makeGame("b", "b1", [
+            { playerId: "b1", kills: 7, deaths: 3, assists: 6 },
+            { playerId: "b2", kills: 3, deaths: 3, assists: 10 },
+            { playerId: "a1", kills: 5, deaths: 6, assists: 4 },
+            { playerId: "a2", kills: 2, deaths: 6, assists: 7 },
+          ]),
+          makeGame("a", "a1", [
+            { playerId: "b1", kills: 5, deaths: 6, assists: 5 },
+            { playerId: "b2", kills: 2, deaths: 6, assists: 8 },
+            { playerId: "a1", kills: 9, deaths: 2, assists: 5 },
+            { playerId: "a2", kills: 3, deaths: 3, assists: 10 },
+          ]),
+        ],
+      },
+      {
+        id: "a-c",
+        date: "2026-02-23",
+        teamAId: "a",
+        teamBId: "c",
+        games: [
+          makeGame("a", "a1", [
+            { playerId: "a1", kills: 8, deaths: 2, assists: 5 },
+            { playerId: "a2", kills: 2, deaths: 3, assists: 9 },
+            { playerId: "c1", kills: 4, deaths: 6, assists: 3 },
+            { playerId: "c2", kills: 1, deaths: 6, assists: 6 },
+          ]),
+          makeGame("c", "c1", [
+            { playerId: "a1", kills: 4, deaths: 5, assists: 4 },
+            { playerId: "a2", kills: 1, deaths: 5, assists: 8 },
+            { playerId: "c1", kills: 8, deaths: 2, assists: 4 },
+            { playerId: "c2", kills: 2, deaths: 3, assists: 10 },
+          ]),
+          makeGame("a", "a2", [
+            { playerId: "a1", kills: 6, deaths: 2, assists: 7 },
+            { playerId: "a2", kills: 4, deaths: 2, assists: 11 },
+            { playerId: "c1", kills: 5, deaths: 6, assists: 4 },
+            { playerId: "c2", kills: 2, deaths: 6, assists: 7 },
+          ]),
+        ],
+      },
+      {
+        id: "a-d",
+        date: "2026-02-24",
+        teamAId: "a",
+        teamBId: "d",
+        games: [
+          makeGame("d", "d1", [
+            { playerId: "a1", kills: 4, deaths: 6, assists: 4 },
+            { playerId: "a2", kills: 1, deaths: 6, assists: 7 },
+            { playerId: "d1", kills: 8, deaths: 2, assists: 5 },
+            { playerId: "d2", kills: 3, deaths: 3, assists: 9 },
+          ]),
+          makeGame("d", "d1", [
+            { playerId: "a1", kills: 5, deaths: 6, assists: 5 },
+            { playerId: "a2", kills: 2, deaths: 6, assists: 8 },
+            { playerId: "d1", kills: 7, deaths: 3, assists: 6 },
+            { playerId: "d2", kills: 3, deaths: 4, assists: 10 },
+          ]),
+        ],
+      },
+      {
+        id: "b-c",
+        date: "2026-02-25",
+        teamAId: "b",
+        teamBId: "c",
+        games: [
+          makeGame("b", "b1", [
+            { playerId: "b1", kills: 8, deaths: 2, assists: 5 },
+            { playerId: "b2", kills: 2, deaths: 3, assists: 9 },
+            { playerId: "c1", kills: 4, deaths: 6, assists: 4 },
+            { playerId: "c2", kills: 1, deaths: 6, assists: 6 },
+          ]),
+          makeGame("b", "b1", [
+            { playerId: "b1", kills: 7, deaths: 3, assists: 6 },
+            { playerId: "b2", kills: 3, deaths: 3, assists: 10 },
+            { playerId: "c1", kills: 5, deaths: 6, assists: 4 },
+            { playerId: "c2", kills: 2, deaths: 6, assists: 7 },
+          ]),
+        ],
+      },
+      {
+        id: "b-d",
+        date: "2026-02-26",
+        teamAId: "b",
+        teamBId: "d",
+        games: [
+          makeGame("d", "d1", [
+            { playerId: "b1", kills: 4, deaths: 6, assists: 4 },
+            { playerId: "b2", kills: 1, deaths: 6, assists: 7 },
+            { playerId: "d1", kills: 8, deaths: 2, assists: 5 },
+            { playerId: "d2", kills: 3, deaths: 3, assists: 9 },
+          ]),
+          makeGame("b", "b1", [
+            { playerId: "b1", kills: 10, deaths: 3, assists: 4 },
+            { playerId: "b2", kills: 3, deaths: 4, assists: 10 },
+            { playerId: "d1", kills: 5, deaths: 6, assists: 5 },
+            { playerId: "d2", kills: 2, deaths: 5, assists: 8 },
+          ]),
+          makeGame("d", "d1", [
+            { playerId: "b1", kills: 5, deaths: 6, assists: 5 },
+            { playerId: "b2", kills: 2, deaths: 6, assists: 8 },
+            { playerId: "d1", kills: 7, deaths: 3, assists: 6 },
+            { playerId: "d2", kills: 3, deaths: 4, assists: 10 },
+          ]),
+        ],
+      },
+    ];
+
+    const standings = calculateStandings(dataset);
+    const aRow = standings.rows.find((row) => row.teamId === "a");
+    const bRow = standings.rows.find((row) => row.teamId === "b");
+
+    expect(aRow).toMatchObject({ points: 2, seriesWon: 2, gameDiff: 0 });
+    expect(bRow).toMatchObject({ points: 2, seriesWon: 2, gameDiff: 0 });
+    expect(aRow?.position).toBeLessThan(bRow!.position);
   });
 });

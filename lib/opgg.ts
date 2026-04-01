@@ -28,9 +28,6 @@ export function parseRiotId(input: string): ParsedRiotId | null {
 
   const gameName = trimmed.slice(0, hashIndex).trim();
   const tagLine = trimmed.slice(hashIndex + 1).trim();
-
-  if (!gameName || !tagLine) return null;
-
   return { gameName, tagLine };
 }
 

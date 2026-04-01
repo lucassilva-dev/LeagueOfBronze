@@ -11,6 +11,7 @@ import {
   getDatasetOverview,
   getGameMvpPlayerId,
   getGameTeamKills,
+  getKda,
   getLatestSeries,
   getPlayerBySlug,
   getPlayerGameHistory,
@@ -329,6 +330,12 @@ describe("tournament helpers", () => {
     expect(orderedIds[0]).toBe("s4");
     expect(orderedIds.at(-1)).toBe("invalid-date");
 
+    const reversedInvalidIds = sortSeriesByDateDesc([
+      { ...dataset.seriesMatches[0]!, id: "invalid-first", date: "not-a-date" },
+      dataset.seriesMatches[0]!,
+    ]).map((series) => series.id);
+    expect(reversedInvalidIds).toEqual(["s1", "invalid-first"]);
+
     const standings = calculateStandings(dataset);
     expect(standings.source).toBe("series");
     expect(standings.rows.map((row) => row.teamId)).toEqual(["a", "b", "c"]);
@@ -481,5 +488,244 @@ describe("tournament helpers", () => {
     expect(gameRows[0]?.gameIndex).toBe(1);
     expect(gameRows[0]?.teamARows[0]?.playerNick).toBe("A1");
     expect(gameRows[0]?.teamBRows[0]?.playerNick).toBe("B1");
+  });
+
+  it("covers remaining helper branches for KDA, leaderboard positions and game rows", () => {
+    const dataset = createDataset();
+    const oddSeries = {
+      id: "s-odd",
+      date: "2026-04-02",
+      teamAId: "a",
+      teamBId: "b",
+      games: [
+        {
+          winnerTeamId: "a",
+          mvpPlayerId: "",
+          durationMin: 28,
+          statsByPlayer: [
+            { playerId: "a2", champion: "Lulu", kills: 3, deaths: 1, assists: 4 },
+            { playerId: "a1", champion: "Ahri", kills: 3, deaths: 0, assists: 5 },
+            { playerId: "ghost", champion: "Teemo", kills: 99, deaths: 99, assists: 99 },
+            { playerId: "b2", champion: "Ashe", kills: 2, deaths: 4, assists: 3 },
+            { playerId: "b1", champion: "Garen", kills: 2, deaths: 4, assists: 5 },
+          ],
+        },
+      ],
+    };
+
+    expect(getKda(5, 0, 3)).toBe(8);
+    expect(getPlayerLeaderboardPositions(dataset, "missing-player")).toEqual({});
+    expect(getTeamBySlug(dataset, "missing-team")).toBeNull();
+    expect(getPlayerBySlug(dataset, "missing-player")).toBeNull();
+    expect(getSeriesById(dataset, "missing-series")).toBeNull();
+    expect(getPlayersForTeam(dataset, "missing-team")).toEqual([]);
+    expect(getPlayerGameHistory(dataset, "missing-player")).toEqual([]);
+
+    expect(getGameTeamKills(oddSeries.games[0]!, oddSeries, dataset)).toEqual({
+      teamAKills: 6,
+      teamBKills: 4,
+    });
+
+    const oddRows = getSeriesGamesWithTeamRows(oddSeries, dataset);
+    expect(oddRows[0]?.teamARows.map((row) => row.playerNick)).toEqual(["A1", "A2"]);
+    expect(oddRows[0]?.teamBRows.map((row) => row.playerNick)).toEqual(["B1", "B2"]);
+
+    const historyDataset = createDataset();
+    historyDataset.seriesMatches.push({
+      id: "s-history-gap",
+      date: "2026-04-03",
+      teamAId: "a",
+      teamBId: "ghost-team",
+      games: [
+        {
+          winnerTeamId: "a",
+          mvpPlayerId: "",
+          durationMin: 24,
+          statsByPlayer: [
+            { playerId: "a1", champion: "Ahri", kills: 2, deaths: 1, assists: 4 },
+            { playerId: "ghost-player", champion: "Teemo", kills: 1, deaths: 5, assists: 1 },
+          ],
+        },
+        {
+          winnerTeamId: "a",
+          mvpPlayerId: "",
+          durationMin: 22,
+          statsByPlayer: [{ playerId: "ghost-player", champion: "Teemo", kills: 0, deaths: 4, assists: 0 }],
+        },
+      ],
+    });
+
+    const c1History = getPlayerGameHistory(dataset, "c1");
+    expect(c1History[0]?.opponentTeamId).toBe("a");
+
+    const a1History = getPlayerGameHistory(historyDataset, "a1");
+    const ghostSeriesRow = a1History.find((row) => row.seriesId === "s-history-gap");
+    expect(ghostSeriesRow?.opponentTeamId).toBe("ghost-team");
+    expect(ghostSeriesRow?.opponentTeamName).toBe("ghost-team");
+  });
+
+  it("covers aggregate fallbacks for orphan players and empty teams", () => {
+    const dataset = createDataset();
+    dataset.teams.push({ id: "z", name: "Zulu", slug: "zulu" });
+    dataset.players.push({
+      id: "orphan",
+      nick: "Orphan",
+      slug: "orphan",
+      teamId: "ghost-team",
+      role1: "MID",
+      role2: "TOP",
+      elo: "OURO",
+    });
+    dataset.seriesMatches.push({
+      id: "s5",
+      date: "2026-04-02",
+      teamAId: "a",
+      teamBId: "b",
+      stage: "REGULAR_SEASON",
+      games: [
+        {
+          winnerTeamId: "a",
+          mvpPlayerId: "",
+          durationMin: 27,
+          statsByPlayer: [
+            { playerId: "a1", champion: "Ahri", kills: 7, deaths: 2, assists: 5 },
+            { playerId: "a2", champion: "Lulu", kills: 2, deaths: 3, assists: 9 },
+            { playerId: "ghost-player", champion: "Teemo", kills: 0, deaths: 8, assists: 0 },
+            { playerId: "b1", champion: "Garen", kills: 3, deaths: 6, assists: 2 },
+            { playerId: "b2", champion: "Ashe", kills: 1, deaths: 6, assists: 4 },
+          ],
+        },
+        {
+          winnerTeamId: "b",
+          mvpPlayerId: "",
+          durationMin: 28,
+          statsByPlayer: [
+            { playerId: "a1", champion: "Ahri", kills: 4, deaths: 5, assists: 5 },
+            { playerId: "a2", champion: "Lulu", kills: 1, deaths: 4, assists: 8 },
+            { playerId: "b1", champion: "Garen", kills: 8, deaths: 2, assists: 4 },
+            { playerId: "b2", champion: "Ashe", kills: 2, deaths: 3, assists: 10 },
+          ],
+        },
+      ],
+    });
+    dataset.seriesMatches.push({
+      id: "s6",
+      date: "2026-04-03",
+      teamAId: "ghost-team",
+      teamBId: "a",
+      stage: "REGULAR_SEASON",
+      games: [
+        {
+          winnerTeamId: "a",
+          mvpPlayerId: "",
+          durationMin: 24,
+          statsByPlayer: [
+            { playerId: "a1", champion: "Ahri", kills: 6, deaths: 1, assists: 5 },
+            { playerId: "a2", champion: "Lulu", kills: 2, deaths: 2, assists: 8 },
+          ],
+        },
+      ],
+    });
+    dataset.seriesMatches.push({
+      id: "s7",
+      date: "2026-04-04",
+      teamAId: "a",
+      teamBId: "ghost-team",
+      stage: "REGULAR_SEASON",
+      games: [
+        {
+          winnerTeamId: "a",
+          mvpPlayerId: "",
+          durationMin: 23,
+          statsByPlayer: [
+            { playerId: "a1", champion: "Ahri", kills: 5, deaths: 1, assists: 6 },
+            { playerId: "a2", champion: "Lulu", kills: 1, deaths: 2, assists: 9 },
+          ],
+        },
+      ],
+    });
+    dataset.seriesMatches.push({
+      id: "s8",
+      date: "2026-04-05",
+      teamAId: "a",
+      teamBId: "phantom-team",
+      stage: "REGULAR_SEASON",
+      games: [
+        {
+          winnerTeamId: "a",
+          mvpPlayerId: "",
+          durationMin: 22,
+          statsByPlayer: [
+            { playerId: "a1", champion: "Ahri", kills: 4, deaths: 1, assists: 5 },
+            { playerId: "a2", champion: "Lulu", kills: 1, deaths: 2, assists: 7 },
+          ],
+        },
+      ],
+    });
+
+    const playerAggs = calculatePlayerAggregates(dataset);
+    const orphan = playerAggs.find((player) => player.playerId === "orphan");
+    expect(orphan).toMatchObject({
+      teamName: "ghost-team",
+      teamSlug: "ghost-team",
+      gamesPlayed: 0,
+      gameMvps: 0,
+      seriesMvps: 0,
+    });
+
+    const ghostOnlyAggs = calculatePlayerAggregates(dataset, { teamId: "ghost-team" });
+    expect(ghostOnlyAggs.find((player) => player.playerId === "orphan")).toMatchObject({
+      gameMvps: 0,
+      seriesMvps: 0,
+    });
+
+    const teamAggs = calculateTeamAggregates(dataset);
+    const zulu = teamAggs.find((team) => team.teamId === "z");
+    expect(zulu).toMatchObject({
+      kills: 0,
+      deaths: 0,
+      assists: 0,
+      gamesPlayed: 0,
+      gameMvps: 0,
+      seriesMvps: 0,
+      gameDiff: 0,
+    });
+
+    const standings = calculateStandings(dataset);
+    expect(standings.rows.find((team) => team.teamId === "a")?.seriesWon).toBeGreaterThan(0);
+  });
+
+  it("covers date-range branches for invalid and out-of-range series", () => {
+    const outOfRangeDataset = createDataset();
+    const outOfRangeAggs = calculatePlayerAggregates(outOfRangeDataset, { from: "2026-04-30" });
+    expect(outOfRangeAggs.every((player) => player.gamesPlayed === 0)).toBe(true);
+
+    const dataset = createDataset();
+    dataset.seriesMatches.push({
+      id: "invalid-date-series",
+      date: "not-a-date",
+      teamAId: "a",
+      teamBId: "b",
+      games: [
+        {
+          winnerTeamId: "a",
+          mvpPlayerId: "",
+          durationMin: 30,
+          statsByPlayer: [
+            { playerId: "a1", champion: "Ahri", kills: 1, deaths: 1, assists: 1 },
+            { playerId: "a2", champion: "Lulu", kills: 0, deaths: 1, assists: 2 },
+            { playerId: "b1", champion: "Garen", kills: 0, deaths: 1, assists: 0 },
+            { playerId: "b2", champion: "Ashe", kills: 0, deaths: 1, assists: 1 },
+          ],
+        },
+      ],
+    });
+
+    const invalidDateAggs = calculatePlayerAggregates(dataset, {
+      teamId: "a",
+      from: "2026-03-21",
+      to: "2026-03-21",
+    });
+    expect(invalidDateAggs.find((player) => player.playerId === "a1")?.kills).toBe(1);
   });
 });

@@ -54,7 +54,7 @@ export function inferGameMvpPlayerId(rows: PlayerGameStats[]) {
       return a.playerId.localeCompare(b.playerId, "pt-BR");
     });
 
-  return ranked[0]?.playerId ?? "";
+  return ranked[0]!.playerId;
 }
 
 export function getGameMvpPlayerId(game: SeriesGame) {
@@ -268,8 +268,8 @@ function pickBestSeriesMvpCandidate(
     return candidate.kda > current.kda ? candidate : current;
   }
 
-  const candidateNick = indexes.playersById.get(candidate.playerId)?.nick ?? candidate.playerId;
-  const currentNick = indexes.playersById.get(current.playerId)?.nick ?? current.playerId;
+  const candidateNick = indexes.playersById.get(candidate.playerId)!.nick;
+  const currentNick = indexes.playersById.get(current.playerId)!.nick;
 
   return candidateNick.localeCompare(currentNick, "pt-BR") < 0 ? candidate : current;
 }
@@ -478,16 +478,12 @@ function buildSeriesStandingsRows(dataset: TournamentDataset): StandingsRow[] {
     rowB.gamesWon += score.teamBWins;
     rowB.gamesLost += score.teamAWins;
 
-    const winnerRow = rowsByTeamId.get(winnerTeamId);
-    const loserRow = rowsByTeamId.get(loserTeamId);
-    if (winnerRow) {
-      winnerRow.seriesWon += 1;
-      winnerRow.points += dataset.tournament.seriesPointsRule.win;
-    }
-    if (loserRow) {
-      loserRow.seriesLost += 1;
-      loserRow.points += dataset.tournament.seriesPointsRule.loss;
-    }
+    const winnerRow = winnerTeamId === series.teamAId ? rowA : rowB;
+    const loserRow = loserTeamId === series.teamAId ? rowA : rowB;
+    winnerRow.seriesWon += 1;
+    winnerRow.points += dataset.tournament.seriesPointsRule.win;
+    loserRow.seriesLost += 1;
+    loserRow.points += dataset.tournament.seriesPointsRule.loss;
   }
 
   const rows = [...rowsByTeamId.values()].map((row) => ({
@@ -528,16 +524,18 @@ export function getChampionshipResult(
 ): ChampionshipResult | null {
   for (const summary of getSeriesSummaries(dataset)) {
     if ((summary.series.stage ?? "REGULAR_SEASON") !== "FINAL") continue;
-    if (!summary.isComplete || !summary.winnerTeamId) continue;
+    if (!summary.isComplete) continue;
+
+    const winnerTeamId = summary.winnerTeamId!;
 
     const runnerUpTeamId =
-      summary.winnerTeamId === summary.series.teamAId
+      winnerTeamId === summary.series.teamAId
         ? summary.series.teamBId
         : summary.series.teamAId;
 
     return {
       summary,
-      championTeamId: summary.winnerTeamId,
+      championTeamId: winnerTeamId,
       runnerUpTeamId,
     };
   }
@@ -774,7 +772,7 @@ export function calculateTeamAggregates(dataset: TournamentDataset): TeamAggrega
         gamesPlayed: bucket?.gamesPlayed ?? 0,
         gameMvps: bucket?.gameMvps ?? 0,
         seriesMvps: bucket?.seriesMvps ?? 0,
-        gameDiff: gameDiffByTeam.get(team.id) ?? 0,
+        gameDiff: gameDiffByTeam.get(team.id)!,
         kda: getKda(kills, deaths, assists),
       };
     })
