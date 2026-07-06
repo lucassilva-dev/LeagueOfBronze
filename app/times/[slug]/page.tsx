@@ -7,6 +7,7 @@ import { PageHero } from "@/components/page-hero";
 import { PageShell } from "@/components/page-shell";
 import { SeriesSummaryCard } from "@/components/series-summary-card";
 import { StatChip } from "@/components/stat-chip";
+import { AnimatedCounter } from "@/components/ui/animated-counter";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import {
@@ -112,9 +113,7 @@ function TeamHeaderExtra({
   return (
     <div className="flex flex-wrap gap-2">
       {isChampion ? (
-        <Badge className="border-amber-300/30 bg-amber-300/15 text-amber-100" variant="outline">
-          Campeão do campeonato
-        </Badge>
+        <Badge variant="bronze">Campeão do campeonato</Badge>
       ) : null}
       {hasStandingsPosition ? <Badge variant="accent">#{standingsPosition} na tabela</Badge> : null}
       {hasPoints ? <Badge variant="outline">{points} pts</Badge> : null}
@@ -144,28 +143,23 @@ function TeamChampionPanel({ teamName, data }: TeamChampionPanelProps) {
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-3xl">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge
-                className="border-amber-300/30 bg-amber-300/15 text-amber-100"
-                variant="outline"
-              >
-                Título confirmado
-              </Badge>
+              <Badge variant="bronze">Título confirmado</Badge>
               <Badge variant="outline">{data.summary.formatLabel}</Badge>
               <Badge variant="outline">{formatDateLabel(data.summary.series.date)}</Badge>
             </div>
 
             <div className="mt-4 flex items-start gap-3">
-              <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/10 text-amber-100">
+              <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-accent2/25 bg-accent2/10 text-accent2">
                 <Crown className="h-6 w-6" />
               </span>
               <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-amber-100/75">
+                <p className="text-[11px] uppercase tracking-[0.22em] text-accent2/80">
                   Momento do título
                 </p>
-                <h2 className="mt-1 font-display text-2xl font-black tracking-wide sm:text-3xl">
+                <h2 className="mt-1 font-heading text-2xl font-bold tracking-tight sm:text-3xl">
                   {teamName}
                 </h2>
-                <p className="mt-2 text-sm text-slate-200/80 sm:text-base">
+                <p className="mt-2 text-sm text-text/75 sm:text-base">
                   {getChampionSummaryText(data)}
                 </p>
               </div>
@@ -173,26 +167,26 @@ function TeamChampionPanel({ teamName, data }: TeamChampionPanelProps) {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:w-[22rem]">
-            <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4 text-center">
+            <div className="rounded-2xl border border-accent2/20 bg-bg/40 p-4 text-center">
               <p className="text-xs uppercase tracking-[0.16em] text-muted">Placar da final</p>
-              <p className="mt-2 font-display text-4xl font-black tracking-wide text-amber-100">
-                {data.championWins}
+              <p className="mt-2 font-display text-5xl tracking-wide text-accent2">
+                <AnimatedCounter to={data.championWins} />
                 <span className="mx-2 text-white/35">-</span>
-                {data.runnerUpWins}
+                <AnimatedCounter to={data.runnerUpWins} />
               </p>
               <p className="mt-1 text-xs text-muted">{data.summary.stageLabel}</p>
             </div>
 
-            <div className="flex flex-col justify-between rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+            <div className="flex flex-col justify-between rounded-2xl border border-border/60 bg-bg/40 p-4">
               <div>
                 <p className="text-xs uppercase tracking-[0.16em] text-muted">Grande final</p>
-                <p className="mt-2 text-sm text-slate-200/80">
+                <p className="mt-2 text-sm text-text/75">
                   Abra o detalhe completo da decisão do campeonato.
                 </p>
               </div>
               <Link
                 href={`/partidas/${data.summary.series.id}`}
-                className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-amber-100 transition hover:text-white"
+                className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-accent2 transition hover:text-text"
               >
                 Ver final completa
                 <ArrowRight className="h-4 w-4" />
@@ -224,7 +218,7 @@ function TeamRosterCard({ roster, multiOpGg }: TeamRosterCardProps) {
   return (
     <Card className="p-5">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="font-display text-xl font-bold tracking-wide">Elenco</h2>
+        <h2 className="font-heading text-xl font-semibold tracking-wide">Elenco</h2>
         <div className="flex flex-wrap items-center justify-end gap-2">
           <Badge variant="muted">{roster.length} jogadores</Badge>
           {multiOpGg.ok ? (
@@ -352,7 +346,7 @@ export default async function TeamPage({ params }: TeamPageParams) {
         </div>
 
         <div className="space-y-4">
-          <h2 className="font-display text-xl font-bold tracking-wide">Histórico de séries</h2>
+          <h2 className="font-heading text-xl font-semibold tracking-wide">Histórico de séries</h2>
           {history.length === 0 ? (
             <EmptyState
               title="Sem séries ainda"

@@ -5,6 +5,7 @@ import { Crown } from "lucide-react";
 import { PageHero } from "@/components/page-hero";
 import { PageShell } from "@/components/page-shell";
 import { TeamLink } from "@/components/team-link";
+import { AnimatedCounter } from "@/components/ui/animated-counter";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import {
@@ -155,7 +156,7 @@ function SeriesExtraBadges({
       <Badge
         variant="muted"
         className={
-          identity.isGrandFinal ? "border-amber-300/20 bg-amber-300/10 text-amber-100" : undefined
+          identity.isGrandFinal ? "border-accent2/20 bg-accent2/10 text-accent2" : undefined
         }
       >
         {identity.stageLabel}
@@ -182,25 +183,23 @@ function FinalChampionPanel({
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-3xl">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge className="border-amber-300/30 bg-amber-300/15 text-amber-100" variant="outline">
-                Campeão do campeonato
-              </Badge>
+              <Badge variant="bronze">Campeão do campeonato</Badge>
               <Badge variant="outline">{identity.seriesFormatLabel}</Badge>
               <Badge variant="outline">{formatDateLabel(date)}</Badge>
             </div>
 
             <div className="mt-4 flex items-start gap-3">
-              <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/10 text-amber-100">
+              <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-accent2/25 bg-accent2/10 text-accent2">
                 <Crown className="h-6 w-6" />
               </span>
               <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-amber-100/75">
+                <p className="text-[11px] uppercase tracking-[0.22em] text-accent2/80">
                   Título confirmado
                 </p>
-                <h2 className="mt-1 font-display text-2xl font-black tracking-wide sm:text-3xl">
+                <h2 className="mt-1 font-heading text-2xl font-bold tracking-tight sm:text-3xl">
                   {winnerTeam.name}
                 </h2>
-                <p className="mt-2 text-sm text-slate-200/80 sm:text-base">
+                <p className="mt-2 text-sm text-text/75 sm:text-base">
                   Fechou a grande final por {championWins}-{runnerUpWins}.
                   {finalSummaryText ? ` ${finalSummaryText}` : ""}
                 </p>
@@ -209,26 +208,26 @@ function FinalChampionPanel({
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:w-[22rem]">
-            <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4 text-center">
+            <div className="rounded-2xl border border-accent2/20 bg-bg/40 p-4 text-center">
               <p className="text-xs uppercase tracking-[0.16em] text-muted">Placar da final</p>
-              <p className="mt-2 font-display text-4xl font-black tracking-wide text-amber-100">
-                {championWins}
+              <p className="mt-2 font-display text-5xl tracking-wide text-accent2">
+                <AnimatedCounter to={championWins} />
                 <span className="mx-2 text-white/35">-</span>
-                {runnerUpWins}
+                <AnimatedCounter to={runnerUpWins} />
               </p>
               <p className="mt-1 text-xs text-muted">{identity.stageLabel}</p>
             </div>
 
-            <div className="flex flex-col justify-between rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+            <div className="flex flex-col justify-between rounded-2xl border border-border/60 bg-bg/40 p-4">
               <div>
                 <p className="text-xs uppercase tracking-[0.16em] text-muted">Time campeão</p>
-                <p className="mt-2 text-sm text-slate-200/80">
+                <p className="mt-2 text-sm text-text/75">
                   Abra a página do campeão para ver elenco, campanha e estatísticas.
                 </p>
               </div>
               <Link
                 href={`/times/${winnerTeam.slug}`}
-                className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-amber-100 transition hover:text-white"
+                className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-accent2 transition hover:text-text"
               >
                 Ver time campeão
               </Link>
@@ -271,7 +270,7 @@ function GameDetailsCard({
     <Card className="p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="font-display text-lg font-bold tracking-wide">Jogo {gameIndex}</p>
+          <p className="font-heading text-lg font-semibold tracking-wide">Jogo {gameIndex}</p>
           <p className="mt-1 text-sm text-muted">
             Vencedor: <span className="text-text">{winnerName}</span> • MVP:{" "}
             <span className="text-text">{gameMvpNick ?? "—"}</span>

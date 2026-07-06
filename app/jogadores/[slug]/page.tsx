@@ -97,17 +97,17 @@ function PlayerChampionBanner({
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="max-w-3xl">
             <div className="flex items-start gap-3">
-              <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/10 text-amber-100">
+              <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-accent2/25 bg-accent2/10 text-accent2">
                 <Crown className="h-6 w-6" />
               </span>
               <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-amber-100/75">
+                <p className="text-[11px] uppercase tracking-[0.22em] text-accent2/80">
                   Jogador campeão
                 </p>
-                <h2 className="mt-1 font-display text-2xl font-black tracking-wide sm:text-3xl">
+                <h2 className="mt-1 font-heading text-2xl font-bold tracking-tight sm:text-3xl">
                   {data.team.name}
                 </h2>
-                <p className="mt-2 text-sm text-slate-200/80 sm:text-base">
+                <p className="mt-2 text-sm text-text/75 sm:text-base">
                   Este jogador faz parte do elenco campeão. Título confirmado na{" "}
                   {stageLabel.toLowerCase()} por {data.titleScore}.
                 </p>
@@ -116,11 +116,9 @@ function PlayerChampionBanner({
           </div>
 
           <div className="grid gap-3 sm:w-[18rem]">
-            <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4 text-center">
+            <div className="rounded-2xl border border-accent2/20 bg-bg/40 p-4 text-center">
               <p className="text-xs uppercase tracking-[0.16em] text-muted">Conquista</p>
-              <p className="mt-2 font-display text-3xl font-black tracking-wide text-amber-100">
-                Campeão
-              </p>
+              <p className="mt-2 font-display text-4xl tracking-wide text-accent2">Campeão</p>
               <p className="mt-1 text-xs text-muted">{data.formatLabel}</p>
             </div>
           </div>
@@ -134,9 +132,7 @@ function PlayerBadges({ isChampion, positions, teamSlug, opggUrl }: PlayerBadges
   return (
     <div className="flex flex-wrap gap-2">
       {isChampion ? (
-        <Badge className="border-amber-300/30 bg-amber-300/15 text-amber-100" variant="outline">
-          Elenco campeão
-        </Badge>
+        <Badge variant="bronze">Elenco campeão</Badge>
       ) : null}
       {typeof positions.kills === "number" ? (
         <Badge variant="accent">#{positions.kills} em abates</Badge>
@@ -325,7 +321,7 @@ export default async function PlayerPage({ params }: PlayerPageParams) {
       </section>
 
       <section className="space-y-4">
-        <h2 className="font-display text-xl font-bold tracking-wide">Histórico por jogo</h2>
+        <h2 className="font-heading text-xl font-semibold tracking-wide">Histórico por jogo</h2>
         <div className="grid gap-3 md:hidden">
           <PlayerHistoryMobile history={history} />
         </div>

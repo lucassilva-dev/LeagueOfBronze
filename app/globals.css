@@ -2,17 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+   League of Bronze — NOVA IDENTIDADE "Reforjado"
+   Carvão + ember (laranja-brasa) + bronze metálico, faísca lima.
+   Valores em HSL triplet para manter hsl(var(--x) / <alpha>).
+   ============================================================ */
 :root {
-  --bg: 224 34% 8%;
-  --panel: 224 24% 12%;
-  --panel-2: 224 20% 16%;
-  --text: 210 36% 96%;
-  --muted: 214 18% 66%;
-  --accent: 203 94% 63%;
-  --accent-2: 43 95% 59%;
-  --success: 151 78% 44%;
-  --danger: 0 84% 62%;
-  --border: 220 22% 24%;
+  --bg: 15 12% 6%;         /* #120C0A  carvão quente        */
+  --panel: 22 22% 9%;      /* #1B120E  superfície            */
+  --panel-2: 20 20% 12%;   /* #241812  inset / input         */
+  --text: 33 55% 94%;      /* #F8F0E7  creme (texto)         */
+  --muted: 27 15% 62%;     /* #AD9A8B  taupe (secundário)    */
+  --border: 25 15% 20%;    /* hairline                        */
+  --accent: 18 100% 58%;   /* #FF6A2B  EMBER (ação/dados)    */
+  --accent-2: 32 52% 53%;  /* #C88A45  BRONZE (honra/campeão)*/
+  --lime: 76 100% 62%;     /* #CBFF3E  AO VIVO / alerta      */
+  --success: 152 72% 63%;  /* #5BE59A  vitória               */
+  --danger: 0 100% 71%;    /* #FF6B6B  derrota               */
   color-scheme: dark;
 }
 
@@ -23,12 +29,12 @@ body {
 
 body {
   @apply bg-bg text-text antialiased;
+  font-family: var(--font-body), system-ui, sans-serif;
   background-image:
-    radial-gradient(circle at 12% 8%, rgba(77, 171, 247, 0.1), transparent 34%),
-    radial-gradient(circle at 88% 12%, rgba(250, 204, 21, 0.07), transparent 32%),
-    linear-gradient(180deg, rgba(255,255,255,0.01), transparent),
-    linear-gradient(180deg, rgb(12, 15, 24), rgb(8, 10, 17));
-  font-family: var(--font-body), sans-serif;
+    radial-gradient(120% 70% at 50% -8%, rgba(255, 106, 43, 0.12), transparent 46%),
+    radial-gradient(80% 50% at 90% 6%, rgba(203, 255, 62, 0.045), transparent 50%),
+    linear-gradient(180deg, #16100d, #0e0906);
+  background-attachment: fixed;
 }
 
 * {
@@ -36,32 +42,68 @@ body {
 }
 
 *:focus-visible {
-  outline: 2px solid rgba(86, 180, 255, 0.8);
+  outline: 2px solid hsl(var(--accent) / 0.8);
   outline-offset: 2px;
 }
 
+/* ---- Gradientes-assinatura (utilitárias) ---- */
+.bg-ember {
+  background: linear-gradient(103deg, #e23d1e 0%, #ff6a2b 46%, #ffc061 100%);
+}
+.bg-bronze {
+  background: linear-gradient(135deg, #f3d08a 0%, #c88a45 48%, #7c4e22 100%);
+}
+.text-ember {
+  background: linear-gradient(103deg, #e23d1e 0%, #ff6a2b 46%, #ffc061 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.text-bronze {
+  background: linear-gradient(135deg, #f3d08a 0%, #c88a45 48%, #7c4e22 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ---- Superfícies ---- */
+.lob-card {
+  border: 1px solid hsl(var(--border));
+  background: linear-gradient(160deg, #1b120e, #120c09);
+  border-radius: 20px;
+}
+.lob-champion {
+  border: 1px solid rgba(200, 138, 69, 0.4);
+  background:
+    radial-gradient(120% 100% at 12% 0%, rgba(200, 138, 69, 0.16), transparent 46%),
+    linear-gradient(160deg, #1e1510, #120c09);
+  box-shadow:
+    0 0 0 1px rgba(200, 138, 69, 0.2),
+    0 26px 70px rgba(40, 20, 6, 0.5);
+}
+
+/* ---- Superfícies compartilhadas (mantêm nomes usados nos componentes) ---- */
 .glass-panel {
   @apply border border-border/80 bg-panel/70 backdrop-blur-xl;
-  box-shadow: 0 10px 38px rgba(0, 0, 0, 0.24);
+  box-shadow: 0 10px 38px rgba(20, 10, 4, 0.4);
 }
 
 .glow-border {
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.02),
-    0 0 0 1px rgba(86, 180, 255, 0.12),
-    0 10px 40px rgba(12, 31, 71, 0.2);
+    0 0 0 1px rgba(255, 106, 43, 0.12),
+    0 10px 40px rgba(40, 20, 6, 0.25);
 }
 
 .champion-panel {
   background-image:
-    radial-gradient(circle at 10% 14%, rgba(250, 204, 21, 0.16), transparent 32%),
-    radial-gradient(circle at 88% 18%, rgba(86, 180, 255, 0.18), transparent 28%),
-    linear-gradient(135deg, rgba(250, 204, 21, 0.08), transparent 42%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0));
+    radial-gradient(120% 100% at 12% 0%, rgba(200, 138, 69, 0.18), transparent 46%),
+    radial-gradient(80% 60% at 90% 8%, rgba(255, 106, 43, 0.1), transparent 44%),
+    linear-gradient(160deg, rgba(30, 21, 16, 0.9), rgba(18, 12, 9, 0.9));
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.03),
-    0 0 0 1px rgba(250, 204, 21, 0.18),
-    0 20px 70px rgba(13, 22, 46, 0.46);
+    0 0 0 1px rgba(200, 138, 69, 0.24),
+    0 26px 70px rgba(40, 20, 6, 0.5);
 }
 
 .champion-glow {
@@ -71,20 +113,20 @@ body {
 .final-card {
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.03),
-    0 0 0 1px rgba(250, 204, 21, 0.14),
-    0 16px 48px rgba(11, 19, 43, 0.32);
+    0 0 0 1px rgba(200, 138, 69, 0.18),
+    0 16px 48px rgba(40, 20, 6, 0.35);
 }
 
 .bg-grid {
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
   background-size: 28px 28px;
 }
 
 .scrollbar-thin {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  scrollbar-color: rgba(255, 106, 43, 0.28) transparent;
 }
 
 .scrollbar-thin::-webkit-scrollbar {
@@ -93,7 +135,7 @@ body {
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 106, 43, 0.24);
   border-radius: 999px;
 }
 
@@ -102,7 +144,7 @@ body {
     linear-gradient(
       90deg,
       rgba(255, 255, 255, 0.03),
-      rgba(255, 255, 255, 0.08),
+      rgba(255, 176, 97, 0.1),
       rgba(255, 255, 255, 0.03)
     )
     0 0 / 200% 100%;
@@ -114,14 +156,14 @@ body {
   100% {
     box-shadow:
       inset 0 0 0 1px rgba(255, 255, 255, 0.03),
-      0 0 0 1px rgba(250, 204, 21, 0.18),
-      0 20px 70px rgba(13, 22, 46, 0.46);
+      0 0 0 1px rgba(200, 138, 69, 0.24),
+      0 26px 70px rgba(40, 20, 6, 0.5);
   }
   50% {
     box-shadow:
-      inset 0 0 0 1px rgba(255, 255, 255, 0.04),
-      0 0 0 1px rgba(250, 204, 21, 0.28),
-      0 24px 82px rgba(20, 33, 66, 0.58);
+      inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+      0 0 0 1px rgba(200, 138, 69, 0.4),
+      0 30px 82px rgba(60, 28, 8, 0.6);
   }
 }
 

@@ -31,7 +31,7 @@ function getStatusLabel(summary: SeriesSummary) {
 
 function getStatusClassName(summary: SeriesSummary) {
   if (!isGrandFinal(summary)) return undefined;
-  return "border-amber-300/30 bg-amber-300/15 text-amber-100";
+  return "border-accent2/30 bg-accent2/15 text-accent2";
 }
 
 function getScoreLabel(summary: SeriesSummary) {
@@ -60,7 +60,7 @@ function MetaLine({
   if (hasChampion(summary)) {
     return (
       <>
-        <span className="inline-flex items-center gap-1 font-semibold text-amber-100">
+        <span className="inline-flex items-center gap-1 font-semibold text-accent2">
           <Crown className="h-3.5 w-3.5" />
           Campeão: {winnerTeamName ?? summary.winnerTeamId}
         </span>
@@ -113,7 +113,7 @@ export function SeriesSummaryCard({
               </Badge>
               <span className="text-xs text-muted">{formatDateLabel(summary.series.date)}</span>
               <span
-                className={cn("text-xs text-muted", grandFinal && "font-semibold text-amber-100/80")}
+                className={cn("text-xs text-muted", grandFinal && "font-semibold text-accent2/80")}
               >
                 {summary.stageLabel}
               </span>
@@ -137,13 +137,13 @@ export function SeriesSummaryCard({
             <div
               className={cn(
                 "rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-2 text-center",
-                grandFinal && "border-amber-300/20 bg-amber-300/[0.07]",
+                grandFinal && "border-accent2/20 bg-accent2/[0.07]",
               )}
             >
               <p
                 className={cn(
-                  "font-display text-2xl font-bold tracking-wide text-accent",
-                  grandFinal && "text-amber-100",
+                  "font-display text-2xl tracking-wide text-accent",
+                  grandFinal && "text-accent2",
                 )}
               >
                 {summary.score.teamAWins} <span className="text-muted">-</span>{" "}
@@ -156,7 +156,7 @@ export function SeriesSummaryCard({
             <ArrowRight
               className={cn(
                 "h-4 w-4 text-muted transition group-hover:text-accent",
-                grandFinal && "text-amber-100/70 group-hover:text-amber-100",
+                grandFinal && "text-accent2/70 group-hover:text-accent2",
               )}
             />
           </div>

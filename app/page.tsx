@@ -8,6 +8,7 @@ import { QuickLinkCard } from "@/components/quick-link-card";
 import { SectionTitle } from "@/components/section-title";
 import { SeriesSummaryCard } from "@/components/series-summary-card";
 import { StatChip } from "@/components/stat-chip";
+import { AnimatedCounter } from "@/components/ui/animated-counter";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { formatDateLabel, formatDateTimeLabel, formatKda } from "@/lib/format";
@@ -112,12 +113,7 @@ function ChampionshipHero({ data }: Readonly<{ data: ChampionshipHeroData }>) {
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-3xl">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge
-                className="border-amber-300/30 bg-amber-300/15 text-amber-100"
-                variant="outline"
-              >
-                Campeão definido
-              </Badge>
+              <Badge variant="bronze">Campeão definido</Badge>
               <Badge variant="outline">{data.championship.summary.formatLabel}</Badge>
               <Badge variant="outline">
                 {formatDateLabel(data.championship.summary.series.date)}
@@ -125,17 +121,17 @@ function ChampionshipHero({ data }: Readonly<{ data: ChampionshipHeroData }>) {
             </div>
 
             <div className="mt-4 flex items-start gap-3">
-              <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/10 text-amber-100">
+              <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-accent2/25 bg-accent2/10 text-accent2">
                 <Crown className="h-6 w-6" />
               </span>
               <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-amber-100/75">
+                <p className="text-[11px] uppercase tracking-[0.22em] text-accent2/80">
                   Título do campeonato
                 </p>
-                <h2 className="mt-1 font-display text-3xl font-black tracking-wide sm:text-4xl">
+                <h2 className="mt-1 font-heading text-3xl font-bold tracking-tight sm:text-4xl">
                   {data.championTeam.name}
                 </h2>
-                <p className="mt-2 max-w-2xl text-sm text-slate-200/78 sm:text-base">
+                <p className="mt-2 max-w-2xl text-sm text-text/75 sm:text-base">
                   Confirmou o título na grande final contra {data.runnerUpTeamName} por{" "}
                   {data.championWins}-{data.runnerUpWins}.{data.resultSuffix}
                 </p>
@@ -144,34 +140,34 @@ function ChampionshipHero({ data }: Readonly<{ data: ChampionshipHeroData }>) {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:w-[22rem]">
-            <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4 text-center">
+            <div className="rounded-2xl border border-accent2/20 bg-bg/40 p-4 text-center">
               <p className="text-xs uppercase tracking-[0.16em] text-muted">Placar da final</p>
-              <p className="mt-2 font-display text-4xl font-black tracking-wide text-amber-100">
-                {data.championWins}
+              <p className="mt-2 font-display text-5xl tracking-wide text-accent2">
+                <AnimatedCounter to={data.championWins} />
                 <span className="mx-2 text-white/35">-</span>
-                {data.runnerUpWins}
+                <AnimatedCounter to={data.runnerUpWins} />
               </p>
               <p className="mt-1 text-xs text-muted">{data.championship.summary.stageLabel}</p>
             </div>
 
-            <div className="flex flex-col justify-between rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+            <div className="flex flex-col justify-between rounded-2xl border border-border/60 bg-bg/40 p-4">
               <div>
                 <p className="text-xs uppercase tracking-[0.16em] text-muted">Acessos rápidos</p>
-                <p className="mt-2 text-sm text-slate-200/80">
+                <p className="mt-2 text-sm text-text/75">
                   Abra o campeão ou veja o detalhe completo da grande final.
                 </p>
               </div>
               <div className="mt-4 space-y-2">
                 <Link
                   href={`/times/${data.championTeam.slug}`}
-                  className="inline-flex items-center gap-2 text-sm font-semibold text-amber-100 transition hover:text-white"
+                  className="inline-flex items-center gap-2 text-sm font-semibold text-accent2 transition hover:text-text"
                 >
                   Ver time campeão
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link
                   href={`/partidas/${data.championship.summary.series.id}`}
-                  className="inline-flex items-center gap-2 text-sm font-semibold text-accent transition hover:text-white"
+                  className="inline-flex items-center gap-2 text-sm font-semibold text-accent transition hover:text-text"
                 >
                   Abrir grande final
                   <ArrowRight className="h-4 w-4" />
@@ -203,7 +199,7 @@ function HomeStatsSection({
           </span>
           <div>
             <p className="text-xs uppercase tracking-[0.14em] text-muted">Líder atual</p>
-            <p className="font-display text-lg font-bold tracking-wide">{leaderName}</p>
+            <p className="font-heading text-lg font-semibold tracking-wide">{leaderName}</p>
           </div>
         </div>
         <p className="mt-3 text-sm text-muted">{leaderHint}</p>
@@ -216,7 +212,7 @@ function HomeStatsSection({
           </span>
           <div>
             <p className="text-xs uppercase tracking-[0.14em] text-muted">Mais abates</p>
-            <p className="font-display text-lg font-bold tracking-wide">{topKillsName}</p>
+            <p className="font-heading text-lg font-semibold tracking-wide">{topKillsName}</p>
           </div>
         </div>
         <p className="mt-3 text-sm text-muted">{topKillsHint}</p>
@@ -289,6 +285,7 @@ export default async function HomePage() {
   const leader = overview.standings.rows[0];
   const topKills = overview.leaderboards.kills[0];
   const latestSeries = overview.seriesSummaries.slice(0, 3);
+  const hasLiveSeries = overview.seriesSummaries.some((summary) => !summary.isComplete);
   const hasBo5 = dataset.seriesMatches.some((series) => series.format === "BO5");
   const tournamentFormatsLabel = getTournamentFormatsLabel(hasBo5, dataset.tournament.format);
   const championshipHeroData = getChampionshipHeroData(
@@ -305,6 +302,15 @@ export default async function HomePage() {
         description="Acompanhe tabela da fase regular, séries, MVPs e os rankings em tempo real."
         extra={
           <div className="flex flex-wrap items-center gap-2">
+            {hasLiveSeries ? (
+              <Badge variant="live" className="gap-1.5">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-lime/70" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-lime" />
+                </span>
+                AO VIVO
+              </Badge>
+            ) : null}
             <Badge variant="muted">Formato: {tournamentFormatsLabel}</Badge>
             <Badge variant="outline">
               Atualizado em {formatDateTimeLabel(dataset.tournament.lastUpdatedISO)}

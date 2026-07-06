@@ -2,12 +2,22 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-type BadgeVariant = "default" | "muted" | "accent" | "success" | "danger" | "outline";
+type BadgeVariant =
+  | "default"
+  | "muted"
+  | "accent"
+  | "bronze"
+  | "live"
+  | "success"
+  | "danger"
+  | "outline";
 
 const styles: Record<BadgeVariant, string> = {
   default: "bg-white/10 text-text border border-white/10",
   muted: "bg-white/5 text-muted border border-white/10",
   accent: "bg-accent/15 text-accent border border-accent/30",
+  bronze: "bg-accent2/15 text-accent2 border border-accent2/30",
+  live: "bg-lime/15 text-lime border border-lime/30",
   success: "bg-success/15 text-emerald-300 border border-success/30",
   danger: "bg-danger/15 text-red-300 border border-danger/30",
   outline: "bg-transparent text-text border border-border/80",

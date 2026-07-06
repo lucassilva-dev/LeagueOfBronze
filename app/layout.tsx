@@ -1,20 +1,26 @@
 import type { Metadata } from "next";
-import { Orbitron, Rajdhani } from "next/font/google";
+import { Anton, Space_Grotesk, Sora } from "next/font/google";
 
 import { SiteFrame } from "@/components/site-frame";
 
 import "./globals.css";
 
-const display = Orbitron({
+const display = Anton({
   subsets: ["latin"],
+  weight: "400",
   variable: "--font-display",
-  weight: ["600", "700", "800"],
 });
 
-const body = Rajdhani({
+const heading = Space_Grotesk({
   subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  variable: "--font-heading",
+});
+
+const body = Sora({
+  subsets: ["latin"],
+  weight: ["400", "600", "700"],
   variable: "--font-body",
-  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -27,7 +33,10 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
-      <body suppressHydrationWarning className={`${display.variable} ${body.variable}`}>
+      <body
+        suppressHydrationWarning
+        className={`${display.variable} ${heading.variable} ${body.variable}`}
+      >
         <SiteFrame>{children}</SiteFrame>
       </body>
     </html>

@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Grotesk:wght@400;500;600;700&family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    #nx-root {
+      --nx-bg:#120C0A; --nx-bg2:#1B120E; --nx-ink:#F8F0E7; --nx-muted:#AD9A8B;
+      --nx-line:rgba(255,238,222,.10);
+      --nx-ember-a:#E23D1E; --nx-ember-b:#FF6A2B; --nx-ember-c:#FFC061;
+      --nx-bronze-a:#F3D08A; --nx-bronze-b:#C88A45; --nx-bronze-c:#7C4E22;
+      --nx-lime:#CBFF3E; --nx-win:#5BE59A; --nx-loss:#FF6B6B;
+      --nx-ember: linear-gradient(103deg, #E23D1E 0%, #FF6A2B 46%, #FFC061 100%);
+      --nx-bronze: linear-gradient(135deg, #F3D08A 0%, #C88A45 48%, #7C4E22 100%);
+      --nx-ease: cubic-bezier(.2,.8,.2,1);
+      font-family:'Sora', sans-serif; color:var(--nx-ink);
+    }
+    #nx-root, #nx-root * { box-sizing:border-box; }
+    #nx-root ::selection { background:rgba(255,106,43,.32); color:#fff; }
+    #nx-root[data-reduced="true"] [data-anim], #nx-root[data-reduced="true"] [data-amb] { animation:none !important; opacity:1 !important; transform:none !important; filter:none !important; }
+    #nx-root [data-anim] { animation-fill-mode:both; }
+    #nx-root input::placeholder { color:var(--nx-muted); opacity:.7; }
+    @keyframes nx-rise { from{opacity:0; transform:translateY(22px);} to{opacity:1; transform:translateY(0);} }
+    @keyframes nx-rise-sm { from{opacity:0; transform:translateY(11px);} to{opacity:1; transform:translateY(0);} }
+    @keyframes nx-fade { from{opacity:0;} to{opacity:1;} }
+    @keyframes nx-pop { 0%{opacity:0; transform:scale(.5);} 62%{opacity:1; transform:scale(1.1);} 100%{opacity:1; transform:scale(1);} }
+    @keyframes nx-page { from{opacity:0; transform:translateY(14px); filter:blur(7px);} to{opacity:1; transform:translateY(0); filter:blur(0);} }
+    @keyframes nx-bar { from{transform:scaleX(0);} to{transform:scaleX(1);} }
+    @keyframes nx-float { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-8px);} }
+    @keyframes nx-spark { 0%{opacity:0; transform:translateY(8px) scale(.5);} 15%{opacity:1;} 100%{opacity:0; transform:translateY(-56px) scale(1.05);} }
+    @keyframes nx-sweep { 0%{transform:translateX(-150%) skewX(-16deg);} 100%{transform:translateX(260%) skewX(-16deg);} }
+    @keyframes nx-blink { 0%,100%{opacity:1;} 50%{opacity:.3;} }
+    @keyframes nx-heat { 0%,100%{opacity:.6; transform:scale(1);} 50%{opacity:1; transform:scale(1.1);} }
+    @keyframes nx-shake { 0%,100%{transform:translateX(0);} 20%,60%{transform:translateX(-7px);} 40%,80%{transform:translateX(7px);} }
+    html{ scroll-behavior:smooth; }
+    @media (prefers-reduced-motion: reduce){ html{ scroll-behavior:auto; } }
+    @media (min-width:820px){ #nx-root [data-navwrap]{ overflow:visible !important; } }
+  </style>
+</helmet>
+<div id="nx-root" data-reduced="{{ reducedAttr }}" style="position:relative; min-height:100vh; width:100%; overflow-x:clip; background:radial-gradient(120% 70% at 50% -8%, rgba(255,106,43,.12), transparent 46%), radial-gradient(80% 50% at 90% 6%, rgba(203,255,62,.045), transparent 50%), linear-gradient(180deg,#16100D,#0E0906);">
+
+  <svg width="0" height="0" style="position:absolute;" aria-hidden="true"><defs>
+    <linearGradient id="nxEmber" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#E23D1E"/><stop offset=".5" stop-color="#FF6A2B"/><stop offset="1" stop-color="#FFC061"/></linearGradient>
+    <linearGradient id="nxBronze" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F3D08A"/><stop offset=".5" stop-color="#C88A45"/><stop offset="1" stop-color="#7C4E22"/></linearGradient>
+  </defs></svg>
+
+  <header style="position:sticky; top:0; z-index:40; border-bottom:1px solid var(--nx-line); background:rgba(18,12,10,.74); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);">
+    <div style="max-width:1160px; margin:0 auto; padding:11px 22px; display:flex; align-items:center; gap:18px; flex-wrap:wrap;">
+      <button type="button" onClick="{{ goHome }}" style="display:inline-flex; align-items:center; gap:11px; background:none; border:none; cursor:pointer; padding:0;">
+        <svg viewBox="0 0 64 64" width="32" height="32"><path d="M11 45 L11 29 L22 38 L32 21 L42 38 L53 29 L53 45 Z" fill="url(#nxBronze)"/><rect x="11" y="48" width="42" height="5.4" rx="2.7" fill="url(#nxBronze)"/><circle cx="32" cy="16" r="3.4" fill="url(#nxEmber)"/><circle cx="14.5" cy="26" r="2" fill="#FF7A2E"/><circle cx="49.5" cy="26" r="2" fill="#FF7A2E"/></svg>
+        <span style="font-family:'Space Grotesk'; font-weight:700; font-size:14px; letter-spacing:.14em; color:var(--nx-ink);">LEAGUE OF BRONZE</span>
+      </button>
+      <nav data-navwrap style="flex:1; min-width:0; overflow-x:auto;">
+        <div style="display:inline-flex; gap:4px; min-width:max-content;">
+          <button type="button" onClick="{{ pHome }}" style="{{ tabHome }}">Home</button>
+          <button type="button" onClick="{{ pTabela }}" style="{{ tabTabela }}">Tabela</button>
+          <button type="button" onClick="{{ pPartidas }}" style="{{ tabPartidas }}">Partidas</button>
+          <button type="button" onClick="{{ pStats }}" style="{{ tabStats }}">Estatísticas</button>
+          <button type="button" onClick="{{ pAdmin }}" style="{{ tabAdmin }}">Admin</button>
+        </div>
+      </nav>
+      <button type="button" onClick="{{ toggleReduced }}" style="display:inline-flex; align-items:center; gap:7px; height:34px; padding:0 12px; border-radius:999px; border:1px solid var(--nx-line); background:rgba(255,255,255,.03); color:var(--nx-ink); font-family:'Sora'; font-weight:600; font-size:12.5px; cursor:pointer;" style-hover="border-color:rgba(255,106,43,.5);">
+        <span style="width:7px; height:7px; border-radius:50%; background:{{ reducedDot }};"></span>{{ reducedLabel }}
+      </button>
+    </div>
+  </header>
+
+  <main style="max-width:1160px; margin:0 auto; padding:26px 22px 64px; min-height:70vh;">
+    <div key="{{ pageKey }}" data-anim style="animation:nx-page .34s var(--nx-ease);">
+
+      <!-- ==================== HOME ==================== -->
+      <sc-if value="{{ pIsHome }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex; flex-direction:column; gap:16px;">
+          <!-- hero -->
+          <div style="position:relative; overflow:hidden; border-radius:22px; border:1px solid var(--nx-line); background:linear-gradient(160deg,#1E1410,#130D0A); padding:clamp(22px,4vw,36px);">
+            <div data-amb aria-hidden="true" style="position:absolute; top:-30%; right:-6%; width:400px; height:400px; border-radius:50%; background:radial-gradient(circle, rgba(255,106,43,.2), transparent 62%); animation:nx-heat 6s ease-in-out infinite; z-index:0;"></div>
+            <div style="position:relative; z-index:1;">
+              <span data-anim style="animation:nx-fade .5s var(--nx-ease) .05s; display:inline-flex; align-items:center; gap:8px; padding:5px 12px; border-radius:999px; border:1px solid rgba(203,255,62,.3); background:rgba(203,255,62,.08); color:var(--nx-lime); font-family:'Space Grotesk'; font-weight:600; font-size:11px; letter-spacing:.16em; text-transform:uppercase; white-space:nowrap;"><span data-amb style="width:6px; height:6px; border-radius:50%; background:var(--nx-lime); box-shadow:0 0 8px var(--nx-lime); animation:nx-blink 1.6s ease-in-out infinite;"></span>Ao vivo · Rodada 5</span>
+              <h1 data-anim style="animation:nx-rise .55s var(--nx-ease) .12s; margin:16px 0 0; font-family:'Space Grotesk'; font-weight:700; font-size:clamp(30px,5.4vw,54px); letter-spacing:-.015em; line-height:1;">Campeonato do Grupo</h1>
+              <p data-anim style="animation:nx-fade .6s var(--nx-ease) .28s; margin:12px 0 0; max-width:540px; color:var(--nx-muted); font-size:15px; line-height:1.55;">Acompanhe a tabela da fase regular, séries MD3/MD5 e os rankings — recalculados em tempo real.</p>
+              <div data-anim style="animation:nx-rise-sm .5s var(--nx-ease) .4s; display:flex; flex-wrap:wrap; gap:8px; margin-top:18px;">
+                <span style="padding:6px 12px; border-radius:999px; border:1px solid var(--nx-line); background:rgba(255,255,255,.03); font-size:12.5px; color:var(--nx-muted);">Formato: MD3 / MD5</span>
+                <span style="padding:6px 12px; border-radius:999px; border:1px solid var(--nx-line); background:rgba(255,255,255,.03); font-size:12.5px; color:var(--nx-muted);">Atualizado em 23 fev 2026 · 14:44</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- champion band -->
+          <div data-anim style="animation:nx-rise .55s var(--nx-ease) .18s; position:relative; overflow:hidden; border-radius:22px; border:1px solid rgba(200,138,69,.4); background:radial-gradient(120% 100% at 12% 0%, rgba(200,138,69,.16), transparent 46%), linear-gradient(160deg,#1E1510,#120C09); box-shadow:0 0 0 1px rgba(200,138,69,.2); padding:clamp(20px,3.5vw,30px);">
+            <div data-amb aria-hidden="true" style="animation:nx-sweep 5s ease-in-out 1.2s infinite; position:absolute; top:0; bottom:0; left:0; width:32%; z-index:2; pointer-events:none; background:linear-gradient(100deg, transparent, rgba(255,220,160,.13), transparent); transform:translateX(-150%) skewX(-16deg);"></div>
+            <div style="position:relative; z-index:1; display:flex; flex-wrap:wrap; gap:22px; align-items:center; justify-content:space-between;">
+              <div style="display:flex; align-items:center; gap:15px; min-width:240px;">
+                <span data-amb style="animation:nx-float 3.6s ease-in-out infinite; flex-shrink:0;"><svg viewBox="0 0 64 64" width="46" height="46"><path d="M11 45 L11 29 L22 38 L32 21 L42 38 L53 29 L53 45 Z" fill="url(#nxBronze)"/><rect x="11" y="48" width="42" height="5.4" rx="2.7" fill="url(#nxBronze)"/><circle cx="32" cy="16" r="3.4" fill="url(#nxEmber)"/></svg></span>
+                <div>
+                  <p style="margin:0; font-family:'Space Grotesk'; font-weight:600; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--nx-bronze-a);">Campeão</p>
+                  <h3 style="margin:4px 0 0; font-family:'Space Grotesk'; font-weight:700; font-size:clamp(22px,3.4vw,30px); letter-spacing:-.01em; line-height:1;">PUNHO DO BARÃO</h3>
+                  <p style="margin:6px 0 0; font-size:13px; color:var(--nx-muted);">Grande Final · MVP: Maxmp</p>
+                </div>
+              </div>
+              <div style="text-align:center; flex-shrink:0;">
+                <p style="margin:0; font-family:'Space Grotesk'; font-weight:600; font-size:10.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--nx-muted);">Placar da final</p>
+                <p style="margin:4px 0 0; font-family:'Anton'; font-size:52px; line-height:1; background:var(--nx-bronze); -webkit-background-clip:text; background-clip:text; color:transparent;">{{ cHChampA }}<span style="color:rgba(255,255,255,.26);">–</span>{{ cHChampB }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- quick stats -->
+          <div style="display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(200px,1fr));">
+            <div data-anim style="animation:nx-rise-sm .5s var(--nx-ease) .24s; padding:18px; border-radius:18px; border:1px solid var(--nx-line); background:var(--nx-bg2);">
+              <p style="margin:0; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--nx-muted);">Líder atual</p>
+              <p style="margin:8px 0 0; font-family:'Space Grotesk'; font-weight:700; font-size:20px;">ZENSHIN GAMING</p>
+              <p style="margin:4px 0 0; font-size:13px; color:var(--nx-muted);"><span style="color:var(--nx-ember-c); font-family:'Space Grotesk'; font-weight:700;">{{ cHPts }}</span> pts · 2-1 na fase regular</p>
+            </div>
+            <div data-anim style="animation:nx-rise-sm .5s var(--nx-ease) .3s; padding:18px; border-radius:18px; border:1px solid var(--nx-line); background:var(--nx-bg2);">
+              <p style="margin:0; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--nx-muted);">Mais abates</p>
+              <p style="margin:8px 0 0; font-family:'Space Grotesk'; font-weight:700; font-size:20px;">nak4y</p>
+              <p style="margin:4px 0 0; font-size:13px; color:var(--nx-muted);"><span style="color:var(--nx-ember-c); font-family:'Space Grotesk'; font-weight:700;">{{ cHKills }}</span> abates · KDA 4,20</p>
+            </div>
+            <div data-anim style="animation:nx-rise-sm .5s var(--nx-ease) .36s; padding:18px; border-radius:18px; border:1px solid var(--nx-line); background:var(--nx-bg2);">
+              <p style="margin:0; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--nx-muted);">Séries registradas</p>
+              <p style="margin:8px 0 0; font-family:'Space Grotesk'; font-weight:700; font-size:20px;">4</p>
+              <p style="margin:4px 0 0; font-size:13px; color:var(--nx-muted);">Fase regular, semifinal e final</p>
+            </div>
+          </div>
+
+          <!-- últimas séries -->
+          <div data-anim style="animation:nx-rise .5s var(--nx-ease) .42s;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin:8px 2px 12px;">
+              <h3 style="margin:0; font-family:'Space Grotesk'; font-weight:700; font-size:18px;">Últimas séries</h3>
+              <button type="button" onClick="{{ pPartidas }}" style="background:none; border:none; cursor:pointer; color:var(--nx-ember-b); font-family:'Space Grotesk'; font-weight:600; font-size:13px;">Ver todas →</button>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+              <sc-for list="{{ homeSeries }}" as="s" hint-placeholder-count="2">
+                <div onClick="{{ s.open }}" style="{{ s.rowStyle }}">
+                  <div style="min-width:0; flex:1;">
+                    <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:6px;">
+                      <span style="{{ s.badgeStyle }}">{{ s.stage }}</span>
+                      <span style="font-size:12px; color:var(--nx-muted);">{{ s.date }}</span>
+                    </div>
+                    <p style="margin:0; font-family:'Space Grotesk'; font-weight:600; font-size:15px;">{{ s.teamA }} <span style="color:var(--nx-muted); font-weight:400;">vs</span> {{ s.teamB }}</p>
+                    <p style="margin:3px 0 0; font-size:12px; color:var(--nx-muted);">MVP: {{ s.mvp }}</p>
+                  </div>
+                  <div style="text-align:center; flex-shrink:0; border-radius:12px; border:1px solid var(--nx-line); background:rgba(0,0,0,.28); padding:8px 16px;">
+                    <div style="font-family:'Anton'; font-size:24px; line-height:1; color:{{ s.scoreColor }};">{{ s.a }}<span style="color:var(--nx-muted);">-</span>{{ s.b }}</div>
+                    <div style="font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--nx-muted);">{{ s.fmt }}</div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ==================== TABELA ==================== -->
+      <sc-if value="{{ pIsTabela }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:18px;">
+            <div>
+              <span style="font-family:'Space Grotesk'; font-weight:700; font-size:12px; letter-spacing:.22em; text-transform:uppercase; color:var(--nx-ember-b);">Fase regular</span>
+              <h1 style="margin:8px 0 0; font-family:'Space Grotesk'; font-weight:700; font-size:clamp(26px,4vw,38px); letter-spacing:-.01em;">Tabela</h1>
+            </div>
+            <span style="display:inline-flex; align-items:center; gap:7px; padding:6px 12px; border-radius:999px; border:1px solid rgba(91,229,154,.3); background:rgba(91,229,154,.08); color:var(--nx-win); font-family:'Space Grotesk'; font-weight:600; font-size:12px;"><span style="width:6px; height:6px; border-radius:50%; background:var(--nx-win);"></span>Calculada pelas séries</span>
+          </div>
+
+          <div style="border-radius:20px; border:1px solid var(--nx-line); background:linear-gradient(160deg,#1B120E,#120C09); padding:14px; overflow-x:auto;">
+            <div style="min-width:520px;">
+              <div style="display:flex; align-items:center; gap:12px; padding:0 14px 12px; border-bottom:1px solid var(--nx-line); font-family:'Space Grotesk'; font-size:11px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--nx-muted);">
+                <div style="width:52px; flex-shrink:0;">Pos</div>
+                <div style="flex:1; min-width:0;">Time</div>
+                <div style="width:64px; text-align:center; flex-shrink:0;">Séries</div>
+                <div style="width:64px; text-align:center; flex-shrink:0;">Saldo</div>
+                <div style="width:60px; text-align:right; flex-shrink:0;">Pontos</div>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:8px; margin-top:10px;">
+                <sc-for list="{{ tableRows }}" as="row" hint-placeholder-count="7">
+                  <div style="{{ row.rowStyle }}">
+                    <div style="width:52px; flex-shrink:0; display:flex; align-items:center; gap:7px;">
+                      <sc-if value="{{ row.top3 }}"><svg width="15" height="15" viewBox="0 0 24 24" fill="{{ row.medal }}" style="flex-shrink:0;"><path d="M5 16 3 5l5.5 4L12 4l3.5 5L21 5l-2 11H5Z"/></svg></sc-if>
+                      <span style="font-family:'Space Grotesk'; font-weight:700; font-size:14px;">{{ row.pos }}</span>
+                    </div>
+                    <div style="flex:1; min-width:0; display:flex; align-items:center; gap:9px;">
+                      <span style="flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:9px; font-family:'Space Grotesk'; font-weight:700; font-size:11px; color:var(--nx-ember-c); background:rgba(0,0,0,.35); border:1px solid var(--nx-line);">{{ row.short }}</span>
+                      <span onClick="{{ row.openTeam }}" style="font-family:'Space Grotesk'; font-weight:600; font-size:14.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer;" style-hover="color:var(--nx-ember-c);">{{ row.name }}</span>
+                      <sc-if value="{{ row.leader }}"><span style="flex-shrink:0; padding:2px 8px; border-radius:999px; font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--nx-ember-c); background:rgba(255,106,43,.14); border:1px solid rgba(255,106,43,.3);">Líder</span></sc-if>
+                    </div>
+                    <div style="width:64px; text-align:center; flex-shrink:0; color:var(--nx-muted);">{{ row.played }}</div>
+                    <div style="width:64px; text-align:center; flex-shrink:0; font-weight:700; color:{{ row.diffColor }};">{{ row.diffLabel }}</div>
+                    <div style="width:60px; text-align:right; flex-shrink:0; font-family:'Anton'; font-size:20px; color:var(--nx-ember-c);">{{ row.ptsLabel }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ==================== PARTIDAS ==================== -->
+      <sc-if value="{{ pIsPartidas }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="margin-bottom:18px;">
+            <span style="font-family:'Space Grotesk'; font-weight:700; font-size:12px; letter-spacing:.22em; text-transform:uppercase; color:var(--nx-ember-b);">Séries MD3 / MD5</span>
+            <h1 style="margin:8px 0 0; font-family:'Space Grotesk'; font-weight:700; font-size:clamp(26px,4vw,38px); letter-spacing:-.01em;">Partidas</h1>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:12px;">
+            <sc-for list="{{ seriesRows }}" as="s" hint-placeholder-count="4">
+              <div onClick="{{ s.open }}" style="{{ s.rowStyle }}">
+                <div style="min-width:0; flex:1;">
+                  <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:8px;">
+                    <span style="{{ s.badgeStyle }}">{{ s.stage }}</span>
+                    <span style="display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:999px; font-size:11px; font-weight:600; color:var(--nx-win); background:rgba(91,229,154,.1); border:1px solid rgba(91,229,154,.28);">{{ s.status }}</span>
+                    <span style="font-size:12px; color:var(--nx-muted);">{{ s.date }}</span>
+                  </div>
+                  <p style="margin:0; font-family:'Space Grotesk'; font-weight:600; font-size:clamp(15px,2vw,18px);">{{ s.teamA }} <span style="color:var(--nx-muted); font-weight:400; margin:0 4px;">vs</span> {{ s.teamB }}</p>
+                  <p style="margin:5px 0 0; font-size:12.5px; color:var(--nx-muted);">MVP da série: {{ s.mvp }}</p>
+                </div>
+                <div style="display:flex; align-items:center; gap:14px; flex-shrink:0;">
+                  <div style="text-align:center; border-radius:14px; border:1px solid var(--nx-line); background:rgba(0,0,0,.3); padding:10px 20px;">
+                    <div style="font-family:'Anton'; font-size:30px; line-height:1; color:{{ s.scoreColor }};">{{ s.a }}<span style="color:var(--nx-muted);">-</span>{{ s.b }}</div>
+                    <div style="font-size:9px; letter-spacing:.16em; text-transform:uppercase; color:var(--nx-muted); margin-top:2px;">Série {{ s.fmt }}</div>
+                  </div>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--nx-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ==================== ESTATÍSTICAS ==================== -->
+      <sc-if value="{{ pIsStats }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="margin-bottom:16px;">
+            <span style="font-family:'Space Grotesk'; font-weight:700; font-size:12px; letter-spacing:.22em; text-transform:uppercase; color:var(--nx-ember-b);">Rankings ao vivo</span>
+            <h1 style="margin:8px 0 0; font-family:'Space Grotesk'; font-weight:700; font-size:clamp(26px,4vw,38px); letter-spacing:-.01em;">Estatísticas</h1>
+          </div>
+          <div style="display:flex; gap:6px; padding:6px; margin-bottom:20px; border-radius:14px; border:1px solid var(--nx-line); background:rgba(255,255,255,.02); overflow-x:auto;">
+            <button type="button" onClick="{{ metric_kills }}" style="{{ segKills }}">Abates</button>
+            <button type="button" onClick="{{ metric_kda }}" style="{{ segKda }}">KDA</button>
+            <button type="button" onClick="{{ metric_mvps }}" style="{{ segMvps }}">MVPs</button>
+            <button type="button" onClick="{{ metric_assists }}" style="{{ segAssists }}">Assistências</button>
+            <button type="button" onClick="{{ metric_deaths }}" style="{{ segDeaths }}">Mortes</button>
+          </div>
+          <div style="display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(300px,1fr));">
+            <div style="border-radius:20px; border:1px solid var(--nx-line); background:linear-gradient(160deg,#1B120E,#120C09); padding:22px 20px;">
+              <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;"><span style="font-family:'Space Grotesk'; font-weight:700; font-size:14px;">Pódio · {{ metricLabel }}</span><span style="font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--nx-muted);">Top 3</span></div>
+              <div key="{{ podiumKey }}" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; align-items:end; min-height:200px;">
+                <div data-anim style="animation:nx-rise .55s var(--nx-ease) .12s; display:flex; flex-direction:column; align-items:center; gap:7px;">
+                  <span style="display:inline-flex; width:32px; height:32px; align-items:center; justify-content:center; border-radius:50%; font-family:'Space Grotesk'; font-weight:700; font-size:13px; color:#d9c3a0; border:1px solid rgba(217,195,160,.4); background:rgba(217,195,160,.1);">2</span>
+                  <div style="text-align:center; line-height:1.1;"><div style="font-family:'Space Grotesk'; font-weight:600; font-size:12.5px;">{{ podium.0.nick }}</div><div style="font-family:'Anton'; font-size:18px; color:var(--nx-ember-c);">{{ podium.0.val }}</div></div>
+                  <div style="width:100%; height:92px; border-radius:11px 11px 0 0; background:linear-gradient(180deg, rgba(217,195,160,.24), rgba(217,195,160,.04)); border:1px solid rgba(217,195,160,.2); border-bottom:none;"></div>
+                </div>
+                <div data-anim style="animation:nx-rise .55s var(--nx-ease) 0s; display:flex; flex-direction:column; align-items:center; gap:7px;">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="url(#nxBronze)"><path d="M5 16 3 5l5.5 4L12 4l3.5 5L21 5l-2 11H5Z"/></svg>
+                  <div style="text-align:center; line-height:1.1;"><div style="font-family:'Space Grotesk'; font-weight:700; font-size:13.5px; color:var(--nx-bronze-a);">{{ podium.1.nick }}</div><div style="font-family:'Anton'; font-size:24px; color:var(--nx-ember-c);">{{ podium.1.val }}</div></div>
+                  <div style="width:100%; height:140px; border-radius:11px 11px 0 0; background:linear-gradient(180deg, rgba(200,138,69,.3), rgba(200,138,69,.05)); border:1px solid rgba(200,138,69,.32); border-bottom:none; display:flex; align-items:flex-start; justify-content:center; padding-top:8px; font-family:'Anton'; font-size:22px; color:rgba(243,208,138,.5);">1</div>
+                </div>
+                <div data-anim style="animation:nx-rise .55s var(--nx-ease) .24s; display:flex; flex-direction:column; align-items:center; gap:7px;">
+                  <span style="display:inline-flex; width:32px; height:32px; align-items:center; justify-content:center; border-radius:50%; font-family:'Space Grotesk'; font-weight:700; font-size:13px; color:#C88A45; border:1px solid rgba(200,138,69,.4); background:rgba(200,138,69,.1);">3</span>
+                  <div style="text-align:center; line-height:1.1;"><div style="font-family:'Space Grotesk'; font-weight:600; font-size:12.5px;">{{ podium.2.nick }}</div><div style="font-family:'Anton'; font-size:18px; color:var(--nx-ember-c);">{{ podium.2.val }}</div></div>
+                  <div style="width:100%; height:72px; border-radius:11px 11px 0 0; background:linear-gradient(180deg, rgba(200,138,69,.2), rgba(200,138,69,.04)); border:1px solid rgba(200,138,69,.18); border-bottom:none;"></div>
+                </div>
+              </div>
+            </div>
+            <div style="border-radius:20px; border:1px solid var(--nx-line); background:linear-gradient(160deg,#1B120E,#120C09); padding:22px 20px;">
+              <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;"><span style="font-family:'Space Grotesk'; font-weight:700; font-size:14px;">Ranking · {{ metricLabel }}</span><span style="font-size:11px; color:var(--nx-muted);">6 jogadores</span></div>
+              <div style="position:relative; height:{{ statsHeight }}px;">
+                <sc-for list="{{ statsRows }}" as="row" hint-placeholder-count="6">
+                  <div style="{{ row.outerStyle }}">
+                    <div style="{{ row.cardStyle }}">
+                      <span style="flex-shrink:0; display:inline-flex; width:28px; height:26px; align-items:center; justify-content:center; border-radius:8px; font-family:'Space Grotesk'; font-weight:700; font-size:12px; color:var(--nx-ember-c); background:rgba(0,0,0,.35); border:1px solid var(--nx-line);">{{ row.rank }}</span>
+                      <div style="min-width:92px; max-width:132px;">
+                        <div style="font-family:'Space Grotesk'; font-weight:600; font-size:13.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center; gap:5px;"><span onClick="{{ row.openPlayer }}" style="cursor:pointer;" style-hover="color:var(--nx-ember-c);">{{ row.nick }}</span><sc-if value="{{ row.leader }}"><svg width="12" height="12" viewBox="0 0 24 24" fill="url(#nxBronze)" style="flex-shrink:0;"><path d="M5 16 3 5l5.5 4L12 4l3.5 5L21 5l-2 11H5Z"/></svg></sc-if></div>
+                        <div style="font-size:11px; color:var(--nx-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ row.team }}</div>
+                      </div>
+                      <div style="position:relative; flex:1; height:8px; border-radius:999px; background:rgba(255,255,255,.05); overflow:hidden;"><div style="position:absolute; top:0; left:0; bottom:0; width:{{ row.barPct }}%; border-radius:999px;"><div data-anim style="animation:nx-bar .9s var(--nx-ease); transform-origin:left; width:100%; height:100%; border-radius:999px; background:{{ row.bar }};"></div></div></div>
+                      <span style="flex-shrink:0; font-family:'Anton'; font-size:20px; min-width:44px; text-align:right; color:var(--nx-ember-c);">{{ row.val }}</span>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ==================== ADMIN ==================== -->
+      <sc-if value="{{ pIsAdmin }}" hint-placeholder-val="{{ false }}">
+        <sc-if value="{{ adminLocked }}" hint-placeholder-val="{{ true }}">
+          <div style="max-width:420px; margin:6vh auto 0;">
+            <div data-anim style="animation:nx-rise .5s var(--nx-ease); {{ adminShake }} border-radius:20px; border:1px solid var(--nx-line); background:linear-gradient(160deg,#1E1410,#130D0A); padding:32px 28px; text-align:center;">
+              <span style="display:inline-flex; width:56px; height:56px; align-items:center; justify-content:center; border-radius:16px; background:rgba(255,106,43,.12); border:1px solid rgba(255,106,43,.3); color:var(--nx-ember-b);"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+              <h2 style="margin:18px 0 0; font-family:'Space Grotesk'; font-weight:700; font-size:24px;">Painel restrito</h2>
+              <p style="margin:8px 0 0; color:var(--nx-muted); font-size:14px; line-height:1.5;">Área de administração — lançamento de séries, times e jogadores.</p>
+              <input type="password" value="{{ adminPass }}" onInput="{{ onAdminInput }}" placeholder="Senha" style="width:100%; height:48px; margin-top:20px; padding:0 16px; border-radius:12px; border:1px solid var(--nx-line); background:rgba(0,0,0,.3); color:var(--nx-ink); font-family:'Sora'; font-size:15px; outline:none;" style-focus="border-color:rgba(255,106,43,.6); box-shadow:0 0 0 2px rgba(255,106,43,.2);">
+              <sc-if value="{{ adminError }}"><p style="margin:8px 0 0; font-size:12.5px; color:var(--nx-loss);">Digite uma senha para entrar.</p></sc-if>
+              <button type="button" onClick="{{ tryUnlock }}" style="width:100%; height:48px; margin-top:12px; border-radius:12px; border:none; cursor:pointer; background:var(--nx-ember); color:#1a0d06; font-family:'Space Grotesk'; font-weight:700; font-size:15px; box-shadow:0 8px 24px rgba(255,106,43,.26);">Entrar</button>
+              <p style="margin:14px 0 0; font-size:12px; color:var(--nx-muted);">Demo — digite qualquer senha para explorar.</p>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ adminUnlocked }}" hint-placeholder-val="{{ false }}">
+          <div>
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:18px;">
+              <div><span style="display:inline-flex; align-items:center; gap:7px; font-family:'Space Grotesk'; font-weight:700; font-size:12px; letter-spacing:.2em; text-transform:uppercase; color:var(--nx-lime);"><span style="width:6px; height:6px; border-radius:50%; background:var(--nx-lime); box-shadow:0 0 8px var(--nx-lime);"></span>Sessão ativa</span><h1 style="margin:8px 0 0; font-family:'Space Grotesk'; font-weight:700; font-size:clamp(26px,4vw,38px);">Painel Admin</h1></div>
+            </div>
+            <div data-anim style="animation:nx-rise .5s var(--nx-ease); border-radius:18px; border:1px solid rgba(255,106,43,.25); background:linear-gradient(160deg, rgba(255,106,43,.06), var(--nx-bg2)); padding:22px; margin-bottom:16px;">
+              <h3 style="margin:0 0 4px; font-family:'Space Grotesk'; font-weight:700; font-size:17px;">Lançar nova série</h3>
+              <p style="margin:0 0 16px; font-size:13px; color:var(--nx-muted);">Preencha e a série aparece na hora em Partidas e na Home.</p>
+              <div style="display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
+                <label><span style="display:block; font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--nx-muted); margin-bottom:5px;">Time A</span><select value="{{ form.a }}" onChange="{{ fA }}" style="{{ fld }}"><option value="">Selecione…</option><sc-for list="{{ teamOptions }}" as="t" hint-placeholder-count="7"><option value="{{ t.id }}">{{ t.name }}</option></sc-for></select></label>
+                <label><span style="display:block; font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--nx-muted); margin-bottom:5px;">Time B</span><select value="{{ form.b }}" onChange="{{ fB }}" style="{{ fld }}"><option value="">Selecione…</option><sc-for list="{{ teamOptions }}" as="t" hint-placeholder-count="7"><option value="{{ t.id }}">{{ t.name }}</option></sc-for></select></label>
+                <label><span style="display:block; font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--nx-muted); margin-bottom:5px;">Etapa</span><select value="{{ form.stage }}" onChange="{{ fStage }}" style="{{ fld }}"><option>Fase regular</option><option>Semifinal</option><option>Grande Final</option></select></label>
+                <label><span style="display:block; font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--nx-muted); margin-bottom:5px;">Formato</span><select value="{{ form.fmt }}" onChange="{{ fFmt }}" style="{{ fld }}"><option>MD3</option><option>MD5</option></select></label>
+                <label><span style="display:block; font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--nx-muted); margin-bottom:5px;">Placar A</span><input type="number" min="0" value="{{ form.sa }}" onInput="{{ fSA }}" style="{{ fld }}"></label>
+                <label><span style="display:block; font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--nx-muted); margin-bottom:5px;">Placar B</span><input type="number" min="0" value="{{ form.sb }}" onInput="{{ fSB }}" style="{{ fld }}"></label>
+              </div>
+              <sc-if value="{{ formError }}" hint-placeholder-val="{{ false }}"><p style="margin:12px 0 0; font-size:13px; color:var(--nx-loss);">{{ formError }}</p></sc-if>
+              <button type="button" onClick="{{ addSerie }}" style="margin-top:16px; height:46px; padding:0 24px; border-radius:12px; border:none; cursor:pointer; background:var(--nx-ember); color:#1a0d06; font-family:'Space Grotesk'; font-weight:700; font-size:15px; box-shadow:0 8px 24px rgba(255,106,43,.24);">Lançar série</button>
+            </div>
+            <div style="display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(220px,1fr));">
+              <div data-anim style="animation:nx-rise-sm .5s var(--nx-ease); padding:20px; border-radius:18px; border:1px solid var(--nx-line); background:var(--nx-bg2);"><div style="display:flex; align-items:center; justify-content:space-between;"><span style="font-family:'Space Grotesk'; font-weight:700; font-size:15px;">Times</span><span style="font-family:'Anton'; font-size:26px; color:var(--nx-ember-c);">7</span></div><p style="margin:6px 0 0; font-size:13px; color:var(--nx-muted);">Criar, editar e remover equipes.</p><span style="display:inline-block; margin-top:12px; color:var(--nx-ember-b); font-family:'Space Grotesk'; font-weight:600; font-size:13px;">Gerenciar →</span></div>
+              <div data-anim style="animation:nx-rise-sm .5s var(--nx-ease) .06s; padding:20px; border-radius:18px; border:1px solid var(--nx-line); background:var(--nx-bg2);"><div style="display:flex; align-items:center; justify-content:space-between;"><span style="font-family:'Space Grotesk'; font-weight:700; font-size:15px;">Jogadores</span><span style="font-family:'Anton'; font-size:26px; color:var(--nx-ember-c);">34</span></div><p style="margin:6px 0 0; font-size:13px; color:var(--nx-muted);">Elenco, roles e elo por time.</p><span style="display:inline-block; margin-top:12px; color:var(--nx-ember-b); font-family:'Space Grotesk'; font-weight:600; font-size:13px;">Gerenciar →</span></div>
+              <div data-anim style="animation:nx-rise-sm .5s var(--nx-ease) .12s; padding:20px; border-radius:18px; border:1px solid var(--nx-line); background:var(--nx-bg2);"><div style="display:flex; align-items:center; justify-content:space-between;"><span style="font-family:'Space Grotesk'; font-weight:700; font-size:15px;">Séries</span><span style="font-family:'Anton'; font-size:26px; color:var(--nx-ember-c);">4</span></div><p style="margin:6px 0 0; font-size:13px; color:var(--nx-muted);">Lançar games, K/D/A e MVP.</p><span style="display:inline-block; margin-top:12px; color:var(--nx-ember-b); font-family:'Space Grotesk'; font-weight:600; font-size:13px;">Gerenciar →</span></div>
+            </div>
+            <div data-anim style="animation:nx-rise .5s var(--nx-ease) .18s; margin-top:14px; padding:18px 20px; border-radius:18px; border:1px solid rgba(203,255,62,.22); background:rgba(203,255,62,.05); display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--nx-lime)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+              <div style="flex:1; min-width:200px;"><div style="font-family:'Space Grotesk'; font-weight:700; font-size:14px;">Importar / Exportar JSON</div><div style="font-size:13px; color:var(--nx-muted);">Backup completo do campeonato com validação.</div></div>
+            </div>
+          </div>
+        </sc-if>
+      </sc-if>
+
+      <!-- ==================== SÉRIE (detalhe) ==================== -->
+      <sc-if value="{{ pIsSerie }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <button type="button" onClick="{{ pPartidas }}" style="display:inline-flex; align-items:center; gap:7px; background:none; border:none; cursor:pointer; color:var(--nx-muted); font-family:'Space Grotesk'; font-weight:600; font-size:13px; padding:0; margin-bottom:16px;" style-hover="color:var(--nx-ember-b);">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>Voltar para Partidas
+          </button>
+          <div data-anim style="animation:nx-rise .5s var(--nx-ease); position:relative; overflow:hidden; border-radius:20px; border:1px solid var(--nx-line); background:radial-gradient(120% 100% at 12% 0%, rgba(200,138,69,.1), transparent 46%), linear-gradient(160deg,#1E1510,#120C09); padding:clamp(20px,3.5vw,32px); margin-bottom:22px;">
+            <div style="display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:8px; margin-bottom:18px;">
+              <span style="padding:4px 11px; border-radius:999px; font-family:'Space Grotesk'; font-weight:700; font-size:11px; color:#22160a; background:var(--nx-bronze);">{{ serie.stage }}</span>
+              <span style="padding:4px 11px; border-radius:999px; font-size:11px; font-weight:600; color:var(--nx-win); background:rgba(91,229,154,.1); border:1px solid rgba(91,229,154,.28);">{{ serie.status }}</span>
+              <span style="font-size:12px; color:var(--nx-muted);">{{ serie.date }} · Série {{ serie.fmt }}</span>
+            </div>
+            <div style="display:flex; align-items:center; justify-content:center; gap:clamp(12px,4vw,40px); flex-wrap:wrap;">
+              <div style="text-align:right; flex:1; min-width:110px;"><div style="font-family:'Space Grotesk'; font-weight:700; font-size:clamp(17px,3vw,26px); line-height:1.1;">{{ serie.teamA }}</div></div>
+              <div style="text-align:center; flex-shrink:0;"><div style="font-family:'Anton'; font-size:clamp(46px,8vw,74px); line-height:1; color:{{ serie.scoreColor }};">{{ serie.aLabel }}<span style="color:rgba(255,255,255,.26); margin:0 8px;">–</span>{{ serie.bLabel }}</div></div>
+              <div style="text-align:left; flex:1; min-width:110px;"><div style="font-family:'Space Grotesk'; font-weight:700; font-size:clamp(17px,3vw,26px); line-height:1.1;">{{ serie.teamB }}</div></div>
+            </div>
+            <p style="text-align:center; margin:14px 0 0; font-size:13px; color:var(--nx-muted);">MVP da série: <span style="color:var(--nx-ember-c); font-weight:600;">{{ serie.mvp }}</span></p>
+          </div>
+
+          <h3 style="margin:0 2px 12px; font-family:'Space Grotesk'; font-weight:700; font-size:18px;">Jogo a jogo</h3>
+          <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:26px;">
+            <sc-for list="{{ serie.games }}" as="g" hint-placeholder-count="3">
+              <div data-anim style="{{ g.rowStyle }}">
+                <span style="flex-shrink:0; display:inline-flex; width:40px; height:40px; align-items:center; justify-content:center; border-radius:11px; font-family:'Anton'; font-size:18px; color:var(--nx-ember-c); background:rgba(0,0,0,.3); border:1px solid var(--nx-line);">{{ g.n }}</span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-family:'Space Grotesk'; font-weight:600; font-size:14.5px;">Vitória · <span style="color:var(--nx-ember-c);">{{ g.winner }}</span></div>
+                  <div style="font-size:12px; color:var(--nx-muted);">MVP do jogo: {{ g.mvp }}</div>
+                </div>
+                <span style="flex-shrink:0; display:inline-flex; align-items:center; gap:5px; font-size:12.5px; color:var(--nx-muted);"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>{{ g.dur }} min</span>
+              </div>
+            </sc-for>
+          </div>
+
+          <h3 style="margin:0 2px 12px; font-family:'Space Grotesk'; font-weight:700; font-size:18px;">Destaques da série</h3>
+          <div style="border-radius:18px; border:1px solid var(--nx-line); background:var(--nx-bg2); padding:8px; overflow-x:auto;">
+            <div style="min-width:440px; display:flex; flex-direction:column; gap:4px;">
+              <div style="display:flex; align-items:center; gap:14px; padding:6px 12px; font-family:'Space Grotesk'; font-size:10.5px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--nx-muted);"><span style="flex:1;">Jogador</span><span style="width:110px;">Campeão</span><span style="width:80px; text-align:center;">K / D / A</span><span style="width:56px; text-align:right;">KDA</span></div>
+              <sc-for list="{{ serie.destaques }}" as="d" hint-placeholder-count="3">
+                <div style="display:flex; align-items:center; gap:14px; padding:11px 12px; border-radius:12px; background:rgba(255,255,255,.02);">
+                  <div style="flex:1; min-width:0; display:flex; align-items:center; gap:8px;"><span style="font-family:'Space Grotesk'; font-weight:700; font-size:14px;">{{ d.nick }}</span><sc-if value="{{ d.mvp }}"><span style="padding:2px 8px; border-radius:999px; font-size:10px; font-weight:700; color:#22160a; background:var(--nx-bronze);">MVP</span></sc-if></div>
+                  <span style="width:110px; font-size:13px; color:var(--nx-muted);">{{ d.champ }}</span>
+                  <span style="width:80px; text-align:center; font-family:'Space Grotesk'; font-weight:600; font-size:13px;">{{ d.line }}</span>
+                  <span style="width:56px; text-align:right; font-family:'Space Grotesk'; font-weight:700; font-size:14px; color:var(--nx-ember-c);">{{ d.kda }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ==================== TIME (perfil) ==================== -->
+      <sc-if value="{{ pIsTime }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <button type="button" onClick="{{ pTabela }}" style="display:inline-flex; align-items:center; gap:7px; background:none; border:none; cursor:pointer; color:var(--nx-muted); font-family:'Space Grotesk'; font-weight:600; font-size:13px; padding:0; margin-bottom:16px;" style-hover="color:var(--nx-ember-b);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>Voltar para Tabela</button>
+          <div data-anim style="animation:nx-rise .5s var(--nx-ease); border-radius:20px; border:1px solid var(--nx-line); background:linear-gradient(160deg,#1E1510,#120C09); padding:clamp(20px,3.5vw,32px); margin-bottom:20px; display:flex; flex-wrap:wrap; align-items:center; gap:20px; justify-content:space-between;">
+            <div style="display:flex; align-items:center; gap:18px; min-width:220px;">
+              <span style="flex-shrink:0; display:inline-flex; width:64px; height:64px; align-items:center; justify-content:center; border-radius:18px; font-family:'Space Grotesk'; font-weight:700; font-size:24px; color:var(--nx-ember-c); background:rgba(255,106,43,.12); border:1px solid rgba(255,106,43,.3);">{{ team.short }}</span>
+              <div>
+                <p style="margin:0; font-family:'Space Grotesk'; font-weight:600; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--nx-muted);">Posição #{{ team.pos }} · Fase regular</p>
+                <h1 style="margin:6px 0 0; font-family:'Space Grotesk'; font-weight:700; font-size:clamp(24px,4vw,34px); line-height:1;">{{ team.name }}</h1>
+              </div>
+            </div>
+            <div style="display:flex; gap:24px;">
+              <div style="text-align:center;"><div style="font-family:'Anton'; font-size:40px; line-height:1; color:var(--nx-ember-c);">{{ team.ptsLabel }}</div><div style="font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--nx-muted); margin-top:2px;">Pontos</div></div>
+              <div style="text-align:center;"><div style="font-family:'Anton'; font-size:40px; line-height:1;">{{ team.played }}</div><div style="font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--nx-muted); margin-top:2px;">Séries</div></div>
+              <div style="text-align:center;"><div style="font-family:'Anton'; font-size:40px; line-height:1; color:{{ team.diffColor }};">{{ team.diffLabel }}</div><div style="font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--nx-muted); margin-top:2px;">Saldo</div></div>
+            </div>
+          </div>
+          <sc-if value="{{ team.hasRoster }}" hint-placeholder-val="{{ false }}">
+            <h3 style="margin:0 2px 12px; font-family:'Space Grotesk'; font-weight:700; font-size:18px;">Elenco</h3>
+            <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:24px;">
+              <sc-for list="{{ team.roster }}" as="pl" hint-placeholder-count="3">
+                <button type="button" onClick="{{ pl.open }}" style="display:inline-flex; align-items:center; gap:8px; padding:9px 15px; border-radius:12px; border:1px solid var(--nx-line); background:rgba(255,255,255,.02); cursor:pointer; color:var(--nx-ink); font-family:'Space Grotesk'; font-weight:600; font-size:14px;" style-hover="border-color:rgba(255,106,43,.5); color:var(--nx-ember-c);">{{ pl.nick }}<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
+              </sc-for>
+            </div>
+          </sc-if>
+          <h3 style="margin:0 2px 12px; font-family:'Space Grotesk'; font-weight:700; font-size:18px;">Séries do time</h3>
+          <div style="display:flex; flex-direction:column; gap:12px;">
+            <sc-for list="{{ team.series }}" as="s" hint-placeholder-count="2">
+              <div onClick="{{ s.open }}" style="{{ s.rowStyle }}">
+                <div style="min-width:0; flex:1;">
+                  <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:6px;"><span style="{{ s.badgeStyle }}">{{ s.stage }}</span><span style="font-size:12px; color:var(--nx-muted);">{{ s.date }}</span></div>
+                  <p style="margin:0; font-family:'Space Grotesk'; font-weight:600; font-size:15px;">{{ s.teamA }} <span style="color:var(--nx-muted); font-weight:400;">vs</span> {{ s.teamB }}</p>
+                </div>
+                <div style="text-align:center; flex-shrink:0; border-radius:12px; border:1px solid var(--nx-line); background:rgba(0,0,0,.3); padding:8px 16px;"><div style="font-family:'Anton'; font-size:24px; line-height:1; color:{{ s.scoreColor }};">{{ s.a }}<span style="color:var(--nx-muted);">-</span>{{ s.b }}</div></div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ==================== JOGADOR (perfil) ==================== -->
+      <sc-if value="{{ pIsJogador }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <button type="button" onClick="{{ pStats }}" style="display:inline-flex; align-items:center; gap:7px; background:none; border:none; cursor:pointer; color:var(--nx-muted); font-family:'Space Grotesk'; font-weight:600; font-size:13px; padding:0; margin-bottom:16px;" style-hover="color:var(--nx-ember-b);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>Voltar para Estatísticas</button>
+          <div data-anim style="animation:nx-rise .5s var(--nx-ease); position:relative; overflow:hidden; border-radius:20px; border:1px solid var(--nx-line); background:radial-gradient(120% 120% at 12% 0%, rgba(255,106,43,.14), transparent 46%), linear-gradient(160deg,#1E1410,#130D0A); padding:clamp(22px,4vw,34px); margin-bottom:20px;">
+            <p style="margin:0; font-family:'Space Grotesk'; font-weight:600; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--nx-ember-b);">Jogador</p>
+            <h1 style="margin:8px 0 0; font-family:'Space Grotesk'; font-weight:700; font-size:clamp(30px,5vw,48px); line-height:1;">{{ player.nick }}</h1>
+            <p style="margin:8px 0 0; color:var(--nx-muted); font-size:15px;">{{ player.team }}</p>
+          </div>
+          <div style="display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
+            <div data-anim style="animation:nx-rise-sm .5s var(--nx-ease); padding:20px; border-radius:18px; border:1px solid rgba(255,106,43,.28); background:rgba(255,106,43,.06);"><div style="font-family:'Anton'; font-size:40px; line-height:1; background:var(--nx-ember); -webkit-background-clip:text; background-clip:text; color:transparent;">{{ player.kills }}</div><div style="font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--nx-muted); margin-top:4px;">Abates</div></div>
+            <div data-anim style="animation:nx-rise-sm .5s var(--nx-ease) .05s; padding:20px; border-radius:18px; border:1px solid var(--nx-line); background:var(--nx-bg2);"><div style="font-family:'Anton'; font-size:40px; line-height:1;">{{ player.deaths }}</div><div style="font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--nx-muted); margin-top:4px;">Mortes</div></div>
+            <div data-anim style="animation:nx-rise-sm .5s var(--nx-ease) .1s; padding:20px; border-radius:18px; border:1px solid var(--nx-line); background:var(--nx-bg2);"><div style="font-family:'Anton'; font-size:40px; line-height:1;">{{ player.assists }}</div><div style="font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--nx-muted); margin-top:4px;">Assistências</div></div>
+            <div data-anim style="animation:nx-rise-sm .5s var(--nx-ease) .15s; padding:20px; border-radius:18px; border:1px solid rgba(200,138,69,.3); background:rgba(200,138,69,.06);"><div style="font-family:'Anton'; font-size:40px; line-height:1; color:var(--nx-bronze-a);">{{ player.kda }}</div><div style="font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--nx-muted); margin-top:4px;">KDA</div></div>
+            <div data-anim style="animation:nx-rise-sm .5s var(--nx-ease) .2s; padding:20px; border-radius:18px; border:1px solid var(--nx-line); background:var(--nx-bg2);"><div style="font-family:'Anton'; font-size:40px; line-height:1;">{{ player.mvps }}</div><div style="font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--nx-muted); margin-top:4px;">MVPs (jogo)</div></div>
+            <div data-anim style="animation:nx-rise-sm .5s var(--nx-ease) .25s; padding:20px; border-radius:18px; border:1px solid var(--nx-line); background:var(--nx-bg2);"><div style="font-family:'Anton'; font-size:40px; line-height:1;">{{ player.games }}</div><div style="font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--nx-muted); margin-top:4px;">Jogos</div></div>
+          </div>
+        </div>
+      </sc-if>
+
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1160,&quot;height&quot;:860}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { page:'home', pageKey:1, reduced:false, counts:{}, metric:'kills', selectedSerie:0, selectedTeam:'zenshin', selectedPlayer:'nak4y', form:{a:'',b:'',stage:'Fase regular',fmt:'MD3',sa:'',sb:''}, formError:'', adminUnlocked:false, adminPass:'', adminError:false };
+    this._active = new Map(); this._loopOn = false; this._raf = 0;
+
+    this.toggleReduced = () => this.setState(s => ({ reduced: !s.reduced }));
+    this.goHome = () => this.setPage('home');
+    this.pHome = () => this.setPage('home');
+    this.pTabela = () => this.setPage('tabela');
+    this.pPartidas = () => this.setPage('partidas');
+    this.pStats = () => this.setPage('stats');
+    this.pAdmin = () => this.setPage('admin');
+    this.metric_kills = () => this.setMetric('kills');
+    this.metric_kda = () => this.setMetric('kda');
+    this.metric_mvps = () => this.setMetric('mvps');
+    this.metric_assists = () => this.setMetric('assists');
+    this.metric_deaths = () => this.setMetric('deaths');
+    this.onAdminInput = (e) => this.setState({ adminPass: e.target.value, adminError:false });
+    this.tryUnlock = () => { if ((this.state.adminPass || '').trim()) this.setState({ adminUnlocked:true, adminError:false }); else this.setState({ adminError:true }); };
+    this.setForm = (k, v) => this.setState(s => ({ form: Object.assign({}, s.form, { [k]:v }), formError:'' }));
+    this.fA = (e) => this.setForm('a', e.target.value);
+    this.fB = (e) => this.setForm('b', e.target.value);
+    this.fStage = (e) => this.setForm('stage', e.target.value);
+    this.fFmt = (e) => this.setForm('fmt', e.target.value);
+    this.fSA = (e) => this.setForm('sa', e.target.value);
+    this.fSB = (e) => this.setForm('sb', e.target.value);
+    this.addSerie = () => {
+      const f = this.state.form;
+      if (!f.a || !f.b) { this.setState({ formError:'Selecione os dois times.' }); return; }
+      if (f.a === f.b) { this.setState({ formError:'Os times devem ser diferentes.' }); return; }
+      const ta = this.TEAMS.find(t => t.id === f.a), tb = this.TEAMS.find(t => t.id === f.b);
+      const a = Math.max(0, parseInt(f.sa, 10) || 0), b = Math.max(0, parseInt(f.sb, 10) || 0);
+      const serie = { teamA:ta.name, teamB:tb.name, a, b, stage:f.stage||'Fase regular', fmt:f.fmt||'MD3', status:'Finalizada', mvp:'—', date:'Agora', champion: f.stage === 'Grande Final' };
+      this.SERIES = [serie].concat(this.SERIES);
+      this.setState({ form:{a:'',b:'',stage:'Fase regular',fmt:'MD3',sa:'',sb:''}, formError:'', page:'partidas', pageKey:this.state.pageKey + 1 }, () => this.enterPage('partidas'));
+    };
+
+    this.TEAMS = [
+      { id:'zenshin', pos:1, name:'ZENSHIN GAMING', short:'ZG', played:3, points:6, diff:2 },
+      { id:'moonrock', pos:2, name:'MOONROCK', short:'MR', played:3, points:6, diff:1 },
+      { id:'punho', pos:3, name:'PUNHO DO BARÃO', short:'PB', played:2, points:3, diff:0 },
+      { id:'pequi', pos:4, name:'PEQUI PIKANTE', short:'PP', played:1, points:3, diff:1 },
+      { id:'semdedos', pos:5, name:'SEM DEDOS GAMING', short:'SD', played:2, points:3, diff:-1 },
+      { id:'lov2', pos:6, name:'LEAGUE OF VALLEY 2.0', short:'LV', played:2, points:0, diff:-3 },
+      { id:'inss', pos:7, name:'INSS GAMING', short:'IN', played:1, points:0, diff:-1 },
+    ];
+    this.PLAYERS = [
+      { pid:'nak4y', nick:'nak4y', team:'ZENSHIN GAMING' },
+      { pid:'maxmp', nick:'Maxmp', team:'PUNHO DO BARÃO' },
+      { pid:'leao', nick:'Leão', team:'PEQUI PIKANTE' },
+      { pid:'vidotti', nick:'vidotti agiota', team:'INSS GAMING' },
+      { pid:'hail', nick:'Hail#hell', team:'MOONROCK' },
+      { pid:'shift', nick:'SHIFT', team:'LEAGUE OF VALLEY 2.0' },
+    ];
+    this.STATS = {
+      kills:   { nak4y:47, maxmp:28, leao:35, vidotti:39, hail:42, shift:24, dir:'desc', dec:0, label:'Abates' },
+      kda:     { nak4y:4.20, maxmp:5.42, leao:4.88, vidotti:3.10, hail:3.95, shift:2.75, dir:'desc', dec:2, label:'KDA' },
+      mvps:    { nak4y:6, maxmp:4, leao:5, vidotti:2, hail:3, shift:1, dir:'desc', dec:0, label:'MVPs' },
+      assists: { nak4y:44, maxmp:88, leao:71, vidotti:59, hail:52, shift:64, dir:'desc', dec:0, label:'Assistências' },
+      deaths:  { nak4y:19, maxmp:14, leao:12, vidotti:31, hail:22, shift:25, dir:'asc', dec:0, label:'Mortes' },
+    };
+    this.SERIES = [
+      { teamA:'PUNHO DO BARÃO', teamB:'ZENSHIN GAMING', a:3, b:1, stage:'Grande Final', fmt:'MD5', status:'Finalizada', mvp:'Maxmp', date:'23 fev 2026', champion:true },
+      { teamA:'ZENSHIN GAMING', teamB:'MOONROCK', a:2, b:1, stage:'Semifinal', fmt:'MD3', status:'Finalizada', mvp:'nak4y', date:'21 fev 2026' },
+      { teamA:'PUNHO DO BARÃO', teamB:'PEQUI PIKANTE', a:2, b:0, stage:'Semifinal', fmt:'MD3', status:'Finalizada', mvp:'Maxmp', date:'20 fev 2026' },
+      { teamA:'MOONROCK', teamB:'SEM DEDOS GAMING', a:2, b:1, stage:'Fase regular', fmt:'MD3', status:'Finalizada', mvp:'Hail#hell', date:'18 fev 2026' },
+    ];
+  }
+
+  componentDidMount() {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) this.setState({ reduced:true });
+    this.enterPage('home');
+  }
+  componentWillUnmount() { cancelAnimationFrame(this._raf); clearTimeout(this._finalT); }
+  get isReduced() { return this.state.reduced; }
+
+  setPage(p) {
+    if (p === this.state.page) return;
+    this.setState(s => ({ page:p, pageKey:s.pageKey + 1 }), () => this.enterPage(p));
+  }
+  enterPage(p) {
+    if (p === 'home') this.startCounts({ hChampA:{to:3,dur:1200}, hChampB:{to:1,dur:1200}, hKills:{to:47,dur:1300}, hPts:{to:6,dur:1000} }, { delay:300 });
+    if (p === 'tabela') { const m = {}; this.TEAMS.forEach(t => m['pts-'+t.id] = { to:t.points, dur:900 }); this.startCounts(m, { delay:250 }); }
+    if (p === 'partidas') { const m = {}; this.SERIES.forEach((s, i) => { m['sa-'+i] = { to:s.a, dur:800 }; m['sb-'+i] = { to:s.b, dur:800 }; }); this.startCounts(m, { delay:250 }); }
+    if (p === 'stats') this.startStats(300);
+    if (p === 'serie') { const s = this.SERIES[this.state.selectedSerie]; this.startCounts({ dsa:{to:s.a,dur:900}, dsb:{to:s.b,dur:900} }, { delay:300 }); }
+    if (p === 'time') { const t = this.TEAMS.find(x => x.id === this.state.selectedTeam) || this.TEAMS[0]; this.startCounts({ tPts:{to:t.points,dur:900} }, { delay:300 }); }
+    if (p === 'jogador') { const pl = this.PLAYERS.find(x => x.pid === this.state.selectedPlayer) || this.PLAYERS[0]; this.startCounts({ pKills:{to:this.STATS.kills[pl.pid],dur:1100} }, { delay:300 }); }
+  }
+  startStats(delay) {
+    const m = this.STATS[this.state.metric]; const map = {};
+    for (const pl of this.PLAYERS) map['val-'+pl.pid] = { to:m[pl.pid], dur:1000 };
+    this.startCounts(map, { delay: delay || 0 });
+  }
+  setMetric(m) {
+    if (m === this.state.metric) return;
+    this.setState({ metric:m }, () => this.startStats(0));
+  }
+
+  startCounts(map, opts) {
+    opts = opts || {}; const delay = opts.delay || 0;
+    if (this.isReduced) { const c = Object.assign({}, this.state.counts); for (const k in map) c[k] = map[k].to; this.setState({ counts:c }); return; }
+    const begin = performance.now() + delay; const c = Object.assign({}, this.state.counts);
+    let maxEnd = 0;
+    for (const k in map) { const from = (this.state.counts[k] != null && opts.keep) ? this.state.counts[k] : 0; c[k] = from; const dur = map[k].dur||1000; this._active.set(k, { from, to:map[k].to, dur, start:begin }); if (delay+dur > maxEnd) maxEnd = delay+dur; }
+    this.setState({ counts:c }); this._ensureLoop();
+    clearTimeout(this._finalT); this._finalT = setTimeout(() => this._finalize(), maxEnd + 160);
+  }
+  _finalize() {
+    if (!this._active || this._active.size === 0) return;
+    const c = Object.assign({}, this.state.counts);
+    for (const [k, s] of this._active) { c[k] = s.to; this._active.delete(k); }
+    this.setState({ counts:c });
+  }
+  _ensureLoop() {
+    cancelAnimationFrame(this._raf);
+    const tick = (now) => {
+      if (!this._active || this._active.size === 0) return;
+      const c = Object.assign({}, this.state.counts);
+      for (const [k, s] of this._active) { const t = Math.min(1, Math.max(0,(now - s.start)/s.dur)); const e = 1 - Math.pow(1-t,3); c[k] = s.from + (s.to-s.from)*e; if (t>=1) this._active.delete(k); }
+      this.setState({ counts:c }); this._raf = requestAnimationFrame(tick);
+    };
+    this._raf = requestAnimationFrame(tick);
+  }
+
+  tab(p) {
+    const on = this.state.page === p;
+    return `flex-shrink:0; white-space:nowrap; height:38px; padding:0 15px; border-radius:11px; border:none; cursor:pointer; font-family:'Space Grotesk'; font-weight:600; font-size:14px; transition:all .2s; ${on ? 'background:rgba(255,106,43,.16); color:var(--nx-ember-c); box-shadow:0 0 0 1px rgba(255,106,43,.32), 0 6px 18px rgba(255,106,43,.14);' : 'background:transparent; color:var(--nx-muted);'}`;
+  }
+  seg(m) {
+    const on = this.state.metric === m;
+    return `flex-shrink:0; white-space:nowrap; height:36px; padding:0 15px; border-radius:10px; border:none; cursor:pointer; font-family:'Space Grotesk'; font-weight:600; font-size:13px; transition:all .2s; ${on ? 'background:rgba(255,106,43,.18); color:var(--nx-ember-c); box-shadow:0 0 0 1px rgba(255,106,43,.3);' : 'background:transparent; color:var(--nx-muted);'}`;
+  }
+
+  tableRows() {
+    return this.TEAMS.map((t, i) => {
+      const raw = this.state.counts['pts-'+t.id]; const pts = (raw == null) ? t.points : Math.round(raw);
+      const leader = t.pos === 1, top3 = t.pos <= 3;
+      const skin = leader ? 'border:1px solid rgba(255,106,43,.4); background:linear-gradient(90deg, rgba(255,106,43,.12), transparent 72%);' : (top3 ? 'border:1px solid rgba(200,138,69,.24); background:rgba(200,138,69,.05);' : 'border:1px solid var(--nx-line); background:rgba(255,255,255,.02);');
+      const rowStyle = `animation:nx-rise-sm .5s var(--nx-ease) ${(0.06*i).toFixed(2)}s both; display:flex; align-items:center; gap:12px; padding:11px 14px; border-radius:13px; ${skin}`;
+      let diffColor = 'var(--nx-muted)', diffLabel = String(t.diff);
+      if (t.diff > 0) { diffColor = 'var(--nx-win)'; diffLabel = '+'+t.diff; } else if (t.diff < 0) { diffColor = 'var(--nx-loss)'; }
+      return { pos:t.pos, name:t.name, short:t.short, played:t.played, ptsLabel:String(pts), leader, top3, openTeam: () => this.openTeam(t.id), rowStyle, diffColor, diffLabel, medal: top3 ? (t.pos===1?'#F3D08A':t.pos===2?'#d9c3a0':'#C88A45') : null };
+    });
+  }
+
+  statsRows() {
+    const m = this.STATS[this.state.metric]; const dec = m.dec; const asc = m.dir === 'asc';
+    const vals = this.PLAYERS.map(p => m[p.pid]); const maxV = Math.max.apply(null, vals); const minV = Math.min.apply(null, vals);
+    const ranked = this.PLAYERS.slice().sort((a, b) => asc ? m[a.pid]-m[b.pid] : m[b.pid]-m[a.pid]);
+    const rowH = 60;
+    return this.PLAYERS.map(p => {
+      const rank = ranked.findIndex(r => r.pid === p.pid); const leader = rank === 0; const target = m[p.pid];
+      const pct = asc ? Math.round((minV/target)*100) : Math.round((target/maxV)*100);
+      const raw = this.state.counts['val-'+p.pid]; const cur = (raw == null) ? 0 : raw;
+      const val = dec === 2 ? cur.toFixed(2).replace('.', ',') : String(Math.round(cur));
+      const outerStyle = `position:absolute; left:0; right:0; top:0; transform:translateY(${rank*rowH}px); transition:transform .55s var(--nx-ease); will-change:transform;`;
+      const cardStyle = `display:flex; align-items:center; gap:14px; height:52px; padding:0 14px; border-radius:13px; transition:border-color .4s, background .4s; ${leader ? 'border:1px solid rgba(200,138,69,.5); background:linear-gradient(90deg, rgba(200,138,69,.14), transparent 72%);' : 'border:1px solid var(--nx-line); background:rgba(255,255,255,.02);'}`;
+      return { pid:p.pid, nick:p.nick, team:p.team, openPlayer: () => this.openPlayer(p.pid), rank:rank+1, leader, barPct:Math.max(10,pct), val, outerStyle, cardStyle, bar: leader ? 'var(--nx-bronze)' : 'var(--nx-ember)' };
+    });
+  }
+  podium() {
+    const rows = this.statsRows().slice().sort((a, b) => a.rank - b.rank); const t = rows.slice(0, 3);
+    return [t[1], t[0], t[2]];
+  }
+  seriesRows(list) {
+    return list.map((s, i) => {
+      const ra = this.state.counts['sa-'+i], rb = this.state.counts['sb-'+i];
+      const a = (ra == null) ? s.a : Math.round(ra); const b = (rb == null) ? s.b : Math.round(rb);
+      const champ = !!s.champion;
+      const rowStyle = `animation:nx-rise-sm .5s var(--nx-ease) ${(0.07*i).toFixed(2)}s both; display:flex; align-items:center; justify-content:space-between; gap:14px; padding:15px 17px; border-radius:16px; cursor:pointer; ${champ ? 'border:1px solid rgba(200,138,69,.42); background:radial-gradient(120% 120% at 8% 0%, rgba(200,138,69,.13), transparent 50%), rgba(255,255,255,.02);' : 'border:1px solid var(--nx-line); background:rgba(255,255,255,.02);'}`;
+      const badgeStyle = champ ? "padding:3px 10px; border-radius:999px; font-family:'Space Grotesk'; font-weight:700; font-size:11px; color:#22160a; background:var(--nx-bronze);" : "padding:3px 10px; border-radius:999px; font-family:'Space Grotesk'; font-weight:600; font-size:11px; color:var(--nx-muted); border:1px solid var(--nx-line);";
+      const scoreColor = champ ? 'var(--nx-bronze-a)' : 'var(--nx-ember-c)';
+      return { teamA:s.teamA, teamB:s.teamB, a:String(a), b:String(b), stage:s.stage, fmt:s.fmt, status:s.status, mvp:s.mvp, date:s.date, champion:champ, rowStyle, badgeStyle, scoreColor, open: () => this.openSerie(this.SERIES.indexOf(s)) };
+    });
+  }
+
+  openSerie(i) { this.setState(s => ({ selectedSerie:i, page:'serie', pageKey:s.pageKey + 1 }), () => this.enterPage('serie')); }
+  gamesFor(s) {
+    const seq = ({'3-1':['A','B','A','A'],'2-1':['A','B','A'],'2-0':['A','A'],'3-0':['A','A','A'],'3-2':['A','B','A','B','A']})[s.a+'-'+s.b] || ['A'];
+    const durs = [34,29,38,41,45]; const mvps = ['nak4y','Maxmp','Leão','Hail#hell','vidotti agiota'];
+    return seq.map((w, i) => ({ n:i+1, winner: w==='A'?s.teamA:s.teamB, dur:durs[i%durs.length], mvp:mvps[i%mvps.length], rowStyle:`animation:nx-rise-sm .45s var(--nx-ease) ${(0.06*i).toFixed(2)}s both; display:flex; align-items:center; gap:14px; padding:13px 15px; border-radius:14px; border:1px solid var(--nx-line); background:rgba(255,255,255,.02);` }));
+  }
+  destaquesFor(s) {
+    return [
+      { nick:s.mvp, champ:'Ahri', line:'8 / 2 / 11', kda:'9,50', mvp:true },
+      { nick:'Ikira', champ:'Lee Sin', line:'6 / 3 / 9', kda:'5,00', mvp:false },
+      { nick:'zeus', champ:'Thresh', line:'3 / 5 / 14', kda:'3,40', mvp:false },
+    ];
+  }
+  serieDetail() {
+    const s = this.SERIES[this.state.selectedSerie] || this.SERIES[0];
+    const ra = this.state.counts.dsa, rb = this.state.counts.dsb;
+    const a = (ra == null) ? s.a : Math.round(ra); const b = (rb == null) ? s.b : Math.round(rb);
+    return { teamA:s.teamA, teamB:s.teamB, aLabel:String(a), bLabel:String(b), stage:s.stage, fmt:s.fmt, status:s.status, mvp:s.mvp, date:s.date, champion:!!s.champion, scoreColor: s.champion ? 'var(--nx-bronze-a)' : 'var(--nx-ember-c)', games:this.gamesFor(s), destaques:this.destaquesFor(s) };
+  }
+  openTeam(id) { this.setState(s => ({ selectedTeam:id, page:'time', pageKey:s.pageKey + 1 }), () => this.enterPage('time')); }
+  openPlayer(pid) { this.setState(s => ({ selectedPlayer:pid, page:'jogador', pageKey:s.pageKey + 1 }), () => this.enterPage('jogador')); }
+  teamDetail() {
+    const t = this.TEAMS.find(x => x.id === this.state.selectedTeam) || this.TEAMS[0];
+    const raw = this.state.counts.tPts; const pts = (raw == null) ? t.points : Math.round(raw);
+    let diffColor = 'var(--nx-muted)', diffLabel = String(t.diff);
+    if (t.diff > 0) { diffColor = 'var(--nx-win)'; diffLabel = '+'+t.diff; } else if (t.diff < 0) { diffColor = 'var(--nx-loss)'; }
+    const roster = this.PLAYERS.filter(x => x.team === t.name).map(x => ({ nick:x.nick, open:() => this.openPlayer(x.pid) }));
+    const series = this.seriesRows(this.SERIES.filter(s => s.teamA === t.name || s.teamB === t.name));
+    return { name:t.name, short:t.short, pos:t.pos, ptsLabel:String(pts), played:t.played, diffColor, diffLabel, leader:t.pos===1, roster, hasRoster:roster.length>0, series };
+  }
+  playerDetail() {
+    const p = this.PLAYERS.find(x => x.pid === this.state.selectedPlayer) || this.PLAYERS[0];
+    const S = this.STATS; const raw = this.state.counts.pKills; const k = (raw == null) ? S.kills[p.pid] : Math.round(raw);
+    return { nick:p.nick, team:p.team, kills:String(k), deaths:String(S.deaths[p.pid]), assists:String(S.assists[p.pid]), kda:S.kda[p.pid].toFixed(2).replace('.', ','), mvps:String(S.mvps[p.pid]), games:'12' };
+  }
+  renderVals() {
+    const c = this.state.counts; const p = this.state.page;
+    return {
+      reducedAttr: this.state.reduced ? 'true' : 'false',
+      reducedLabel: this.state.reduced ? 'Movimento reduzido' : 'Movimento pleno',
+      reducedDot: this.state.reduced ? 'var(--nx-muted)' : 'var(--nx-lime)',
+      toggleReduced: this.toggleReduced, goHome: this.goHome,
+      pHome: this.pHome, pTabela: this.pTabela, pPartidas: this.pPartidas, pStats: this.pStats, pAdmin: this.pAdmin,
+      tabHome: this.tab('home'), tabTabela: this.tab('tabela'), tabPartidas: this.tab('partidas'), tabStats: this.tab('stats'), tabAdmin: this.tab('admin'),
+      pageKey: this.state.pageKey,
+      pIsHome: p === 'home', pIsTabela: p === 'tabela', pIsPartidas: p === 'partidas', pIsStats: p === 'stats', pIsAdmin: p === 'admin', pIsSerie: p === 'serie', pIsTime: p === 'time', pIsJogador: p === 'jogador',
+      serie: this.serieDetail(), team: this.teamDetail(), player: this.playerDetail(),
+      cHChampA: Math.round(c.hChampA || 0), cHChampB: Math.round(c.hChampB || 0), cHKills: Math.round(c.hKills || 0), cHPts: Math.round(c.hPts || 0),
+      tableRows: this.tableRows(),
+      homeSeries: this.seriesRows(this.SERIES.slice(0, 2)),
+      seriesRows: this.seriesRows(this.SERIES),
+      statsRows: this.statsRows(), podium: this.podium(),
+      statsHeight: this.PLAYERS.length * 60, metricLabel: this.STATS[this.state.metric].label,
+      metric_kills: this.metric_kills, metric_kda: this.metric_kda, metric_mvps: this.metric_mvps, metric_assists: this.metric_assists, metric_deaths: this.metric_deaths,
+      segKills: this.seg('kills'), segKda: this.seg('kda'), segMvps: this.seg('mvps'), segAssists: this.seg('assists'), segDeaths: this.seg('deaths'),
+      podiumKey: this.state.metric + '-' + this.state.pageKey,
+      onAdminInput: this.onAdminInput, tryUnlock: this.tryUnlock, adminPass: this.state.adminPass, adminUnlocked: this.state.adminUnlocked, adminLocked: !this.state.adminUnlocked, adminError: this.state.adminError,
+      form: this.state.form, formError: this.state.formError,
+      fA: this.fA, fB: this.fB, fStage: this.fStage, fFmt: this.fFmt, fSA: this.fSA, fSB: this.fSB, addSerie: this.addSerie,
+      teamOptions: this.TEAMS.map(t => ({ id:t.id, name:t.name })),
+      fld: "width:100%; height:44px; padding:0 12px; border-radius:11px; border:1px solid var(--nx-line); background:rgba(0,0,0,.3); color:var(--nx-ink); font-family:'Sora'; font-size:14px; outline:none;",
+      adminShake: this.state.adminError ? 'animation:nx-shake .4s ease;' : '',
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -221,8 +221,8 @@ export function StandingsPageClient({ rows, source }: StandingsPageClientProps) 
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="font-display text-xl font-bold">#{row.position}</span>
-                    {row.position <= 3 ? <Trophy className="h-4 w-4 text-accent" /> : null}
+                    <span className="font-display text-2xl text-accent">#{row.position}</span>
+                    {row.position <= 3 ? <Trophy className="h-4 w-4 text-accent2" /> : null}
                   </div>
                   <StandingsTeamLink row={row} />
                   <p className="mt-1 text-xs text-muted">
@@ -241,11 +241,15 @@ export function StandingsPageClient({ rows, source }: StandingsPageClientProps) 
           columns={tableColumns}
           data={filteredRows}
           emptyMessage="Nenhum time encontrado."
-          rowClassName={(row) =>
-            row.position <= 3
-              ? "bg-accent/[0.03] shadow-[inset_0_0_0_1px_rgba(86,180,255,0.08)]"
-              : ""
-          }
+          rowClassName={(row) => {
+            if (row.position === 1) {
+              return "bg-accent/[0.06] shadow-[inset_0_0_0_1px_rgba(255,106,43,0.2)]";
+            }
+            if (row.position <= 3) {
+              return "bg-accent2/[0.04] shadow-[inset_0_0_0_1px_rgba(200,138,69,0.14)]";
+            }
+            return "";
+          }}
         />
       </Card>
     </div>

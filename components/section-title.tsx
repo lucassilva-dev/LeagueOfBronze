@@ -11,7 +11,7 @@ export function SectionTitle({
 }>) {
   return (
     <div className={cn("space-y-1", className)}>
-      <h2 className="font-display text-xl font-bold tracking-wide sm:text-2xl">
+      <h2 className="font-heading text-xl font-semibold tracking-wide sm:text-2xl">
         {title}
       </h2>
       {subtitle ? <p className="text-sm text-muted">{subtitle}</p> : null}

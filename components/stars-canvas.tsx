@@ -45,10 +45,10 @@ export function StarsCanvas() {
       stars = Array.from({ length: count }, () => ({
         x: getRandomBetween(0, width),
         y: getRandomBetween(0, height),
-        r: getRandomBetween(0.4, 1.6),
-        vx: getRandomBetween(-0.01, 0.01),
-        vy: getRandomBetween(0.01, 0.04),
-        a: getRandomBetween(0.1, 0.55),
+        r: getRandomBetween(0.4, 1.7),
+        vx: getRandomBetween(-0.012, 0.012),
+        vy: getRandomBetween(-0.045, -0.015),
+        a: getRandomBetween(0.08, 0.5),
       }));
     };
 
@@ -63,12 +63,12 @@ export function StarsCanvas() {
         s.y += s.vy * dt;
         if (s.x < 0) s.x = width;
         if (s.x > width) s.x = 0;
-        if (s.y > height) {
-          s.y = -5;
+        if (s.y < -5) {
+          s.y = height + 5;
           s.x = getRandomBetween(0, width);
         }
         ctx.beginPath();
-        ctx.fillStyle = `rgba(180, 215, 255, ${s.a})`;
+        ctx.fillStyle = `rgba(255, 138, 76, ${s.a})`;
         ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
         ctx.fill();
       }

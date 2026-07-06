@@ -9,6 +9,7 @@ import { buildLeaderboards } from "@/lib/tournament";
 import { formatDateLabel, formatKda } from "@/lib/format";
 import type { LeaderboardMetric, LeaderboardRow } from "@/types/domain";
 import { DataTable } from "@/components/data-table";
+import { StatsLeaderboardVisual } from "@/components/stats-leaderboard-visual";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -173,6 +174,8 @@ export function StatsPageClient({ dataset }: StatsPageClientProps) {
           { value: "deathsLeast", label: "Mortes" },
         ]}
       />
+
+      {rows.length > 0 ? <StatsLeaderboardVisual rows={rows} metric={metric} /> : null}
 
       <div className="grid gap-3 md:hidden">
         {rows.length === 0 ? (

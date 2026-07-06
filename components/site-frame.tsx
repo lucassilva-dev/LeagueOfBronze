@@ -13,7 +13,7 @@ export function SiteFrame({ children }: SiteFrameProps) {
       <div className="pointer-events-none fixed inset-0 -z-10 bg-grid opacity-20" />
 
       <header className="sticky top-0 z-30 border-b border-white/5 bg-bg/70 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-[1160px] flex-col gap-3 px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between gap-3">
             <Link href="/" className="group inline-flex items-center gap-3">
               <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-accent/30 bg-accent/10 shadow-glow">
@@ -27,10 +27,12 @@ export function SiteFrame({ children }: SiteFrameProps) {
                 />
               </span>
               <div>
-                <p className="font-display text-sm font-bold tracking-[0.18em] text-text">
+                <p className="font-heading text-sm font-bold tracking-[0.14em] text-text">
                   LEAGUE OF BRONZE
                 </p>
-                <p className="text-xs text-muted">Campeonato amador</p>
+                <p className="text-[11px] uppercase tracking-[0.22em] text-muted">
+                  Campeonato amador
+                </p>
               </div>
             </Link>
           </div>

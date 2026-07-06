@@ -28,7 +28,7 @@ export function CardTitle({
 }: Readonly<React.HTMLAttributes<HTMLHeadingElement> & { children: React.ReactNode }>) {
   return (
     <h3
-      className={cn("font-display text-lg font-bold tracking-wide", className)}
+      className={cn("font-heading text-lg font-semibold tracking-wide", className)}
       {...props}
     >
       {children}

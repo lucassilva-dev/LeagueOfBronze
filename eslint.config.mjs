@@ -5,7 +5,7 @@ const config = [
   ...nextCoreWebVitals,
   ...nextTypescript,
   {
-    ignores: ["coverage/**"],
+    ignores: ["coverage/**", "design_handoff_rebrand/**"],
   },
 ];
 

@@ -14,24 +14,29 @@ const config: Config = {
         panel2: "hsl(var(--panel-2) / <alpha-value>)",
         text: "hsl(var(--text) / <alpha-value>)",
         muted: "hsl(var(--muted) / <alpha-value>)",
-        accent: "hsl(var(--accent) / <alpha-value>)",
-        accent2: "hsl(var(--accent-2) / <alpha-value>)",
+        accent: "hsl(var(--accent) / <alpha-value>)", // ember
+        accent2: "hsl(var(--accent-2) / <alpha-value>)", // bronze
+        lime: "hsl(var(--lime) / <alpha-value>)",
         success: "hsl(var(--success) / <alpha-value>)",
         danger: "hsl(var(--danger) / <alpha-value>)",
         border: "hsl(var(--border) / <alpha-value>)",
       },
       fontFamily: {
-        display: ["var(--font-display)", "sans-serif"],
-        body: ["var(--font-body)", "sans-serif"],
+        display: ["var(--font-display)", "sans-serif"], // Anton — números/heros gigantes
+        heading: ["var(--font-heading)", "sans-serif"], // Space Grotesk — títulos, rótulos
+        body: ["var(--font-body)", "sans-serif"], // Sora — corpo e UI
       },
       boxShadow: {
-        glow: "0 0 0 1px rgba(120, 190, 255, 0.16), 0 8px 30px rgba(35, 90, 160, 0.18)",
+        ember: "0 8px 24px rgba(255, 106, 43, 0.24)",
+        bronze: "0 20px 70px rgba(40, 20, 6, 0.5), 0 0 0 1px rgba(200, 138, 69, 0.2)",
+        // nomes mantidos p/ compat — agora com tom ember
+        glow: "0 0 0 1px rgba(255, 106, 43, 0.16), 0 8px 30px rgba(120, 50, 12, 0.22)",
         "glow-strong":
-          "0 0 0 1px rgba(120, 190, 255, 0.32), 0 12px 40px rgba(35, 90, 160, 0.26)",
+          "0 0 0 1px rgba(255, 106, 43, 0.32), 0 12px 40px rgba(150, 60, 16, 0.3)",
       },
       backgroundImage: {
         "hero-radial":
-          "radial-gradient(circle at 20% 10%, rgba(86,180,255,0.16), transparent 40%), radial-gradient(circle at 80% 20%, rgba(255,196,77,0.1), transparent 35%), radial-gradient(circle at 50% 90%, rgba(74,122,255,0.1), transparent 40%)",
+          "radial-gradient(120% 70% at 50% -8%, rgba(255,106,43,0.14), transparent 46%), radial-gradient(80% 50% at 90% 6%, rgba(203,255,62,0.05), transparent 50%), radial-gradient(70% 60% at 8% 100%, rgba(200,138,69,0.08), transparent 46%)",
       },
       keyframes: {
         float: {

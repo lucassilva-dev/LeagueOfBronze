@@ -30,9 +30,9 @@ export function MainNav() {
               <Link
                 href={link.href}
                 className={cn(
-                  "inline-flex h-10 items-center rounded-xl px-3 text-sm font-semibold tracking-wide transition",
+                  "inline-flex h-10 items-center rounded-xl px-3.5 text-sm font-semibold tracking-wide transition",
                   active
-                    ? "bg-accent/20 text-accent shadow-glow"
+                    ? "bg-accent/16 text-accent shadow-glow ring-1 ring-accent/30"
                     : "text-muted hover:bg-white/5 hover:text-text",
                 )}
                 aria-current={active ? "page" : undefined}
