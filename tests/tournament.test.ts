@@ -19,7 +19,9 @@ function baseDataset(): TournamentDataset {
       lastUpdatedISO: "2026-02-23T00:00:00.000Z",
       seriesPointsRule: { win: 3, loss: 0 },
       format: "BO3",
+      status: "active",
     },
+    archivedSeasons: [],
     teams: [
       { id: "a", name: "Alpha", slug: "alpha" },
       { id: "b", name: "Beta", slug: "beta" },

@@ -1,4 +1,5 @@
 import type {
+  ArchivedSeason,
   Player,
   PlayerGameStats,
   SeriesFormat,
@@ -6,6 +7,7 @@ import type {
   SeriesMatch,
   Team,
   TournamentDataset,
+  TournamentDatasetSnapshot,
 } from "@/lib/schema";
 import { toDateEnd, toDateStart } from "@/lib/format";
 import type {
@@ -938,4 +940,119 @@ export function getSeriesGamesWithTeamRows(
         .sort((a, b) => b.kills - a.kills || a.playerNick.localeCompare(b.playerNick, "pt-BR")),
     };
   });
+}
+
+// ============================================================
+// Ciclo de vida do torneio (helpers puros — sem I/O)
+// Um snapshot arquivado É um dataset completo, então as funções derivadas
+// acima (getChampionshipResult, calculateStandings, getDatasetOverview...)
+// operam sobre ele sem mudança.
+// ============================================================
+
+export interface ArchivedSeasonSummary {
+  seasonId: string;
+  name: string;
+  startedAtISO?: string;
+  endedAtISO?: string;
+  archivedAtISO: string;
+  championTeamName: string | null;
+  teamCount: number;
+  seriesCount: number;
+}
+
+// Um snapshot não carrega archivedSeasons; adiciona um vazio para reusar as
+// funções derivadas (que ignoram esse campo) tratando-o como dataset.
+export function snapshotToDataset(
+  snapshot: TournamentDatasetSnapshot,
+): TournamentDataset {
+  return { ...snapshot, archivedSeasons: [] };
+}
+
+// Monta o registro arquivado da temporada atual (marca como finished).
+export function buildArchivedSeason(
+  dataset: TournamentDataset,
+  now: string,
+): ArchivedSeason {
+  const endedAtISO = dataset.tournament.endedAtISO ?? now;
+
+  const snapshot: TournamentDatasetSnapshot = {
+    tournament: {
+      ...dataset.tournament,
+      status: "finished",
+      endedAtISO,
+    },
+    teams: dataset.teams,
+    players: dataset.players,
+    seriesMatches: dataset.seriesMatches,
+    standingsSeed: dataset.standingsSeed,
+  };
+
+  return {
+    seasonId: dataset.tournament.seasonId ?? `season-${now.replace(/[:.]/g, "-")}`,
+    name: dataset.tournament.name,
+    archivedAtISO: now,
+    startedAtISO: dataset.tournament.startedAtISO,
+    endedAtISO,
+    snapshot,
+  };
+}
+
+// Constrói o dataset da nova temporada: limpa séries/standings, mantém
+// teams/players conforme as flags, preserva o histórico arquivado.
+export function buildNextSeasonDataset(
+  dataset: TournamentDataset,
+  options: {
+    name: string;
+    format: SeriesFormat;
+    keepTeams: boolean;
+    keepPlayers: boolean;
+    seasonId: string;
+    now: string;
+  },
+): TournamentDataset {
+  const teams = options.keepTeams ? dataset.teams : [];
+  const teamIds = new Set(teams.map((team) => team.id));
+  const players = options.keepPlayers
+    ? dataset.players.filter((player) => teamIds.has(player.teamId))
+    : [];
+
+  return {
+    tournament: {
+      name: options.name,
+      format: options.format,
+      seriesPointsRule: dataset.tournament.seriesPointsRule,
+      lastUpdatedISO: options.now,
+      seasonId: options.seasonId,
+      status: "active",
+      startedAtISO: options.now,
+    },
+    teams,
+    players,
+    seriesMatches: [],
+    standingsSeed: [],
+    archivedSeasons: dataset.archivedSeasons,
+  };
+}
+
+// Resumo leve de uma temporada arquivada (para listagens).
+export function summarizeArchivedSeason(
+  archived: ArchivedSeason,
+): ArchivedSeasonSummary {
+  const dataset = snapshotToDataset(archived.snapshot);
+  const championship = getChampionshipResult(dataset);
+  const championTeamName = championship
+    ? createIndexes(dataset).teamsById.get(championship.championTeamId)?.name ??
+      championship.championTeamId
+    : null;
+
+  return {
+    seasonId: archived.seasonId,
+    name: archived.name,
+    startedAtISO: archived.startedAtISO,
+    endedAtISO: archived.endedAtISO,
+    archivedAtISO: archived.archivedAtISO,
+    championTeamName,
+    teamCount: dataset.teams.length,
+    seriesCount: dataset.seriesMatches.length,
+  };
 }

@@ -44,7 +44,9 @@ function createDataset(): TournamentDataset {
       lastUpdatedISO: "2026-03-30T21:30:00.000Z",
       seriesPointsRule: { win: 3, loss: 0 },
       format: "BO3",
+      status: "active",
     },
+    archivedSeasons: [],
     teams: [
       { id: "a", name: "Alpha", slug: "alpha" },
       { id: "b", name: "Beta", slug: "beta" },

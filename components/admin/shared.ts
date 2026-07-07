@@ -8,7 +8,13 @@ import type {
   TournamentDataset,
 } from "@/lib/schema";
 
-export type AdminTab = "overview" | "teams" | "players" | "series" | "backup";
+export type AdminTab =
+  | "tournament"
+  | "overview"
+  | "teams"
+  | "players"
+  | "series"
+  | "backup";
 export type MutateDraft = (recipe: (draft: TournamentDataset) => void) => void;
 
 function isCombiningMark(char: string) {

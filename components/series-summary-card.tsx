@@ -12,6 +12,7 @@ type SeriesSummaryCardProps = Readonly<{
   summary: SeriesSummary;
   teamsById: Map<string, Team>;
   playersById: Map<string, Player>;
+  readOnly?: boolean;
 }>;
 
 function isGrandFinal(summary: SeriesSummary) {
@@ -85,6 +86,7 @@ export function SeriesSummaryCard({
   summary,
   teamsById,
   playersById,
+  readOnly = false,
 }: SeriesSummaryCardProps) {
   const teamA = teamsById.get(summary.series.teamAId);
   const teamB = teamsById.get(summary.series.teamBId);
@@ -93,8 +95,7 @@ export function SeriesSummaryCard({
   const grandFinal = isGrandFinal(summary);
   const champion = hasChampion(summary);
 
-  return (
-    <Link href={`/partidas/${summary.series.id}`} className="block">
+  const body = (
       <Card
         className={cn(
           "group p-4 transition hover:-translate-y-0.5 hover:shadow-glow-strong",
@@ -162,6 +163,15 @@ export function SeriesSummaryCard({
           </div>
         </div>
       </Card>
+  );
+
+  if (readOnly) {
+    return <div className="block">{body}</div>;
+  }
+
+  return (
+    <Link href={`/partidas/${summary.series.id}`} className="block">
+      {body}
     </Link>
   );
 }

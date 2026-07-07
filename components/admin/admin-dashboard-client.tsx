@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { LogOut, RefreshCcw, Save } from "lucide-react";
 
-import type { TournamentDataset } from "@/lib/schema";
+import type { SeriesFormat, TournamentDataset } from "@/lib/schema";
 import { applyAutoGameMvpsToDataset, calculateStandings } from "@/lib/tournament";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -15,11 +15,20 @@ import { AdminTeamsPanel } from "@/components/admin/admin-teams-panel";
 import { AdminPlayersPanel } from "@/components/admin/admin-players-panel";
 import { AdminSeriesPanel } from "@/components/admin/admin-series-panel";
 import { AdminBackupPanel } from "@/components/admin/admin-backup-panel";
+import { AdminTournamentPanel } from "@/components/admin/admin-tournament-panel";
 import {
   cloneDataset,
   type AdminTab,
   type MutateDraft,
 } from "@/components/admin/shared";
+
+type StartTournamentPayload = Readonly<{
+  name: string;
+  format: SeriesFormat;
+  keepTeams: boolean;
+  keepPlayers: boolean;
+  archiveCurrent: boolean;
+}>;
 
 type SessionResponse = {
   configured: boolean;
@@ -64,6 +73,8 @@ type AdminTabContentProps = Readonly<{
   isBusy: boolean;
   onImportFile: (file: File) => Promise<void>;
   onImportText: (text: string) => Promise<void>;
+  onEndTournament: () => void;
+  onStartTournament: (payload: StartTournamentPayload) => void;
 }>;
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -143,8 +154,19 @@ function AdminTabContent({
   isBusy,
   onImportFile,
   onImportText,
+  onEndTournament,
+  onStartTournament,
 }: AdminTabContentProps) {
   switch (activeTab) {
+    case "tournament":
+      return (
+        <AdminTournamentPanel
+          draft={draft}
+          isBusy={isBusy}
+          onEndTournament={onEndTournament}
+          onStartTournament={onStartTournament}
+        />
+      );
     case "overview":
       return <AdminOverviewPanel draft={draft} />;
     case "teams":
@@ -337,8 +359,44 @@ export function AdminDashboardClient() {
     setMessage(data.message || "Importação concluída.");
   };
 
+  const endTournament = () => {
+    runTransitionTask(async () => {
+      clearAlerts();
+      const response = await fetch("/api/admin/tournament/end", {
+        method: "POST",
+        credentials: "same-origin",
+      });
+      const data = (await response.json()) as DatasetResponse;
+      if (!response.ok || !data.dataset) {
+        throw new Error(data.error || "Falha ao encerrar a temporada.");
+      }
+      setDraft(data.dataset);
+      setMessage(data.message || "Temporada encerrada.");
+    }, "Falha ao encerrar a temporada.");
+  };
+
+  const startTournament = (payload: StartTournamentPayload) => {
+    runTransitionTask(async () => {
+      clearAlerts();
+      const response = await fetch("/api/admin/tournament/start", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...payload, confirm: true }),
+      });
+      const data = (await response.json()) as DatasetResponse;
+      if (!response.ok || !data.dataset) {
+        throw new Error(data.error || "Falha ao iniciar a temporada.");
+      }
+      setDraft(data.dataset);
+      setActiveTab("overview");
+      setMessage(data.message || "Nova temporada iniciada.");
+    }, "Falha ao iniciar a temporada.");
+  };
+
   const tabOptions = useMemo(
     () => [
+      { value: "tournament" as const, label: "Torneio" },
       { value: "overview" as const, label: "Visão geral" },
       { value: "teams" as const, label: "Times" },
       { value: "players" as const, label: "Jogadores" },
@@ -463,6 +521,8 @@ export function AdminDashboardClient() {
         isBusy={isBusy}
         onImportFile={handleImportFile}
         onImportText={handleImportText}
+        onEndTournament={endTournament}
+        onStartTournament={startTournament}
       />
     </div>
   );

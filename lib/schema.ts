@@ -38,7 +38,7 @@ function validateUniqueListField<T extends Record<string, unknown>>(
 }
 
 function validateDatasetUniqueness(
-  dataset: TournamentDataset,
+  dataset: DatasetCore,
   ctx: z.RefinementCtx,
 ) {
   validateUniqueListField(ctx, dataset.teams, "id", ["teams"], "IDs de times duplicados.");
@@ -67,7 +67,7 @@ function validateDatasetUniqueness(
 }
 
 function validatePlayerTeamReferences(
-  dataset: TournamentDataset,
+  dataset: DatasetCore,
   ctx: z.RefinementCtx,
   teamIds: Set<string>,
 ) {
@@ -82,7 +82,7 @@ function validatePlayerTeamReferences(
 }
 
 function validateStandingsSeedReferences(
-  dataset: TournamentDataset,
+  dataset: DatasetCore,
   ctx: z.RefinementCtx,
   teamIds: Set<string>,
 ) {
@@ -229,7 +229,7 @@ function validateWalkoverSeries(
 }
 
 function validateSeriesReferences(
-  dataset: TournamentDataset,
+  dataset: DatasetCore,
   ctx: z.RefinementCtx,
   teamIds: Set<string>,
   playerIds: Set<string>,
@@ -254,6 +254,8 @@ function validateSeriesReferences(
 export const seriesFormatSchema = z.enum(seriesFormats);
 export const seriesStageSchema = z.enum(seriesStages);
 
+export const tournamentStatusSchema = z.enum(["active", "finished"]);
+
 export const tournamentSchema = z.object({
   name: nonEmpty,
   lastUpdatedISO: nonEmpty,
@@ -262,6 +264,10 @@ export const tournamentSchema = z.object({
     loss: z.number().int().nonnegative(),
   }),
   format: seriesFormatSchema,
+  seasonId: z.string().trim().min(1).optional(),
+  status: tournamentStatusSchema.default("active"),
+  startedAtISO: z.string().trim().optional(),
+  endedAtISO: z.string().trim().optional(),
 });
 
 export const teamSchema = z.object({
@@ -313,24 +319,56 @@ export const standingsSeedRowSchema = z.object({
   points: z.number().int().min(0),
 });
 
-export const tournamentDatasetSchema = z
-  .object({
-    tournament: tournamentSchema,
-    teams: z.array(teamSchema),
-    players: z.array(playerSchema),
-    seriesMatches: z.array(seriesMatchSchema),
-    standingsSeed: z.array(standingsSeedRowSchema).default([]),
+const datasetCoreSchema = z.object({
+  tournament: tournamentSchema,
+  teams: z.array(teamSchema),
+  players: z.array(playerSchema),
+  seriesMatches: z.array(seriesMatchSchema),
+  standingsSeed: z.array(standingsSeedRowSchema).default([]),
+});
+
+type DatasetCore = z.infer<typeof datasetCoreSchema>;
+
+function refineDatasetIntegrity(dataset: DatasetCore, ctx: z.RefinementCtx) {
+  validateDatasetUniqueness(dataset, ctx);
+
+  const teamIds = new Set(dataset.teams.map((team) => team.id));
+  const playerIds = new Set(dataset.players.map((player) => player.id));
+
+  validatePlayerTeamReferences(dataset, ctx, teamIds);
+  validateStandingsSeedReferences(dataset, ctx, teamIds);
+  validateSeriesReferences(dataset, ctx, teamIds, playerIds);
+}
+
+// Snapshot de uma temporada arquivada: é um dataset completo, porém SEM o campo
+// archivedSeasons (evita aninhamento recursivo de históricos).
+export const tournamentDatasetSnapshotSchema = datasetCoreSchema.superRefine(
+  refineDatasetIntegrity,
+);
+
+export const archivedSeasonSchema = z.object({
+  seasonId: nonEmpty,
+  name: nonEmpty,
+  archivedAtISO: nonEmpty,
+  startedAtISO: z.string().trim().optional(),
+  endedAtISO: z.string().trim().optional(),
+  snapshot: tournamentDatasetSnapshotSchema,
+});
+
+export const tournamentDatasetSchema = datasetCoreSchema
+  .extend({
+    archivedSeasons: z.array(archivedSeasonSchema).default([]),
   })
-  .superRefine((dataset, ctx) => {
-    validateDatasetUniqueness(dataset, ctx);
+  .superRefine(refineDatasetIntegrity);
 
-    const teamIds = new Set(dataset.teams.map((team) => team.id));
-    const playerIds = new Set(dataset.players.map((player) => player.id));
-
-    validatePlayerTeamReferences(dataset, ctx, teamIds);
-    validateStandingsSeedReferences(dataset, ctx, teamIds);
-    validateSeriesReferences(dataset, ctx, teamIds, playerIds);
-  });
+export const startTournamentSchema = z.object({
+  name: nonEmpty,
+  format: seriesFormatSchema,
+  keepTeams: z.boolean().default(true),
+  keepPlayers: z.boolean().default(true),
+  archiveCurrent: z.boolean().default(false),
+  confirm: z.literal(true),
+});
 
 export const adminLoginSchema = z.object({
   password: z.string().min(1, "Senha obrigatória."),
@@ -346,4 +384,8 @@ export type SeriesMatch = z.infer<typeof seriesMatchSchema>;
 export type StandingsSeedRow = z.infer<typeof standingsSeedRowSchema>;
 export type SeriesFormat = z.infer<typeof seriesFormatSchema>;
 export type SeriesStage = z.infer<typeof seriesStageSchema>;
+export type TournamentStatus = z.infer<typeof tournamentStatusSchema>;
+export type ArchivedSeason = z.infer<typeof archivedSeasonSchema>;
+export type TournamentDatasetSnapshot = z.infer<typeof tournamentDatasetSnapshotSchema>;
+export type StartTournamentInput = z.infer<typeof startTournamentSchema>;
 

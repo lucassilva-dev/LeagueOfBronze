@@ -3,8 +3,19 @@ import path from "node:path";
 
 import { createClient } from "@supabase/supabase-js";
 
-import { tournamentDatasetSchema, type TournamentDataset } from "@/lib/schema";
-import { applyAutoGameMvpsToDataset } from "@/lib/tournament";
+import {
+  tournamentDatasetSchema,
+  type ArchivedSeason,
+  type SeriesFormat,
+  type TournamentDataset,
+} from "@/lib/schema";
+import {
+  applyAutoGameMvpsToDataset,
+  buildArchivedSeason,
+  buildNextSeasonDataset,
+  summarizeArchivedSeason,
+  type ArchivedSeasonSummary,
+} from "@/lib/tournament";
 
 export const DATASET_FILENAME = "leagueofbronze.json";
 const SUPABASE_TABLE = "tournament_state";
@@ -32,12 +43,17 @@ function parseAndValidateDataset(json: unknown) {
 
 export function normalizeDatasetForSave(dataset: TournamentDataset): TournamentDataset {
   const withAutoMvps = applyAutoGameMvpsToDataset(dataset);
+  const now = new Date().toISOString();
 
   return {
     ...withAutoMvps,
     tournament: {
       ...withAutoMvps.tournament,
-      lastUpdatedISO: new Date().toISOString(),
+      // Auto-cura campos de ciclo de vida ausentes (migração da linha viva).
+      status: withAutoMvps.tournament.status ?? "active",
+      seasonId: withAutoMvps.tournament.seasonId ?? `season-${now.slice(0, 10)}`,
+      startedAtISO: withAutoMvps.tournament.startedAtISO ?? now,
+      lastUpdatedISO: now,
     },
   };
 }
@@ -228,4 +244,93 @@ export async function importDatasetFromText(raw: string) {
   }
 
   return saveDataset(json);
+}
+
+// ============================================================
+// Ciclo de vida do torneio (orquestram read → helper puro → save)
+// ============================================================
+
+export async function endCurrentTournament(): Promise<TournamentDataset> {
+  const current = await readDataset();
+
+  if (current.tournament.status === "finished") {
+    throw new Error("A temporada atual já está encerrada.");
+  }
+
+  const now = new Date().toISOString();
+  const seasonId = current.tournament.seasonId ?? `season-${now.replace(/[:.]/g, "-")}`;
+
+  const currentWithId: TournamentDataset = {
+    ...current,
+    tournament: { ...current.tournament, seasonId },
+  };
+
+  const archived = buildArchivedSeason(currentWithId, now);
+
+  const updated: TournamentDataset = {
+    ...currentWithId,
+    tournament: {
+      ...currentWithId.tournament,
+      status: "finished",
+      endedAtISO: now,
+    },
+    archivedSeasons: [
+      ...current.archivedSeasons.filter((season) => season.seasonId !== seasonId),
+      archived,
+    ],
+  };
+
+  return saveDataset(updated);
+}
+
+export async function startNewTournament(options: {
+  name: string;
+  format: SeriesFormat;
+  keepTeams?: boolean;
+  keepPlayers?: boolean;
+  archiveCurrent?: boolean;
+}): Promise<TournamentDataset> {
+  let current = await readDataset();
+
+  const activeWithData =
+    current.tournament.status !== "finished" && current.seriesMatches.length > 0;
+
+  if (activeWithData && !options.archiveCurrent) {
+    throw new Error(
+      "A temporada atual tem séries e ainda está ativa. Encerre-a antes de iniciar uma nova (ou marque para arquivar).",
+    );
+  }
+
+  if (options.archiveCurrent && current.tournament.status !== "finished") {
+    current = await endCurrentTournament();
+  }
+
+  const now = new Date().toISOString();
+
+  const next = buildNextSeasonDataset(current, {
+    name: options.name,
+    format: options.format,
+    keepTeams: options.keepTeams ?? true,
+    keepPlayers: options.keepPlayers ?? true,
+    seasonId: `season-${now.replace(/[:.]/g, "-")}`,
+    now,
+  });
+
+  return saveDataset(next);
+}
+
+export async function listArchivedSeasons(): Promise<ArchivedSeasonSummary[]> {
+  const dataset = await readDataset();
+  return dataset.archivedSeasons
+    .map((season) => summarizeArchivedSeason(season))
+    .sort((a, b) =>
+      (b.endedAtISO ?? b.archivedAtISO).localeCompare(a.endedAtISO ?? a.archivedAtISO),
+    );
+}
+
+export async function readArchivedSeason(
+  seasonId: string,
+): Promise<ArchivedSeason | null> {
+  const dataset = await readDataset();
+  return dataset.archivedSeasons.find((season) => season.seasonId === seasonId) ?? null;
 }
