@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { Plus, Shuffle, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 
 import type {
   CardId,
@@ -722,27 +722,6 @@ export function AdminSeriesPanel({
     });
   };
 
-  const drawRandomCard = () => CARDS[Math.floor(Math.random() * CARDS.length)];
-
-  const sortearCartaUnica = () => {
-    updateSelectedSeries((series) => {
-      if (!series.cardsUsed) series.cardsUsed = [];
-      series.cardsUsed.push({ teamId: series.teamAId || "", cardId: drawRandomCard().id });
-    });
-  };
-
-  const sortearCartaDupla = () => {
-    updateSelectedSeries((series) => {
-      if (!series.cardsUsed) series.cardsUsed = [];
-      if (series.teamAId) {
-        series.cardsUsed.push({ teamId: series.teamAId, cardId: drawRandomCard().id });
-      }
-      if (series.teamBId) {
-        series.cardsUsed.push({ teamId: series.teamBId, cardId: drawRandomCard().id });
-      }
-    });
-  };
-
   const updateCardField = (cardIndex: number, field: "teamId" | "cardId", value: string) => {
     updateSelectedSeries((series) => {
       const card = series.cardsUsed?.[cardIndex];
@@ -1270,21 +1249,13 @@ export function AdminSeriesPanel({
             </div>
 
             <div className="rounded-xl border border-white/8 bg-white/[0.02] p-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
-                  Cartinhas sorteadas na série
+                  Cartinhas da série (registro manual)
                 </p>
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="secondary" size="sm" onClick={sortearCartaUnica}>
-                    <Shuffle className="h-4 w-4" /> Sortear única
-                  </Button>
-                  <Button variant="secondary" size="sm" onClick={sortearCartaDupla}>
-                    <Shuffle className="h-4 w-4" /> Sortear duplo
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={addCardToSeries}>
-                    <Plus className="h-4 w-4" /> Manual
-                  </Button>
-                </div>
+                <Button variant="secondary" size="sm" onClick={addCardToSeries}>
+                  <Plus className="h-4 w-4" /> Cartinha
+                </Button>
               </div>
               {(selectedSeries.cardsUsed ?? []).length === 0 ? (
                 <p className="mt-2 text-xs text-muted">
