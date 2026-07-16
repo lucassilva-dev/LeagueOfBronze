@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createBlankTeam, slugifyValue, type MutateDraft } from "@/components/admin/shared";
+import { TeamCrest } from "@/components/team-crest";
 
 type TeamEditorCardProps = Readonly<{
   initialTeam: Team;
@@ -64,6 +65,19 @@ function TeamEditorCard({
             value={form.slug}
             onChange={(e) => setForm((prev) => ({ ...prev, slug: e.target.value }))}
           />
+        </div>
+        <div>
+          <Label htmlFor="team-image">Imagem / escudo (URL)</Label>
+          <Input
+            id="team-image"
+            value={form.imageUrl ?? ""}
+            placeholder="https://... ou /times/meu-time.png"
+            onChange={(e) => setForm((prev) => ({ ...prev, imageUrl: e.target.value }))}
+          />
+          <div className="mt-2 flex items-center gap-2 text-xs text-muted">
+            <TeamCrest team={{ name: form.name || "?", imageUrl: form.imageUrl }} size={34} />
+            <span>Prévia (usa as iniciais quando vazio).</span>
+          </div>
         </div>
 
         <div className="mt-2 flex flex-wrap gap-2">

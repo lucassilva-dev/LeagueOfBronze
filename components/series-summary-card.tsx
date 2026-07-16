@@ -7,6 +7,7 @@ import { formatSeriesDateLabel, getSeriesTurnoLabel } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { TeamCrest } from "@/components/team-crest";
 
 type SeriesSummaryCardProps = Readonly<{
   summary: SeriesSummary;
@@ -127,10 +128,17 @@ export function SeriesSummaryCard({
               </span>
             </div>
 
-            <p className="mt-2 line-clamp-2 font-semibold">
-              {teamA?.name ?? summary.series.teamAId} <span className="mx-1 text-muted">vs</span>{" "}
-              {teamB?.name ?? summary.series.teamBId}
-            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold">
+              <span className="inline-flex items-center gap-1.5">
+                {teamA ? <TeamCrest team={teamA} size={20} /> : null}
+                {teamA?.name ?? summary.series.teamAId}
+              </span>
+              <span className="text-muted">vs</span>
+              <span className="inline-flex items-center gap-1.5">
+                {teamB ? <TeamCrest team={teamB} size={20} /> : null}
+                {teamB?.name ?? summary.series.teamBId}
+              </span>
+            </div>
 
             <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
               <MetaLine

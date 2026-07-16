@@ -15,6 +15,7 @@ export interface StandingsRow {
   teamId: string;
   teamName: string;
   teamSlug: string;
+  teamImageUrl?: string;
   seriesPlayed: number;
   seriesWon: number;
   seriesLost: number;
@@ -96,6 +97,40 @@ export interface LeaderboardRow {
   metric: LeaderboardMetric;
   value: number;
   player: PlayerAggregate;
+}
+
+export interface ChampionAggregate {
+  championId: string; // id canônico do Data Dragon (ou fallback do texto)
+  championName: string;
+  picks: number;
+  bans: number;
+  games: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  pickRate: number;
+  banRate: number;
+  presence: number;
+  kills: number;
+  deaths: number;
+  assists: number;
+  kda: number;
+}
+
+export type ChampionMetric = "picks" | "bans" | "banRate" | "presence" | "winRate" | "kda";
+
+export interface ChampionLeaderboardRow {
+  position: number;
+  metric: ChampionMetric;
+  value: number;
+  champion: ChampionAggregate;
+}
+
+export interface CardStat {
+  cardId: string;
+  title: string;
+  count: number;
+  byTeam: Array<{ teamId: string; teamName: string; count: number }>;
 }
 
 export interface DateRangeFilter {

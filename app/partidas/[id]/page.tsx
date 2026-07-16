@@ -16,6 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ChampionIcon } from "@/components/champion-icon";
 import { formatKda, formatSeriesDateLabel } from "@/lib/format";
 import { getServerDataset } from "@/lib/server-data";
 import {
@@ -335,7 +336,9 @@ function GameDetailsCard({
                             {row.playerNick}
                           </Link>
                         </TableCell>
-                        <TableCell className="whitespace-nowrap">{row.champion || "—"}</TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          <ChampionIcon champion={row.champion} size={22} showName />
+                        </TableCell>
                         <TableCell className="whitespace-nowrap">
                           {row.kills}/{row.deaths}/{row.assists}
                         </TableCell>

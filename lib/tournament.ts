@@ -10,7 +10,13 @@ import type {
   TournamentDatasetSnapshot,
 } from "@/lib/schema";
 import { toDateEnd, toDateStart } from "@/lib/format";
+import { resolveChampion } from "@/lib/champions";
+import { CARDS } from "@/lib/cards";
 import type {
+  CardStat,
+  ChampionAggregate,
+  ChampionLeaderboardRow,
+  ChampionMetric,
   ChampionshipResult,
   DateRangeFilter,
   LeaderboardMetric,
@@ -424,6 +430,7 @@ function buildSeedStandingsRows(dataset: TournamentDataset): StandingsRow[] {
       teamId: team.id,
       teamName: team.name,
       teamSlug: team.slug,
+      teamImageUrl: team.imageUrl,
       seriesPlayed,
       seriesWon,
       seriesLost: Math.max(0, seriesPlayed - seriesWon),
@@ -451,6 +458,7 @@ function buildSeriesStandingsRows(dataset: TournamentDataset): StandingsRow[] {
       teamId: team.id,
       teamName: team.name,
       teamSlug: team.slug,
+      teamImageUrl: team.imageUrl,
       seriesPlayed: 0,
       seriesWon: 0,
       seriesLost: 0,
@@ -1055,4 +1063,159 @@ export function summarizeArchivedSeason(
     teamCount: dataset.teams.length,
     seriesCount: dataset.seriesMatches.length,
   };
+}
+
+// ============================================================
+// Agregações de campeões (Data Dragon) e cartinhas (regulamento)
+// ============================================================
+
+type ChampionAccumulator = {
+  name: string;
+  picks: number;
+  bans: number;
+  wins: number;
+  kills: number;
+  deaths: number;
+  assists: number;
+  presenceGames: Set<string>;
+};
+
+export function calculateChampionAggregates(dataset: TournamentDataset): ChampionAggregate[] {
+  const indexes = createIndexes(dataset);
+  const acc = new Map<string, ChampionAccumulator>();
+  let totalGames = 0;
+
+  const bucketFor = (raw: string) => {
+    const resolved = resolveChampion(raw);
+    const id = resolved?.id ?? raw.trim().toLowerCase();
+    const name = resolved?.name ?? raw.trim();
+    let bucket = acc.get(id);
+    if (!bucket) {
+      bucket = {
+        name,
+        picks: 0,
+        bans: 0,
+        wins: 0,
+        kills: 0,
+        deaths: 0,
+        assists: 0,
+        presenceGames: new Set<string>(),
+      };
+      acc.set(id, bucket);
+    }
+    return bucket;
+  };
+
+  for (const series of dataset.seriesMatches) {
+    if (isWalkoverSeries(series)) continue;
+    series.games.forEach((game, gameIndex) => {
+      totalGames += 1;
+      const gameKey = `${series.id}#${gameIndex}`;
+
+      for (const stats of game.statsByPlayer) {
+        const champ = stats.champion?.trim();
+        if (!champ) continue;
+        const bucket = bucketFor(champ);
+        bucket.picks += 1;
+        bucket.presenceGames.add(gameKey);
+        bucket.kills += stats.kills;
+        bucket.deaths += stats.deaths;
+        bucket.assists += stats.assists;
+        const player = indexes.playersById.get(stats.playerId);
+        if (player && game.winnerTeamId === player.teamId) bucket.wins += 1;
+      }
+
+      for (const ban of game.bans ?? []) {
+        const champ = ban.championName?.trim();
+        if (!champ) continue;
+        const bucket = bucketFor(champ);
+        bucket.bans += 1;
+        bucket.presenceGames.add(gameKey);
+      }
+    });
+  }
+
+  const denom = Math.max(1, totalGames);
+
+  return [...acc.entries()]
+    .map<ChampionAggregate>(([championId, b]) => ({
+      championId,
+      championName: b.name,
+      picks: b.picks,
+      bans: b.bans,
+      games: b.picks,
+      wins: b.wins,
+      losses: Math.max(0, b.picks - b.wins),
+      winRate: b.picks > 0 ? (b.wins / b.picks) * 100 : 0,
+      pickRate: (b.picks / denom) * 100,
+      banRate: (b.bans / denom) * 100,
+      presence: (b.presenceGames.size / denom) * 100,
+      kills: b.kills,
+      deaths: b.deaths,
+      assists: b.assists,
+      kda: getKda(b.kills, b.deaths, b.assists),
+    }))
+    .sort((a, z) => z.picks - a.picks || a.championName.localeCompare(z.championName, "pt-BR"));
+}
+
+export function buildChampionLeaderboards(
+  dataset: TournamentDataset,
+): Record<ChampionMetric, ChampionLeaderboardRow[]> {
+  const champions = calculateChampionAggregates(dataset);
+
+  const makeBoard = (
+    metric: ChampionMetric,
+    getValue: (row: ChampionAggregate) => number,
+    predicate: (row: ChampionAggregate) => boolean,
+  ) =>
+    champions
+      .filter(predicate)
+      .sort((a, b) => {
+        const diff = getValue(b) - getValue(a);
+        if (diff !== 0) return diff;
+        return a.championName.localeCompare(b.championName, "pt-BR");
+      })
+      .map<ChampionLeaderboardRow>((champion, index) => ({
+        position: index + 1,
+        metric,
+        value: getValue(champion),
+        champion,
+      }));
+
+  return {
+    picks: makeBoard("picks", (c) => c.picks, (c) => c.picks > 0),
+    bans: makeBoard("bans", (c) => c.bans, (c) => c.bans > 0),
+    banRate: makeBoard("banRate", (c) => c.banRate, (c) => c.bans > 0),
+    presence: makeBoard("presence", (c) => c.presence, (c) => c.picks + c.bans > 0),
+    winRate: makeBoard("winRate", (c) => c.winRate, (c) => c.picks > 0),
+    kda: makeBoard("kda", (c) => c.kda, (c) => c.picks > 0),
+  };
+}
+
+export function calculateCardStats(dataset: TournamentDataset): CardStat[] {
+  const indexes = createIndexes(dataset);
+  const usage = new Map<string, { count: number; byTeam: Map<string, number> }>();
+
+  for (const series of dataset.seriesMatches) {
+    for (const card of series.cardsUsed ?? []) {
+      const bucket = usage.get(card.cardId) ?? { count: 0, byTeam: new Map<string, number>() };
+      bucket.count += 1;
+      bucket.byTeam.set(card.teamId, (bucket.byTeam.get(card.teamId) ?? 0) + 1);
+      usage.set(card.cardId, bucket);
+    }
+  }
+
+  return CARDS.map<CardStat>((cardDef) => {
+    const bucket = usage.get(cardDef.id);
+    const byTeam = bucket
+      ? [...bucket.byTeam.entries()]
+          .map(([teamId, count]) => ({
+            teamId,
+            teamName: indexes.teamsById.get(teamId)?.name ?? teamId,
+            count,
+          }))
+          .sort((a, b) => b.count - a.count)
+      : [];
+    return { cardId: cardDef.id, title: cardDef.title, count: bucket?.count ?? 0, byTeam };
+  }).sort((a, b) => b.count - a.count);
 }

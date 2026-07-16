@@ -10,6 +10,8 @@ const links = [
   { href: "/tabela", label: "Tabela" },
   { href: "/partidas", label: "Partidas" },
   { href: "/stats", label: "Estatísticas" },
+  { href: "/campeoes", label: "Campeões" },
+  { href: "/cartas", label: "Cartas" },
   { href: "/temporadas", label: "Temporadas" },
   { href: "/admin", label: "Admin" },
 ];

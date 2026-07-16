@@ -5,6 +5,9 @@ import { Crown } from "lucide-react";
 import { PageHero } from "@/components/page-hero";
 import { PageShell } from "@/components/page-shell";
 import { StatChip } from "@/components/stat-chip";
+import { ChampionIcon } from "@/components/champion-icon";
+import { EloBadge } from "@/components/elo-badge";
+import { PlayerAvatar } from "@/components/player-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import {
@@ -43,16 +46,12 @@ type PlayerBadgesProps = Readonly<{
   positions: ReturnType<typeof getPlayerLeaderboardPositions>;
   teamSlug: string | null;
   opggUrl: string | null;
+  elo: string;
 }>;
 
-function getPlayerDescription(
-  teamName: string,
-  role1: string,
-  role2: string | undefined,
-  elo: string,
-) {
+function getPlayerDescription(teamName: string, role1: string, role2: string | undefined) {
   const roles = role2 ? `${role1} / ${role2}` : role1;
-  return `Time: ${teamName} • Rotas: ${roles} • Elo: ${elo}`;
+  return `Time: ${teamName} • Rotas: ${roles}`;
 }
 
 function getFinalScore(championship: ChampionshipResult) {
@@ -128,9 +127,15 @@ function PlayerChampionBanner({
   );
 }
 
-function PlayerBadges({ isChampion, positions, teamSlug, opggUrl }: PlayerBadgesProps) {
+function PlayerBadges({ isChampion, positions, teamSlug, opggUrl, elo }: PlayerBadgesProps) {
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap items-center gap-2">
+      <EloBadge
+        elo={elo}
+        showLabel
+        size={22}
+        className="rounded-full border border-border/60 bg-panel2/50 px-2 py-0.5"
+      />
       {isChampion ? (
         <Badge variant="bronze">Elenco campeão</Badge>
       ) : null}
@@ -195,10 +200,10 @@ function PlayerHistoryMobile({
               <p className="font-display font-bold">
                 {row.kills}/{row.deaths}/{row.assists}
               </p>
-              <p className="text-xs text-muted">
-                {row.champion || "—"}
-                {row.mvp ? " • MVP" : ""}
-              </p>
+              <div className="mt-0.5 flex items-center justify-end gap-1.5 text-xs text-muted">
+                <ChampionIcon champion={row.champion} size={18} showName />
+                {row.mvp ? <span className="text-accent">• MVP</span> : null}
+              </div>
             </div>
           </div>
         </Card>
@@ -246,8 +251,10 @@ function PlayerHistoryTable({
                   <TableCell>Jogo {row.gameIndex}</TableCell>
                   <TableCell>{row.opponentTeamName}</TableCell>
                   <TableCell>
-                    {row.champion || "—"}{" "}
-                    {row.mvp ? <span className="text-xs text-accent">(MVP)</span> : null}
+                    <span className="inline-flex items-center gap-2">
+                      <ChampionIcon champion={row.champion} size={22} showName />
+                      {row.mvp ? <span className="text-xs text-accent">(MVP)</span> : null}
+                    </span>
                   </TableCell>
                   <TableCell>
                     {row.kills}/{row.deaths}/{row.assists}
@@ -285,7 +292,6 @@ export default async function PlayerPage({ params }: PlayerPageParams) {
     team?.name ?? player.teamId,
     player.role1,
     player.role2,
-    player.elo,
   );
 
   return (
@@ -293,6 +299,7 @@ export default async function PlayerPage({ params }: PlayerPageParams) {
       <PageHero
         badge={championBannerData ? "Campeão" : "Jogador"}
         title={player.nick}
+        media={<PlayerAvatar player={player} size={56} />}
         description={description}
         extra={
           <PlayerBadges
@@ -300,6 +307,7 @@ export default async function PlayerPage({ params }: PlayerPageParams) {
             positions={positions}
             teamSlug={team?.slug ?? null}
             opggUrl={opggUrl}
+            elo={player.elo}
           />
         }
       />

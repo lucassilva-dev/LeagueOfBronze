@@ -7,6 +7,9 @@ import { PageHero } from "@/components/page-hero";
 import { PageShell } from "@/components/page-shell";
 import { SeriesSummaryCard } from "@/components/series-summary-card";
 import { StatChip } from "@/components/stat-chip";
+import { EloBadge } from "@/components/elo-badge";
+import { PlayerAvatar } from "@/components/player-avatar";
+import { TeamCrest } from "@/components/team-crest";
 import { AnimatedCounter } from "@/components/ui/animated-counter";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -240,14 +243,21 @@ function TeamRosterCard({ roster, multiOpGg }: TeamRosterCardProps) {
 
       <div className="mt-4 grid gap-3 md:hidden">
         {roster.map((player) => (
-          <Card key={player.id} className="p-3">
-            <Link href={`/jogadores/${player.slug}`} className="font-semibold hover:text-accent">
-              {player.nick}
-            </Link>
-            <p className="mt-1 text-xs text-muted">
-              {player.role1}
-              {player.role2 ? ` / ${player.role2}` : ""} • {player.elo}
-            </p>
+          <Card key={player.id} className="flex items-center gap-3 p-3">
+            <PlayerAvatar player={player} size={38} />
+            <div className="min-w-0 flex-1">
+              <Link
+                href={`/jogadores/${player.slug}`}
+                className="font-semibold hover:text-accent"
+              >
+                {player.nick}
+              </Link>
+              <p className="mt-1 text-xs text-muted">
+                {player.role1}
+                {player.role2 ? ` / ${player.role2}` : ""}
+              </p>
+            </div>
+            <EloBadge elo={player.elo} size={26} />
           </Card>
         ))}
       </div>
@@ -269,14 +279,17 @@ function TeamRosterCard({ roster, multiOpGg }: TeamRosterCardProps) {
                   <TableCell>
                     <Link
                       href={`/jogadores/${player.slug}`}
-                      className="font-semibold hover:text-accent"
+                      className="inline-flex items-center gap-2 font-semibold hover:text-accent"
                     >
-                      {player.nick}
+                      <PlayerAvatar player={player} size={30} />
+                      <span>{player.nick}</span>
                     </Link>
                   </TableCell>
                   <TableCell>{player.role1}</TableCell>
                   <TableCell>{player.role2 || "—"}</TableCell>
-                  <TableCell>{player.elo}</TableCell>
+                  <TableCell>
+                    <EloBadge elo={player.elo} size={22} showLabel />
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -314,6 +327,7 @@ export default async function TeamPage({ params }: TeamPageParams) {
       <PageHero
         badge={titleHeroData ? "Campeão" : "Time"}
         title={team.name}
+        media={<TeamCrest team={team} size={56} className="rounded-xl" />}
         description="Elenco, histórico de séries e estatísticas agregadas calculadas automaticamente a partir dos jogos."
         extra={
           <TeamHeaderExtra

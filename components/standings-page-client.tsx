@@ -9,6 +9,7 @@ import type { StandingsRow, StandingsSource } from "@/types/domain";
 import { cn } from "@/lib/utils";
 import { formatPercent } from "@/lib/format";
 import { DataTable } from "@/components/data-table";
+import { TeamCrest } from "@/components/team-crest";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -34,8 +35,12 @@ function StandingsPosition({ position }: PositionProps) {
 
 function StandingsTeamLink({ row }: StandingsRowProps) {
   return (
-    <Link href={`/times/${row.teamSlug}`} className="font-semibold hover:text-accent">
-      {row.teamName}
+    <Link
+      href={`/times/${row.teamSlug}`}
+      className="inline-flex items-center gap-2 font-semibold hover:text-accent"
+    >
+      <TeamCrest team={{ name: row.teamName, imageUrl: row.teamImageUrl }} size={26} />
+      <span>{row.teamName}</span>
     </Link>
   );
 }

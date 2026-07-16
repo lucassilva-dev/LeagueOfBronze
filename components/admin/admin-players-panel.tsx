@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import type { Player, TournamentDataset } from "@/lib/schema";
 import { createBlankPlayer, slugifyValue, type MutateDraft } from "@/components/admin/shared";
+import { PlayerAvatar } from "@/components/player-avatar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -121,6 +122,19 @@ function PlayerEditorCard({
               value={form.elo}
               onChange={(e) => setForm((player) => ({ ...player, elo: e.target.value }))}
             />
+          </div>
+        </div>
+        <div>
+          <Label htmlFor="player-image">Foto (URL)</Label>
+          <Input
+            id="player-image"
+            value={form.imageUrl ?? ""}
+            placeholder="https://... ou /jogadores/nick.png"
+            onChange={(e) => setForm((player) => ({ ...player, imageUrl: e.target.value }))}
+          />
+          <div className="mt-2 flex items-center gap-2 text-xs text-muted">
+            <PlayerAvatar player={{ nick: form.nick || "?", imageUrl: form.imageUrl }} size={36} />
+            <span>Prévia (usa as iniciais quando vazio).</span>
           </div>
         </div>
 

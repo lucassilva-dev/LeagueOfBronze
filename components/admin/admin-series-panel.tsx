@@ -4,6 +4,7 @@ import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 
 import type {
+  CardId,
   Player,
   PlayerGameStats,
   SeriesFormat,
@@ -35,6 +36,8 @@ import {
   slugifyValue,
   type MutateDraft,
 } from "@/components/admin/shared";
+import { CARDS } from "@/lib/cards";
+import { CHAMPIONS } from "@/lib/champions";
 
 function getTeamName(dataset: TournamentDataset, teamId: string) {
   return dataset.teams.find((team) => team.id === teamId)?.name ?? teamId ?? "—";
@@ -683,6 +686,57 @@ export function AdminSeriesPanel({
     });
   };
 
+  const addBanToGame = (gameIndex: number) => {
+    updateSelectedSeries((series) => {
+      const game = series.games[gameIndex];
+      if (!game) return;
+      if (!game.bans) game.bans = [];
+      game.bans.push({ teamId: series.teamAId || "", championName: "" });
+    });
+  };
+
+  const updateBanField = (
+    gameIndex: number,
+    banIndex: number,
+    field: "teamId" | "championName",
+    value: string,
+  ) => {
+    updateSelectedSeries((series) => {
+      const ban = series.games[gameIndex]?.bans?.[banIndex];
+      if (!ban) return;
+      if (field === "teamId") ban.teamId = value;
+      else ban.championName = value;
+    });
+  };
+
+  const removeBanFromGame = (gameIndex: number, banIndex: number) => {
+    updateSelectedSeries((series) => {
+      series.games[gameIndex]?.bans?.splice(banIndex, 1);
+    });
+  };
+
+  const addCardToSeries = () => {
+    updateSelectedSeries((series) => {
+      if (!series.cardsUsed) series.cardsUsed = [];
+      series.cardsUsed.push({ teamId: series.teamAId || "", cardId: CARDS[0].id });
+    });
+  };
+
+  const updateCardField = (cardIndex: number, field: "teamId" | "cardId", value: string) => {
+    updateSelectedSeries((series) => {
+      const card = series.cardsUsed?.[cardIndex];
+      if (!card) return;
+      if (field === "cardId") card.cardId = value as CardId;
+      else card.teamId = value;
+    });
+  };
+
+  const removeCardFromSeries = (cardIndex: number) => {
+    updateSelectedSeries((series) => {
+      series.cardsUsed?.splice(cardIndex, 1);
+    });
+  };
+
   const importGameFromRiot = async (gameIndex: number) => {
     if (!selectedSeries) return;
 
@@ -997,6 +1051,7 @@ export function AdminSeriesPanel({
                         <Input
                           aria-label={`Campeão linha ${rowIndex + 1}`}
                           placeholder="Campeão"
+                          list="champions-datalist"
                           value={row.champion ?? ""}
                           onChange={(e) =>
                             updateStatsRowField(gameIndex, rowIndex, "champion", e.target.value)
@@ -1054,6 +1109,70 @@ export function AdminSeriesPanel({
                 )}
               </div>
             </div>
+
+            {selectedSeries.teamAId || selectedSeries.teamBId ? (
+              <div className="mt-4 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
+                    Campeões banidos
+                  </p>
+                  <Button variant="secondary" size="sm" onClick={() => addBanToGame(gameIndex)}>
+                    <Plus className="h-4 w-4" /> Ban
+                  </Button>
+                </div>
+                {(game.bans ?? []).length === 0 ? (
+                  <p className="text-xs text-muted">Nenhum ban registrado.</p>
+                ) : (
+                  <div className="grid gap-2">
+                    {(game.bans ?? []).map((ban, banIndex) => (
+                      <div
+                        key={`${selectedSeries.id}-g${gameIndex}-ban${banIndex}`}
+                        className="grid gap-2 rounded-xl border border-white/8 bg-white/[0.02] p-2 sm:grid-cols-[1fr_1.2fr_auto]"
+                      >
+                        <Select
+                          aria-label={`Time do ban ${banIndex + 1}`}
+                          value={ban.teamId}
+                          onChange={(e) =>
+                            updateBanField(gameIndex, banIndex, "teamId", e.target.value)
+                          }
+                        >
+                          <option value="">Time</option>
+                          {selectedSeries.teamAId ? (
+                            <option value={selectedSeries.teamAId}>
+                              {getTeamName(draft, selectedSeries.teamAId)}
+                            </option>
+                          ) : null}
+                          {selectedSeries.teamBId ? (
+                            <option value={selectedSeries.teamBId}>
+                              {getTeamName(draft, selectedSeries.teamBId)}
+                            </option>
+                          ) : null}
+                        </Select>
+                        <Input
+                          aria-label={`Campeão banido ${banIndex + 1}`}
+                          placeholder="Campeão banido"
+                          list="champions-datalist"
+                          value={ban.championName}
+                          onChange={(e) =>
+                            updateBanField(gameIndex, banIndex, "championName", e.target.value)
+                          }
+                        />
+                        <div className="flex items-center justify-end">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeBanFromGame(gameIndex, banIndex)}
+                            aria-label={`Remover ban ${banIndex + 1}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : null}
           </Card>
         );
       });
@@ -1062,6 +1181,11 @@ export function AdminSeriesPanel({
 
   return (
     <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+      <datalist id="champions-datalist">
+        {CHAMPIONS.map((champion) => (
+          <option key={champion.id} value={champion.name} />
+        ))}
+      </datalist>
       <Card className="min-w-0 overflow-hidden p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-display text-lg font-bold tracking-wide">Séries</h3>
@@ -1122,6 +1246,70 @@ export function AdminSeriesPanel({
                   }
                 />
               </div>
+            </div>
+
+            <div className="rounded-xl border border-white/8 bg-white/[0.02] p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
+                  Cartinhas usadas na série
+                </p>
+                <Button variant="secondary" size="sm" onClick={addCardToSeries}>
+                  <Plus className="h-4 w-4" /> Cartinha
+                </Button>
+              </div>
+              {(selectedSeries.cardsUsed ?? []).length === 0 ? (
+                <p className="mt-2 text-xs text-muted">
+                  Nenhuma cartinha registrada nesta série.
+                </p>
+              ) : (
+                <div className="mt-2 grid gap-2">
+                  {(selectedSeries.cardsUsed ?? []).map((card, cardIndex) => (
+                    <div
+                      key={`${selectedSeries.id}-card${cardIndex}`}
+                      className="grid gap-2 sm:grid-cols-[1fr_1.2fr_auto]"
+                    >
+                      <Select
+                        aria-label={`Time da cartinha ${cardIndex + 1}`}
+                        value={card.teamId}
+                        onChange={(e) => updateCardField(cardIndex, "teamId", e.target.value)}
+                      >
+                        <option value="">Time</option>
+                        {selectedSeries.teamAId ? (
+                          <option value={selectedSeries.teamAId}>
+                            {getTeamName(draft, selectedSeries.teamAId)}
+                          </option>
+                        ) : null}
+                        {selectedSeries.teamBId ? (
+                          <option value={selectedSeries.teamBId}>
+                            {getTeamName(draft, selectedSeries.teamBId)}
+                          </option>
+                        ) : null}
+                      </Select>
+                      <Select
+                        aria-label={`Cartinha ${cardIndex + 1}`}
+                        value={card.cardId}
+                        onChange={(e) => updateCardField(cardIndex, "cardId", e.target.value)}
+                      >
+                        {CARDS.map((cardDef) => (
+                          <option key={cardDef.id} value={cardDef.id}>
+                            {cardDef.title}
+                          </option>
+                        ))}
+                      </Select>
+                      <div className="flex items-center justify-end">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeCardFromSeries(cardIndex)}
+                          aria-label={`Remover cartinha ${cardIndex + 1}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">

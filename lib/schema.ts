@@ -4,6 +4,14 @@ const nonEmpty = z.string().trim().min(1);
 type IssuePath = Array<string | number>;
 const seriesFormats = ["BO3", "BO5"] as const;
 const seriesStages = ["REGULAR_SEASON", "SEMIFINAL", "FINAL"] as const;
+const cardIds = [
+  "ABCDRAFT",
+  "DRAFT_SABOTADO",
+  "INTER_CLASSE",
+  "INVASAO_YUUMI",
+  "INVERSAO_ROTAS",
+  "TUDO_LIBERADO",
+] as const;
 
 function addCustomIssue(
   ctx: z.RefinementCtx,
@@ -270,10 +278,13 @@ export const tournamentSchema = z.object({
   endedAtISO: z.string().trim().optional(),
 });
 
+export const cardIdSchema = z.enum(cardIds);
+
 export const teamSchema = z.object({
   id: nonEmpty,
   name: nonEmpty,
   slug: nonEmpty,
+  imageUrl: z.string().trim().optional(),
 });
 
 export const playerSchema = z.object({
@@ -284,6 +295,7 @@ export const playerSchema = z.object({
   role1: nonEmpty,
   role2: z.string().trim().optional(),
   elo: nonEmpty,
+  imageUrl: z.string().trim().optional(),
 });
 
 export const playerGameStatsSchema = z.object({
@@ -294,11 +306,23 @@ export const playerGameStatsSchema = z.object({
   assists: z.number().int().min(0),
 });
 
+export const championBanSchema = z.object({
+  teamId: nonEmpty,
+  championName: z.string().trim().min(1),
+});
+
 export const seriesGameSchema = z.object({
   winnerTeamId: nonEmpty,
   durationMin: z.number().int().positive().optional(),
   mvpPlayerId: nonEmpty,
   statsByPlayer: z.array(playerGameStatsSchema).max(20),
+  bans: z.array(championBanSchema).max(10).optional(),
+});
+
+export const cardUsageSchema = z.object({
+  teamId: nonEmpty,
+  cardId: cardIdSchema,
+  gameIndex: z.number().int().min(1).optional(),
 });
 
 export const seriesMatchSchema = z.object({
@@ -311,6 +335,7 @@ export const seriesMatchSchema = z.object({
   walkoverWinnerTeamId: z.string().trim().optional(),
   walkoverReason: z.string().trim().optional(),
   games: z.array(seriesGameSchema).max(5),
+  cardsUsed: z.array(cardUsageSchema).max(20).optional(),
 });
 
 export const standingsSeedRowSchema = z.object({
@@ -381,6 +406,9 @@ export type Player = z.infer<typeof playerSchema>;
 export type PlayerGameStats = z.infer<typeof playerGameStatsSchema>;
 export type SeriesGame = z.infer<typeof seriesGameSchema>;
 export type SeriesMatch = z.infer<typeof seriesMatchSchema>;
+export type ChampionBan = z.infer<typeof championBanSchema>;
+export type CardUsage = z.infer<typeof cardUsageSchema>;
+export type CardId = z.infer<typeof cardIdSchema>;
 export type StandingsSeedRow = z.infer<typeof standingsSeedRowSchema>;
 export type SeriesFormat = z.infer<typeof seriesFormatSchema>;
 export type SeriesStage = z.infer<typeof seriesStageSchema>;
