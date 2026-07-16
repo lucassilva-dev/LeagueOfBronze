@@ -4,7 +4,6 @@ import { ChampionshipHero } from "@/components/championship-hero";
 import { EmptyState } from "@/components/empty-state";
 import { PageHero } from "@/components/page-hero";
 import { PageShell } from "@/components/page-shell";
-import { QuickLinkCard } from "@/components/quick-link-card";
 import { SectionTitle } from "@/components/section-title";
 import { SeriesSummaryCard } from "@/components/series-summary-card";
 import { StatChip } from "@/components/stat-chip";
@@ -86,31 +85,6 @@ function HomeStatsSection({
   );
 }
 
-function HomeQuickLinks() {
-  return (
-    <div className="space-y-4">
-      <SectionTitle title="Atalhos" subtitle="Acesso rápido para tabela, partidas e rankings." />
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-        <QuickLinkCard
-          href="/tabela"
-          title="Tabela"
-          description="Classificação da fase regular com busca por time."
-        />
-        <QuickLinkCard
-          href="/partidas"
-          title="Partidas"
-          description="Lista de séries MD3 e MD5 com placar e detalhe jogo a jogo."
-        />
-        <QuickLinkCard
-          href="/stats"
-          title="Estatísticas"
-          description="Rankings de abates, KDA, MVPs e assistências com filtros."
-        />
-      </div>
-    </div>
-  );
-}
-
 export default async function HomePage() {
   const { dataset, indexes, overview } = await getServerOverview();
   const leader = overview.standings.rows[0];
@@ -185,8 +159,6 @@ export default async function HomePage() {
             </div>
           )}
         </div>
-
-        <HomeQuickLinks />
       </section>
     </PageShell>
   );

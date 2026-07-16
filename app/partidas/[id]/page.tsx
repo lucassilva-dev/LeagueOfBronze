@@ -17,6 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ChampionIcon } from "@/components/champion-icon";
+import { CARDS_BY_ID } from "@/lib/cards";
 import { formatKda, formatSeriesDateLabel } from "@/lib/format";
 import { getServerDataset } from "@/lib/server-data";
 import {
@@ -32,7 +33,7 @@ import {
   getSeriesWinnerTeamId,
   isWalkoverSeries,
 } from "@/lib/tournament";
-import type { Player, Team } from "@/lib/schema";
+import type { Player, SeriesMatch, Team } from "@/lib/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -358,6 +359,61 @@ function GameDetailsCard({
   );
 }
 
+function SeriesCardsPanel({
+  series,
+  teamA,
+  teamB,
+}: Readonly<{ series: SeriesMatch; teamA: Team | null; teamB: Team | null }>) {
+  const cards = series.cardsUsed ?? [];
+  if (cards.length === 0) return null;
+
+  const renderTeam = (team: Team | null, teamId: string) => {
+    const list = cards.filter((card) => card.teamId === teamId);
+    return (
+      <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+        <p className="text-xs text-muted">{team?.name ?? teamId}</p>
+        {list.length === 0 ? (
+          <p className="mt-2 text-sm text-muted">Não sorteou carta.</p>
+        ) : (
+          <div className="mt-2 space-y-2">
+            {list.map((card, index) => {
+              const def = CARDS_BY_ID[card.cardId as keyof typeof CARDS_BY_ID];
+              return (
+                <div key={`${card.cardId}-${index}`} className="flex items-center gap-2">
+                  <span
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-lg"
+                    style={{
+                      background: def
+                        ? `linear-gradient(135deg, ${def.from}, ${def.to})`
+                        : undefined,
+                    }}
+                    aria-hidden
+                  >
+                    {def?.emoji ?? "🎴"}
+                  </span>
+                  <span className="text-sm font-semibold">{def?.title ?? card.cardId}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <Card className="p-5">
+      <p className="text-xs uppercase tracking-[0.14em] text-muted">
+        Cartinhas sorteadas na série
+      </p>
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        {renderTeam(teamA, series.teamAId)}
+        {renderTeam(teamB, series.teamBId)}
+      </div>
+    </Card>
+  );
+}
+
 export default async function PartidaDetalhePage({ params }: PartidaDetalhePageParams) {
   const { id } = await params;
   const { dataset, indexes } = await getServerDataset();
@@ -417,6 +473,8 @@ export default async function PartidaDetalhePage({ params }: PartidaDetalhePageP
           date={series.date}
         />
       ) : null}
+
+      <SeriesCardsPanel series={series} teamA={teamA} teamB={teamB} />
 
       <section className="grid gap-4 md:grid-cols-2">
         <Card className="p-5">

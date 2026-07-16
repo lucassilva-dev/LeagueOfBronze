@@ -1,13 +1,32 @@
-import { CartasPageClient } from "@/components/cartas-page-client";
 import { PageHero } from "@/components/page-hero";
 import { PageShell } from "@/components/page-shell";
 import { Card } from "@/components/ui/card";
-import { CARDS_BY_ID } from "@/lib/cards";
+import type { CardDef } from "@/lib/cards";
+import { CARDS, CARDS_BY_ID } from "@/lib/cards";
 import type { CardId } from "@/lib/schema";
 import { getServerDataset } from "@/lib/server-data";
 import { calculateCardStats } from "@/lib/tournament";
 
 export const dynamic = "force-dynamic";
+
+function CartaVisual({ card }: Readonly<{ card: CardDef }>) {
+  return (
+    <Card className="overflow-hidden p-0">
+      <div
+        className="flex items-center justify-center py-8"
+        style={{ background: `linear-gradient(135deg, ${card.from}, ${card.to})` }}
+      >
+        <span className="text-6xl drop-shadow-[0_2px_6px_rgba(0,0,0,0.4)]" aria-hidden>
+          {card.emoji}
+        </span>
+      </div>
+      <div className="p-4">
+        <h3 className="font-heading text-lg font-bold tracking-wide">{card.title}</h3>
+        <p className="mt-1 text-sm text-muted">{card.description}</p>
+      </div>
+    </Card>
+  );
+}
 
 export default async function CartasPage() {
   const { dataset } = await getServerDataset();
@@ -18,17 +37,24 @@ export default async function CartasPage() {
       <PageHero
         badge="Cartinhas"
         title="Cartas"
-        description="Acervo das Cartinhas Surpresa do torneio e sorteio (único ou duplo). Cada carta altera o draft de uma partida da série, a critério do capitão."
+        description="Acervo das Cartinhas Surpresa do torneio. O sorteio é feito nos detalhes de cada série, no dia do jogo — aqui ficam todas as cartas que existem e suas regras."
       />
 
-      <CartasPageClient />
+      <section>
+        <h2 className="mb-3 font-heading text-xl font-semibold tracking-wide">Acervo de Cartas</h2>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {CARDS.map((card) => (
+            <CartaVisual key={card.id} card={card} />
+          ))}
+        </div>
+      </section>
 
       <section>
         <h2 className="mb-3 font-heading text-xl font-semibold tracking-wide">Cartas mais usadas</h2>
         {used.length === 0 ? (
           <Card className="p-5 text-sm text-muted">
-            Nenhuma cartinha registrada ainda. Conforme forem usadas nas séries (lançadas no
-            /admin), o ranking aparece aqui.
+            Nenhuma cartinha sorteada ainda. Conforme forem sorteadas nas séries, o ranking aparece
+            aqui.
           </Card>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -50,7 +76,7 @@ export default async function CartasPage() {
                     </span>
                     <div>
                       <p className="font-semibold">{stat.title}</p>
-                      <p className="text-xs text-muted">{stat.count} uso(s)</p>
+                      <p className="text-xs text-muted">{stat.count} sorteio(s)</p>
                     </div>
                   </div>
                   {stat.byTeam.length > 0 ? (

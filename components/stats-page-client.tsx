@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 import type { TournamentDataset } from "@/lib/schema";
 import { buildLeaderboards } from "@/lib/tournament";
 import { formatDateLabel, formatKda } from "@/lib/format";
+import { getDisplayNick } from "@/lib/opgg";
 import type { LeaderboardMetric, LeaderboardRow } from "@/types/domain";
 import { DataTable } from "@/components/data-table";
 import { StatsLeaderboardVisual } from "@/components/stats-leaderboard-visual";
@@ -41,7 +42,7 @@ function PlayerLinkCell({ row }: Readonly<{ row: LeaderboardRow }>) {
   return (
     <div>
       <Link href={`/jogadores/${row.player.playerSlug}`} className="font-semibold hover:text-accent">
-        {row.player.playerNick}
+        {getDisplayNick(row.player.playerNick)}
       </Link>
       <p className="text-xs text-muted">
         <Link href={`/times/${row.player.teamSlug}`} className="hover:text-text">
@@ -190,7 +191,7 @@ export function StatsPageClient({ dataset }: StatsPageClientProps) {
                     href={`/jogadores/${row.player.playerSlug}`}
                     className="font-semibold hover:text-accent"
                   >
-                    {row.player.playerNick}
+                    {getDisplayNick(row.player.playerNick)}
                   </Link>
                   <p className="text-xs text-muted">{row.player.teamName}</p>
                 </div>
