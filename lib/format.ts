@@ -32,6 +32,31 @@ export function formatDateTimeLabel(value?: string | null) {
   }).format(date);
 }
 
+function seriesDateHasTime(value?: string | null) {
+  return typeof value === "string" && value.includes("T");
+}
+
+// Séries da 3ª temporada guardam data+horário (ISO com hora). As antigas guardam
+// só a data (YYYY-MM-DD). Mostra dia+hora quando há horário; senão, só o dia.
+export function formatSeriesDateLabel(value?: string | null) {
+  return seriesDateHasTime(value) ? formatDateTimeLabel(value) : formatDateLabel(value);
+}
+
+// Turno (Matutino/Vespertino) derivado do horário, no fuso de Brasília.
+export function getSeriesTurnoLabel(value?: string | null): string | null {
+  if (!seriesDateHasTime(value)) return null;
+  const date = new Date(value as string);
+  if (Number.isNaN(date.getTime())) return null;
+  const hour = Number(
+    new Intl.DateTimeFormat("pt-BR", {
+      hour: "2-digit",
+      hour12: false,
+      timeZone: BRAZIL_TIME_ZONE,
+    }).format(date),
+  );
+  return hour < 13 ? "Matutino" : "Vespertino";
+}
+
 export function formatPercent(value: number, maximumFractionDigits = 1) {
   return new Intl.NumberFormat("pt-BR", {
     style: "percent",

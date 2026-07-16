@@ -16,7 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatDateLabel, formatKda } from "@/lib/format";
+import { formatKda, formatSeriesDateLabel } from "@/lib/format";
 import { getServerDataset } from "@/lib/server-data";
 import {
   getGameMvpPlayerId,
@@ -185,7 +185,7 @@ function FinalChampionPanel({
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="bronze">Campeão do campeonato</Badge>
               <Badge variant="outline">{identity.seriesFormatLabel}</Badge>
-              <Badge variant="outline">{formatDateLabel(date)}</Badge>
+              <Badge variant="outline">{formatSeriesDateLabel(date)}</Badge>
             </div>
 
             <div className="mt-4 flex items-start gap-3">
@@ -385,7 +385,7 @@ export default async function PartidaDetalhePage({ params }: PartidaDetalhePageP
     winnerTeamId === null ? null : getWinnerScore(score, winnerTeamId, series.teamAId);
   const finalSummaryText = getFinalSummaryText(isWalkover, seriesMvpNick);
   const title = `${teamA?.name ?? series.teamAId} ${score.teamAWins}–${score.teamBWins} ${teamB?.name ?? series.teamBId}`;
-  const description = `${identity.stageLabel} • ${identity.seriesFormatLabel} • Série ${series.id} • ${formatDateLabel(series.date)}`;
+  const description = `${identity.stageLabel} • ${identity.seriesFormatLabel} • Série ${series.id} • ${formatSeriesDateLabel(series.date)}`;
 
   return (
     <PageShell className="space-y-6">

@@ -1,403 +1,428 @@
 {
   "tournament": {
-    "name": "Campeonato do Grupo",
-    "lastUpdatedISO": "2026-02-23T14:44:39.457Z",
+    "name": "3ª Edição dos Bronzes",
+    "lastUpdatedISO": "2026-07-16T13:57:39.550Z",
     "seriesPointsRule": {
       "win": 3,
       "loss": 0
     },
-    "format": "BO3"
+    "format": "BO3",
+    "seasonId": "season-3-edicao-bronzes",
+    "status": "active",
+    "startedAtISO": "2026-07-16T13:57:39.550Z"
   },
   "teams": [
     {
-      "id": "zenshin",
-      "name": "ZENSHIN GAMING",
-      "slug": "zenshin-gaming"
+      "id": "pantera-cor-de-goza",
+      "name": "PANTERA COR DE GOZA",
+      "slug": "pantera-cor-de-goza"
     },
     {
-      "id": "moonrock",
-      "name": "MOONROCK",
-      "slug": "moonrock"
+      "id": "vanguarda-de-ferro",
+      "name": "VANGUARDA DE FERRO",
+      "slug": "vanguarda-de-ferro"
     },
     {
-      "id": "punho",
-      "name": "PUNHO DO BARÃO",
-      "slug": "punho-do-barao"
+      "id": "presas-shurima",
+      "name": "PRESAS DE SHURIMA",
+      "slug": "presas-de-shurima"
     },
     {
-      "id": "pequi",
-      "name": "PEQUI PIKANTE",
-      "slug": "pequi-pikante"
+      "id": "time4",
+      "name": "Time 4",
+      "slug": "time-4"
     },
     {
-      "id": "semdedos",
-      "name": "SEM DEDOS GAMING",
-      "slug": "sem-dedos-gaming"
+      "id": "capangas-motomoto",
+      "name": "CAPANGAS DO MOTOMOTO",
+      "slug": "capangas-do-motomoto"
     },
     {
-      "id": "lov2",
-      "name": "LEAGUE OF VALLEY 2.0",
-      "slug": "league-of-valley-2-0"
-    },
-    {
-      "id": "inss",
-      "name": "INSS GAMING",
-      "slug": "inss-gaming"
+      "id": "lgtv-wins",
+      "name": "LGTV WINS",
+      "slug": "lgtv-wins"
     }
   ],
   "players": [
     {
-      "id": "maxmp",
-      "nick": "Maxmp",
-      "slug": "maxmp",
-      "teamId": "punho",
-      "role1": "SUP",
-      "role2": "JUNG",
-      "elo": "DIAM"
-    },
-    {
-      "id": "ikira",
-      "nick": "Ikira",
-      "slug": "ikira",
-      "teamId": "punho",
-      "role1": "ADC",
-      "role2": "MID",
-      "elo": "PLAT"
-    },
-    {
-      "id": "epicdron",
-      "nick": "EPICDRON",
-      "slug": "epicdron",
-      "teamId": "punho",
-      "role1": "TOP",
-      "role2": "SUP",
-      "elo": "PRAT"
-    },
-    {
-      "id": "onigami-666",
-      "nick": "Onigami #666",
-      "slug": "onigami-666",
-      "teamId": "punho",
-      "role1": "MID",
-      "role2": "ADC",
-      "elo": "ESME"
-    },
-    {
-      "id": "fail-error",
-      "nick": "Fail Error",
-      "slug": "fail-error",
-      "teamId": "punho",
-      "role1": "JUNG",
-      "role2": "TOP",
-      "elo": "OURO"
-    },
-    {
-      "id": "hail-to-deicidal-hell",
-      "nick": "Hail to deicidal#hell",
-      "slug": "hail-to-deicidal-hell",
-      "teamId": "moonrock",
-      "role1": "TOP",
-      "role2": "MID",
-      "elo": "MEST"
-    },
-    {
-      "id": "zac-schwarzenegg",
-      "nick": "Zac Schwarzenegg",
-      "slug": "zac-schwarzenegg",
-      "teamId": "moonrock",
-      "role1": "JUNG",
-      "role2": "ADC",
-      "elo": "ESME"
-    },
-    {
-      "id": "zeus",
-      "nick": "zeus",
-      "slug": "zeus",
-      "teamId": "moonrock",
-      "role1": "SUP",
-      "role2": "JUNG",
-      "elo": "PRAT"
-    },
-    {
-      "id": "el-math",
-      "nick": "El Math",
-      "slug": "el-math",
-      "teamId": "moonrock",
-      "role1": "MID",
-      "role2": "TOP",
-      "elo": "BRON"
-    },
-    {
-      "id": "pai-de-familia",
-      "nick": "PAI DE FAMILIA",
-      "slug": "pai-de-familia",
-      "teamId": "moonrock",
-      "role1": "ADC",
-      "role2": "SUP",
-      "elo": "OURO"
-    },
-    {
-      "id": "vidotti-agiota",
-      "nick": "vidotti agiota",
-      "slug": "vidotti-agiota",
-      "teamId": "inss",
-      "role1": "ADC",
-      "role2": "MID",
-      "elo": "ESME"
-    },
-    {
-      "id": "reimeldinguer",
-      "nick": "REIMelDinguer",
-      "slug": "reimeldinguer",
-      "teamId": "inss",
-      "role1": "SUP",
-      "role2": "MID",
-      "elo": "OURO"
-    },
-    {
-      "id": "luiz6546",
-      "nick": "Luiz6546",
-      "slug": "luiz6546",
-      "teamId": "inss",
-      "role1": "TOP",
-      "role2": "JUNG",
-      "elo": "ESME"
-    },
-    {
-      "id": "x-de-shaco",
-      "nick": "X de shaco",
-      "slug": "x-de-shaco",
-      "teamId": "inss",
-      "role1": "JUNG",
-      "role2": "TOP",
-      "elo": "PLAT"
-    },
-    {
-      "id": "killergoldo",
-      "nick": "KILLERGOLDO",
-      "slug": "killergoldo",
-      "teamId": "inss",
-      "role1": "MID",
-      "role2": "TOP",
-      "elo": "BRONZ"
-    },
-    {
-      "id": "frango-vegano",
-      "nick": "Frango vegano",
-      "slug": "frango-vegano",
-      "teamId": "semdedos",
-      "role1": "SUP",
-      "role2": "JUNG",
-      "elo": "ESME"
-    },
-    {
-      "id": "stormshadow",
-      "nick": "Il StormShadow I",
-      "slug": "il-stormshadow-i",
-      "teamId": "semdedos",
-      "role1": "ADC",
-      "role2": "MID",
-      "elo": "PLAT"
-    },
-    {
-      "id": "calabreso",
-      "nick": "Calabreso",
-      "slug": "calabreso",
-      "teamId": "semdedos",
-      "role1": "TOP",
-      "role2": "ADC",
-      "elo": "OURO"
-    },
-    {
-      "id": "3perna",
-      "nick": "3perna",
-      "slug": "3perna",
-      "teamId": "semdedos",
-      "role1": "JUNG",
-      "role2": "TOP",
-      "elo": "PRAT"
-    },
-    {
-      "id": "alemonstro",
-      "nick": "AleMonStr0",
-      "slug": "alemonstr0",
-      "teamId": "semdedos",
-      "role1": "MID",
-      "role2": "TOP",
-      "elo": "OURO"
-    },
-    {
-      "id": "leao",
-      "nick": "Leão",
-      "slug": "leao",
-      "teamId": "pequi",
-      "role1": "MID",
-      "role2": "TOP",
-      "elo": "MEST"
-    },
-    {
-      "id": "midas",
-      "nick": "MIDAS",
-      "slug": "midas",
-      "teamId": "pequi",
-      "role1": "SUP",
-      "role2": "JUNG",
-      "elo": "PLAT"
-    },
-    {
-      "id": "wrgamer",
-      "nick": "WRGamer",
-      "slug": "wrgamer",
-      "teamId": "pequi",
-      "role1": "ADC",
-      "role2": "SUP",
-      "elo": "PLAT"
-    },
-    {
-      "id": "onlyfans-kindred",
-      "nick": "onlyfans kindred",
-      "slug": "onlyfans-kindred",
-      "teamId": "pequi",
-      "role1": "JUNG",
-      "role2": "SUP",
-      "elo": "PRAT"
-    },
-    {
-      "id": "desliga-cerebro",
-      "nick": "Desliga Cerebro",
-      "slug": "desliga-cerebro",
-      "teamId": "pequi",
-      "role1": "TOP",
-      "role2": "JUNG",
-      "elo": "PRAT"
-    },
-    {
-      "id": "cavalinha-do-job",
-      "nick": "cavalinha do job",
-      "slug": "cavalinha-do-job",
-      "teamId": "lov2",
-      "role1": "MID",
-      "role2": "JUNG",
-      "elo": "ESME"
-    },
-    {
-      "id": "top-lane-666",
-      "nick": "Top Lane 666",
-      "slug": "top-lane-666",
-      "teamId": "lov2",
-      "role1": "TOP",
-      "role2": "JUNG",
-      "elo": "PRAT"
-    },
-    {
-      "id": "shift",
-      "nick": "SHIFT",
-      "slug": "shift",
-      "teamId": "lov2",
-      "role1": "JUNG",
-      "role2": "SUP",
-      "elo": "ESME"
-    },
-    {
-      "id": "gaylord",
-      "nick": "GayLord",
-      "slug": "gaylord",
-      "teamId": "lov2",
-      "role1": "ADC",
-      "role2": "MID",
-      "elo": "OURO"
-    },
-    {
-      "id": "miva",
-      "nick": "MIVA",
-      "slug": "miva",
-      "teamId": "lov2",
-      "role1": "SUP",
-      "role2": "MID",
-      "elo": "PLAT"
-    },
-    {
       "id": "nak4y",
-      "nick": "nak4y",
+      "nick": "nak4y#JPN",
       "slug": "nak4y",
-      "teamId": "zenshin",
-      "role1": "ADC",
-      "role2": "JUNG",
-      "elo": "DIAM"
+      "teamId": "pantera-cor-de-goza",
+      "role1": "JUNG",
+      "elo": "MEST"
     },
     {
-      "id": "razeral",
-      "nick": "яαzεгαł        ッ #yse",
-      "slug": "razeral",
-      "teamId": "zenshin",
+      "id": "tikin-d-calcinha",
+      "nick": "tikin d calcinha#jcdk",
+      "slug": "tikin-d-calcinha",
+      "teamId": "pantera-cor-de-goza",
       "role1": "MID",
-      "role2": "ADC",
-      "elo": "ESME"
+      "elo": "OURO"
+    },
+    {
+      "id": "tapa-de-doido",
+      "nick": "Tapa de doido #ats",
+      "slug": "tapa-de-doido",
+      "teamId": "pantera-cor-de-goza",
+      "role1": "TOP",
+      "elo": "PLAT"
+    },
+    {
+      "id": "gar3na",
+      "nick": "GAR3NA#333",
+      "slug": "gar3na",
+      "teamId": "pantera-cor-de-goza",
+      "role1": "SUP",
+      "elo": "OURO"
+    },
+    {
+      "id": "iranildo-gari",
+      "nick": "Iranildo Gari#Pilar",
+      "slug": "iranildo-gari",
+      "teamId": "pantera-cor-de-goza",
+      "role1": "ADC",
+      "elo": "PRAT"
+    },
+    {
+      "id": "mxxdragonxxm",
+      "nick": "mxxDragonxxm #br1",
+      "slug": "mxxdragonxxm",
+      "teamId": "vanguarda-de-ferro",
+      "role1": "JUNG",
+      "elo": "DIAM"
     },
     {
       "id": "satoshi",
-      "nick": "Satoshi",
+      "nick": "Satoshi #VDD",
       "slug": "satoshi",
-      "teamId": "zenshin",
+      "teamId": "vanguarda-de-ferro",
+      "role1": "MID",
+      "elo": "PLAT"
+    },
+    {
+      "id": "thalao",
+      "nick": "THALAO # FIRST",
+      "slug": "thalao",
+      "teamId": "vanguarda-de-ferro",
       "role1": "SUP",
+      "elo": "BRON"
+    },
+    {
+      "id": "peideicaldinho",
+      "nick": "Peideicaldinho#pei",
+      "slug": "peideicaldinho",
+      "teamId": "vanguarda-de-ferro",
+      "role1": "TOP",
+      "elo": "ESME"
+    },
+    {
+      "id": "ctz",
+      "nick": "ctz #444",
+      "slug": "ctz",
+      "teamId": "vanguarda-de-ferro",
+      "role1": "ADC",
+      "elo": "DIAM"
+    },
+    {
+      "id": "hikolin",
+      "nick": "Hikolin#2112",
+      "slug": "hikolin",
+      "teamId": "presas-shurima",
+      "role1": "ADC",
+      "elo": "ESME"
+    },
+    {
+      "id": "n4firida-agiota",
+      "nick": "N4firida  agiota #7937",
+      "slug": "n4firida-agiota",
+      "teamId": "presas-shurima",
+      "role1": "MID",
+      "elo": "OURO"
+    },
+    {
+      "id": "sr-hades",
+      "nick": "Sr Hades#2522",
+      "slug": "sr-hades",
+      "teamId": "presas-shurima",
+      "role1": "ADC",
+      "elo": "OURO"
+    },
+    {
+      "id": "onigami",
+      "nick": "Onigami #666",
+      "slug": "onigami",
+      "teamId": "presas-shurima",
+      "role1": "ADC",
       "role2": "TOP",
       "elo": "PLAT"
     },
     {
-      "id": "malasarte",
-      "nick": "Malasarte",
-      "slug": "malasarte",
-      "teamId": "zenshin",
+      "id": "famoso-parrudao",
+      "nick": "Famoso Parrudao #6969",
+      "slug": "famoso-parrudao",
+      "teamId": "presas-shurima",
       "role1": "JUNG",
-      "role2": "SUP",
+      "elo": "ESME"
+    },
+    {
+      "id": "sabor-energetico",
+      "nick": "Sabor Energético #1777",
+      "slug": "sabor-energetico",
+      "teamId": "time4",
+      "role1": "MID",
+      "elo": "PRAT"
+    },
+    {
+      "id": "top-lane-666",
+      "nick": "Top Lane 666 #BR1",
+      "slug": "top-lane-666",
+      "teamId": "time4",
+      "role1": "TOP",
+      "elo": "PLAT"
+    },
+    {
+      "id": "malasartes",
+      "nick": "Malasartes #7804",
+      "slug": "malasartes",
+      "teamId": "time4",
+      "role1": "JUNG",
       "elo": "BRON"
     },
     {
-      "id": "thebetamogger",
-      "nick": "TheBetaMogger",
-      "slug": "thebetamogger",
-      "teamId": "zenshin",
+      "id": "sou-adc-nao-deus",
+      "nick": "SOU ADC NÃO DEUS#BR1",
+      "slug": "sou-adc-nao-deus",
+      "teamId": "time4",
+      "role1": "ADC",
+      "elo": "ESME"
+    },
+    {
+      "id": "miva",
+      "nick": "Miva#Br1",
+      "slug": "miva",
+      "teamId": "time4",
+      "role1": "SUP",
+      "elo": "PLAT"
+    },
+    {
+      "id": "razeral",
+      "nick": "яαzεгαł ッ #yse",
+      "slug": "razeral",
+      "teamId": "capangas-motomoto",
+      "role1": "MID",
+      "elo": "DIAM"
+    },
+    {
+      "id": "midas",
+      "nick": "MIDAS#Ayla",
+      "slug": "midas",
+      "teamId": "capangas-motomoto",
+      "role1": "SUP",
+      "elo": "ESME"
+    },
+    {
+      "id": "motomoto",
+      "nick": "motomoto#thuc",
+      "slug": "motomoto",
+      "teamId": "capangas-motomoto",
+      "role1": "SUP",
+      "elo": "BRON"
+    },
+    {
+      "id": "samuel-venancio",
+      "nick": "SAMUEL VENÂNCIO#MC97",
+      "slug": "samuel-venancio",
+      "teamId": "capangas-motomoto",
+      "role1": "ADC",
+      "elo": "OURO"
+    },
+    {
+      "id": "innellea",
+      "nick": "INNELLEA #GOAT",
+      "slug": "innellea",
+      "teamId": "capangas-motomoto",
       "role1": "TOP",
-      "role2": "MID",
-      "elo": "PRAT"
+      "elo": "ESME"
+    },
+    {
+      "id": "png-gala",
+      "nick": "PNG GALA #PNG",
+      "slug": "png-gala",
+      "teamId": "lgtv-wins",
+      "role1": "ADC",
+      "elo": "PLAT"
+    },
+    {
+      "id": "vidotti-agiota",
+      "nick": "vidotti agiota #br1",
+      "slug": "vidotti-agiota",
+      "teamId": "lgtv-wins",
+      "role1": "TOP",
+      "elo": "DIAM"
+    },
+    {
+      "id": "maxmp",
+      "nick": "Maxmp #br1",
+      "slug": "maxmp",
+      "teamId": "lgtv-wins",
+      "role1": "SUP",
+      "elo": "ESME"
+    },
+    {
+      "id": "wrgamer",
+      "nick": "wrgamer#153",
+      "slug": "wrgamer",
+      "teamId": "lgtv-wins",
+      "role1": "ADC",
+      "elo": "PLAT"
+    },
+    {
+      "id": "z0e-baiana",
+      "nick": "Z0E Baiana #br1",
+      "slug": "z0e-baiana",
+      "teamId": "lgtv-wins",
+      "role1": "MID",
+      "elo": "PLAT"
     }
   ],
-  "seriesMatches": [],
-  "standingsSeed": [
+  "seriesMatches": [
     {
-      "teamId": "zenshin",
-      "played": 3,
-      "points": 6
+      "id": "serie-01",
+      "date": "2026-07-25T09:00:00-03:00",
+      "teamAId": "time4",
+      "teamBId": "presas-shurima",
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "games": []
     },
     {
-      "teamId": "moonrock",
-      "played": 3,
-      "points": 6
+      "id": "serie-02",
+      "date": "2026-07-25T10:30:00-03:00",
+      "teamAId": "lgtv-wins",
+      "teamBId": "capangas-motomoto",
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "games": []
     },
     {
-      "teamId": "punho",
-      "played": 2,
-      "points": 3
+      "id": "serie-03",
+      "date": "2026-07-25T12:00:00-03:00",
+      "teamAId": "pantera-cor-de-goza",
+      "teamBId": "vanguarda-de-ferro",
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "games": []
     },
     {
-      "teamId": "pequi",
-      "played": 1,
-      "points": 3
+      "id": "serie-04",
+      "date": "2026-07-25T14:00:00-03:00",
+      "teamAId": "time4",
+      "teamBId": "capangas-motomoto",
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "games": []
     },
     {
-      "teamId": "semdedos",
-      "played": 2,
-      "points": 3
+      "id": "serie-05",
+      "date": "2026-07-25T15:30:00-03:00",
+      "teamAId": "presas-shurima",
+      "teamBId": "vanguarda-de-ferro",
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "games": []
     },
     {
-      "teamId": "lov2",
-      "played": 2,
-      "points": 0
+      "id": "serie-06",
+      "date": "2026-07-25T17:00:00-03:00",
+      "teamAId": "lgtv-wins",
+      "teamBId": "pantera-cor-de-goza",
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "games": []
     },
     {
-      "teamId": "inss",
-      "played": 1,
-      "points": 0
+      "id": "serie-07",
+      "date": "2026-07-26T09:00:00-03:00",
+      "teamAId": "time4",
+      "teamBId": "vanguarda-de-ferro",
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "games": []
+    },
+    {
+      "id": "serie-08",
+      "date": "2026-07-26T10:30:00-03:00",
+      "teamAId": "capangas-motomoto",
+      "teamBId": "pantera-cor-de-goza",
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "games": []
+    },
+    {
+      "id": "serie-09",
+      "date": "2026-07-26T12:00:00-03:00",
+      "teamAId": "presas-shurima",
+      "teamBId": "lgtv-wins",
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "games": []
+    },
+    {
+      "id": "serie-10",
+      "date": "2026-07-26T14:00:00-03:00",
+      "teamAId": "time4",
+      "teamBId": "pantera-cor-de-goza",
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "games": []
+    },
+    {
+      "id": "serie-11",
+      "date": "2026-07-26T15:30:00-03:00",
+      "teamAId": "vanguarda-de-ferro",
+      "teamBId": "lgtv-wins",
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "games": []
+    },
+    {
+      "id": "serie-12",
+      "date": "2026-07-26T17:00:00-03:00",
+      "teamAId": "capangas-motomoto",
+      "teamBId": "presas-shurima",
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "games": []
+    },
+    {
+      "id": "serie-13",
+      "date": "2026-08-01T09:00:00-03:00",
+      "teamAId": "time4",
+      "teamBId": "lgtv-wins",
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "games": []
+    },
+    {
+      "id": "serie-14",
+      "date": "2026-08-01T10:30:00-03:00",
+      "teamAId": "pantera-cor-de-goza",
+      "teamBId": "presas-shurima",
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "games": []
+    },
+    {
+      "id": "serie-15",
+      "date": "2026-08-01T12:00:00-03:00",
+      "teamAId": "vanguarda-de-ferro",
+      "teamBId": "capangas-motomoto",
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "games": []
     }
-  ]
+  ],
+  "standingsSeed": [],
+  "archivedSeasons": []
 }

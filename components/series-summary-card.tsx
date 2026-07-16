@@ -3,7 +3,7 @@ import { ArrowRight, Crown } from "lucide-react";
 
 import type { Player, Team } from "@/lib/schema";
 import type { SeriesSummary } from "@/types/domain";
-import { formatDateLabel } from "@/lib/format";
+import { formatSeriesDateLabel, getSeriesTurnoLabel } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -112,7 +112,14 @@ export function SeriesSummaryCard({
               >
                 {getStatusLabel(summary)}
               </Badge>
-              <span className="text-xs text-muted">{formatDateLabel(summary.series.date)}</span>
+              <span className="text-xs text-muted">
+                {formatSeriesDateLabel(summary.series.date)}
+              </span>
+              {getSeriesTurnoLabel(summary.series.date) ? (
+                <Badge variant="outline" className="text-[10px]">
+                  {getSeriesTurnoLabel(summary.series.date)}
+                </Badge>
+              ) : null}
               <span
                 className={cn("text-xs text-muted", grandFinal && "font-semibold text-accent2/80")}
               >

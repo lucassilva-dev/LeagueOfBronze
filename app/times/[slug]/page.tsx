@@ -18,7 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatDateLabel, formatKda } from "@/lib/format";
+import { formatKda, formatSeriesDateLabel } from "@/lib/format";
 import { getOpGgMultiSearchUrlFromNicks } from "@/lib/opgg";
 import { getServerDataset } from "@/lib/server-data";
 import {
@@ -145,7 +145,7 @@ function TeamChampionPanel({ teamName, data }: TeamChampionPanelProps) {
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="bronze">Título confirmado</Badge>
               <Badge variant="outline">{data.summary.formatLabel}</Badge>
-              <Badge variant="outline">{formatDateLabel(data.summary.series.date)}</Badge>
+              <Badge variant="outline">{formatSeriesDateLabel(data.summary.series.date)}</Badge>
             </div>
 
             <div className="mt-4 flex items-start gap-3">
