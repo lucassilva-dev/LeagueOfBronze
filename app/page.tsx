@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { Crown, Skull, Swords } from "lucide-react";
+import { Crown, Skull } from "lucide-react";
 
 import { ChampionshipHero } from "@/components/championship-hero";
 import { EmptyState } from "@/components/empty-state";
@@ -16,7 +15,6 @@ import { getServerOverview } from "@/lib/server-data";
 
 export const dynamic = "force-dynamic";
 
-type HomeQuickLinksProps = Readonly<{ latestSeriesCount: number }>;
 type HomeStatsSectionProps = Readonly<{
   leaderName: string;
   leaderHint: string;
@@ -88,12 +86,7 @@ function HomeStatsSection({
   );
 }
 
-function HomeQuickLinks({ latestSeriesCount }: HomeQuickLinksProps) {
-  const latestSeriesDescription =
-    latestSeriesCount === 0
-      ? "Ainda não há séries lançadas, mas o layout já está pronto para atualizar automaticamente."
-      : "As séries mais recentes aparecem com placar, etapa e MVP da série.";
-
+function HomeQuickLinks() {
   return (
     <div className="space-y-4">
       <SectionTitle title="Atalhos" subtitle="Acesso rápido para tabela, partidas e rankings." />
@@ -101,7 +94,7 @@ function HomeQuickLinks({ latestSeriesCount }: HomeQuickLinksProps) {
         <QuickLinkCard
           href="/tabela"
           title="Tabela"
-          description="Classificação da fase regular com filtros e busca por time."
+          description="Classificação da fase regular com busca por time."
         />
         <QuickLinkCard
           href="/partidas"
@@ -114,28 +107,6 @@ function HomeQuickLinks({ latestSeriesCount }: HomeQuickLinksProps) {
           description="Rankings de abates, KDA, MVPs e assistências com filtros."
         />
       </div>
-
-      <Card className="p-4">
-        <div className="flex items-start gap-3">
-          <span className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 text-accent2">
-            <Swords className="h-4 w-4" />
-          </span>
-          <div>
-            <p className="font-semibold">Admin</p>
-            <p className="mt-1 text-sm text-muted">
-              Lançamento de séries, times e jogadores com suporte a fase regular, semifinal,
-              final, MD3 e MD5.
-            </p>
-            <p className="mt-2 text-xs text-muted">{latestSeriesDescription}</p>
-            <Link
-              href="/admin"
-              className="mt-2 inline-flex text-sm font-semibold text-accent hover:underline"
-            >
-              Abrir painel admin
-            </Link>
-          </div>
-        </div>
-      </Card>
     </div>
   );
 }
@@ -215,7 +186,7 @@ export default async function HomePage() {
           )}
         </div>
 
-        <HomeQuickLinks latestSeriesCount={latestSeries.length} />
+        <HomeQuickLinks />
       </section>
     </PageShell>
   );

@@ -13,10 +13,7 @@ import { TeamCrest } from "@/components/team-crest";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { SegmentedControl } from "@/components/ui/segmented-control";
 
-type StandingsMode = "simple" | "advanced";
-type ScopeMode = "all" | "top3";
 type StandingsPageClientProps = Readonly<{
   rows: StandingsRow[];
   source: StandingsSource;
@@ -24,10 +21,6 @@ type StandingsPageClientProps = Readonly<{
 type StandingsRowProps = Readonly<{ row: StandingsRow }>;
 type PositionProps = Readonly<{ position: number }>;
 type GameDiffProps = Readonly<{ value: number }>;
-type MobileRowDetailsProps = Readonly<{
-  mode: StandingsMode;
-  row: StandingsRow;
-}>;
 
 function StandingsPosition({ position }: PositionProps) {
   return <span className={cn("font-semibold", position <= 3 && "text-accent")}>#{position}</span>;
@@ -63,9 +56,7 @@ function GameDiffValue({ value }: GameDiffProps) {
   return <span className={colorClassName}>{label}</span>;
 }
 
-function MobileRowDetails({ mode, row }: MobileRowDetailsProps) {
-  if (mode !== "advanced") return null;
-
+function MobileRowDetails({ row }: StandingsRowProps) {
   return (
     <div className="text-right text-xs text-muted">
       <p>V-D séries: {row.seriesWon}-{row.seriesLost}</p>
@@ -90,7 +81,7 @@ function SourceBadge({ source }: Readonly<{ source: StandingsSource }>) {
   return <Badge variant="success">Tabela calculada pelas séries registradas</Badge>;
 }
 
-const SIMPLE_COLUMNS: ColumnDef<StandingsRow>[] = [
+const TABLE_COLUMNS: ColumnDef<StandingsRow>[] = [
   {
     accessorKey: "position",
     header: "Pos",
@@ -101,21 +92,6 @@ const SIMPLE_COLUMNS: ColumnDef<StandingsRow>[] = [
     header: "Time",
     cell: ({ row }) => <StandingsTeamLink row={row.original} />,
   },
-  {
-    accessorKey: "seriesPlayed",
-    header: "Séries",
-    cell: ({ getValue }) => getValue<number>(),
-  },
-  {
-    accessorKey: "points",
-    header: "Pontos",
-    cell: ({ getValue }) => <StandingsPoints value={getValue<number>()} />,
-  },
-];
-
-const ADVANCED_COLUMNS: ColumnDef<StandingsRow>[] = [
-  SIMPLE_COLUMNS[0],
-  SIMPLE_COLUMNS[1],
   {
     id: "seriesRecord",
     header: "Séries (V-D)",
@@ -146,64 +122,29 @@ const ADVANCED_COLUMNS: ColumnDef<StandingsRow>[] = [
 ];
 
 export function StandingsPageClient({ rows, source }: StandingsPageClientProps) {
-  const [mode, setMode] = useState<StandingsMode>("simple");
-  const [scope, setScope] = useState<ScopeMode>("all");
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
 
   const filteredRows = useMemo(() => {
     const q = deferredQuery.trim().toLowerCase();
-    let next = rows;
-
-    if (scope === "top3") {
-      next = next.filter((row) => row.position <= 3);
-    }
-
-    if (q) {
-      next = next.filter((row) => row.teamName.toLowerCase().includes(q));
-    }
-
-    return next;
-  }, [rows, scope, deferredQuery]);
-
-  const tableColumns = mode === "simple" ? SIMPLE_COLUMNS : ADVANCED_COLUMNS;
+    if (!q) return rows;
+    return rows.filter((row) => row.teamName.toLowerCase().includes(q));
+  }, [rows, deferredQuery]);
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <div className="w-full sm:w-72">
-            <label
-              htmlFor="team-search"
-              className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-muted"
-            >
-              Buscar time
-            </label>
-            <Input
-              id="team-search"
-              placeholder="Ex: Zenshin"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </div>
-          <SegmentedControl
-            label="Mostrar"
-            value={scope}
-            onChange={setScope}
-            options={[
-              { value: "all", label: "Todos" },
-              { value: "top3", label: "Top 3" },
-            ]}
-          />
-        </div>
-        <SegmentedControl
-          label="Modo"
-          value={mode}
-          onChange={setMode}
-          options={[
-            { value: "simple", label: "Simples" },
-            { value: "advanced", label: "Avançado" },
-          ]}
+      <div className="w-full sm:w-72">
+        <label
+          htmlFor="team-search"
+          className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-muted"
+        >
+          Buscar time
+        </label>
+        <Input
+          id="team-search"
+          placeholder="Nome do time"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
         />
       </div>
 
@@ -234,7 +175,7 @@ export function StandingsPageClient({ rows, source }: StandingsPageClientProps) 
                     Séries: {row.seriesPlayed} | Pontos: {row.points}
                   </p>
                 </div>
-                <MobileRowDetails mode={mode} row={row} />
+                <MobileRowDetails row={row} />
               </div>
             </Card>
           ))
@@ -243,7 +184,7 @@ export function StandingsPageClient({ rows, source }: StandingsPageClientProps) 
 
       <Card className="hidden p-2 md:block">
         <DataTable
-          columns={tableColumns}
+          columns={TABLE_COLUMNS}
           data={filteredRows}
           emptyMessage="Nenhum time encontrado."
           rowClassName={(row) => {
