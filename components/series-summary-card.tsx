@@ -4,6 +4,7 @@ import { ArrowRight, Crown } from "lucide-react";
 import type { Player, Team } from "@/lib/schema";
 import type { SeriesSummary } from "@/types/domain";
 import { formatSeriesDateLabel, getSeriesTurnoLabel } from "@/lib/format";
+import { getDisplayNick } from "@/lib/opgg";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -47,7 +48,8 @@ function getWinnerTeamName(summary: SeriesSummary, teamsById: Map<string, Team>)
 
 function getMvpPlayerNick(summary: SeriesSummary, playersById: Map<string, Player>) {
   if (!summary.mvp) return undefined;
-  return playersById.get(summary.mvp.playerId)?.nick;
+  const nick = playersById.get(summary.mvp.playerId)?.nick;
+  return nick ? getDisplayNick(nick) : undefined;
 }
 
 function MetaLine({

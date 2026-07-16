@@ -13,7 +13,6 @@ const links = [
   { href: "/campeoes", label: "Campeões" },
   { href: "/cartas", label: "Cartas" },
   { href: "/temporadas", label: "Temporadas" },
-  { href: "/admin", label: "Admin" },
 ];
 
 export function MainNav() {

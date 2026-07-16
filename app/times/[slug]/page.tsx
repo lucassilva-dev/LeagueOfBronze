@@ -22,7 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatKda, formatSeriesDateLabel } from "@/lib/format";
-import { getOpGgMultiSearchUrlFromNicks } from "@/lib/opgg";
+import { getDisplayNick, getOpGgMultiSearchUrlFromNicks } from "@/lib/opgg";
 import { getServerDataset } from "@/lib/server-data";
 import {
   calculateStandings,
@@ -250,7 +250,7 @@ function TeamRosterCard({ roster, multiOpGg }: TeamRosterCardProps) {
                 href={`/jogadores/${player.slug}`}
                 className="font-semibold hover:text-accent"
               >
-                {player.nick}
+                {getDisplayNick(player.nick)}
               </Link>
               <p className="mt-1 text-xs text-muted">
                 {player.role1}
@@ -282,7 +282,7 @@ function TeamRosterCard({ roster, multiOpGg }: TeamRosterCardProps) {
                       className="inline-flex items-center gap-2 font-semibold hover:text-accent"
                     >
                       <PlayerAvatar player={player} size={30} />
-                      <span>{player.nick}</span>
+                      <span>{getDisplayNick(player.nick)}</span>
                     </Link>
                   </TableCell>
                   <TableCell>{player.role1}</TableCell>

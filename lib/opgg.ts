@@ -31,6 +31,12 @@ export function parseRiotId(input: string): ParsedRiotId | null {
   return { gameName, tagLine };
 }
 
+// Nome de exibição sem a #TAG (ex.: "ctz #444" -> "ctz"). Mantém o nick cru para o op.gg.
+export function getDisplayNick(nick: string) {
+  const parsed = parseRiotId(nick);
+  return parsed ? parsed.gameName : nick.trim();
+}
+
 export function getOpGgSummonerUrlFromNick(
   nick: string,
   region = DEFAULT_OPGG_REGION,
