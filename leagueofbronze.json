@@ -44,7 +44,8 @@
     {
       "id": "lgtv-wins",
       "name": "LGTV WINS",
-      "slug": "lgtv-wins"
+      "slug": "lgtv-wins",
+      "imageUrl": "/teams/lgtv-wins.jpeg"
     }
   ],
   "players": [
@@ -274,7 +275,8 @@
       "slug": "png-gala",
       "teamId": "lgtv-wins",
       "role1": "TOP",
-      "elo": "PLAT"
+      "elo": "PLAT",
+      "imageUrl": "/players/png-gala.jpeg"
     },
     {
       "id": "vidotti-agiota",
@@ -282,7 +284,8 @@
       "slug": "vidotti-agiota",
       "teamId": "lgtv-wins",
       "role1": "JUNG",
-      "elo": "DIAM"
+      "elo": "DIAM",
+      "imageUrl": "/players/vidotti-agiota.png"
     },
     {
       "id": "maxmp",
@@ -290,7 +293,8 @@
       "slug": "maxmp",
       "teamId": "lgtv-wins",
       "role1": "SUP",
-      "elo": "ESME"
+      "elo": "ESME",
+      "imageUrl": "/players/maxmp.png"
     },
     {
       "id": "wrgamer",
@@ -298,7 +302,8 @@
       "slug": "wrgamer",
       "teamId": "lgtv-wins",
       "role1": "ADC",
-      "elo": "PLAT"
+      "elo": "PLAT",
+      "imageUrl": "/players/wrgamer.png"
     },
     {
       "id": "z0e-baiana",
@@ -306,7 +311,8 @@
       "slug": "z0e-baiana",
       "teamId": "lgtv-wins",
       "role1": "MID",
-      "elo": "PLAT"
+      "elo": "PLAT",
+      "imageUrl": "/players/z0e-baiana.jpeg"
     }
   ],
   "seriesMatches": [
