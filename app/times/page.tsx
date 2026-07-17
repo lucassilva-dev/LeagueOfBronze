@@ -36,7 +36,7 @@ function TeamCard({ team }: Readonly<{ team: DesignTeam }>) {
       >
         {team.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={team.imageUrl} alt={team.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          <img src={team.imageUrl} alt={team.name} style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "center 40%", padding: 16, boxSizing: "border-box" }} />
         ) : null}
         <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "linear-gradient(180deg,rgba(0,0,0,.28) 0%,transparent 30%,transparent 42%,rgba(13,10,5,.97) 100%)" }} />
         <div style={{ position: "absolute", top: 11, right: 11, display: "flex", alignItems: "baseline", gap: 4, padding: "5px 10px", borderRadius: 2, background: "linear-gradient(180deg,#f0c88a,#b97e40)", color: "#160f06", fontWeight: 700, boxShadow: "0 4px 14px -4px rgba(0,0,0,.6)" }}>

@@ -44,7 +44,7 @@ export default async function TeamRosterPage({ params }: TeamPageParams) {
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, zIndex: 2, background: team.color }} />
             {team.imageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={team.imageUrl} alt={team.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              <img src={team.imageUrl} alt={team.name} style={{ width: "100%", height: "100%", objectFit: "contain", padding: 14, boxSizing: "border-box" }} />
             ) : null}
           </div>
           <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 12, minWidth: 240, flex: 1 }}>

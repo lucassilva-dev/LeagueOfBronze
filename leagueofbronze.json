@@ -15,17 +15,20 @@
     {
       "id": "pantera-cor-de-goza",
       "name": "PANTERA COR DE GOZA",
-      "slug": "pantera-cor-de-goza"
+      "slug": "pantera-cor-de-goza",
+      "imageUrl": "/teams/pantera-cor-de-goza.png"
     },
     {
       "id": "vanguarda-de-ferro",
       "name": "VANGUARDA DE FERRO",
-      "slug": "vanguarda-de-ferro"
+      "slug": "vanguarda-de-ferro",
+      "imageUrl": "/teams/vanguarda-de-ferro.jpeg"
     },
     {
       "id": "presas-shurima",
       "name": "PRESAS DE SHURIMA",
-      "slug": "presas-de-shurima"
+      "slug": "presas-de-shurima",
+      "imageUrl": "/teams/presas-shurima.jpeg"
     },
     {
       "id": "time4",
@@ -35,7 +38,8 @@
     {
       "id": "capangas-motomoto",
       "name": "CAPANGAS DO MOTOMOTO",
-      "slug": "capangas-do-motomoto"
+      "slug": "capangas-do-motomoto",
+      "imageUrl": "/teams/capangas-motomoto.jpeg"
     },
     {
       "id": "lgtv-wins",
@@ -50,7 +54,8 @@
       "slug": "nak4y",
       "teamId": "pantera-cor-de-goza",
       "role1": "JUNG",
-      "elo": "MEST"
+      "elo": "MEST",
+      "imageUrl": "/players/nak4y.jpeg"
     },
     {
       "id": "tikin-d-calcinha",
@@ -58,7 +63,8 @@
       "slug": "tikin-d-calcinha",
       "teamId": "pantera-cor-de-goza",
       "role1": "MID",
-      "elo": "OURO"
+      "elo": "OURO",
+      "imageUrl": "/players/tikin-d-calcinha.jpeg"
     },
     {
       "id": "tapa-de-doido",
@@ -66,7 +72,8 @@
       "slug": "tapa-de-doido",
       "teamId": "pantera-cor-de-goza",
       "role1": "TOP",
-      "elo": "PLAT"
+      "elo": "PLAT",
+      "imageUrl": "/players/tapa-de-doido.jpeg"
     },
     {
       "id": "gar3na",
@@ -74,7 +81,8 @@
       "slug": "gar3na",
       "teamId": "pantera-cor-de-goza",
       "role1": "SUP",
-      "elo": "OURO"
+      "elo": "OURO",
+      "imageUrl": "/players/gar3na.jpeg"
     },
     {
       "id": "iranildo-gari",
@@ -82,7 +90,8 @@
       "slug": "iranildo-gari",
       "teamId": "pantera-cor-de-goza",
       "role1": "ADC",
-      "elo": "PRAT"
+      "elo": "PRAT",
+      "imageUrl": "/players/iranildo-gari.jpeg"
     },
     {
       "id": "mxxdragonxxm",
@@ -90,7 +99,8 @@
       "slug": "mxxdragonxxm",
       "teamId": "vanguarda-de-ferro",
       "role1": "JUNG",
-      "elo": "DIAM"
+      "elo": "DIAM",
+      "imageUrl": "/players/mxxdragonxxm.jpeg"
     },
     {
       "id": "satoshi",
@@ -98,7 +108,8 @@
       "slug": "satoshi",
       "teamId": "vanguarda-de-ferro",
       "role1": "MID",
-      "elo": "PLAT"
+      "elo": "PLAT",
+      "imageUrl": "/players/satoshi.jpeg"
     },
     {
       "id": "thalao",
@@ -106,7 +117,8 @@
       "slug": "thalao",
       "teamId": "vanguarda-de-ferro",
       "role1": "SUP",
-      "elo": "BRON"
+      "elo": "BRON",
+      "imageUrl": "/players/thalao.jpeg"
     },
     {
       "id": "peideicaldinho",
@@ -114,7 +126,8 @@
       "slug": "peideicaldinho",
       "teamId": "vanguarda-de-ferro",
       "role1": "TOP",
-      "elo": "ESME"
+      "elo": "ESME",
+      "imageUrl": "/players/peideicaldinho.jpeg"
     },
     {
       "id": "ctz",
@@ -122,7 +135,8 @@
       "slug": "ctz",
       "teamId": "vanguarda-de-ferro",
       "role1": "ADC",
-      "elo": "DIAM"
+      "elo": "DIAM",
+      "imageUrl": "/players/ctz.jpeg"
     },
     {
       "id": "hikolin",
@@ -130,7 +144,8 @@
       "slug": "hikolin",
       "teamId": "presas-shurima",
       "role1": "ADC",
-      "elo": "ESME"
+      "elo": "ESME",
+      "imageUrl": "/players/hikolin.jpeg"
     },
     {
       "id": "n4firida-agiota",
@@ -138,7 +153,8 @@
       "slug": "n4firida-agiota",
       "teamId": "presas-shurima",
       "role1": "MID",
-      "elo": "OURO"
+      "elo": "OURO",
+      "imageUrl": "/players/n4firida-agiota.jpeg"
     },
     {
       "id": "sr-hades",
@@ -146,7 +162,8 @@
       "slug": "sr-hades",
       "teamId": "presas-shurima",
       "role1": "ADC",
-      "elo": "OURO"
+      "elo": "OURO",
+      "imageUrl": "/players/sr-hades.jpeg"
     },
     {
       "id": "onigami",
@@ -155,7 +172,8 @@
       "teamId": "presas-shurima",
       "role1": "ADC",
       "role2": "TOP",
-      "elo": "PLAT"
+      "elo": "PLAT",
+      "imageUrl": "/players/onigami.jpeg"
     },
     {
       "id": "famoso-parrudao",
@@ -163,7 +181,8 @@
       "slug": "famoso-parrudao",
       "teamId": "presas-shurima",
       "role1": "JUNG",
-      "elo": "ESME"
+      "elo": "ESME",
+      "imageUrl": "/players/famoso-parrudao.jpeg"
     },
     {
       "id": "sabor-energetico",
@@ -211,7 +230,8 @@
       "slug": "razeral",
       "teamId": "capangas-motomoto",
       "role1": "MID",
-      "elo": "DIAM"
+      "elo": "DIAM",
+      "imageUrl": "/players/razeral.jpeg"
     },
     {
       "id": "midas",
@@ -219,7 +239,8 @@
       "slug": "midas",
       "teamId": "capangas-motomoto",
       "role1": "SUP",
-      "elo": "ESME"
+      "elo": "ESME",
+      "imageUrl": "/players/midas.png"
     },
     {
       "id": "motomoto",
@@ -227,7 +248,8 @@
       "slug": "motomoto",
       "teamId": "capangas-motomoto",
       "role1": "SUP",
-      "elo": "BRON"
+      "elo": "BRON",
+      "imageUrl": "/players/motomoto.jpeg"
     },
     {
       "id": "samuel-venancio",
@@ -235,7 +257,8 @@
       "slug": "samuel-venancio",
       "teamId": "capangas-motomoto",
       "role1": "ADC",
-      "elo": "OURO"
+      "elo": "OURO",
+      "imageUrl": "/players/samuel-venancio.jpeg"
     },
     {
       "id": "innellea",
@@ -243,7 +266,8 @@
       "slug": "innellea",
       "teamId": "capangas-motomoto",
       "role1": "TOP",
-      "elo": "ESME"
+      "elo": "ESME",
+      "imageUrl": "/players/innellea.jpeg"
     },
     {
       "id": "png-gala",
