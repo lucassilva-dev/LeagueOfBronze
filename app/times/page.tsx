@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { Eyebrow, GoldTitle, SectionTitle } from "@/components/lob/ui";
+import { Eyebrow, GoldTitle, RoleIcon, SectionTitle } from "@/components/lob/ui";
 import { buildDesignTeams, type DesignTeam } from "@/lib/roster";
 import { getServerDataset } from "@/lib/server-data";
 
@@ -55,8 +55,9 @@ function TeamCard({ team }: Readonly<{ team: DesignTeam }>) {
           {team.roster.map((player) => (
             <span
               key={player.id}
-              style={{ flex: 1, textAlign: "center", padding: "6px 0", borderRadius: 2, background: "rgba(201,138,75,.10)", borderBottom: `2px solid ${player.roleMeta.color}`, color: "#cdbfa8", fontSize: 9.5, fontWeight: 600, letterSpacing: ".03em" }}
+              style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "6px 0", borderRadius: 2, background: "rgba(201,138,75,.10)", borderBottom: `2px solid ${player.roleMeta.color}`, color: "#cdbfa8", fontSize: 9.5, fontWeight: 600, letterSpacing: ".03em" }}
             >
+              <RoleIcon role={player.role1} size={15} color={player.roleMeta.color} />
               {player.roleMeta.short}
             </span>
           ))}

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { EloCrest } from "@/components/lob/ui";
+import { EloCrest, RoleIcon } from "@/components/lob/ui";
 import { formatKda } from "@/lib/format";
 import { getOpGgSummonerUrlFromNick } from "@/lib/opgg";
 import { buildDesignPlayers } from "@/lib/roster";
@@ -46,7 +46,7 @@ export default async function PlayerFichaPage({ params }: PlayerPageParams) {
         <div style={{ display: "flex", flexWrap: "wrap" }}>
           <div style={{ position: "relative", flex: "1 1 300px", minWidth: 260, minHeight: 380, background: "#0d0a05" }}>
             <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "radial-gradient(120% 80% at 50% 0%,rgba(201,138,75,.16),transparent 62%)" }}>
-              <span className="lob-display" style={{ fontSize: 150, color: "rgba(201,138,75,.09)" }}>{player.roleMeta.short}</span>
+              <RoleIcon role={player.role1} size={188} color="#c98a4b" opacity={0.09} />
             </div>
             {player.imageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element

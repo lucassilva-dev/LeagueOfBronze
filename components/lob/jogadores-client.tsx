@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { PlayerCard } from "@/components/lob/player-card";
-import { EloCrest } from "@/components/lob/ui";
+import { EloCrest, RoleIcon } from "@/components/lob/ui";
 import type { DesignPlayer } from "@/lib/roster";
 
 const ROLE_ORDER = ["TOP", "SEL", "MID", "ADC", "SUP"];
@@ -50,7 +50,7 @@ function PlayerModal({ player, onClose }: Readonly<{ player: DesignPlayer; onClo
         <div style={{ display: "flex", flexWrap: "wrap" }}>
           <div style={{ position: "relative", flex: "1 1 300px", minWidth: 260, minHeight: 360, background: "#0d0a05" }}>
             <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "radial-gradient(120% 80% at 50% 0%,rgba(201,138,75,.16),transparent 62%)" }}>
-              <span className="lob-display" style={{ fontSize: 150, color: "rgba(201,138,75,.09)" }}>{player.roleMeta.short}</span>
+              <RoleIcon role={player.role1} size={188} color="#c98a4b" opacity={0.09} />
             </div>
             {player.imageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -136,7 +136,7 @@ export function JogadoresClient({ players }: Readonly<{ players: DesignPlayer[] 
         <section key={section.short} className="lob-fade">
           <div style={{ display: "flex", alignItems: "center", gap: 16, margin: "36px 0 16px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <span style={{ width: 12, height: 12, background: section.color, transform: "rotate(45deg)" }} />
+              <RoleIcon role={section.players[0].role1} size={26} color={section.color} />
               <h2 className="lob-display" style={{ fontSize: 27, color: "#f2ebdf", margin: 0 }}>{section.label}</h2>
             </div>
             <div style={{ height: 1, flex: 1, background: "linear-gradient(90deg,rgba(201,138,75,.4),transparent)" }} />

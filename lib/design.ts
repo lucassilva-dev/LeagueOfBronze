@@ -12,14 +12,14 @@ function normalizeKey(value: string) {
 }
 
 // ---------- ROTAS ----------
-export type RoleMeta = { label: string; short: string; color: string; order: number };
+export type RoleMeta = { label: string; short: string; color: string; order: number; icon?: string };
 
 const ROLE_TABLE: Record<string, RoleMeta> = {
-  TOP: { label: "Topo", short: "TOP", color: "#e0894a", order: 1 },
-  JUNG: { label: "Selva", short: "SEL", color: "#5fbf6a", order: 2 },
-  MID: { label: "Meio", short: "MID", color: "#5aa2ff", order: 3 },
-  ADC: { label: "Atirador", short: "ADC", color: "#e85c6a", order: 4 },
-  SUP: { label: "Suporte", short: "SUP", color: "#c79be0", order: 5 },
+  TOP: { label: "Topo", short: "TOP", color: "#e0894a", order: 1, icon: "top" },
+  JUNG: { label: "Selva", short: "SEL", color: "#5fbf6a", order: 2, icon: "jg" },
+  MID: { label: "Meio", short: "MID", color: "#5aa2ff", order: 3, icon: "mid" },
+  ADC: { label: "Atirador", short: "ADC", color: "#e85c6a", order: 4, icon: "adc" },
+  SUP: { label: "Suporte", short: "SUP", color: "#c79be0", order: 5, icon: "suporte" },
 };
 
 const ROLE_ALIASES: Record<string, keyof typeof ROLE_TABLE> = {
@@ -113,6 +113,12 @@ export function resolveElo(elo?: string | null): EloMeta | null {
 
 export function eloSvgUrl(key: string) {
   return `/elo/${key}.png`;
+}
+
+// Ícone oficial de posição (PNG branco com transparência em /public/roles).
+// Usado como máscara CSS para tingir na cor do tema/rota.
+export function roleIconUrl(meta: RoleMeta): string | null {
+  return meta.icon ? `/roles/${meta.icon}.png` : null;
 }
 
 export const ELO_ORDER: EloMeta[] = [

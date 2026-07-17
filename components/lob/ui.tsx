@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 
-import { eloSvgUrl, resolveElo, resolveRole } from "@/lib/design";
+import { eloSvgUrl, resolveElo, resolveRole, roleIconUrl } from "@/lib/design";
 
 // Rótulo pequeno com traço (eyebrow) usado no topo das seções/heros.
 export function Eyebrow({ children }: Readonly<{ children: ReactNode }>) {
@@ -81,12 +81,48 @@ export function EloCrest({
   );
 }
 
-// Etiqueta de rota (badge colorido).
+// Ícone oficial de posição, tingível (via máscara CSS) — /public/roles.
+export function RoleIcon({
+  role,
+  size = 14,
+  color = "#120d06",
+  opacity = 1,
+}: Readonly<{ role?: string | null; size?: number; color?: string; opacity?: number }>) {
+  const meta = resolveRole(role);
+  const url = roleIconUrl(meta);
+  if (!url) return null;
+  return (
+    <span
+      aria-hidden
+      style={{
+        display: "inline-block",
+        width: size,
+        height: size,
+        flexShrink: 0,
+        background: color,
+        opacity,
+        WebkitMaskImage: `url(${url})`,
+        maskImage: `url(${url})`,
+        WebkitMaskRepeat: "no-repeat",
+        maskRepeat: "no-repeat",
+        WebkitMaskPosition: "center",
+        maskPosition: "center",
+        WebkitMaskSize: "contain",
+        maskSize: "contain",
+      }}
+    />
+  );
+}
+
+// Etiqueta de rota (badge colorido) com ícone oficial da posição.
 export function RoleTag({ role, size = 10.5 }: Readonly<{ role?: string | null; size?: number }>) {
   const rm = resolveRole(role);
   return (
     <span
       style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
         padding: "4px 9px",
         borderRadius: 2,
         background: rm.color,
@@ -96,6 +132,7 @@ export function RoleTag({ role, size = 10.5 }: Readonly<{ role?: string | null; 
         letterSpacing: ".08em",
       }}
     >
+      <RoleIcon role={role} size={size + 3} color="#120d06" opacity={0.82} />
       {rm.short}
     </span>
   );

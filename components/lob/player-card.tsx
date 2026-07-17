@@ -1,13 +1,13 @@
 import Link from "next/link";
 
-import { EloCrest, RoleTag } from "@/components/lob/ui";
+import { EloCrest, RoleIcon, RoleTag } from "@/components/lob/ui";
 import type { DesignPlayer } from "@/lib/roster";
 
 function PhotoArea({ player }: Readonly<{ player: DesignPlayer }>) {
   return (
     <div style={{ position: "relative", width: "100%", aspectRatio: "4 / 5", background: "linear-gradient(160deg,#2a2015,#140e07)" }}>
       <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <span className="lob-display" style={{ fontSize: 76, color: "rgba(201,138,75,.12)" }}>{player.roleMeta.short}</span>
+        <RoleIcon role={player.role1} size={104} color="#c98a4b" opacity={0.14} />
       </div>
       {player.imageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
