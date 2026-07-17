@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { Eyebrow, GoldTitle } from "@/components/lob/ui";
+import { Eyebrow, GoldTitle, TeamMark } from "@/components/lob/ui";
 import { teamColor } from "@/lib/design";
 import { buildDesignTeams } from "@/lib/roster";
 import { getServerDataset } from "@/lib/server-data";
@@ -56,14 +56,7 @@ export default async function TabelaPage() {
               >
                 <span className="lob-display" style={{ color: row.position <= 2 ? "#cfa877" : "#6f6656", fontSize: 16 }}>{row.position}</span>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                  <span style={{ width: 30, height: 30, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    {team?.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={team.imageUrl} alt={row.teamName} style={{ width: 30, height: 30, objectFit: "contain", borderRadius: 4 }} />
-                    ) : (
-                      <span style={{ width: 11, height: 11, transform: "rotate(45deg)", background: color }} />
-                    )}
-                  </span>
+                  <TeamMark imageUrl={team?.imageUrl} color={color} name={row.teamName} size={30} diamond={11} />
                   <div style={{ color: "#f0e9dd", fontWeight: 600, letterSpacing: ".02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.teamName}</div>
                 </div>
                 <span style={{ textAlign: "center", color: "#8f8472" }}>{row.seriesPlayed}</span>

@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { Eyebrow, GoldTitle, Pill, TeamDot } from "@/components/lob/ui";
+import { Eyebrow, GoldTitle, Pill, TeamMark } from "@/components/lob/ui";
 import { buildCalendarDays } from "@/lib/calendar";
 import { getServerDataset } from "@/lib/server-data";
 
@@ -45,7 +45,7 @@ export default async function CalendarioPage() {
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 10 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                    <TeamDot color={game.teamA.color} size={10} />
+                    <TeamMark imageUrl={game.teamA.imageUrl} color={game.teamA.color} name={game.teamA.name} size={24} />
                     <span style={{ fontWeight: 600, fontSize: 13.5, color: "#e9dfcd", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{game.teamA.name}</span>
                   </div>
                   <div style={{ textAlign: "center" }}>
@@ -54,7 +54,7 @@ export default async function CalendarioPage() {
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, justifyContent: "flex-end" }}>
                     <span style={{ fontWeight: 600, fontSize: 13.5, color: "#e9dfcd", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "right" }}>{game.teamB.name}</span>
-                    <TeamDot color={game.teamB.color} size={10} />
+                    <TeamMark imageUrl={game.teamB.imageUrl} color={game.teamB.color} name={game.teamB.name} size={24} />
                   </div>
                 </div>
               </Link>

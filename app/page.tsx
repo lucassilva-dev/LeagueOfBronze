@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { Eyebrow, GoldTitle, Pill, SectionTitle, TeamDot } from "@/components/lob/ui";
+import { Eyebrow, GoldTitle, Pill, SectionTitle, TeamMark } from "@/components/lob/ui";
 import { buildCalendarDays } from "@/lib/calendar";
 import { buildDesignPlayers } from "@/lib/roster";
 import { getServerDataset } from "@/lib/server-data";
@@ -174,13 +174,13 @@ export default async function InicioPage() {
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 10 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                    <TeamDot color={game.teamA.color} />
+                    <TeamMark imageUrl={game.teamA.imageUrl} color={game.teamA.color} name={game.teamA.name} size={24} />
                     <span style={{ fontWeight: 600, fontSize: 13, color: "#e9dfcd", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{game.teamA.name}</span>
                   </div>
                   <span className="lob-display" style={{ fontSize: 14, color: "#6f6656" }}>MD3</span>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end", minWidth: 0 }}>
                     <span style={{ fontWeight: 600, fontSize: 13, color: "#e9dfcd", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "right" }}>{game.teamB.name}</span>
-                    <TeamDot color={game.teamB.color} />
+                    <TeamMark imageUrl={game.teamB.imageUrl} color={game.teamB.color} name={game.teamB.name} size={24} />
                   </div>
                 </div>
               </Link>

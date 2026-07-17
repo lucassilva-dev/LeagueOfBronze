@@ -168,3 +168,27 @@ export function TeamDot({ color, size = 9 }: Readonly<{ color: string; size?: nu
     />
   );
 }
+
+// Marcador do time: logo (avatar) se houver imageUrl, senão o losango colorido.
+// Slot de tamanho fixo (`size`) para os nomes ao lado ficarem alinhados.
+export function TeamMark({
+  imageUrl,
+  color,
+  name,
+  size = 24,
+  diamond,
+}: Readonly<{ imageUrl?: string | null; color: string; name?: string; size?: number; diamond?: number }>) {
+  const dSize = diamond ?? Math.round(size * 0.42);
+  return (
+    <span
+      style={{ width: size, height: size, flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+    >
+      {imageUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={imageUrl} alt={name ?? ""} style={{ width: size, height: size, objectFit: "contain", borderRadius: 4 }} />
+      ) : (
+        <span style={{ width: dSize, height: dSize, transform: "rotate(45deg)", background: color, flexShrink: 0 }} />
+      )}
+    </span>
+  );
+}

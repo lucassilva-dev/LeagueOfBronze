@@ -1,7 +1,7 @@
 import type { TournamentDataset } from "@/lib/schema";
 import { teamColor } from "@/lib/design";
 
-export type CalTeamRef = { id: string; name: string; color: string };
+export type CalTeamRef = { id: string; name: string; color: string; imageUrl?: string };
 export type CalGame = {
   id: string;
   n: number;
@@ -50,8 +50,8 @@ export function buildRegularGames(dataset: TournamentDataset): CalGame[] {
         dateLabel: parts.dateLabel,
         turno: parts.turno,
         hora: parts.hora,
-        teamA: { id: series.teamAId, name: teamA?.name ?? series.teamAId, color: teamColor(series.teamAId) },
-        teamB: { id: series.teamBId, name: teamB?.name ?? series.teamBId, color: teamColor(series.teamBId) },
+        teamA: { id: series.teamAId, name: teamA?.name ?? series.teamAId, color: teamColor(series.teamAId), imageUrl: teamA?.imageUrl },
+        teamB: { id: series.teamBId, name: teamB?.name ?? series.teamBId, color: teamColor(series.teamBId), imageUrl: teamB?.imageUrl },
         stage: series.stage ?? "REGULAR_SEASON",
       };
     });
