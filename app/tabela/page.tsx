@@ -19,7 +19,7 @@ const INFO = [
 export default async function TabelaPage() {
   const { dataset } = await getServerDataset();
   const standings = calculateStandings(dataset).rows;
-  const totalsById = new Map(buildDesignTeams(dataset).map((team) => [team.id, team.total]));
+  const teamsById = new Map(buildDesignTeams(dataset).map((team) => [team.id, team]));
 
   return (
     <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "0 clamp(16px,4vw,24px) 96px" }}>
@@ -45,7 +45,10 @@ export default async function TabelaPage() {
               <span style={{ textAlign: "center" }}>PTS</span>
               <span style={{ textAlign: "center" }}>ELENCO</span>
             </div>
-            {standings.map((row) => (
+            {standings.map((row) => {
+              const team = teamsById.get(row.teamId);
+              const color = team?.color ?? teamColor(row.teamId);
+              return (
               <Link
                 key={row.teamId}
                 href={`/times/${row.teamSlug}`}
@@ -53,7 +56,14 @@ export default async function TabelaPage() {
               >
                 <span className="lob-display" style={{ color: row.position <= 2 ? "#cfa877" : "#6f6656", fontSize: 16 }}>{row.position}</span>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                  <span style={{ width: 11, height: 11, transform: "rotate(45deg)", flexShrink: 0, background: teamColor(row.teamId) }} />
+                  <span style={{ width: 30, height: 30, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {team?.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={team.imageUrl} alt={row.teamName} style={{ width: 30, height: 30, objectFit: "contain", borderRadius: 4 }} />
+                    ) : (
+                      <span style={{ width: 11, height: 11, transform: "rotate(45deg)", background: color }} />
+                    )}
+                  </span>
                   <div style={{ color: "#f0e9dd", fontWeight: 600, letterSpacing: ".02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.teamName}</div>
                 </div>
                 <span style={{ textAlign: "center", color: "#8f8472" }}>{row.seriesPlayed}</span>
@@ -61,9 +71,10 @@ export default async function TabelaPage() {
                 <span style={{ textAlign: "center", color: "#8f8472" }}>{row.seriesLost}</span>
                 <span style={{ textAlign: "center", color: "#8f8472" }}>{row.gameDiff > 0 ? `+${row.gameDiff}` : row.gameDiff}</span>
                 <span style={{ textAlign: "center", color: "#f0e9dd", fontWeight: 700 }}>{row.points}</span>
-                <span className="lob-display" style={{ textAlign: "center", color: "#cfa877" }}>{totalsById.get(row.teamId) ?? 0}</span>
+                <span className="lob-display" style={{ textAlign: "center", color: "#cfa877" }}>{team?.total ?? 0}</span>
               </Link>
-            ))}
+              );
+            })}
           </div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: 12, marginTop: 16 }}>
