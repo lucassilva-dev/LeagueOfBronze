@@ -33,7 +33,8 @@
     {
       "id": "time4",
       "name": "Shadows V",
-      "slug": "time-4"
+      "slug": "time-4",
+      "imageUrl": "/teams/time4.png"
     },
     {
       "id": "capangas-motomoto",
@@ -190,7 +191,8 @@
       "slug": "sabor-energetico",
       "teamId": "time4",
       "role1": "MID",
-      "elo": "PRAT"
+      "elo": "PRAT",
+      "imageUrl": "/players/sabor-energetico.jpeg"
     },
     {
       "id": "top-lane-666",
@@ -198,7 +200,8 @@
       "slug": "top-lane-666",
       "teamId": "time4",
       "role1": "TOP",
-      "elo": "PLAT"
+      "elo": "PLAT",
+      "imageUrl": "/players/top-lane-666.jpeg"
     },
     {
       "id": "malasartes",
@@ -206,7 +209,8 @@
       "slug": "malasartes",
       "teamId": "time4",
       "role1": "JUNG",
-      "elo": "BRON"
+      "elo": "BRON",
+      "imageUrl": "/players/malasartes.jpeg"
     },
     {
       "id": "sou-adc-nao-deus",
@@ -214,7 +218,8 @@
       "slug": "sou-adc-nao-deus",
       "teamId": "time4",
       "role1": "ADC",
-      "elo": "ESME"
+      "elo": "ESME",
+      "imageUrl": "/players/sou-adc-nao-deus.jpeg"
     },
     {
       "id": "miva",
@@ -222,7 +227,8 @@
       "slug": "miva",
       "teamId": "time4",
       "role1": "SUP",
-      "elo": "PLAT"
+      "elo": "PLAT",
+      "imageUrl": "/players/miva.jpeg"
     },
     {
       "id": "razeral",
