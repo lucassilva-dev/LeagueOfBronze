@@ -8,17 +8,27 @@
    Valores em HSL triplet para manter hsl(var(--x) / <alpha>).
    ============================================================ */
 :root {
-  --bg: 15 12% 6%;         /* #120C0A  carvão quente        */
-  --panel: 22 22% 9%;      /* #1B120E  superfície            */
-  --panel-2: 20 20% 12%;   /* #241812  inset / input         */
-  --text: 33 55% 94%;      /* #F8F0E7  creme (texto)         */
-  --muted: 27 15% 62%;     /* #AD9A8B  taupe (secundário)    */
-  --border: 25 15% 20%;    /* hairline                        */
-  --accent: 18 100% 58%;   /* #FF6A2B  EMBER (ação/dados)    */
-  --accent-2: 32 52% 53%;  /* #C88A45  BRONZE (honra/campeão)*/
-  --lime: 76 100% 62%;     /* #CBFF3E  AO VIVO / alerta      */
-  --success: 152 72% 63%;  /* #5BE59A  vitória               */
-  --danger: 0 100% 71%;    /* #FF6B6B  derrota               */
+  /* Paleta "esports Bronze Hextech" — tokens legados remapeados (HSL). */
+  --bg: 36 39% 5%;         /* #100d07 */
+  --panel: 35 27% 9%;      /* #1c1710 */
+  --panel-2: 34 33% 10%;   /* #221b11 */
+  --text: 37 45% 92%;      /* #f3ece0 */
+  --muted: 38 18% 60%;     /* #a99e8b */
+  --border: 33 42% 15%;    /* bronze hairline */
+  --accent: 30 53% 54%;    /* #c98a4b bronze/ouro */
+  --accent-2: 31 49% 49%;  /* #b97e40 */
+  --lime: 173 63% 59%;     /* #57d8cb teal */
+  --success: 152 72% 63%;
+  --danger: 0 100% 71%;
+  /* Paleta hex direta do design */
+  --lob-bg: #100d07;
+  --lob-line: rgba(201, 138, 75, 0.22);
+  --lob-gold-1: #f0c88a;
+  --lob-gold-2: #b97e40;
+  --lob-bronze: #c98a4b;
+  --lob-teal: #57d8cb;
+  --lob-text: #f3ece0;
+  --lob-muted: #a99e8b;
   color-scheme: dark;
 }
 
@@ -28,13 +38,26 @@ body {
 }
 
 body {
-  @apply bg-bg text-text antialiased;
-  font-family: var(--font-body), system-ui, sans-serif;
-  background-image:
-    radial-gradient(120% 70% at 50% -8%, rgba(255, 106, 43, 0.12), transparent 46%),
-    radial-gradient(80% 50% at 90% 6%, rgba(203, 255, 62, 0.045), transparent 50%),
-    linear-gradient(180deg, #16100d, #0e0906);
-  background-attachment: fixed;
+  @apply antialiased;
+  background: var(--lob-bg);
+  color: #b8ab97;
+  font-family: var(--font-body), "Chakra Petch", system-ui, sans-serif;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+a {
+  color: #57d8cb;
+  text-decoration: none;
+}
+a:hover {
+  color: #8fe9df;
+}
+::selection {
+  background: rgba(232, 184, 120, 0.3);
+  color: #fff;
 }
 
 * {
@@ -176,4 +199,152 @@ body {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ============================================================
+   Design "esports Bronze Hextech" — utilitárias novas
+   ============================================================ */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes lobGlow {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+.lob-fade {
+  animation: fadeUp 0.6s both;
+}
+
+.gold-text {
+  background: linear-gradient(180deg, #f6d6a2, #dc9f57 46%, #a5692f);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+.lob-h1 {
+  font-family: var(--font-display), "Anton", sans-serif;
+  line-height: 0.9;
+  padding-bottom: 0.06em;
+  letter-spacing: 0.005em;
+  margin: 0;
+}
+.lob-display {
+  font-family: var(--font-display), "Anton", sans-serif;
+  letter-spacing: 0.02em;
+}
+
+/* Cartão base do novo design (sobrescreve o antigo) */
+.lob-card {
+  border: 1px solid rgba(201, 138, 75, 0.22);
+  background: linear-gradient(180deg, #221b11, #120e08);
+  border-radius: 4px;
+}
+.lob-card-2 {
+  border: 1px solid rgba(201, 138, 75, 0.2);
+  background: linear-gradient(180deg, #1c1710, #130f08);
+  border-radius: 3px;
+}
+.lob-lift {
+  transition:
+    transform 0.28s cubic-bezier(0.2, 0.7, 0.2, 1),
+    box-shadow 0.28s ease,
+    border-color 0.28s ease;
+}
+.lob-lift:hover {
+  transform: translateY(-6px);
+  box-shadow:
+    0 24px 46px -22px rgba(0, 0, 0, 0.88),
+    0 0 24px -6px rgba(232, 184, 120, 0.4);
+  border-color: rgba(232, 184, 120, 0.6);
+}
+.lob-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 13px;
+  background: rgba(201, 138, 75, 0.07);
+  border: 1px solid rgba(201, 138, 75, 0.22);
+  border-radius: 2px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: #cdbfa8;
+}
+.lob-mark {
+  width: 6px;
+  height: 6px;
+  transform: rotate(45deg);
+  background: #d79a55;
+  flex-shrink: 0;
+}
+.lob-diamond {
+  width: 12px;
+  height: 12px;
+  transform: rotate(45deg);
+  background: #c98a4b;
+  flex-shrink: 0;
+}
+.lob-btn-gold {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(180deg, #f0c88a, #b97e40);
+  color: #160f06;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  border: none;
+  border-radius: 2px;
+  cursor: pointer;
+  box-shadow: 0 12px 30px -12px rgba(232, 184, 120, 0.6);
+  transition:
+    filter 0.2s ease,
+    transform 0.2s ease;
+}
+.lob-btn-gold:hover {
+  filter: brightness(1.05);
+}
+.lob-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(201, 138, 75, 0.08);
+  border: 1px solid rgba(201, 138, 75, 0.4);
+  color: #e6c592;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  border-radius: 2px;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+.lob-btn-ghost:hover {
+  border-color: rgba(232, 184, 120, 0.6);
+  color: #f0d9ac;
+}
+.lob-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(201, 138, 75, 0.28) transparent;
+}
+.lob-scroll::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+.lob-scroll::-webkit-scrollbar-thumb {
+  background: rgba(201, 138, 75, 0.28);
+  border-radius: 999px;
 }

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Anton, Space_Grotesk, Sora } from "next/font/google";
+import { Anton, Chakra_Petch } from "next/font/google";
 
 import { SiteFrame } from "@/components/site-frame";
 
@@ -11,21 +11,16 @@ const display = Anton({
   variable: "--font-display",
 });
 
-const heading = Space_Grotesk({
+const body = Chakra_Petch({
   subsets: ["latin"],
-  weight: ["500", "600", "700"],
-  variable: "--font-heading",
-});
-
-const body = Sora({
-  subsets: ["latin"],
-  weight: ["400", "600", "700"],
+  weight: ["400", "500", "600", "700"],
   variable: "--font-body",
 });
 
 export const metadata: Metadata = {
-  title: "League of Bronze",
-  description: "Acompanhamento de campeonato amador de League of Legends com séries MD3 e MD5",
+  title: "Os Bronzes · 3ª Edição",
+  description:
+    "3ª Edição dos Bronzes — campeonato amador de League of Legends. Times, jogadores, calendário, tabela e estatísticas.",
 };
 
 export default function RootLayout({
@@ -35,7 +30,7 @@ export default function RootLayout({
     <html lang="pt-BR" suppressHydrationWarning>
       <body
         suppressHydrationWarning
-        className={`${display.variable} ${heading.variable} ${body.variable}`}
+        className={`${display.variable} ${body.variable}`}
       >
         <SiteFrame>{children}</SiteFrame>
       </body>

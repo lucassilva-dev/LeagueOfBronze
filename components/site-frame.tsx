@@ -1,46 +1,123 @@
-import Image from "next/image";
 import Link from "next/link";
 
 import { MainNav } from "@/components/main-nav";
-import { StarsCanvas } from "@/components/stars-canvas";
 
 type SiteFrameProps = Readonly<{ children: React.ReactNode }>;
 
+const NOISE =
+  "url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22140%22 height=%22140%22%3E%3Cfilter id=%22n%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.85%22 numOctaves=%222%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23n)%22/%3E%3C/svg%3E')";
+
 export function SiteFrame({ children }: SiteFrameProps) {
   return (
-    <div className="relative min-h-screen overflow-x-clip">
-      <StarsCanvas />
-      <div className="pointer-events-none fixed inset-0 -z-10 bg-grid opacity-20" />
+    <div style={{ position: "relative", minHeight: "100vh", color: "#b8ab97", overflowX: "hidden" }}>
+      {/* Camada de glows bronze + teal + listras diagonais */}
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 0,
+          pointerEvents: "none",
+          backgroundColor: "#100d07",
+          backgroundImage:
+            "radial-gradient(1100px 640px at 8% -8%,rgba(201,138,75,.20),transparent 62%),radial-gradient(920px 720px at 108% 114%,rgba(70,214,200,.07),transparent 55%),repeating-linear-gradient(135deg,rgba(201,138,75,.035) 0 2px,transparent 2px 26px)",
+        }}
+      />
+      {/* Ruído fininho */}
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 0,
+          pointerEvents: "none",
+          opacity: 0.05,
+          mixBlendMode: "overlay",
+          backgroundImage: NOISE,
+        }}
+      />
 
-      <header className="sticky top-0 z-30 border-b border-white/5 bg-bg/70 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1160px] flex-col gap-3 px-4 py-3 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between gap-3">
-            <Link href="/" className="group inline-flex items-center gap-3">
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-accent/30 bg-accent/10 shadow-glow">
-                <Image
-                  src="/lol-icon.svg"
-                  alt="Ícone do campeonato"
-                  width={24}
-                  height={24}
-                  className="h-6 w-6"
-                  priority
-                />
-              </span>
-              <div>
-                <p className="font-heading text-sm font-bold tracking-[0.14em] text-text">
-                  LEAGUE OF BRONZE
-                </p>
-                <p className="text-[11px] uppercase tracking-[0.22em] text-muted">
-                  Campeonato amador
-                </p>
+      <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+        <header
+          style={{
+            position: "sticky",
+            top: 0,
+            zIndex: 40,
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+            background: "linear-gradient(180deg,rgba(16,13,7,.95),rgba(16,13,7,.80))",
+            borderBottom: "1px solid rgba(201,138,75,.22)",
+          }}
+        >
+          <div
+            style={{
+              maxWidth: 1280,
+              margin: "0 auto",
+              padding: "12px clamp(16px,4vw,24px)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 16,
+            }}
+          >
+            <Link
+              href="/"
+              style={{ display: "flex", alignItems: "center", gap: 12, textDecoration: "none" }}
+            >
+              <div
+                style={{
+                  width: 32,
+                  height: 32,
+                  transform: "rotate(45deg)",
+                  background: "linear-gradient(135deg,#f0c88a,#a46a34)",
+                  borderRadius: 5,
+                  boxShadow: "0 0 20px -4px rgba(232,184,120,.65)",
+                  flexShrink: 0,
+                }}
+              />
+              <div style={{ display: "flex", flexDirection: "column", lineHeight: 1 }}>
+                <span
+                  className="lob-display"
+                  style={{ fontSize: 16, letterSpacing: ".05em", color: "#f3ece0" }}
+                >
+                  OS BRONZES
+                </span>
+                <span style={{ fontSize: 9, letterSpacing: ".34em", color: "#a98a5f", marginTop: 4 }}>
+                  3ª EDIÇÃO
+                </span>
               </div>
             </Link>
+            <MainNav />
           </div>
-          <MainNav />
-        </div>
-      </header>
+          <div
+            style={{
+              height: 1,
+              background: "linear-gradient(90deg,transparent,rgba(232,184,120,.35),transparent)",
+            }}
+          />
+        </header>
 
-      {children}
+        <div style={{ flex: 1 }}>{children}</div>
+
+        <footer style={{ position: "relative", borderTop: "1px solid rgba(201,138,75,.16)" }}>
+          <div
+            style={{
+              maxWidth: 1280,
+              margin: "0 auto",
+              padding: "22px clamp(16px,4vw,24px)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 16,
+              flexWrap: "wrap",
+              fontSize: 11,
+              letterSpacing: ".10em",
+              color: "#6f6656",
+            }}
+          >
+            <span>OS BRONZES · 3ª EDIÇÃO · 2026</span>
+            <span>MECÂNICA DUVIDOSA · ENTRETENIMENTO IMACULADO</span>
+          </div>
+        </footer>
+      </div>
     </div>
   );
 }

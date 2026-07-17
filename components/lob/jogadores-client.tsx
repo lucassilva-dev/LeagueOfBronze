@@ -1,50 +1,54 @@
-import Link from "next/link";
-import { notFound } from "next/navigation";
+"use client";
 
+import { useEffect, useState } from "react";
+
+import { PlayerCard } from "@/components/lob/player-card";
 import { EloCrest } from "@/components/lob/ui";
-import { formatKda } from "@/lib/format";
-import { getOpGgSummonerUrlFromNick } from "@/lib/opgg";
-import { buildDesignPlayers } from "@/lib/roster";
-import { getServerDataset } from "@/lib/server-data";
-import { calculatePlayerAggregates } from "@/lib/tournament";
+import type { DesignPlayer } from "@/lib/roster";
 
-export const dynamic = "force-dynamic";
+const ROLE_ORDER = ["TOP", "SEL", "MID", "ADC", "SUP"];
 
-type PlayerPageParams = Readonly<{ params: Promise<{ slug: string }> }>;
+const PERF_TILES = [
+  { label: "PARTIDAS", val: "0" },
+  { label: "VITÓRIAS", val: "0" },
+  { label: "ABATES", val: "—" },
+  { label: "MORTES", val: "—" },
+  { label: "ASSIST.", val: "—" },
+  { label: "KDA", val: "—" },
+  { label: "MVPs", val: "0" },
+  { label: "WINRATE", val: "—" },
+];
 
-export default async function PlayerFichaPage({ params }: PlayerPageParams) {
-  const { slug } = await params;
-  const { dataset } = await getServerDataset();
-  const player = buildDesignPlayers(dataset).find((p) => p.slug === slug);
-
-  if (!player) {
-    notFound();
-  }
-
-  const aggregate = calculatePlayerAggregates(dataset).find((a) => a.playerId === player.id);
-  const games = aggregate?.gamesPlayed ?? 0;
-  const dash = (value: string) => (games > 0 ? value : "—");
-  const tiles = [
-    { label: "PARTIDAS", val: String(games) },
-    { label: "VITÓRIAS", val: "—" },
-    { label: "ABATES", val: dash(String(aggregate?.kills ?? 0)) },
-    { label: "MORTES", val: dash(String(aggregate?.deaths ?? 0)) },
-    { label: "ASSIST.", val: dash(String(aggregate?.assists ?? 0)) },
-    { label: "KDA", val: dash(formatKda(aggregate?.kda ?? 0)) },
-    { label: "MVPs", val: String(aggregate?.gameMvps ?? 0) },
-    { label: "WINRATE", val: "—" },
-  ];
-  const opggUrl = getOpGgSummonerUrlFromNick(player.nick);
+function PlayerModal({ player, onClose }: Readonly<{ player: DesignPlayer; onClose: () => void }>) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   return (
-    <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "44px clamp(16px,4vw,24px) 96px" }}>
-      <Link href={`/times/${player.teamSlug}`} className="lob-btn-ghost" style={{ padding: "9px 16px", fontSize: 11.5, letterSpacing: ".12em", marginBottom: 26 }}>
-        ← VOLTAR AO ELENCO
-      </Link>
-      <div className="lob-fade" style={{ marginTop: 20, position: "relative", background: "linear-gradient(180deg,#1d1710,#0d0a05)", border: "1px solid rgba(232,184,120,.4)", borderRadius: 8, overflow: "hidden", boxShadow: "0 44px 100px -30px rgba(0,0,0,.6)" }}>
-        <div style={{ height: 4, background: `linear-gradient(90deg,${player.teamColor},transparent)` }} />
+    <div
+      onClick={onClose}
+      style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, background: "rgba(6,4,2,.82)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", animation: "fadeUp .22s both" }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="lob-scroll"
+        style={{ position: "relative", width: "min(860px,100%)", maxHeight: "92vh", overflow: "auto", background: "linear-gradient(180deg,#1d1710,#0d0a05)", border: "1px solid rgba(232,184,120,.4)", borderRadius: 8, boxShadow: "0 44px 100px -30px rgba(0,0,0,.95)" }}
+      >
+        <div style={{ height: 4, background: `linear-gradient(90deg,${player.teamColor},transparent)`, position: "sticky", top: 0, zIndex: 5 }} />
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Fechar"
+          style={{ position: "absolute", top: 16, right: 16, zIndex: 6, width: 36, height: 36, borderRadius: "50%", background: "rgba(10,8,4,.75)", border: "1px solid rgba(201,138,75,.4)", color: "#e6c592", fontSize: 15, cursor: "pointer", lineHeight: 1 }}
+        >
+          ✕
+        </button>
         <div style={{ display: "flex", flexWrap: "wrap" }}>
-          <div style={{ position: "relative", flex: "1 1 300px", minWidth: 260, minHeight: 380, background: "#0d0a05" }}>
+          <div style={{ position: "relative", flex: "1 1 300px", minWidth: 260, minHeight: 360, background: "#0d0a05" }}>
             <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "radial-gradient(120% 80% at 50% 0%,rgba(201,138,75,.16),transparent 62%)" }}>
               <span className="lob-display" style={{ fontSize: 150, color: "rgba(201,138,75,.09)" }}>{player.roleMeta.short}</span>
             </div>
@@ -87,16 +91,13 @@ export default async function PlayerFichaPage({ params }: PlayerPageParams) {
                 <span className="lob-display" style={{ fontSize: 16 }}>{player.pts}</span>
                 <span style={{ fontSize: 9, letterSpacing: ".08em" }}>PTS DRAFT</span>
               </span>
-              {opggUrl ? (
-                <Link href={opggUrl} target="_blank" rel="noreferrer" className="lob-pill" style={{ fontSize: 11.5, color: "#e6c592" }}>OP.GG →</Link>
-              ) : null}
             </div>
             <div style={{ marginTop: 22, display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ fontSize: 11, letterSpacing: ".14em", color: "#c98a4b", whiteSpace: "nowrap" }}>PERFORMANCE NO CAMPEONATO</span>
               <div style={{ height: 1, flex: 1, background: "linear-gradient(90deg,rgba(201,138,75,.3),transparent)" }} />
             </div>
             <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
-              {tiles.map((tile) => (
+              {PERF_TILES.map((tile) => (
                 <div key={tile.label} style={{ padding: "13px 6px", textAlign: "center", background: "linear-gradient(180deg,rgba(201,138,75,.08),rgba(201,138,75,.02))", border: "1px solid rgba(201,138,75,.16)", borderRadius: 3 }}>
                   <div className="lob-display" style={{ fontSize: 23, color: "#e6c592", lineHeight: 1 }}>{tile.val}</div>
                   <div style={{ fontSize: 8, letterSpacing: ".04em", color: "#8f8472", marginTop: 5 }}>{tile.label}</div>
@@ -111,5 +112,44 @@ export default async function PlayerFichaPage({ params }: PlayerPageParams) {
         </div>
       </div>
     </div>
+  );
+}
+
+export function JogadoresClient({ players }: Readonly<{ players: DesignPlayer[] }>) {
+  const [modal, setModal] = useState<DesignPlayer | null>(null);
+
+  const byRole = new Map<string, DesignPlayer[]>();
+  for (const player of players) {
+    const list = byRole.get(player.roleMeta.short) ?? [];
+    list.push(player);
+    byRole.set(player.roleMeta.short, list);
+  }
+  const sections = ROLE_ORDER.map((short) => {
+    const list = (byRole.get(short) ?? []).slice().sort((a, b) => b.pts - a.pts);
+    if (list.length === 0) return null;
+    return { short, label: list[0].roleMeta.label, color: list[0].roleMeta.color, players: list };
+  }).filter((section): section is NonNullable<typeof section> => section !== null);
+
+  return (
+    <>
+      {sections.map((section) => (
+        <section key={section.short} className="lob-fade">
+          <div style={{ display: "flex", alignItems: "center", gap: 16, margin: "36px 0 16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={{ width: 12, height: 12, background: section.color, transform: "rotate(45deg)" }} />
+              <h2 className="lob-display" style={{ fontSize: 27, color: "#f2ebdf", margin: 0 }}>{section.label}</h2>
+            </div>
+            <div style={{ height: 1, flex: 1, background: "linear-gradient(90deg,rgba(201,138,75,.4),transparent)" }} />
+            <span style={{ fontSize: 11, letterSpacing: ".10em", color: "#8f8472", whiteSpace: "nowrap" }}>{section.players.length} JOGADORES</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(188px,1fr))", gap: 16 }}>
+            {section.players.map((player) => (
+              <PlayerCard key={player.id} player={player} onOpen={() => setModal(player)} />
+            ))}
+          </div>
+        </section>
+      ))}
+      {modal ? <PlayerModal player={modal} onClose={() => setModal(null)} /> : null}
+    </>
   );
 }

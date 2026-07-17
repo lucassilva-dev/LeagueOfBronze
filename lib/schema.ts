@@ -296,6 +296,8 @@ export const playerSchema = z.object({
   role2: z.string().trim().optional(),
   elo: nonEmpty,
   imageUrl: z.string().trim().optional(),
+  name: z.string().trim().optional(),
+  mono: z.boolean().optional(),
 });
 
 export const playerGameStatsSchema = z.object({

@@ -1,385 +1,80 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowRight, Crown } from "lucide-react";
 
-import { EmptyState } from "@/components/empty-state";
-import { PageHero } from "@/components/page-hero";
-import { PageShell } from "@/components/page-shell";
-import { SeriesSummaryCard } from "@/components/series-summary-card";
-import { StatChip } from "@/components/stat-chip";
-import { EloBadge } from "@/components/elo-badge";
-import { PlayerAvatar } from "@/components/player-avatar";
-import { TeamCrest } from "@/components/team-crest";
-import { AnimatedCounter } from "@/components/ui/animated-counter";
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHeadCell,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { formatKda, formatSeriesDateLabel } from "@/lib/format";
-import { getDisplayNick, getOpGgMultiSearchUrlFromNicks } from "@/lib/opgg";
+import { PlayerCard } from "@/components/lob/player-card";
+import { getOpGgMultiSearchUrlFromNicks } from "@/lib/opgg";
+import { buildDesignTeams } from "@/lib/roster";
 import { getServerDataset } from "@/lib/server-data";
-import {
-  calculateStandings,
-  calculateTeamAggregates,
-  getChampionshipResult,
-  getPlayersForTeam,
-  getTeamBySlug,
-  getTeamSeriesHistory,
-} from "@/lib/tournament";
-import type { ChampionshipResult } from "@/types/domain";
-import type { Player, Team } from "@/lib/schema";
 
 export const dynamic = "force-dynamic";
 
-type TeamPageParams = Readonly<{
-  params: Promise<{ slug: string }>;
-}>;
-type TeamTitleHeroData = Readonly<{
-  championWins: number;
-  runnerUpWins: number;
-  runnerUpTeamName: string;
-  finalMvpNick: string | null;
-  summary: ChampionshipResult["summary"];
-}>;
-type TeamHeaderExtraProps = Readonly<{
-  isChampion: boolean;
-  standingsPosition: number | null;
-  points: number | null;
-  seriesRecord: string | null;
-}>;
-type TeamChampionPanelProps = Readonly<{
-  teamName: string;
-  data: TeamTitleHeroData;
-}>;
-type TeamRosterNoticeProps = Readonly<{
-  error: string;
-  invalidNicks: string[];
-}>;
-type TeamRosterCardProps = Readonly<{
-  roster: Player[];
-  multiOpGg: ReturnType<typeof getOpGgMultiSearchUrlFromNicks>;
-}>;
+type TeamPageParams = Readonly<{ params: Promise<{ slug: string }> }>;
 
-function getFinalScore(championship: ChampionshipResult) {
-  const championWonOnSideA = championship.championTeamId === championship.summary.series.teamAId;
-
-  if (championWonOnSideA) {
-    return {
-      championWins: championship.summary.score.teamAWins,
-      runnerUpWins: championship.summary.score.teamBWins,
-    };
-  }
-
-  return {
-    championWins: championship.summary.score.teamBWins,
-    runnerUpWins: championship.summary.score.teamAWins,
-  };
-}
-
-function getTeamTitleHeroData(
-  championship: ChampionshipResult | null,
-  team: Team,
-  teamsById: Map<string, Team>,
-  playersById: Map<string, Player>,
-): TeamTitleHeroData | null {
-  if (championship?.championTeamId !== team.id) return null;
-
-  const finalMvpNick = championship.summary.mvp
-    ? playersById.get(championship.summary.mvp.playerId)?.nick ?? null
-    : null;
-  const score = getFinalScore(championship);
-
-  return {
-    championWins: score.championWins,
-    runnerUpWins: score.runnerUpWins,
-    runnerUpTeamName: teamsById.get(championship.runnerUpTeamId)?.name ?? championship.runnerUpTeamId,
-    finalMvpNick,
-    summary: championship.summary,
-  };
-}
-
-function TeamHeaderExtra({
-  isChampion,
-  standingsPosition,
-  points,
-  seriesRecord,
-}: TeamHeaderExtraProps) {
-  const hasStandingsPosition = standingsPosition !== null;
-  const hasPoints = points !== null;
-
-  return (
-    <div className="flex flex-wrap gap-2">
-      {isChampion ? (
-        <Badge variant="bronze">Campeão do campeonato</Badge>
-      ) : null}
-      {hasStandingsPosition ? <Badge variant="accent">#{standingsPosition} na tabela</Badge> : null}
-      {hasPoints ? <Badge variant="outline">{points} pts</Badge> : null}
-      {seriesRecord ? <Badge variant="outline">Séries {seriesRecord}</Badge> : null}
-    </div>
-  );
-}
-
-function getChampionSummaryText(data: TeamTitleHeroData) {
-  const baseText = `Venceu a grande final contra ${data.runnerUpTeamName} por ${data.championWins}-${data.runnerUpWins}.`;
-
-  if (data.summary.isWalkover) {
-    return `${baseText} Série encerrada por W.O.`;
-  }
-
-  if (data.finalMvpNick) {
-    return `${baseText} MVP da final: ${data.finalMvpNick}.`;
-  }
-
-  return baseText;
-}
-
-function TeamChampionPanel({ teamName, data }: TeamChampionPanelProps) {
-  return (
-    <section>
-      <Card className="champion-panel champion-glow overflow-hidden p-5 sm:p-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="max-w-3xl">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="bronze">Título confirmado</Badge>
-              <Badge variant="outline">{data.summary.formatLabel}</Badge>
-              <Badge variant="outline">{formatSeriesDateLabel(data.summary.series.date)}</Badge>
-            </div>
-
-            <div className="mt-4 flex items-start gap-3">
-              <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-accent2/25 bg-accent2/10 text-accent2">
-                <Crown className="h-6 w-6" />
-              </span>
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.22em] text-accent2/80">
-                  Momento do título
-                </p>
-                <h2 className="mt-1 font-heading text-2xl font-bold tracking-tight sm:text-3xl">
-                  {teamName}
-                </h2>
-                <p className="mt-2 text-sm text-text/75 sm:text-base">
-                  {getChampionSummaryText(data)}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2 lg:w-[22rem]">
-            <div className="rounded-2xl border border-accent2/20 bg-bg/40 p-4 text-center">
-              <p className="text-xs uppercase tracking-[0.16em] text-muted">Placar da final</p>
-              <p className="mt-2 font-display text-5xl tracking-wide text-accent2">
-                <AnimatedCounter to={data.championWins} />
-                <span className="mx-2 text-white/35">-</span>
-                <AnimatedCounter to={data.runnerUpWins} />
-              </p>
-              <p className="mt-1 text-xs text-muted">{data.summary.stageLabel}</p>
-            </div>
-
-            <div className="flex flex-col justify-between rounded-2xl border border-border/60 bg-bg/40 p-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.16em] text-muted">Grande final</p>
-                <p className="mt-2 text-sm text-text/75">
-                  Abra o detalhe completo da decisão do campeonato.
-                </p>
-              </div>
-              <Link
-                href={`/partidas/${data.summary.series.id}`}
-                className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-accent2 transition hover:text-text"
-              >
-                Ver final completa
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-            </div>
-          </div>
-        </div>
-      </Card>
-    </section>
-  );
-}
-
-function TeamRosterNotice({ error, invalidNicks }: TeamRosterNoticeProps) {
-  return (
-    <div className="mt-3 rounded-xl border border-red-400/20 bg-red-500/10 p-3 text-sm text-red-100">
-      <p className="font-semibold">{error}</p>
-      {invalidNicks.length > 0 ? (
-        <p className="mt-1 text-xs text-red-200/90">
-          Nicks com problema: {invalidNicks.join(", ")}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-function TeamRosterCard({ roster, multiOpGg }: TeamRosterCardProps) {
-  const showRosterNotice = multiOpGg.ok === false;
-
-  return (
-    <Card className="p-5">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="font-heading text-xl font-semibold tracking-wide">Elenco</h2>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <Badge variant="muted">{roster.length} jogadores</Badge>
-          {multiOpGg.ok ? (
-            <Link
-              href={multiOpGg.url}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex h-8 items-center justify-center rounded-lg border border-border/80 bg-panel2/90 px-3 text-xs font-semibold tracking-wide text-text transition hover:bg-panel2"
-            >
-              Multi OP.GG (5)
-            </Link>
-          ) : null}
-        </div>
-      </div>
-
-      {showRosterNotice ? (
-        <TeamRosterNotice error={multiOpGg.error} invalidNicks={multiOpGg.invalidNicks} />
-      ) : null}
-
-      <div className="mt-4 grid gap-3 md:hidden">
-        {roster.map((player) => (
-          <Card key={player.id} className="flex items-center gap-3 p-3">
-            <PlayerAvatar player={player} size={38} />
-            <div className="min-w-0 flex-1">
-              <Link
-                href={`/jogadores/${player.slug}`}
-                className="font-semibold hover:text-accent"
-              >
-                {getDisplayNick(player.nick)}
-              </Link>
-              <p className="mt-1 text-xs text-muted">
-                {player.role1}
-                {player.role2 ? ` / ${player.role2}` : ""}
-              </p>
-            </div>
-            <EloBadge elo={player.elo} size={26} />
-          </Card>
-        ))}
-      </div>
-
-      <div className="hidden md:block">
-        <div className="mt-4 overflow-x-auto scrollbar-thin">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHeadCell>Nick</TableHeadCell>
-                <TableHeadCell>Rota 1</TableHeadCell>
-                <TableHeadCell>Rota 2</TableHeadCell>
-                <TableHeadCell>Elo</TableHeadCell>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {roster.map((player) => (
-                <TableRow key={player.id}>
-                  <TableCell>
-                    <Link
-                      href={`/jogadores/${player.slug}`}
-                      className="inline-flex items-center gap-2 font-semibold hover:text-accent"
-                    >
-                      <PlayerAvatar player={player} size={30} />
-                      <span>{getDisplayNick(player.nick)}</span>
-                    </Link>
-                  </TableCell>
-                  <TableCell>{player.role1}</TableCell>
-                  <TableCell>{player.role2 || "—"}</TableCell>
-                  <TableCell>
-                    <EloBadge elo={player.elo} size={22} showLabel />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-export default async function TeamPage({ params }: TeamPageParams) {
+export default async function TeamRosterPage({ params }: TeamPageParams) {
   const { slug } = await params;
-  const { dataset, indexes } = await getServerDataset();
-  const team = getTeamBySlug(dataset, slug);
+  const { dataset } = await getServerDataset();
+  const team = buildDesignTeams(dataset).find((t) => t.slug === slug);
 
   if (!team) {
     notFound();
   }
 
-  const roster = getPlayersForTeam(dataset, team.id);
-  const history = getTeamSeriesHistory(dataset, team.id);
-  const teamStats = calculateTeamAggregates(dataset).find((row) => row.teamId === team.id);
-  const standingsRow = calculateStandings(dataset).rows.find((row) => row.teamId === team.id);
-  const multiOpGg = getOpGgMultiSearchUrlFromNicks(roster.map((player) => player.nick));
-  const championship = getChampionshipResult(dataset);
-  const titleHeroData = getTeamTitleHeroData(
-    championship,
-    team,
-    indexes.teamsById,
-    indexes.playersById,
-  );
+  const multiOpGg = getOpGgMultiSearchUrlFromNicks(team.roster.map((player) => player.nick));
 
   return (
-    <PageShell className="space-y-6">
-      <PageHero
-        badge={titleHeroData ? "Campeão" : "Time"}
-        title={team.name}
-        media={<TeamCrest team={team} size={56} className="rounded-xl" />}
-        description="Elenco, histórico de séries e estatísticas agregadas calculadas automaticamente a partir dos jogos."
-        extra={
-          <TeamHeaderExtra
-            isChampion={Boolean(titleHeroData)}
-            standingsPosition={standingsRow?.position ?? null}
-            points={standingsRow?.points ?? null}
-            seriesRecord={
-              standingsRow ? `${standingsRow.seriesWon}-${standingsRow.seriesLost}` : null
-            }
-          />
-        }
-      />
-
-      {titleHeroData ? <TeamChampionPanel teamName={team.name} data={titleHeroData} /> : null}
-
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatChip label="Abates" value={teamStats?.kills ?? 0} />
-        <StatChip label="Mortes" value={teamStats?.deaths ?? 0} />
-        <StatChip label="Assistências" value={teamStats?.assists ?? 0} />
-        <StatChip
-          label="KDA médio"
-          value={formatKda(teamStats?.kda ?? 0)}
-          hint={`MVPs (jogo): ${teamStats?.gameMvps ?? 0} • Saldo de jogos: ${teamStats?.gameDiff ?? 0}`}
-        />
-      </section>
-
-      <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-        <div className="space-y-4">
-          <TeamRosterCard roster={roster} multiOpGg={multiOpGg} />
-        </div>
-
-        <div className="space-y-4">
-          <h2 className="font-heading text-xl font-semibold tracking-wide">Histórico de séries</h2>
-          {history.length === 0 ? (
-            <EmptyState
-              title="Sem séries ainda"
-              description="Quando você lançar séries no admin, o histórico deste time aparecerá aqui."
-            />
-          ) : (
-            <div className="space-y-3">
-              {history.map((summary) => (
-                <SeriesSummaryCard
-                  key={summary.series.id}
-                  summary={summary}
-                  teamsById={indexes.teamsById}
-                  playersById={indexes.playersById}
-                />
-              ))}
+    <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "0 clamp(16px,4vw,24px) 96px" }}>
+      <section className="lob-fade" style={{ padding: "44px 0 0" }}>
+        <Link href="/times" className="lob-btn-ghost" style={{ padding: "9px 16px", fontSize: 11.5, letterSpacing: ".12em", marginBottom: 26 }}>
+          ← VOLTAR AOS TIMES
+        </Link>
+        <div style={{ display: "flex", gap: 22, alignItems: "stretch", flexWrap: "wrap", marginBottom: 34, marginTop: 20 }}>
+          <div
+            style={{
+              position: "relative",
+              width: 150,
+              height: 200,
+              flexShrink: 0,
+              background: team.imageUrl ? "#0d0a05" : `linear-gradient(160deg,${team.color}33,#0d0a05 74%)`,
+              border: "1px solid rgba(201,138,75,.3)",
+              borderRadius: 3,
+              overflow: "hidden",
+              clipPath: "polygon(0 0,100% 0,100% calc(100% - 16px),calc(100% - 16px) 100%,0 100%)",
+            }}
+          >
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, zIndex: 2, background: team.color }} />
+            {team.imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={team.imageUrl} alt={team.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            ) : null}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 12, minWidth: 240, flex: 1 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 11, fontSize: 11, letterSpacing: ".22em", color: team.color }}>
+              <span style={{ width: 24, height: 1, background: team.color }} />
+              ELENCO OFICIAL
             </div>
-          )}
+            <h1 className="lob-h1 gold-text" style={{ fontSize: "clamp(40px,7vw,84px)", lineHeight: 0.86 }}>{team.name}</h1>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 9, marginTop: 2 }}>
+              <span style={{ display: "inline-flex", alignItems: "baseline", gap: 5, padding: "8px 14px", background: "linear-gradient(180deg,#f0c88a,#b97e40)", color: "#160f06", borderRadius: 2, fontWeight: 700 }}>
+                <span className="lob-display" style={{ fontSize: 18 }}>{team.total}</span>
+                <span style={{ fontSize: 10, letterSpacing: ".10em" }}>PTS DE ELENCO</span>
+              </span>
+              {team.captain ? (
+                <span className="lob-pill" style={{ letterSpacing: ".06em" }}>◆ CAPITÃO · {team.captain.displayNick}</span>
+              ) : null}
+              {multiOpGg.ok ? (
+                <Link href={multiOpGg.url} target="_blank" rel="noreferrer" className="lob-pill" style={{ letterSpacing: ".08em", color: "#e6c592" }}>
+                  MULTI OP.GG (5) →
+                </Link>
+              ) : null}
+            </div>
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(196px,1fr))", gap: 16 }}>
+          {team.roster.map((player) => (
+            <PlayerCard key={player.id} player={player} href={`/jogadores/${player.slug}`} />
+          ))}
         </div>
       </section>
-    </PageShell>
+    </div>
   );
 }

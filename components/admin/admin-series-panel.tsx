@@ -36,7 +36,7 @@ import {
   slugifyValue,
   type MutateDraft,
 } from "@/components/admin/shared";
-import { CARDS } from "@/lib/cards";
+import { CARD_OPTIONS } from "@/lib/cards";
 import { CHAMPIONS } from "@/lib/champions";
 
 function getTeamName(dataset: TournamentDataset, teamId: string) {
@@ -718,7 +718,7 @@ export function AdminSeriesPanel({
   const addCardToSeries = () => {
     updateSelectedSeries((series) => {
       if (!series.cardsUsed) series.cardsUsed = [];
-      series.cardsUsed.push({ teamId: series.teamAId || "", cardId: CARDS[0].id });
+      series.cardsUsed.push({ teamId: series.teamAId || "", cardId: CARD_OPTIONS[0].id });
     });
   };
 
@@ -1290,7 +1290,7 @@ export function AdminSeriesPanel({
                         value={card.cardId}
                         onChange={(e) => updateCardField(cardIndex, "cardId", e.target.value)}
                       >
-                        {CARDS.map((cardDef) => (
+                        {CARD_OPTIONS.map((cardDef) => (
                           <option key={cardDef.id} value={cardDef.id}>
                             {cardDef.title}
                           </option>

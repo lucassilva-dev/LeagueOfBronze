@@ -1,165 +1,192 @@
-import { Crown, Skull } from "lucide-react";
+import Link from "next/link";
 
-import { ChampionshipHero } from "@/components/championship-hero";
-import { EmptyState } from "@/components/empty-state";
-import { PageHero } from "@/components/page-hero";
-import { PageShell } from "@/components/page-shell";
-import { SectionTitle } from "@/components/section-title";
-import { SeriesSummaryCard } from "@/components/series-summary-card";
-import { StatChip } from "@/components/stat-chip";
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
-import { formatDateTimeLabel, formatKda } from "@/lib/format";
-import { getServerOverview } from "@/lib/server-data";
+import { Eyebrow, GoldTitle, Pill, SectionTitle, TeamDot } from "@/components/lob/ui";
+import { buildCalendarDays } from "@/lib/calendar";
+import { buildDesignPlayers } from "@/lib/roster";
+import { getServerDataset } from "@/lib/server-data";
 
 export const dynamic = "force-dynamic";
 
-type HomeStatsSectionProps = Readonly<{
-  leaderName: string;
-  leaderHint: string;
-  topKillsName: string;
-  topKillsHint: string;
-  seriesCount: number;
-  playerCount: number;
-  teamCount: number;
-}>;
+const EXPLORE = [
+  { href: "/times", label: "TIMES", desc: "Os 6 elencos e seus lineups completos." },
+  { href: "/jogadores", label: "JOGADORES", desc: "Os inscritos, do Ferro ao Mestre." },
+  { href: "/calendario", label: "CALENDÁRIO", desc: "15 confrontos + a Grande Final em MD5." },
+  { href: "/tabela", label: "TABELA", desc: "A classificação da fase de pontos corridos." },
+  { href: "/stats", label: "ESTATÍSTICAS", desc: "Rankings de jogadores e campeões." },
+  { href: "/cartas", label: "CARTAS", desc: "As cartinhas surpresa que viram o jogo." },
+  { href: "/regras", label: "REGRAS", desc: "Formato, draft por pontos e regulamento." },
+];
 
-function getTournamentFormatsLabel(hasBo5: boolean, defaultFormat: "BO3" | "BO5") {
-  return hasBo5 || defaultFormat === "BO5" ? "MD3 / MD5" : "MD3";
-}
+export default async function InicioPage() {
+  const { dataset } = await getServerDataset();
+  const players = buildDesignPlayers(dataset);
+  const calDays = buildCalendarDays(dataset);
 
-function getLeaderHint(leader: Awaited<ReturnType<typeof getServerOverview>>["overview"]["standings"]["rows"][number] | undefined) {
-  if (!leader) return "Sem times cadastrados.";
-  return `${leader.points} pts • ${leader.seriesWon}-${leader.seriesLost} na fase regular`;
-}
+  const poolTotal = players.reduce((sum, player) => sum + player.pts, 0);
+  const confrontos = calDays.reduce((sum, day) => sum + day.games.length, 0);
+  const diasDeJogo = calDays.length + 1; // + Grande Final (02/08)
+  const abertura = calDays[0];
+  const preview = abertura ? abertura.games.slice(0, 3) : [];
 
-function getTopKillsHint(topKills: Awaited<ReturnType<typeof getServerOverview>>["overview"]["leaderboards"]["kills"][number] | undefined) {
-  if (!topKills) return "Sem jogos lançados ainda.";
-  return `${topKills.player.kills} abates • KDA ${formatKda(topKills.player.kda)}`;
-}
-
-function HomeStatsSection({
-  leaderName,
-  leaderHint,
-  topKillsName,
-  topKillsHint,
-  seriesCount,
-  playerCount,
-  teamCount,
-}: HomeStatsSectionProps) {
-  return (
-    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <Card className="p-4">
-        <div className="flex items-center gap-3">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-accent/10 text-accent">
-            <Crown className="h-5 w-5" />
-          </span>
-          <div>
-            <p className="text-xs uppercase tracking-[0.14em] text-muted">Líder atual</p>
-            <p className="font-heading text-lg font-semibold tracking-wide">{leaderName}</p>
-          </div>
-        </div>
-        <p className="mt-3 text-sm text-muted">{leaderHint}</p>
-      </Card>
-
-      <Card className="p-4">
-        <div className="flex items-center gap-3">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-accent/10 text-accent">
-            <Skull className="h-5 w-5" />
-          </span>
-          <div>
-            <p className="text-xs uppercase tracking-[0.14em] text-muted">Mais abates</p>
-            <p className="font-heading text-lg font-semibold tracking-wide">{topKillsName}</p>
-          </div>
-        </div>
-        <p className="mt-3 text-sm text-muted">{topKillsHint}</p>
-      </Card>
-
-      <StatChip
-        label="Séries registradas"
-        value={seriesCount}
-        hint="Inclui fase regular, semifinal e final"
-      />
-      <StatChip label="Jogadores" value={playerCount} hint={`${teamCount} times cadastrados`} />
-    </section>
-  );
-}
-
-export default async function HomePage() {
-  const { dataset, indexes, overview } = await getServerOverview();
-  const leader = overview.standings.rows[0];
-  const topKills = overview.leaderboards.kills[0];
-  const latestSeries = overview.seriesSummaries.slice(0, 3);
-  const hasLiveSeries = overview.seriesSummaries.some((summary) => !summary.isComplete);
-  const hasBo5 = dataset.seriesMatches.some((series) => series.format === "BO5");
-  const tournamentFormatsLabel = getTournamentFormatsLabel(hasBo5, dataset.tournament.format);
+  const numbers = [
+    { v: String(dataset.teams.length), l: "TIMES" },
+    { v: String(dataset.players.length), l: "JOGADORES" },
+    { v: String(confrontos), l: "CONFRONTOS" },
+    { v: String(diasDeJogo), l: "DIAS DE JOGO" },
+  ];
 
   return (
-    <PageShell className="space-y-6">
-      <PageHero
-        badge="Campeonato"
-        title={dataset.tournament.name}
-        description="Acompanhe tabela da fase regular, séries, MVPs e os rankings em tempo real."
-        extra={
-          <div className="flex flex-wrap items-center gap-2">
-            {hasLiveSeries ? (
-              <Badge variant="live" className="gap-1.5">
-                <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-lime/70" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-lime" />
-                </span>
-                AO VIVO
-              </Badge>
-            ) : null}
-            <Badge variant="muted">Formato: {tournamentFormatsLabel}</Badge>
-            <Badge variant="outline">
-              Atualizado em {formatDateTimeLabel(dataset.tournament.lastUpdatedISO)}
-            </Badge>
-          </div>
-        }
-      />
-
-      <ChampionshipHero
-        championship={overview.championship}
-        teamsById={indexes.teamsById}
-        playersById={indexes.playersById}
-      />
-
-      <HomeStatsSection
-        leaderName={leader?.teamName ?? "—"}
-        leaderHint={getLeaderHint(leader)}
-        topKillsName={topKills?.player.playerNick ?? "—"}
-        topKillsHint={getTopKillsHint(topKills)}
-        seriesCount={dataset.seriesMatches.length}
-        playerCount={dataset.players.length}
-        teamCount={dataset.teams.length}
-      />
-
-      <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <div className="space-y-4">
-          <SectionTitle
-            title="Últimas séries"
-            subtitle="As 3 séries mais recentes aparecem aqui com placar, etapa e MVP da série."
-          />
-          {latestSeries.length === 0 ? (
-            <EmptyState
-              title="Nenhuma série registrada"
-              description="Use o painel /admin para lançar as primeiras séries. As páginas públicas já estão prontas para atualizar automaticamente."
-            />
-          ) : (
-            <div className="space-y-3">
-              {latestSeries.map((summary) => (
-                <SeriesSummaryCard
-                  key={summary.series.id}
-                  summary={summary}
-                  teamsById={indexes.teamsById}
-                  playersById={indexes.playersById}
-                />
-              ))}
-            </div>
-          )}
+    <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "0 clamp(16px,4vw,24px) 96px" }}>
+      {/* HERO */}
+      <section className="lob-fade" style={{ padding: "clamp(48px,8vw,88px) 0 30px" }}>
+        <Eyebrow>Campeonato amador de League of Legends</Eyebrow>
+        <GoldTitle style={{ fontSize: "clamp(52px,11vw,148px)", lineHeight: 0.98, margin: "12px 0 14px" }}>
+          3ª EDIÇÃO
+          <br />
+          DOS BRONZES
+        </GoldTitle>
+        <p style={{ maxWidth: 600, fontSize: "clamp(15px,2.2vw,18px)", lineHeight: 1.55, color: "#a99e8b", margin: "0 0 26px" }}>
+          Onde o low elo é o protagonista. Seis times forjados no draft, trinta feras do Ferro ao
+          Mestre e uma taça em disputa — de 25 de julho a 02 de agosto.
+        </p>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 11, marginBottom: 26 }}>
+          <Link href="/times" className="lob-btn-gold" style={{ padding: "14px 24px", fontSize: 13 }}>
+            VER OS TIMES →
+          </Link>
+          <Link href="/jogadores" className="lob-btn-ghost" style={{ padding: "14px 24px", fontSize: 13 }}>
+            JOGADORES
+          </Link>
+          <Link href="/calendario" className="lob-btn-ghost" style={{ padding: "14px 24px", fontSize: 13 }}>
+            CALENDÁRIO
+          </Link>
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 9 }}>
+          <Pill>PONTOS CORRIDOS · MD3</Pill>
+          <Pill>GRANDE FINAL · MD5</Pill>
+          <Pill>POOL DE {poolTotal} PONTOS</Pill>
         </div>
       </section>
-    </PageShell>
+
+      {/* GRANDE FINAL */}
+      <section className="lob-fade" style={{ margin: "18px 0 44px" }}>
+        <div
+          style={{
+            position: "relative",
+            overflow: "hidden",
+            border: "1px solid rgba(201,138,75,.28)",
+            borderRadius: 4,
+            background: "linear-gradient(135deg,#231a0f,#130f08)",
+            padding: "clamp(22px,4vw,40px)",
+          }}
+        >
+          <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 10, fontSize: 11, letterSpacing: ".24em", color: "#e6c592", justifyContent: "center" }}>
+            <span style={{ width: 22, height: 1, background: "#c98a4b" }} />A GRANDE FINAL
+            <span style={{ width: 22, height: 1, background: "#c98a4b" }} />
+          </div>
+          <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", gap: "clamp(16px,5vw,60px)", marginTop: 20, flexWrap: "wrap" }}>
+            {["1º", "2º"].map((pos, i) => (
+              <div key={pos} style={{ textAlign: "center" }}>
+                <div
+                  className="lob-display"
+                  style={{
+                    width: "clamp(76px,14vw,120px)",
+                    height: "clamp(76px,14vw,120px)",
+                    margin: "0 auto",
+                    borderRadius: "50%",
+                    border: "2px dashed rgba(201,138,75,.45)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "clamp(30px,6vw,52px)",
+                    color: "#8a7a5f",
+                  }}
+                >
+                  {pos}
+                </div>
+                <div style={{ marginTop: 12, fontSize: 12, letterSpacing: ".10em", color: "#cdbfa8" }}>
+                  {i === 0 ? "1º COLOCADO" : "2º COLOCADO"}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ position: "relative", display: "flex", justifyContent: "center", gap: 9, marginTop: 22, flexWrap: "wrap" }}>
+            <span style={{ padding: "7px 14px", background: "linear-gradient(180deg,#f0c88a,#b97e40)", color: "#160f06", fontWeight: 700, fontSize: 12, letterSpacing: ".10em", borderRadius: 2 }}>
+              MELHOR DE 5
+            </span>
+            <span style={{ padding: "7px 14px", background: "rgba(10,8,4,.5)", border: "1px solid rgba(201,138,75,.35)", color: "#e6c592", fontSize: 12, letterSpacing: ".10em", borderRadius: 2 }}>
+              02 DE AGOSTO · 14:00
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* NÚMEROS */}
+      <section className="lob-fade" style={{ marginBottom: 44 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 14 }}>
+          {numbers.map((n) => (
+            <div key={n.l} className="lob-card-2" style={{ textAlign: "center", padding: "22px 12px" }}>
+              <div className="lob-display" style={{ fontSize: 44, lineHeight: 1, color: "#f0c88a" }}>{n.v}</div>
+              <div style={{ marginTop: 8, fontSize: 11, letterSpacing: ".12em", color: "#8f8472" }}>{n.l}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* EXPLORE */}
+      <section className="lob-fade" style={{ marginBottom: 44 }}>
+        <div style={{ marginBottom: 16 }}>
+          <SectionTitle>EXPLORE O CAMPEONATO</SectionTitle>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(240px,1fr))", gap: 14 }}>
+          {EXPLORE.map((card) => (
+            <Link
+              key={card.href}
+              href={card.href}
+              className="lob-card-2 lob-lift"
+              style={{ display: "flex", flexDirection: "column", gap: 8, padding: 18, textDecoration: "none" }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span className="lob-display" style={{ fontSize: 20, color: "#f3ece0" }}>{card.label}</span>
+                <span style={{ color: "#c98a4b", fontSize: 18 }}>→</span>
+              </div>
+              <span style={{ fontSize: 12.5, lineHeight: 1.45, color: "#8f8472" }}>{card.desc}</span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* ABERTURA */}
+      {abertura ? (
+        <section className="lob-fade">
+          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
+            <SectionTitle>ABERTURA · {abertura.dateLabel}</SectionTitle>
+            <Link href="/calendario" style={{ color: "#c98a4b", fontWeight: 600, fontSize: 12, letterSpacing: ".10em" }}>
+              VER CALENDÁRIO COMPLETO →
+            </Link>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(320px,1fr))", gap: 12 }}>
+            {preview.map((game) => (
+              <Link key={game.id} href={`/partidas/${game.id}`} className="lob-card-2" style={{ padding: 16, textDecoration: "none", display: "block" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 10.5, letterSpacing: ".08em", color: "#8f8472", marginBottom: 12 }}>
+                  <span>JOGO {game.n} · {game.turno.toUpperCase()}</span>
+                  <span style={{ color: "#cfa877" }}>{game.hora}</span>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                    <TeamDot color={game.teamA.color} />
+                    <span style={{ fontWeight: 600, fontSize: 13, color: "#e9dfcd", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{game.teamA.name}</span>
+                  </div>
+                  <span className="lob-display" style={{ fontSize: 14, color: "#6f6656" }}>MD3</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end", minWidth: 0 }}>
+                    <span style={{ fontWeight: 600, fontSize: 13, color: "#e9dfcd", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "right" }}>{game.teamB.name}</span>
+                    <TeamDot color={game.teamB.color} />
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
+    </div>
   );
 }
