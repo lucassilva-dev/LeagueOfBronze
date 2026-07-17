@@ -161,7 +161,7 @@
       "nick": "Sr Hades#2522",
       "slug": "sr-hades",
       "teamId": "presas-shurima",
-      "role1": "ADC",
+      "role1": "TOP",
       "elo": "OURO",
       "imageUrl": "/players/sr-hades.jpeg"
     },
@@ -170,8 +170,7 @@
       "nick": "Onigami #666",
       "slug": "onigami",
       "teamId": "presas-shurima",
-      "role1": "ADC",
-      "role2": "TOP",
+      "role1": "SUP",
       "elo": "PLAT",
       "imageUrl": "/players/onigami.jpeg"
     },
@@ -238,7 +237,7 @@
       "nick": "MIDAS#Ayla",
       "slug": "midas",
       "teamId": "capangas-motomoto",
-      "role1": "SUP",
+      "role1": "ADC",
       "elo": "ESME",
       "imageUrl": "/players/midas.png"
     },
@@ -249,7 +248,7 @@
       "teamId": "capangas-motomoto",
       "role1": "SUP",
       "elo": "BRON",
-      "imageUrl": "/players/motomoto.jpeg"
+      "imageUrl": "/players/motomoto.png"
     },
     {
       "id": "samuel-venancio",
@@ -274,7 +273,7 @@
       "nick": "PNG GALA #PNG",
       "slug": "png-gala",
       "teamId": "lgtv-wins",
-      "role1": "ADC",
+      "role1": "TOP",
       "elo": "PLAT"
     },
     {
@@ -282,7 +281,7 @@
       "nick": "vidotti agiota #br1",
       "slug": "vidotti-agiota",
       "teamId": "lgtv-wins",
-      "role1": "TOP",
+      "role1": "JUNG",
       "elo": "DIAM"
     },
     {
