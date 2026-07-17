@@ -237,7 +237,9 @@ a:hover {
 .lob-h1 {
   font-family: var(--font-display), "Anton", sans-serif;
   line-height: 0.9;
-  padding-bottom: 0.06em;
+  /* Espaço para acentos (til, cedilha) não serem cortados pelo clip do gradiente. */
+  padding-top: 0.16em;
+  padding-bottom: 0.2em;
   letter-spacing: 0.005em;
   margin: 0;
 }

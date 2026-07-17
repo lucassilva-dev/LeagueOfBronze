@@ -35,12 +35,26 @@ export default async function InicioPage() {
     { v: String(diasDeJogo), l: "DIAS DE JOGO" },
   ];
 
+  const finalCircle = {
+    width: "clamp(76px,14vw,120px)",
+    height: "clamp(76px,14vw,120px)",
+    margin: "0 auto",
+    borderRadius: "50%",
+    border: "2px dashed rgba(201,138,75,.45)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "clamp(30px,6vw,52px)",
+    color: "#8a7a5f",
+  };
+  const finalLabel = { marginTop: 12, fontSize: 12, letterSpacing: ".10em", color: "#cdbfa8" };
+
   return (
     <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "0 clamp(16px,4vw,24px) 96px" }}>
       {/* HERO */}
       <section className="lob-fade" style={{ padding: "clamp(48px,8vw,88px) 0 30px" }}>
         <Eyebrow>Campeonato amador de League of Legends</Eyebrow>
-        <GoldTitle style={{ fontSize: "clamp(52px,11vw,148px)", lineHeight: 0.98, margin: "12px 0 14px" }}>
+        <GoldTitle style={{ fontSize: "clamp(52px,11vw,148px)", lineHeight: 1.08, margin: "12px 0 14px" }}>
           3ª EDIÇÃO
           <br />
           DOS BRONZES
@@ -83,31 +97,18 @@ export default async function InicioPage() {
             <span style={{ width: 22, height: 1, background: "#c98a4b" }} />A GRANDE FINAL
             <span style={{ width: 22, height: 1, background: "#c98a4b" }} />
           </div>
-          <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", gap: "clamp(16px,5vw,60px)", marginTop: 20, flexWrap: "wrap" }}>
-            {["1º", "2º"].map((pos, i) => (
-              <div key={pos} style={{ textAlign: "center" }}>
-                <div
-                  className="lob-display"
-                  style={{
-                    width: "clamp(76px,14vw,120px)",
-                    height: "clamp(76px,14vw,120px)",
-                    margin: "0 auto",
-                    borderRadius: "50%",
-                    border: "2px dashed rgba(201,138,75,.45)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "clamp(30px,6vw,52px)",
-                    color: "#8a7a5f",
-                  }}
-                >
-                  {pos}
-                </div>
-                <div style={{ marginTop: 12, fontSize: 12, letterSpacing: ".10em", color: "#cdbfa8" }}>
-                  {i === 0 ? "1º COLOCADO" : "2º COLOCADO"}
-                </div>
-              </div>
-            ))}
+          <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", gap: "clamp(14px,4vw,48px)", marginTop: 20, flexWrap: "wrap" }}>
+            <div style={{ textAlign: "center" }}>
+              <div className="lob-display" style={finalCircle}>1º</div>
+              <div style={finalLabel}>1º COLOCADO</div>
+            </div>
+            <div className="lob-display gold-text" style={{ fontSize: "clamp(28px,7vw,58px)", lineHeight: 1, marginBottom: 30 }}>
+              VS
+            </div>
+            <div style={{ textAlign: "center" }}>
+              <div className="lob-display" style={finalCircle}>2º</div>
+              <div style={finalLabel}>2º COLOCADO</div>
+            </div>
           </div>
           <div style={{ position: "relative", display: "flex", justifyContent: "center", gap: 9, marginTop: 22, flexWrap: "wrap" }}>
             <span style={{ padding: "7px 14px", background: "linear-gradient(180deg,#f0c88a,#b97e40)", color: "#160f06", fontWeight: 700, fontSize: 12, letterSpacing: ".10em", borderRadius: 2 }}>

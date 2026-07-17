@@ -61,7 +61,7 @@ export function Pill({ children, dot = true }: Readonly<{ children: ReactNode; d
   );
 }
 
-// Emblema de crista do elo (SVG local em /public/elo).
+// Emblema de crista do elo (PNG oficial em /public/elo).
 export function EloCrest({
   elo,
   size = 40,

@@ -112,7 +112,7 @@ export function resolveElo(elo?: string | null): EloMeta | null {
 }
 
 export function eloSvgUrl(key: string) {
-  return `/elo/${key}.svg`;
+  return `/elo/${key}.png`;
 }
 
 export const ELO_ORDER: EloMeta[] = [
