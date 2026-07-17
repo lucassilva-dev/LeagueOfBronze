@@ -20,6 +20,7 @@ export type DesignPlayer = {
   teamName: string;
   teamSlug: string;
   teamColor: string;
+  teamImageUrl?: string;
 };
 
 export type DesignTeam = {
@@ -57,6 +58,7 @@ export function buildDesignPlayers(dataset: TournamentDataset): DesignPlayer[] {
       teamName: team?.name ?? player.teamId,
       teamSlug: team?.slug ?? player.teamId,
       teamColor: teamColor(player.teamId),
+      teamImageUrl: team?.imageUrl,
     };
   });
 }

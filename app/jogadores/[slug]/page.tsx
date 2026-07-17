@@ -76,7 +76,7 @@ export default async function PlayerFichaPage({ params }: PlayerPageParams) {
             <div style={{ fontSize: 14, color: "#8f8472" }}>{player.name}</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 16 }}>
               <span className="lob-pill" style={{ fontSize: 11.5 }}>
-                <span style={{ width: 7, height: 7, transform: "rotate(45deg)", background: player.roleMeta.color }} />
+                <RoleIcon role={player.role1} size={14} color={player.roleMeta.color} />
                 {player.roleMeta.label}
               </span>
               <span className="lob-pill" style={{ fontSize: 11.5 }}>

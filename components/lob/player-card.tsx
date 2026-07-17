@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { EloCrest, RoleIcon, RoleTag } from "@/components/lob/ui";
+import { EloCrest, RoleIcon, RoleTag, TeamMark } from "@/components/lob/ui";
 import type { DesignPlayer } from "@/lib/roster";
 
 function PhotoArea({ player }: Readonly<{ player: DesignPlayer }>) {
@@ -37,7 +37,7 @@ function Footer({ player }: Readonly<{ player: DesignPlayer }>) {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "11px 13px 12px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-        <span style={{ width: 9, height: 9, transform: "rotate(45deg)", flexShrink: 0, background: player.teamColor }} />
+        <TeamMark imageUrl={player.teamImageUrl} color={player.teamColor} name={player.teamName} size={17} diamond={9} />
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 12.5, color: "#e4d8c2", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{player.name}</div>
           <div style={{ fontSize: 9.5, letterSpacing: ".05em", color: player.teamColor, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{player.teamName}</div>
