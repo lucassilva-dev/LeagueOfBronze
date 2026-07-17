@@ -61,6 +61,7 @@ export default async function EstatisticasPage() {
     .sort((a, b) => b.total - a.total);
   const teamMax = Math.max(1, ...statTeam.map((row) => row.total));
 
+  const teamImgById = new Map(teams.map((team) => [team.id, team.imageUrl] as const));
   const byValue = [...players].sort((a, b) => b.pts - a.pts);
   const topPlayers = byValue.slice(0, 8);
   const ranking: RankRow[] = byValue.slice(0, 10).map((player, i) => ({
@@ -69,6 +70,7 @@ export default async function EstatisticasPage() {
     roleLabel: player.roleMeta.label,
     teamName: player.teamName,
     teamColor: player.teamColor,
+    teamImageUrl: teamImgById.get(player.teamId),
     eloKey: player.eloMeta?.key ?? "ferro",
     eloLabel: player.eloMeta?.label ?? player.elo,
   }));

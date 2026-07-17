@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { TeamMark } from "@/components/lob/ui";
 import { eloSvgUrl } from "@/lib/design";
 
 export type RankRow = {
@@ -10,6 +11,7 @@ export type RankRow = {
   roleLabel: string;
   teamName: string;
   teamColor: string;
+  teamImageUrl?: string;
   eloKey: string;
   eloLabel: string;
 };
@@ -85,15 +87,15 @@ export function StatsToggles({ ranking }: Readonly<{ ranking: RankRow[] }>) {
         <p style={{ margin: "0 0 14px", fontSize: 13, color: "#8f8472" }}>Abates, KDA, MVPs, assistências e mortes — atualiza a cada rodada.</p>
         <Toggle items={PLAYER_METRICS} value={playerMetric} onChange={setPlayerMetric} />
         <div className="lob-scroll" style={{ overflowX: "auto", border: "1px solid rgba(201,138,75,.20)", borderRadius: 3, background: "linear-gradient(180deg,#1a150d,#120e08)" }}>
-          <div style={{ minWidth: 440 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "44px 1fr 130px 84px", alignItems: "center", gap: 8, padding: "12px 16px", background: "rgba(201,138,75,.08)", fontSize: 10.5, letterSpacing: ".10em", color: "#a98a5f" }}>
+          <div style={{ minWidth: 580 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "44px minmax(140px,1fr) 218px 78px", alignItems: "center", gap: 8, padding: "12px 16px", background: "rgba(201,138,75,.08)", fontSize: 10.5, letterSpacing: ".10em", color: "#a98a5f" }}>
               <span>#</span>
               <span>JOGADOR</span>
               <span>TIME</span>
               <span style={{ textAlign: "right" }}>{pm.label.toUpperCase()}</span>
             </div>
             {ranking.map((row) => (
-              <div key={row.rank} style={{ display: "grid", gridTemplateColumns: "44px 1fr 130px 84px", alignItems: "center", gap: 8, padding: "11px 16px", borderTop: "1px solid rgba(201,138,75,.10)" }}>
+              <div key={row.rank} style={{ display: "grid", gridTemplateColumns: "44px minmax(140px,1fr) 218px 78px", alignItems: "center", gap: 8, padding: "11px 16px", borderTop: "1px solid rgba(201,138,75,.10)" }}>
                 <span className="lob-display" style={{ fontSize: 15, color: "#6f6656" }}>{row.rank}</span>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -103,9 +105,9 @@ export function StatsToggles({ ranking }: Readonly<{ ranking: RankRow[] }>) {
                     <div style={{ fontSize: 10, color: "#8f8472" }}>{row.roleLabel}</div>
                   </div>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
-                  <span style={{ width: 8, height: 8, transform: "rotate(45deg)", flexShrink: 0, background: row.teamColor }} />
-                  <span style={{ fontSize: 11, color: "#b8ab97", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.teamName}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                  <TeamMark imageUrl={row.teamImageUrl} color={row.teamColor} name={row.teamName} size={22} diamond={8} />
+                  <span style={{ fontSize: 11.5, color: "#b8ab97", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.teamName}</span>
                 </div>
                 <span className="lob-display" style={{ textAlign: "right", fontSize: 16, color: "#6f6656" }}>—</span>
               </div>
