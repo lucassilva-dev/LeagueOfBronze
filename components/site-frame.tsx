@@ -62,15 +62,19 @@ export function SiteFrame({ children }: SiteFrameProps) {
               href="/"
               style={{ display: "flex", alignItems: "center", gap: 12, textDecoration: "none" }}
             >
-              <div
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/logo.png"
+                alt="Os Bronzes"
+                width={44}
+                height={44}
                 style={{
-                  width: 32,
-                  height: 32,
-                  transform: "rotate(45deg)",
-                  background: "linear-gradient(135deg,#f0c88a,#a46a34)",
-                  borderRadius: 5,
-                  boxShadow: "0 0 20px -4px rgba(232,184,120,.65)",
+                  width: 44,
+                  height: 44,
+                  objectFit: "contain",
+                  borderRadius: 6,
                   flexShrink: 0,
+                  filter: "drop-shadow(0 0 14px rgba(232,184,120,.4))",
                 }}
               />
               <div style={{ display: "flex", flexDirection: "column", lineHeight: 1 }}>
