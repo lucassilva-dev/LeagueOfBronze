@@ -21,8 +21,8 @@ export default async function CalendarioPage() {
           primeiros da tabela decidem tudo na Grande Final em MD5.
         </p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 9 }}>
-          <Pill dot={false}>MATUTINO · 9h</Pill>
-          <Pill dot={false}>VESPERTINO · 14h</Pill>
+          <Pill dot={false}>MATUTINO · 9h–12h</Pill>
+          <Pill dot={false}>NOTURNO · 20h–23h</Pill>
           <Pill dot={false}>{confrontos} CONFRONTOS + FINAL</Pill>
         </div>
       </section>

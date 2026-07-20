@@ -29,7 +29,7 @@ function parseParts(iso: string) {
   const dateLabel = day && month ? `${day}/${month}` : dateKey;
   const hora = iso.length > 10 ? iso.slice(11, 16) : "";
   const hour = hora ? Number(hora.slice(0, 2)) : Number.NaN;
-  const turno = Number.isNaN(hour) ? "" : hour < 13 ? "Matutino" : "Vespertino";
+  const turno = Number.isNaN(hour) ? "" : hour < 13 ? "Matutino" : hour < 18 ? "Vespertino" : "Noturno";
   return { dateKey, dateLabel, hora, turno };
 }
 

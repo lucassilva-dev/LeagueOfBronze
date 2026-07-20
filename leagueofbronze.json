@@ -324,7 +324,7 @@
   "seriesMatches": [
     {
       "id": "serie-01",
-      "date": "2026-07-25T09:00:00-03:00",
+      "date": "2026-08-01T21:30:00-03:00",
       "teamAId": "time4",
       "teamBId": "presas-shurima",
       "stage": "REGULAR_SEASON",
@@ -333,7 +333,7 @@
     },
     {
       "id": "serie-02",
-      "date": "2026-07-25T10:30:00-03:00",
+      "date": "2026-07-25T20:00:00-03:00",
       "teamAId": "lgtv-wins",
       "teamBId": "capangas-motomoto",
       "stage": "REGULAR_SEASON",
@@ -342,7 +342,7 @@
     },
     {
       "id": "serie-03",
-      "date": "2026-07-25T12:00:00-03:00",
+      "date": "2026-07-25T09:00:00-03:00",
       "teamAId": "pantera-cor-de-goza",
       "teamBId": "vanguarda-de-ferro",
       "stage": "REGULAR_SEASON",
@@ -351,7 +351,7 @@
     },
     {
       "id": "serie-04",
-      "date": "2026-07-25T14:00:00-03:00",
+      "date": "2026-07-25T21:30:00-03:00",
       "teamAId": "time4",
       "teamBId": "capangas-motomoto",
       "stage": "REGULAR_SEASON",
@@ -360,7 +360,7 @@
     },
     {
       "id": "serie-05",
-      "date": "2026-07-25T15:30:00-03:00",
+      "date": "2026-07-25T10:30:00-03:00",
       "teamAId": "presas-shurima",
       "teamBId": "vanguarda-de-ferro",
       "stage": "REGULAR_SEASON",
@@ -369,7 +369,7 @@
     },
     {
       "id": "serie-06",
-      "date": "2026-07-25T17:00:00-03:00",
+      "date": "2026-07-25T23:00:00-03:00",
       "teamAId": "lgtv-wins",
       "teamBId": "pantera-cor-de-goza",
       "stage": "REGULAR_SEASON",
@@ -378,7 +378,7 @@
     },
     {
       "id": "serie-07",
-      "date": "2026-07-26T09:00:00-03:00",
+      "date": "2026-07-26T20:00:00-03:00",
       "teamAId": "time4",
       "teamBId": "vanguarda-de-ferro",
       "stage": "REGULAR_SEASON",
@@ -387,7 +387,7 @@
     },
     {
       "id": "serie-08",
-      "date": "2026-07-26T10:30:00-03:00",
+      "date": "2026-07-26T12:00:00-03:00",
       "teamAId": "capangas-motomoto",
       "teamBId": "pantera-cor-de-goza",
       "stage": "REGULAR_SEASON",
@@ -396,7 +396,7 @@
     },
     {
       "id": "serie-09",
-      "date": "2026-07-26T12:00:00-03:00",
+      "date": "2026-07-26T09:00:00-03:00",
       "teamAId": "presas-shurima",
       "teamBId": "lgtv-wins",
       "stage": "REGULAR_SEASON",
@@ -405,7 +405,7 @@
     },
     {
       "id": "serie-10",
-      "date": "2026-07-26T14:00:00-03:00",
+      "date": "2026-07-26T21:30:00-03:00",
       "teamAId": "time4",
       "teamBId": "pantera-cor-de-goza",
       "stage": "REGULAR_SEASON",
@@ -414,7 +414,7 @@
     },
     {
       "id": "serie-11",
-      "date": "2026-07-26T15:30:00-03:00",
+      "date": "2026-07-26T10:30:00-03:00",
       "teamAId": "vanguarda-de-ferro",
       "teamBId": "lgtv-wins",
       "stage": "REGULAR_SEASON",
@@ -423,7 +423,7 @@
     },
     {
       "id": "serie-12",
-      "date": "2026-07-26T17:00:00-03:00",
+      "date": "2026-08-01T23:00:00-03:00",
       "teamAId": "capangas-motomoto",
       "teamBId": "presas-shurima",
       "stage": "REGULAR_SEASON",
@@ -432,7 +432,7 @@
     },
     {
       "id": "serie-13",
-      "date": "2026-08-01T09:00:00-03:00",
+      "date": "2026-08-01T20:00:00-03:00",
       "teamAId": "time4",
       "teamBId": "lgtv-wins",
       "stage": "REGULAR_SEASON",
@@ -441,7 +441,7 @@
     },
     {
       "id": "serie-14",
-      "date": "2026-08-01T10:30:00-03:00",
+      "date": "2026-08-01T09:00:00-03:00",
       "teamAId": "pantera-cor-de-goza",
       "teamBId": "presas-shurima",
       "stage": "REGULAR_SEASON",
@@ -450,7 +450,7 @@
     },
     {
       "id": "serie-15",
-      "date": "2026-08-01T12:00:00-03:00",
+      "date": "2026-08-01T10:30:00-03:00",
       "teamAId": "vanguarda-de-ferro",
       "teamBId": "capangas-motomoto",
       "stage": "REGULAR_SEASON",
