@@ -329,7 +329,106 @@
       "teamBId": "presas-shurima",
       "stage": "REGULAR_SEASON",
       "format": "BO3",
-      "games": []
+      "games": [
+        {
+          "winnerTeamId": "presas-shurima",
+          "mvpPlayerId": "sr-hades",
+          "statsByPlayer": [
+            {
+              "playerId": "n4firida-agiota",
+              "champion": "Naafiri",
+              "kills": 5,
+              "deaths": 2,
+              "assists": 9
+            },
+            {
+              "playerId": "sr-hades",
+              "champion": "Mordekaiser",
+              "kills": 10,
+              "deaths": 1,
+              "assists": 2
+            },
+            {
+              "playerId": "famoso-parrudao",
+              "champion": "Sylas",
+              "kills": 4,
+              "deaths": 8,
+              "assists": 5
+            },
+            {
+              "playerId": "hikolin",
+              "champion": "Ezreal",
+              "kills": 3,
+              "deaths": 2,
+              "assists": 3
+            },
+            {
+              "playerId": "onigami",
+              "champion": "Vel'Koz",
+              "kills": 3,
+              "deaths": 3,
+              "assists": 6
+            },
+            {
+              "playerId": "top-lane-666",
+              "champion": "Yorick",
+              "kills": 2,
+              "deaths": 5,
+              "assists": 3
+            },
+            {
+              "playerId": "malasartes",
+              "champion": "Amumu",
+              "kills": 1,
+              "deaths": 9,
+              "assists": 6
+            },
+            {
+              "playerId": "sabor-energetico",
+              "champion": "Xerath",
+              "kills": 2,
+              "deaths": 8,
+              "assists": 5
+            },
+            {
+              "playerId": "sou-adc-nao-deus",
+              "champion": "Caitlyn",
+              "kills": 10,
+              "deaths": 2,
+              "assists": 5
+            },
+            {
+              "playerId": "miva",
+              "champion": "Milio",
+              "kills": 1,
+              "deaths": 1,
+              "assists": 15
+            }
+          ],
+          "bans": [
+            {
+              "teamId": "presas-shurima",
+              "championName": "Illaoi"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Zac"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Jinx"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Tristana"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Mel"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "serie-02",
