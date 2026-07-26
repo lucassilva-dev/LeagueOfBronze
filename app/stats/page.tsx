@@ -7,8 +7,6 @@ import { buildChampionLeaderboards, buildLeaderboards } from "@/lib/tournament";
 
 export const dynamic = "force-dynamic";
 
-const ROLE_SHORTS = ["TOP", "SEL", "MID", "ADC", "SUP"];
-
 function BarRow({ label, color, count, pct }: Readonly<{ label: string; color: string; count: number; pct: number }>) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "78px 1fr 24px", alignItems: "center", gap: 10 }}>
@@ -50,12 +48,6 @@ export default async function EstatisticasPage() {
     .filter((row) => row.count > 0)
     .sort((a, b) => b.count - a.count);
   const eloMax = Math.max(1, ...statElo.map((row) => row.count));
-
-  const statRole = ROLE_SHORTS.map((short) => {
-    const list = players.filter((player) => player.roleMeta.short === short);
-    return { label: list[0]?.roleMeta.label ?? short, color: list[0]?.roleMeta.color ?? "#c98a4b", count: list.length };
-  }).filter((row) => row.count > 0);
-  const roleMax = Math.max(1, ...statRole.map((row) => row.count));
 
   const statTeam = teams
     .map((team) => ({ name: team.name, color: team.color, total: team.total }))
@@ -122,13 +114,6 @@ export default async function EstatisticasPage() {
           <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
             {statElo.map((row) => (
               <BarRow key={row.label} label={row.label} color={row.color} count={row.count} pct={Math.round((row.count / eloMax) * 100)} />
-            ))}
-          </div>
-        </StatCard>
-        <StatCard title="DISTRIBUIÇÃO POR ROTA">
-          <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
-            {statRole.map((row) => (
-              <BarRow key={row.label} label={row.label} color={row.color} count={row.count} pct={Math.round((row.count / roleMax) * 100)} />
             ))}
           </div>
         </StatCard>

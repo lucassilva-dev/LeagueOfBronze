@@ -82,6 +82,24 @@ function Toggle<T extends { key: string; label: string }>({
   );
 }
 
+function SortButton({
+  head,
+  dir,
+  onToggle,
+}: Readonly<{ head: string; dir: "desc" | "asc"; onToggle: () => void }>) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      title={dir === "desc" ? "Ordenado do maior para o menor · clique para inverter" : "Ordenado do menor para o maior · clique para inverter"}
+      style={{ display: "inline-flex", alignItems: "center", gap: 5, marginLeft: "auto", padding: 0, border: "none", background: "transparent", color: "#a98a5f", fontSize: 10.5, letterSpacing: ".10em", fontWeight: 700, cursor: "pointer" }}
+    >
+      {head}
+      <span style={{ fontSize: 9, color: "#e6c592" }}>{dir === "desc" ? "▼" : "▲"}</span>
+    </button>
+  );
+}
+
 function EmptyState({ title }: Readonly<{ title: string }>) {
   return (
     <div style={{ padding: "40px 24px", textAlign: "center", border: "1px dashed rgba(201,138,75,.28)", borderRadius: 4, background: "rgba(201,138,75,.03)" }}>
@@ -102,10 +120,14 @@ export function StatsToggles({
 }>) {
   const [playerMetric, setPlayerMetric] = useState("abates");
   const [champMetric, setChampMetric] = useState("jogados");
+  const [playerDir, setPlayerDir] = useState<"desc" | "asc">("desc");
+  const [champDir, setChampDir] = useState<"desc" | "asc">("desc");
   const pm = PLAYER_METRICS.find((m) => m.key === playerMetric) ?? PLAYER_METRICS[0];
   const cm = CHAMP_METRICS.find((m) => m.key === champMetric) ?? CHAMP_METRICS[0];
-  const rows = (playerRankings[playerMetric] ?? []).slice(0, 10);
-  const crows = (champRankings[champMetric] ?? []).slice(0, 10);
+  const rowsAll = playerRankings[playerMetric] ?? [];
+  const rows = playerDir === "asc" ? [...rowsAll].reverse() : rowsAll;
+  const crowsAll = champRankings[champMetric] ?? [];
+  const crows = champDir === "asc" ? [...crowsAll].reverse() : crowsAll;
 
   return (
     <>
@@ -122,13 +144,15 @@ export function StatsToggles({
         {rows.length === 0 ? (
           <EmptyState title="Sem partidas registradas ainda" />
         ) : (
-          <div className="lob-scroll" style={{ overflowX: "auto", border: "1px solid rgba(201,138,75,.20)", borderRadius: 3, background: "linear-gradient(180deg,#1a150d,#120e08)" }}>
+          <div className="lob-scroll" style={{ overflow: "auto", maxHeight: 560, border: "1px solid rgba(201,138,75,.20)", borderRadius: 3, background: "linear-gradient(180deg,#1a150d,#120e08)" }}>
             <div style={{ minWidth: 600 }}>
-              <div style={{ display: "grid", gridTemplateColumns: GRID_P, alignItems: "center", gap: 8, padding: "12px 16px", background: "rgba(201,138,75,.08)", fontSize: 10.5, letterSpacing: ".10em", color: "#a98a5f" }}>
+              <div style={{ position: "sticky", top: 0, zIndex: 1, display: "grid", gridTemplateColumns: GRID_P, alignItems: "center", gap: 8, padding: "12px 16px", background: "#1d1710", borderBottom: "1px solid rgba(201,138,75,.20)", fontSize: 10.5, letterSpacing: ".10em", color: "#a98a5f" }}>
                 <span>#</span>
                 <span>JOGADOR</span>
                 <span>TIME</span>
-                <span style={{ textAlign: "right" }}>{pm.head}</span>
+                <span style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <SortButton head={pm.head} dir={playerDir} onToggle={() => setPlayerDir((d) => (d === "desc" ? "asc" : "desc"))} />
+                </span>
               </div>
               {rows.map((row) => (
                 <div key={`${row.rank}-${row.nick}`} style={{ display: "grid", gridTemplateColumns: GRID_P, alignItems: "center", gap: 8, padding: "11px 16px", borderTop: "1px solid rgba(201,138,75,.10)" }}>
@@ -168,12 +192,14 @@ export function StatsToggles({
         {crows.length === 0 ? (
           <EmptyState title="Nenhum campeão registrado ainda" />
         ) : (
-          <div className="lob-scroll" style={{ overflowX: "auto", border: "1px solid rgba(201,138,75,.20)", borderRadius: 3, background: "linear-gradient(180deg,#1a150d,#120e08)" }}>
+          <div className="lob-scroll" style={{ overflow: "auto", maxHeight: 560, border: "1px solid rgba(201,138,75,.20)", borderRadius: 3, background: "linear-gradient(180deg,#1a150d,#120e08)" }}>
             <div style={{ minWidth: 360 }}>
-              <div style={{ display: "grid", gridTemplateColumns: GRID_C, alignItems: "center", gap: 8, padding: "12px 16px", background: "rgba(201,138,75,.08)", fontSize: 10.5, letterSpacing: ".10em", color: "#a98a5f" }}>
+              <div style={{ position: "sticky", top: 0, zIndex: 1, display: "grid", gridTemplateColumns: GRID_C, alignItems: "center", gap: 8, padding: "12px 16px", background: "#1d1710", borderBottom: "1px solid rgba(201,138,75,.20)", fontSize: 10.5, letterSpacing: ".10em", color: "#a98a5f" }}>
                 <span>#</span>
                 <span>CAMPEÃO</span>
-                <span style={{ textAlign: "right" }}>{cm.head}</span>
+                <span style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <SortButton head={cm.head} dir={champDir} onToggle={() => setChampDir((d) => (d === "desc" ? "asc" : "desc"))} />
+                </span>
               </div>
               {crows.map((c) => (
                 <div key={`${c.rank}-${c.championId}`} style={{ display: "grid", gridTemplateColumns: GRID_C, alignItems: "center", gap: 8, padding: "10px 16px", borderTop: "1px solid rgba(201,138,75,.10)" }}>
