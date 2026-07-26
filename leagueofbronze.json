@@ -1556,6 +1556,98 @@
               "championName": "Malphite"
             }
           ]
+        },
+        {
+          "winnerTeamId": "lgtv-wins",
+          "mvpPlayerId": "z0e-baiana",
+          "durationMin": 33,
+          "statsByPlayer": [
+            {
+              "playerId": "png-gala",
+              "champion": "Ziggs",
+              "kills": 6,
+              "deaths": 3,
+              "assists": 13
+            },
+            {
+              "playerId": "vidotti-agiota",
+              "champion": "Briar",
+              "kills": 7,
+              "deaths": 5,
+              "assists": 7
+            },
+            {
+              "playerId": "z0e-baiana",
+              "champion": "Galio",
+              "kills": 8,
+              "deaths": 2,
+              "assists": 6
+            },
+            {
+              "playerId": "maxmp",
+              "champion": "Zilean",
+              "kills": 7,
+              "deaths": 5,
+              "assists": 13
+            },
+            {
+              "playerId": "tapa-de-doido",
+              "champion": "Sylas",
+              "kills": 3,
+              "deaths": 6,
+              "assists": 6
+            },
+            {
+              "playerId": "iranildo-gari",
+              "champion": "Diana",
+              "kills": 4,
+              "deaths": 5,
+              "assists": 6
+            },
+            {
+              "playerId": "tikin-d-calcinha",
+              "champion": "Irelia",
+              "kills": 4,
+              "deaths": 7,
+              "assists": 7
+            },
+            {
+              "playerId": "nak4y",
+              "champion": "Mel",
+              "kills": 7,
+              "deaths": 5,
+              "assists": 2
+            },
+            {
+              "playerId": "gar3na",
+              "champion": "Zyra",
+              "kills": 0,
+              "deaths": 6,
+              "assists": 5
+            }
+          ],
+          "bans": [
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Nasus"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Warwick"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Lillia"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Garen"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Ezreal"
+            }
+          ]
         }
       ]
     },
