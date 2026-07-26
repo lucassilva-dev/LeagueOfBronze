@@ -622,7 +622,8 @@
               "teamId": "pantera-cor-de-goza",
               "championName": "Vladimir"
             }
-          ]
+          ],
+          "durationMin": 40
         },
         {
           "winnerTeamId": "vanguarda-de-ferro",
@@ -698,7 +699,8 @@
               "deaths": 6,
               "assists": 14
             }
-          ]
+          ],
+          "durationMin": 28
         },
         {
           "winnerTeamId": "vanguarda-de-ferro",
@@ -816,7 +818,8 @@
               "teamId": "vanguarda-de-ferro",
               "championName": "Garen"
             }
-          ]
+          ],
+          "durationMin": 25
         }
       ]
     },
@@ -969,7 +972,127 @@
       "teamBId": "vanguarda-de-ferro",
       "stage": "REGULAR_SEASON",
       "format": "BO3",
-      "games": []
+      "games": [
+        {
+          "winnerTeamId": "vanguarda-de-ferro",
+          "mvpPlayerId": "ctz",
+          "durationMin": 25,
+          "statsByPlayer": [
+            {
+              "playerId": "satoshi",
+              "champion": "Naafiri",
+              "kills": 6,
+              "deaths": 6,
+              "assists": 9
+            },
+            {
+              "playerId": "peideicaldinho",
+              "champion": "Ornn",
+              "kills": 2,
+              "deaths": 2,
+              "assists": 11
+            },
+            {
+              "playerId": "mxxdragonxxm",
+              "champion": "Shyvana",
+              "kills": 11,
+              "deaths": 3,
+              "assists": 8
+            },
+            {
+              "playerId": "ctz",
+              "champion": "Yunara",
+              "kills": 15,
+              "deaths": 5,
+              "assists": 10
+            },
+            {
+              "playerId": "thalao",
+              "champion": "Nami",
+              "kills": 1,
+              "deaths": 3,
+              "assists": 21
+            },
+            {
+              "playerId": "sr-hades",
+              "champion": "Tahm Kench",
+              "kills": 2,
+              "deaths": 5,
+              "assists": 4
+            },
+            {
+              "playerId": "hikolin",
+              "champion": "Hecarim",
+              "kills": 5,
+              "deaths": 8,
+              "assists": 12
+            },
+            {
+              "playerId": "n4firida-agiota",
+              "champion": "Veigar",
+              "kills": 3,
+              "deaths": 3,
+              "assists": 6
+            },
+            {
+              "playerId": "famoso-parrudao",
+              "champion": "Brand",
+              "kills": 6,
+              "deaths": 9,
+              "assists": 7
+            },
+            {
+              "playerId": "onigami",
+              "champion": "Senna",
+              "kills": 3,
+              "deaths": 10,
+              "assists": 9
+            }
+          ],
+          "bans": [
+            {
+              "teamId": "vanguarda-de-ferro",
+              "championName": "Vel'Koz"
+            },
+            {
+              "teamId": "vanguarda-de-ferro",
+              "championName": "Heimerdinger"
+            },
+            {
+              "teamId": "vanguarda-de-ferro",
+              "championName": "Quinn"
+            },
+            {
+              "teamId": "vanguarda-de-ferro",
+              "championName": "Lillia"
+            },
+            {
+              "teamId": "vanguarda-de-ferro",
+              "championName": "Yasuo"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Ezreal"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Vladimir"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Diana"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Lucian"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Mordekaiser"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "serie-06",
