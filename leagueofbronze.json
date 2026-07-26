@@ -1091,6 +1091,125 @@
               "championName": "Mordekaiser"
             }
           ]
+        },
+        {
+          "winnerTeamId": "vanguarda-de-ferro",
+          "mvpPlayerId": "satoshi",
+          "durationMin": 24,
+          "statsByPlayer": [
+            {
+              "playerId": "satoshi",
+              "champion": "Katarina",
+              "kills": 15,
+              "deaths": 6,
+              "assists": 2
+            },
+            {
+              "playerId": "peideicaldinho",
+              "champion": "Sion",
+              "kills": 1,
+              "deaths": 6,
+              "assists": 11
+            },
+            {
+              "playerId": "mxxdragonxxm",
+              "champion": "Viego",
+              "kills": 10,
+              "deaths": 4,
+              "assists": 6
+            },
+            {
+              "playerId": "ctz",
+              "champion": "Zeri",
+              "kills": 3,
+              "deaths": 2,
+              "assists": 7
+            },
+            {
+              "playerId": "thalao",
+              "champion": "Yuumi",
+              "kills": 1,
+              "deaths": 1,
+              "assists": 16
+            },
+            {
+              "playerId": "sr-hades",
+              "champion": "Gwen",
+              "kills": 3,
+              "deaths": 7,
+              "assists": 4
+            },
+            {
+              "playerId": "famoso-parrudao",
+              "champion": "Jarvan IV",
+              "kills": 4,
+              "deaths": 7,
+              "assists": 11
+            },
+            {
+              "playerId": "onigami",
+              "champion": "Syndra",
+              "kills": 4,
+              "deaths": 7,
+              "assists": 7
+            },
+            {
+              "playerId": "hikolin",
+              "champion": "Jinx",
+              "kills": 6,
+              "deaths": 4,
+              "assists": 5
+            },
+            {
+              "playerId": "n4firida-agiota",
+              "champion": "Zyra",
+              "kills": 2,
+              "deaths": 5,
+              "assists": 8
+            }
+          ],
+          "bans": [
+            {
+              "teamId": "vanguarda-de-ferro",
+              "championName": "Swain"
+            },
+            {
+              "teamId": "vanguarda-de-ferro",
+              "championName": "Nocturne"
+            },
+            {
+              "teamId": "vanguarda-de-ferro",
+              "championName": "Yone"
+            },
+            {
+              "teamId": "vanguarda-de-ferro",
+              "championName": "Mordekaiser"
+            },
+            {
+              "teamId": "vanguarda-de-ferro",
+              "championName": "Yasuo"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Ezreal"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Vladimir"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Diana"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Shen"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Maokai"
+            }
+          ]
         }
       ]
     },
