@@ -80,6 +80,7 @@ export default async function EstatisticasPage() {
       teamName: r.player.teamName,
       teamColor: d?.teamColor ?? "#c98a4b",
       teamImageUrl: d?.teamImageUrl,
+      imageUrl: d?.imageUrl,
       eloKey: d?.eloMeta?.key ?? "ferro",
       eloLabel: d?.eloMeta?.label ?? "",
       valueLabel,

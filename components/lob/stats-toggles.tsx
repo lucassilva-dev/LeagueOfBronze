@@ -13,6 +13,7 @@ export type PlayerStatRow = {
   teamName: string;
   teamColor: string;
   teamImageUrl?: string;
+  imageUrl?: string;
   eloKey: string;
   eloLabel: string;
   valueLabel: string;
@@ -122,7 +123,7 @@ export function StatsToggles({
           <EmptyState title="Sem partidas registradas ainda" />
         ) : (
           <div className="lob-scroll" style={{ overflowX: "auto", border: "1px solid rgba(201,138,75,.20)", borderRadius: 3, background: "linear-gradient(180deg,#1a150d,#120e08)" }}>
-            <div style={{ minWidth: 560 }}>
+            <div style={{ minWidth: 600 }}>
               <div style={{ display: "grid", gridTemplateColumns: GRID_P, alignItems: "center", gap: 8, padding: "12px 16px", background: "rgba(201,138,75,.08)", fontSize: 10.5, letterSpacing: ".10em", color: "#a98a5f" }}>
                 <span>#</span>
                 <span>JOGADOR</span>
@@ -132,9 +133,13 @@ export function StatsToggles({
               {rows.map((row) => (
                 <div key={`${row.rank}-${row.nick}`} style={{ display: "grid", gridTemplateColumns: GRID_P, alignItems: "center", gap: 8, padding: "11px 16px", borderTop: "1px solid rgba(201,138,75,.10)" }}>
                   <span className="lob-display" style={{ fontSize: 15, color: row.rank <= 3 ? "#cfa877" : "#6f6656" }}>{row.rank}</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
+                    {row.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={row.imageUrl} alt={row.nick} width={30} height={30} style={{ width: 30, height: 30, borderRadius: "50%", objectFit: "cover", objectPosition: "center top", border: "1px solid rgba(201,138,75,.35)", flexShrink: 0 }} />
+                    ) : null}
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={eloSvgUrl(row.eloKey)} alt={row.eloLabel} width={26} style={{ height: "auto", flexShrink: 0 }} />
+                    <img src={eloSvgUrl(row.eloKey)} alt={row.eloLabel} width={22} style={{ height: "auto", flexShrink: 0 }} />
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 13, color: "#f0e9dd", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.nick}</div>
                       <div style={{ fontSize: 10, color: "#8f8472" }}>{row.roleLabel}</div>
