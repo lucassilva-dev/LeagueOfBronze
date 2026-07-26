@@ -427,6 +427,124 @@
               "championName": "Mel"
             }
           ]
+        },
+        {
+          "winnerTeamId": "presas-shurima",
+          "mvpPlayerId": "onigami",
+          "statsByPlayer": [
+            {
+              "playerId": "n4firida-agiota",
+              "champion": "Heimerdinger",
+              "kills": 3,
+              "deaths": 5,
+              "assists": 4
+            },
+            {
+              "playerId": "sr-hades",
+              "champion": "Trundle",
+              "kills": 1,
+              "deaths": 4,
+              "assists": 8
+            },
+            {
+              "playerId": "onigami",
+              "champion": "Hecarim",
+              "kills": 5,
+              "deaths": 2,
+              "assists": 3
+            },
+            {
+              "playerId": "hikolin",
+              "champion": "Vayne",
+              "kills": 3,
+              "deaths": 3,
+              "assists": 7
+            },
+            {
+              "playerId": "famoso-parrudao",
+              "champion": "Sona",
+              "kills": 2,
+              "deaths": 2,
+              "assists": 9
+            },
+            {
+              "playerId": "top-lane-666",
+              "champion": "Malphite",
+              "kills": 5,
+              "deaths": 3,
+              "assists": 6
+            },
+            {
+              "playerId": "malasartes",
+              "champion": "Sejuani",
+              "kills": 3,
+              "deaths": 2,
+              "assists": 11
+            },
+            {
+              "playerId": "sabor-energetico",
+              "champion": "Lux",
+              "kills": 4,
+              "deaths": 2,
+              "assists": 5
+            },
+            {
+              "playerId": "sou-adc-nao-deus",
+              "champion": "Miss Fortune",
+              "kills": 3,
+              "deaths": 4,
+              "assists": 6
+            },
+            {
+              "playerId": "miva",
+              "champion": "Seraphine",
+              "kills": 1,
+              "deaths": 3,
+              "assists": 10
+            }
+          ],
+          "bans": [
+            {
+              "teamId": "presas-shurima",
+              "championName": "Illaoi"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Zac"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Jinx"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Tristana"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Draven"
+            },
+            {
+              "teamId": "time4",
+              "championName": "Shen"
+            },
+            {
+              "teamId": "time4",
+              "championName": "Vi"
+            },
+            {
+              "teamId": "time4",
+              "championName": "Mel"
+            },
+            {
+              "teamId": "time4",
+              "championName": "Ziggs"
+            },
+            {
+              "teamId": "time4",
+              "championName": "Quinn"
+            }
+          ]
         }
       ]
     },
