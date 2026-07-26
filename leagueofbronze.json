@@ -356,7 +356,140 @@
       "teamBId": "capangas-motomoto",
       "stage": "REGULAR_SEASON",
       "format": "BO3",
-      "games": []
+      "games": [
+        {
+          "winnerTeamId": "capangas-motomoto",
+          "mvpPlayerId": "samuel-venancio",
+          "statsByPlayer": [
+            {
+              "playerId": "razeral",
+              "kills": 5,
+              "deaths": 5,
+              "assists": 6
+            },
+            {
+              "playerId": "innellea",
+              "kills": 5,
+              "deaths": 4,
+              "assists": 0
+            },
+            {
+              "playerId": "samuel-venancio",
+              "kills": 2,
+              "deaths": 1,
+              "assists": 12
+            },
+            {
+              "playerId": "midas",
+              "kills": 5,
+              "deaths": 2,
+              "assists": 4
+            },
+            {
+              "playerId": "motomoto",
+              "kills": 3,
+              "deaths": 4,
+              "assists": 5
+            },
+            {
+              "playerId": "top-lane-666",
+              "kills": 4,
+              "deaths": 5,
+              "assists": 6
+            },
+            {
+              "playerId": "malasartes",
+              "kills": 5,
+              "deaths": 8,
+              "assists": 2
+            },
+            {
+              "playerId": "sabor-energetico",
+              "kills": 2,
+              "deaths": 4,
+              "assists": 3
+            },
+            {
+              "playerId": "sou-adc-nao-deus",
+              "kills": 4,
+              "deaths": 1,
+              "assists": 4
+            },
+            {
+              "playerId": "miva",
+              "kills": 1,
+              "deaths": 2,
+              "assists": 9
+            }
+          ]
+        },
+        {
+          "winnerTeamId": "capangas-motomoto",
+          "mvpPlayerId": "razeral",
+          "statsByPlayer": [
+            {
+              "playerId": "razeral",
+              "kills": 10,
+              "deaths": 1,
+              "assists": 4
+            },
+            {
+              "playerId": "innellea",
+              "kills": 3,
+              "deaths": 1,
+              "assists": 3
+            },
+            {
+              "playerId": "samuel-venancio",
+              "kills": 8,
+              "deaths": 0,
+              "assists": 13
+            },
+            {
+              "playerId": "midas",
+              "kills": 9,
+              "deaths": 0,
+              "assists": 5
+            },
+            {
+              "playerId": "motomoto",
+              "kills": 0,
+              "deaths": 1,
+              "assists": 15
+            },
+            {
+              "playerId": "top-lane-666",
+              "kills": 1,
+              "deaths": 6,
+              "assists": 0
+            },
+            {
+              "playerId": "malasartes",
+              "kills": 0,
+              "deaths": 7,
+              "assists": 1
+            },
+            {
+              "playerId": "sabor-energetico",
+              "kills": 0,
+              "deaths": 8,
+              "assists": 2
+            },
+            {
+              "playerId": "sou-adc-nao-deus",
+              "kills": 2,
+              "deaths": 5,
+              "assists": 0
+            },
+            {
+              "playerId": "miva",
+              "kills": 0,
+              "deaths": 4,
+              "assists": 1
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "serie-05",
