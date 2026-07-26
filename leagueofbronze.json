@@ -1437,7 +1437,127 @@
       "teamBId": "pantera-cor-de-goza",
       "stage": "REGULAR_SEASON",
       "format": "BO3",
-      "games": []
+      "games": [
+        {
+          "winnerTeamId": "lgtv-wins",
+          "mvpPlayerId": "vidotti-agiota",
+          "durationMin": 39,
+          "statsByPlayer": [
+            {
+              "playerId": "png-gala",
+              "champion": "Shen",
+              "kills": 3,
+              "deaths": 2,
+              "assists": 14
+            },
+            {
+              "playerId": "vidotti-agiota",
+              "champion": "Shyvana",
+              "kills": 15,
+              "deaths": 4,
+              "assists": 7
+            },
+            {
+              "playerId": "z0e-baiana",
+              "champion": "Seraphine",
+              "kills": 6,
+              "deaths": 1,
+              "assists": 11
+            },
+            {
+              "playerId": "wrgamer",
+              "champion": "Jhin",
+              "kills": 6,
+              "deaths": 3,
+              "assists": 13
+            },
+            {
+              "playerId": "maxmp",
+              "champion": "Karma",
+              "kills": 2,
+              "deaths": 0,
+              "assists": 26
+            },
+            {
+              "playerId": "tapa-de-doido",
+              "champion": "Sett",
+              "kills": 2,
+              "deaths": 4,
+              "assists": 3
+            },
+            {
+              "playerId": "iranildo-gari",
+              "champion": "Amumu",
+              "kills": 2,
+              "deaths": 8,
+              "assists": 5
+            },
+            {
+              "playerId": "tikin-d-calcinha",
+              "champion": "Akali",
+              "kills": 4,
+              "deaths": 6,
+              "assists": 3
+            },
+            {
+              "playerId": "nak4y",
+              "champion": "Caitlyn",
+              "kills": 2,
+              "deaths": 9,
+              "assists": 4
+            },
+            {
+              "playerId": "gar3na",
+              "champion": "Leona",
+              "kills": 0,
+              "deaths": 5,
+              "assists": 5
+            }
+          ],
+          "bans": [
+            {
+              "teamId": "lgtv-wins",
+              "championName": "Katarina"
+            },
+            {
+              "teamId": "lgtv-wins",
+              "championName": "Irelia"
+            },
+            {
+              "teamId": "lgtv-wins",
+              "championName": "Vayne"
+            },
+            {
+              "teamId": "lgtv-wins",
+              "championName": "Sylas"
+            },
+            {
+              "teamId": "lgtv-wins",
+              "championName": "Mordekaiser"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Ezreal"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Nasus"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Lillia"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Zilean"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Malphite"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "serie-07",
