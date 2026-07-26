@@ -1,8 +1,9 @@
-import { StatsToggles, type RankRow } from "@/components/lob/stats-toggles";
+import { StatsToggles, type ChampStatRow, type PlayerStatRow } from "@/components/lob/stats-toggles";
 import { Eyebrow, EloCrest, GoldTitle, Pill } from "@/components/lob/ui";
 import { ELO_ORDER } from "@/lib/design";
 import { buildDesignPlayers, buildDesignTeams } from "@/lib/roster";
 import { getServerDataset } from "@/lib/server-data";
+import { buildChampionLeaderboards, buildLeaderboards } from "@/lib/tournament";
 
 export const dynamic = "force-dynamic";
 
@@ -61,19 +62,46 @@ export default async function EstatisticasPage() {
     .sort((a, b) => b.total - a.total);
   const teamMax = Math.max(1, ...statTeam.map((row) => row.total));
 
-  const teamImgById = new Map(teams.map((team) => [team.id, team.imageUrl] as const));
   const byValue = [...players].sort((a, b) => b.pts - a.pts);
   const topPlayers = byValue.slice(0, 8);
-  const ranking: RankRow[] = byValue.slice(0, 10).map((player, i) => ({
-    rank: i + 1,
-    nick: player.displayNick,
-    roleLabel: player.roleMeta.label,
-    teamName: player.teamName,
-    teamColor: player.teamColor,
-    teamImageUrl: teamImgById.get(player.teamId),
-    eloKey: player.eloMeta?.key ?? "ferro",
-    eloLabel: player.eloMeta?.label ?? player.elo,
-  }));
+
+  // Rankings reais dos jogos registrados
+  const designById = new Map(players.map((p) => [p.id, p] as const));
+  const pboards = buildLeaderboards(dataset);
+  const toRow = (
+    r: { position: number; value: number; player: { playerId: string; playerNick: string; teamName: string } },
+    valueLabel: string,
+  ): PlayerStatRow => {
+    const d = designById.get(r.player.playerId);
+    return {
+      rank: r.position,
+      nick: d?.displayNick ?? r.player.playerNick,
+      roleLabel: d?.roleMeta.label ?? "",
+      teamName: r.player.teamName,
+      teamColor: d?.teamColor ?? "#c98a4b",
+      teamImageUrl: d?.teamImageUrl,
+      eloKey: d?.eloMeta?.key ?? "ferro",
+      eloLabel: d?.eloMeta?.label ?? "",
+      valueLabel,
+    };
+  };
+  const playerRankings: Record<string, PlayerStatRow[]> = {
+    abates: pboards.kills.map((r) => toRow(r, String(r.value))),
+    kda: pboards.kda.map((r) => toRow(r, r.value.toFixed(2))),
+    mvps: pboards.mvps.map((r) => toRow(r, String(r.value))),
+    assist: pboards.assists.map((r) => toRow(r, String(r.value))),
+    mortes: pboards.deathsLeast.map((r) => toRow(r, String(r.value))),
+  };
+
+  const cboards = buildChampionLeaderboards(dataset);
+  const champRankings: Record<string, ChampStatRow[]> = {
+    jogados: cboards.picks.map((r) => ({ rank: r.position, championId: r.champion.championId, championName: r.champion.championName, valueLabel: `${r.value}×`, sub: `${r.champion.wins}V · ${r.champion.losses}D` })),
+    banidos: cboards.bans.map((r) => ({ rank: r.position, championId: r.champion.championId, championName: r.champion.championName, valueLabel: `${r.value}×`, sub: `banido ${r.value}×` })),
+    taxaban: cboards.banRate.map((r) => ({ rank: r.position, championId: r.champion.championId, championName: r.champion.championName, valueLabel: `${Math.round(r.value)}%`, sub: `${r.champion.bans} bans` })),
+    presenca: cboards.presence.map((r) => ({ rank: r.position, championId: r.champion.championId, championName: r.champion.championName, valueLabel: `${Math.round(r.value)}%`, sub: `${r.champion.picks}P · ${r.champion.bans}B` })),
+    winrate: cboards.winRate.map((r) => ({ rank: r.position, championId: r.champion.championId, championName: r.champion.championName, valueLabel: `${Math.round(r.value)}%`, sub: `${r.champion.wins}V/${r.champion.games}J` })),
+    kda: cboards.kda.map((r) => ({ rank: r.position, championId: r.champion.championId, championName: r.champion.championName, valueLabel: r.value.toFixed(2), sub: `${r.champion.kills}/${r.champion.deaths}/${r.champion.assists}` })),
+  };
 
   return (
     <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "0 clamp(16px,4vw,24px) 96px" }}>
@@ -135,7 +163,7 @@ export default async function EstatisticasPage() {
         </StatCard>
       </section>
 
-      <StatsToggles ranking={ranking} />
+      <StatsToggles playerRankings={playerRankings} champRankings={champRankings} />
     </div>
   );
 }
