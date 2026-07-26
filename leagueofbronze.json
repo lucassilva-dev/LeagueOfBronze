@@ -338,7 +338,192 @@
       "teamBId": "capangas-motomoto",
       "stage": "REGULAR_SEASON",
       "format": "BO3",
-      "games": []
+      "games": [
+        {
+          "winnerTeamId": "lgtv-wins",
+          "mvpPlayerId": "vidotti-agiota",
+          "statsByPlayer": [
+            {
+              "playerId": "razeral",
+              "champion": "Cassiopeia",
+              "kills": 3,
+              "deaths": 8,
+              "assists": 5
+            },
+            {
+              "playerId": "innellea",
+              "champion": "Warwick",
+              "kills": 1,
+              "deaths": 5,
+              "assists": 5
+            },
+            {
+              "playerId": "samuel-venancio",
+              "champion": "Jarvan IV",
+              "kills": 0,
+              "deaths": 4,
+              "assists": 11
+            },
+            {
+              "playerId": "midas",
+              "champion": "Twitch",
+              "kills": 15,
+              "deaths": 2,
+              "assists": 2
+            },
+            {
+              "playerId": "motomoto",
+              "champion": "Nautilus",
+              "kills": 2,
+              "deaths": 4,
+              "assists": 12
+            },
+            {
+              "playerId": "png-gala",
+              "champion": "Teemo",
+              "kills": 3,
+              "deaths": 5,
+              "assists": 8
+            },
+            {
+              "playerId": "vidotti-agiota",
+              "champion": "Nasus",
+              "kills": 12,
+              "deaths": 2,
+              "assists": 6
+            },
+            {
+              "playerId": "z0e-baiana",
+              "champion": "Seraphine",
+              "kills": 4,
+              "deaths": 2,
+              "assists": 12
+            },
+            {
+              "playerId": "wrgamer",
+              "champion": "Kog'Maw",
+              "kills": 4,
+              "deaths": 6,
+              "assists": 7
+            },
+            {
+              "playerId": "maxmp",
+              "champion": "Ivern",
+              "kills": 0,
+              "deaths": 6,
+              "assists": 15
+            }
+          ],
+          "bans": [
+            {
+              "teamId": "capangas-motomoto",
+              "championName": "Lulu"
+            },
+            {
+              "teamId": "capangas-motomoto",
+              "championName": "Naafiri"
+            },
+            {
+              "teamId": "capangas-motomoto",
+              "championName": "Lillia"
+            },
+            {
+              "teamId": "capangas-motomoto",
+              "championName": "Zilean"
+            },
+            {
+              "teamId": "capangas-motomoto",
+              "championName": "Akali"
+            },
+            {
+              "teamId": "lgtv-wins",
+              "championName": "Yasuo"
+            },
+            {
+              "teamId": "lgtv-wins",
+              "championName": "Syndra"
+            },
+            {
+              "teamId": "lgtv-wins",
+              "championName": "Malphite"
+            },
+            {
+              "teamId": "lgtv-wins",
+              "championName": "Ezreal"
+            },
+            {
+              "teamId": "lgtv-wins",
+              "championName": "Mordekaiser"
+            }
+          ]
+        },
+        {
+          "winnerTeamId": "lgtv-wins",
+          "mvpPlayerId": "wrgamer",
+          "statsByPlayer": [
+            {
+              "playerId": "razeral",
+              "kills": 4,
+              "deaths": 4,
+              "assists": 6
+            },
+            {
+              "playerId": "innellea",
+              "kills": 7,
+              "deaths": 5,
+              "assists": 4
+            },
+            {
+              "playerId": "samuel-venancio",
+              "kills": 4,
+              "deaths": 7,
+              "assists": 6
+            },
+            {
+              "playerId": "midas",
+              "kills": 1,
+              "deaths": 5,
+              "assists": 5
+            },
+            {
+              "playerId": "motomoto",
+              "kills": 0,
+              "deaths": 3,
+              "assists": 5
+            },
+            {
+              "playerId": "png-gala",
+              "kills": 6,
+              "deaths": 2,
+              "assists": 9
+            },
+            {
+              "playerId": "vidotti-agiota",
+              "kills": 3,
+              "deaths": 3,
+              "assists": 12
+            },
+            {
+              "playerId": "z0e-baiana",
+              "kills": 1,
+              "deaths": 3,
+              "assists": 13
+            },
+            {
+              "playerId": "wrgamer",
+              "kills": 13,
+              "deaths": 5,
+              "assists": 5
+            },
+            {
+              "playerId": "maxmp",
+              "kills": 1,
+              "deaths": 3,
+              "assists": 15
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "serie-03",
