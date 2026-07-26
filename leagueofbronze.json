@@ -532,7 +532,175 @@
       "teamBId": "vanguarda-de-ferro",
       "stage": "REGULAR_SEASON",
       "format": "BO3",
-      "games": []
+      "games": [
+        {
+          "winnerTeamId": "pantera-cor-de-goza",
+          "mvpPlayerId": "tapa-de-doido",
+          "statsByPlayer": [
+            {
+              "playerId": "tapa-de-doido",
+              "champion": "Sett",
+              "kills": 15,
+              "deaths": 3,
+              "assists": 10
+            },
+            {
+              "playerId": "iranildo-gari",
+              "champion": "Amumu",
+              "kills": 3,
+              "deaths": 5,
+              "assists": 17
+            },
+            {
+              "playerId": "tikin-d-calcinha",
+              "champion": "Katarina",
+              "kills": 10,
+              "deaths": 5,
+              "assists": 8
+            },
+            {
+              "playerId": "nak4y",
+              "champion": "Caitlyn",
+              "kills": 9,
+              "deaths": 6,
+              "assists": 10
+            },
+            {
+              "playerId": "gar3na",
+              "champion": "Leona",
+              "kills": 3,
+              "deaths": 4,
+              "assists": 25
+            },
+            {
+              "playerId": "satoshi",
+              "champion": "Yasuo",
+              "kills": 9,
+              "deaths": 9,
+              "assists": 5
+            },
+            {
+              "playerId": "mxxdragonxxm",
+              "champion": "Diana",
+              "kills": 6,
+              "deaths": 6,
+              "assists": 8
+            },
+            {
+              "playerId": "thalao",
+              "champion": "Mel",
+              "kills": 6,
+              "deaths": 6,
+              "assists": 6
+            },
+            {
+              "playerId": "peideicaldinho",
+              "champion": "Seraphine",
+              "kills": 2,
+              "deaths": 10,
+              "assists": 13
+            }
+          ],
+          "bans": [
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Shyvana"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Pantheon"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Viego"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Malzahar"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Vladimir"
+            }
+          ]
+        },
+        {
+          "winnerTeamId": "vanguarda-de-ferro",
+          "mvpPlayerId": "satoshi",
+          "statsByPlayer": [
+            {
+              "playerId": "satoshi",
+              "champion": "Vladimir",
+              "kills": 12,
+              "deaths": 2,
+              "assists": 8
+            },
+            {
+              "playerId": "ctz",
+              "champion": "Vayne",
+              "kills": 4,
+              "deaths": 5,
+              "assists": 7
+            },
+            {
+              "playerId": "mxxdragonxxm",
+              "champion": "Nasus",
+              "kills": 5,
+              "deaths": 4,
+              "assists": 17
+            },
+            {
+              "playerId": "thalao",
+              "champion": "Lucian",
+              "kills": 4,
+              "deaths": 5,
+              "assists": 17
+            },
+            {
+              "playerId": "peideicaldinho",
+              "champion": "Camille",
+              "kills": 7,
+              "deaths": 7,
+              "assists": 16
+            },
+            {
+              "playerId": "tapa-de-doido",
+              "champion": "Olaf",
+              "kills": 5,
+              "deaths": 4,
+              "assists": 3
+            },
+            {
+              "playerId": "iranildo-gari",
+              "champion": "Sejuani",
+              "kills": 3,
+              "deaths": 7,
+              "assists": 9
+            },
+            {
+              "playerId": "tikin-d-calcinha",
+              "champion": "Ahri",
+              "kills": 4,
+              "deaths": 7,
+              "assists": 4
+            },
+            {
+              "playerId": "nak4y",
+              "champion": "Zeri",
+              "kills": 9,
+              "deaths": 8,
+              "assists": 7
+            },
+            {
+              "playerId": "gar3na",
+              "champion": "Yuumi",
+              "kills": 2,
+              "deaths": 6,
+              "assists": 14
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "serie-04",
