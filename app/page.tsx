@@ -166,25 +166,35 @@ export default async function InicioPage() {
             </Link>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(320px,1fr))", gap: 12 }}>
-            {preview.map((game) => (
-              <Link key={game.id} href={`/partidas/${game.id}`} className="lob-card-2" style={{ padding: 16, textDecoration: "none", display: "block" }}>
+            {preview.map((game) => {
+              const played = game.scoreA + game.scoreB > 0;
+              const aWon = game.done && game.winnerId === game.teamA.id;
+              const bWon = game.done && game.winnerId === game.teamB.id;
+              const nameColor = (won: boolean) => (game.done ? (won ? "#f5d79a" : "#7c715e") : "#e9dfcd");
+              return (
+              <Link key={game.id} href={`/partidas/${game.id}`} className="lob-card-2" style={{ padding: 16, textDecoration: "none", display: "block", background: game.done ? "linear-gradient(180deg,#15170f,#0c0d07)" : undefined, borderColor: game.done ? "rgba(95,191,106,.32)" : undefined }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 10.5, letterSpacing: ".08em", color: "#8f8472", marginBottom: 12 }}>
                   <span>JOGO {game.n} · {game.turno.toUpperCase()}</span>
-                  <span style={{ color: "#cfa877" }}>{game.hora}</span>
+                  {game.done ? (
+                    <span style={{ padding: "1px 7px", borderRadius: 2, background: "rgba(95,191,106,.16)", border: "1px solid rgba(95,191,106,.5)", color: "#8fe0a0", fontWeight: 700 }}>✓ FINALIZADO</span>
+                  ) : (
+                    <span style={{ color: "#cfa877" }}>{game.hora}</span>
+                  )}
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 10 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                     <TeamMark imageUrl={game.teamA.imageUrl} color={game.teamA.color} name={game.teamA.name} size={24} />
-                    <span style={{ fontWeight: 600, fontSize: 13, color: "#e9dfcd", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{game.teamA.name}</span>
+                    <span style={{ fontWeight: aWon ? 700 : 600, fontSize: 13, color: nameColor(aWon), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{game.teamA.name}</span>
                   </div>
-                  <span className="lob-display" style={{ fontSize: 14, color: "#6f6656" }}>MD3</span>
+                  <span className="lob-display" style={{ fontSize: played ? 17 : 14, color: played ? "#f0c88a" : "#6f6656" }}>{played ? `${game.scoreA} – ${game.scoreB}` : "MD3"}</span>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end", minWidth: 0 }}>
-                    <span style={{ fontWeight: 600, fontSize: 13, color: "#e9dfcd", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "right" }}>{game.teamB.name}</span>
+                    <span style={{ fontWeight: bWon ? 700 : 600, fontSize: 13, color: nameColor(bWon), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "right" }}>{game.teamB.name}</span>
                     <TeamMark imageUrl={game.teamB.imageUrl} color={game.teamB.color} name={game.teamB.name} size={24} />
                   </div>
                 </div>
               </Link>
-            ))}
+              );
+            })}
           </div>
         </section>
       ) : null}

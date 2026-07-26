@@ -38,28 +38,38 @@ export default async function CalendarioPage() {
             <div style={{ height: 1, flex: 1, background: "linear-gradient(90deg,rgba(201,138,75,.4),transparent)" }} />
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(330px,1fr))", gap: 12 }}>
-            {day.games.map((game) => (
-              <Link key={game.id} href={`/partidas/${game.id}`} className="lob-card-2 lob-lift" style={{ padding: "16px 18px", textDecoration: "none", display: "block" }}>
+            {day.games.map((game) => {
+              const played = game.scoreA + game.scoreB > 0;
+              const aWon = game.done && game.winnerId === game.teamA.id;
+              const bWon = game.done && game.winnerId === game.teamB.id;
+              const nameColor = (won: boolean) => (game.done ? (won ? "#f5d79a" : "#7c715e") : "#e9dfcd");
+              return (
+              <Link key={game.id} href={`/partidas/${game.id}`} className="lob-card-2 lob-lift" style={{ padding: "16px 18px", textDecoration: "none", display: "block", background: game.done ? "linear-gradient(180deg,#15170f,#0c0d07)" : undefined, borderColor: game.done ? "rgba(95,191,106,.32)" : undefined }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 10.5, letterSpacing: ".08em", color: "#8f8472", marginBottom: 14 }}>
                   <span>JOGO {game.n} · {game.turno.toUpperCase()}</span>
-                  <span style={{ padding: "2px 8px", border: "1px solid rgba(201,138,75,.3)", borderRadius: 2, color: "#cfa877" }}>{game.hora}</span>
+                  {game.done ? (
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 2, background: "rgba(95,191,106,.16)", border: "1px solid rgba(95,191,106,.5)", color: "#8fe0a0", fontWeight: 700 }}>✓ FINALIZADO</span>
+                  ) : (
+                    <span style={{ padding: "2px 8px", border: "1px solid rgba(201,138,75,.3)", borderRadius: 2, color: "#cfa877" }}>{game.hora}</span>
+                  )}
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 10 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                     <TeamMark imageUrl={game.teamA.imageUrl} color={game.teamA.color} name={game.teamA.name} size={24} />
-                    <span style={{ fontWeight: 600, fontSize: 13.5, color: "#e9dfcd", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{game.teamA.name}</span>
+                    <span style={{ fontWeight: aWon ? 700 : 600, fontSize: 13.5, color: nameColor(aWon), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{game.teamA.name}</span>
                   </div>
                   <div style={{ textAlign: "center" }}>
-                    <div className="lob-display" style={{ fontSize: 22, color: "#6f6656", letterSpacing: ".05em" }}>—</div>
+                    <div className="lob-display" style={{ fontSize: 22, color: played ? "#f0c88a" : "#6f6656", letterSpacing: ".08em" }}>{played ? `${game.scoreA} – ${game.scoreB}` : "—"}</div>
                     <div style={{ fontSize: 9, letterSpacing: ".10em", color: "#5f5747", marginTop: 2 }}>MD3</div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, justifyContent: "flex-end" }}>
-                    <span style={{ fontWeight: 600, fontSize: 13.5, color: "#e9dfcd", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "right" }}>{game.teamB.name}</span>
+                    <span style={{ fontWeight: bWon ? 700 : 600, fontSize: 13.5, color: nameColor(bWon), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "right" }}>{game.teamB.name}</span>
                     <TeamMark imageUrl={game.teamB.imageUrl} color={game.teamB.color} name={game.teamB.name} size={24} />
                   </div>
                 </div>
               </Link>
-            ))}
+              );
+            })}
           </div>
         </section>
       ))}

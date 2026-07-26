@@ -699,6 +699,124 @@
               "assists": 14
             }
           ]
+        },
+        {
+          "winnerTeamId": "vanguarda-de-ferro",
+          "mvpPlayerId": "ctz",
+          "statsByPlayer": [
+            {
+              "playerId": "satoshi",
+              "champion": "Fizz",
+              "kills": 5,
+              "deaths": 3,
+              "assists": 8
+            },
+            {
+              "playerId": "peideicaldinho",
+              "champion": "Maokai",
+              "kills": 7,
+              "deaths": 1,
+              "assists": 10
+            },
+            {
+              "playerId": "mxxdragonxxm",
+              "champion": "Wukong",
+              "kills": 6,
+              "deaths": 2,
+              "assists": 13
+            },
+            {
+              "playerId": "ctz",
+              "champion": "Jhin",
+              "kills": 10,
+              "deaths": 2,
+              "assists": 10
+            },
+            {
+              "playerId": "thalao",
+              "champion": "Thresh",
+              "kills": 1,
+              "deaths": 2,
+              "assists": 16
+            },
+            {
+              "playerId": "tapa-de-doido",
+              "champion": "Jax",
+              "kills": 0,
+              "deaths": 6,
+              "assists": 1
+            },
+            {
+              "playerId": "iranildo-gari",
+              "champion": "Nocturne",
+              "kills": 2,
+              "deaths": 4,
+              "assists": 4
+            },
+            {
+              "playerId": "tikin-d-calcinha",
+              "champion": "Yone",
+              "kills": 4,
+              "deaths": 8,
+              "assists": 2
+            },
+            {
+              "playerId": "nak4y",
+              "champion": "Ezreal",
+              "kills": 3,
+              "deaths": 4,
+              "assists": 4
+            },
+            {
+              "playerId": "gar3na",
+              "champion": "Nautilus",
+              "kills": 1,
+              "deaths": 7,
+              "assists": 4
+            }
+          ],
+          "bans": [
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Jinx"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Irelia"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Akali"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Ekko"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Mordekaiser"
+            },
+            {
+              "teamId": "vanguarda-de-ferro",
+              "championName": "Shyvana"
+            },
+            {
+              "teamId": "vanguarda-de-ferro",
+              "championName": "Pantheon"
+            },
+            {
+              "teamId": "vanguarda-de-ferro",
+              "championName": "Viego"
+            },
+            {
+              "teamId": "vanguarda-de-ferro",
+              "championName": "Malzahar"
+            },
+            {
+              "teamId": "vanguarda-de-ferro",
+              "championName": "Garen"
+            }
+          ]
         }
       ]
     },

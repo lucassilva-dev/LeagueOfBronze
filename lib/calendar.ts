@@ -1,5 +1,6 @@
-import type { TournamentDataset } from "@/lib/schema";
 import { teamColor } from "@/lib/design";
+import type { TournamentDataset } from "@/lib/schema";
+import { getSeriesScore, getSeriesWinnerTeamId } from "@/lib/tournament";
 
 export type CalTeamRef = { id: string; name: string; color: string; imageUrl?: string };
 export type CalGame = {
@@ -12,6 +13,10 @@ export type CalGame = {
   teamA: CalTeamRef;
   teamB: CalTeamRef;
   stage: string;
+  done: boolean;
+  scoreA: number;
+  scoreB: number;
+  winnerId: string | null;
 };
 export type CalDay = { dateKey: string; dateLabel: string; dia: string; games: CalGame[] };
 
@@ -43,6 +48,8 @@ export function buildRegularGames(dataset: TournamentDataset): CalGame[] {
       const parts = parseParts(series.date);
       const teamA = teamsById.get(series.teamAId);
       const teamB = teamsById.get(series.teamBId);
+      const winnerId = getSeriesWinnerTeamId(series, dataset);
+      const score = getSeriesScore(series, dataset);
       return {
         id: series.id,
         n: index + 1,
@@ -53,6 +60,10 @@ export function buildRegularGames(dataset: TournamentDataset): CalGame[] {
         teamA: { id: series.teamAId, name: teamA?.name ?? series.teamAId, color: teamColor(series.teamAId), imageUrl: teamA?.imageUrl },
         teamB: { id: series.teamBId, name: teamB?.name ?? series.teamBId, color: teamColor(series.teamBId), imageUrl: teamB?.imageUrl },
         stage: series.stage ?? "REGULAR_SEASON",
+        done: winnerId != null,
+        scoreA: score.teamAWins,
+        scoreB: score.teamBWins,
+        winnerId,
       };
     });
 }
