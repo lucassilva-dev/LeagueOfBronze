@@ -2481,7 +2481,204 @@
       "teamBId": "pantera-cor-de-goza",
       "stage": "REGULAR_SEASON",
       "format": "BO3",
-      "games": []
+      "games": [
+        {
+          "winnerTeamId": "pantera-cor-de-goza",
+          "mvpPlayerId": "tapa-de-doido",
+          "durationMin": 40,
+          "statsByPlayer": [
+            {
+              "playerId": "iranildo-gari",
+              "champion": "Vayne",
+              "kills": 9,
+              "deaths": 2,
+              "assists": 6
+            },
+            {
+              "playerId": "tapa-de-doido",
+              "champion": "Darius",
+              "kills": 11,
+              "deaths": 2,
+              "assists": 4
+            },
+            {
+              "playerId": "nak4y",
+              "champion": "Lee Sin",
+              "kills": 2,
+              "deaths": 2,
+              "assists": 15
+            },
+            {
+              "playerId": "tikin-d-calcinha",
+              "champion": "Diana",
+              "kills": 10,
+              "deaths": 8,
+              "assists": 3
+            },
+            {
+              "playerId": "gar3na",
+              "champion": "Heimerdinger",
+              "kills": 1,
+              "deaths": 2,
+              "assists": 19
+            },
+            {
+              "playerId": "top-lane-666",
+              "champion": "Nasus",
+              "kills": 4,
+              "deaths": 6,
+              "assists": 2
+            },
+            {
+              "playerId": "malasartes",
+              "champion": "Sejuani",
+              "kills": 3,
+              "deaths": 9,
+              "assists": 4
+            },
+            {
+              "playerId": "sabor-energetico",
+              "champion": "Heimerdinger",
+              "kills": 5,
+              "deaths": 8,
+              "assists": 3
+            },
+            {
+              "playerId": "sou-adc-nao-deus",
+              "champion": "Ezreal",
+              "kills": 3,
+              "deaths": 7,
+              "assists": 4
+            },
+            {
+              "playerId": "miva",
+              "champion": "Karma",
+              "kills": 1,
+              "deaths": 3,
+              "assists": 3
+            }
+          ],
+          "bans": [
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Amumu"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Zac"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Illaoi"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Jinx"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Caitlyn"
+            },
+            {
+              "teamId": "time4",
+              "championName": "Irelia"
+            },
+            {
+              "teamId": "time4",
+              "championName": "Katarina"
+            },
+            {
+              "teamId": "time4",
+              "championName": "Viego"
+            },
+            {
+              "teamId": "time4",
+              "championName": "Akali"
+            },
+            {
+              "teamId": "time4",
+              "championName": "Ahri"
+            }
+          ]
+        },
+        {
+          "winnerTeamId": "pantera-cor-de-goza",
+          "mvpPlayerId": "nak4y",
+          "durationMin": 44,
+          "statsByPlayer": [
+            {
+              "playerId": "tapa-de-doido",
+              "champion": "Sett",
+              "kills": 7,
+              "deaths": 6,
+              "assists": 15
+            },
+            {
+              "playerId": "nak4y",
+              "champion": "Locke",
+              "kills": 24,
+              "deaths": 6,
+              "assists": 8
+            },
+            {
+              "playerId": "tikin-d-calcinha",
+              "champion": "Yone",
+              "kills": 16,
+              "deaths": 9,
+              "assists": 14
+            },
+            {
+              "playerId": "gar3na",
+              "champion": "Samira",
+              "kills": 5,
+              "deaths": 8,
+              "assists": 10
+            },
+            {
+              "playerId": "iranildo-gari",
+              "champion": "Pyke",
+              "kills": 8,
+              "deaths": 8,
+              "assists": 21
+            },
+            {
+              "playerId": "miva",
+              "champion": "Seraphine",
+              "kills": 2,
+              "deaths": 12,
+              "assists": 14
+            },
+            {
+              "playerId": "malasartes",
+              "champion": "Ekko",
+              "kills": 12,
+              "deaths": 15,
+              "assists": 5
+            },
+            {
+              "playerId": "sabor-energetico",
+              "champion": "Xerath",
+              "kills": 3,
+              "deaths": 11,
+              "assists": 8
+            },
+            {
+              "playerId": "sou-adc-nao-deus",
+              "champion": "Caitlyn",
+              "kills": 13,
+              "deaths": 11,
+              "assists": 9
+            },
+            {
+              "playerId": "top-lane-666",
+              "champion": "Illaoi",
+              "kills": 7,
+              "deaths": 11,
+              "assists": 10
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "serie-11",
