@@ -1667,7 +1667,365 @@
       "teamBId": "pantera-cor-de-goza",
       "stage": "REGULAR_SEASON",
       "format": "BO3",
-      "games": []
+      "games": [
+        {
+          "winnerTeamId": "capangas-motomoto",
+          "mvpPlayerId": "razeral",
+          "durationMin": 40,
+          "statsByPlayer": [
+            {
+              "playerId": "razeral",
+              "champion": "Vladimir",
+              "kills": 14,
+              "deaths": 3,
+              "assists": 8
+            },
+            {
+              "playerId": "innellea",
+              "champion": "Garen",
+              "kills": 10,
+              "deaths": 3,
+              "assists": 10
+            },
+            {
+              "playerId": "samuel-venancio",
+              "champion": "Jarvan IV",
+              "kills": 5,
+              "deaths": 6,
+              "assists": 21
+            },
+            {
+              "playerId": "midas",
+              "champion": "Jhin",
+              "kills": 4,
+              "deaths": 5,
+              "assists": 16
+            },
+            {
+              "playerId": "motomoto",
+              "champion": "Leona",
+              "kills": 3,
+              "deaths": 11,
+              "assists": 17
+            },
+            {
+              "playerId": "tapa-de-doido",
+              "champion": "Mordekaiser",
+              "kills": 7,
+              "deaths": 5,
+              "assists": 5
+            },
+            {
+              "playerId": "iranildo-gari",
+              "champion": "Xin Zhao",
+              "kills": 4,
+              "deaths": 7,
+              "assists": 13
+            },
+            {
+              "playerId": "tikin-d-calcinha",
+              "champion": "Irelia",
+              "kills": 8,
+              "deaths": 8,
+              "assists": 7
+            },
+            {
+              "playerId": "nak4y",
+              "champion": "Miss Fortune",
+              "kills": 8,
+              "deaths": 7,
+              "assists": 12
+            },
+            {
+              "playerId": "gar3na",
+              "champion": "Camille",
+              "kills": 1,
+              "deaths": 9,
+              "assists": 15
+            }
+          ],
+          "bans": [
+            {
+              "teamId": "capangas-motomoto",
+              "championName": "Vayne"
+            },
+            {
+              "teamId": "capangas-motomoto",
+              "championName": "Akali"
+            },
+            {
+              "teamId": "capangas-motomoto",
+              "championName": "Caitlyn"
+            },
+            {
+              "teamId": "capangas-motomoto",
+              "championName": "Diana"
+            },
+            {
+              "teamId": "capangas-motomoto",
+              "championName": "Amumu"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Yasuo"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Cassiopeia"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Syndra"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Ezreal"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Nautilus"
+            }
+          ]
+        },
+        {
+          "winnerTeamId": "pantera-cor-de-goza",
+          "mvpPlayerId": "gar3na",
+          "durationMin": 45,
+          "statsByPlayer": [
+            {
+              "playerId": "razeral",
+              "champion": "Yone",
+              "kills": 6,
+              "deaths": 10,
+              "assists": 5
+            },
+            {
+              "playerId": "motomoto",
+              "champion": "Heimerdinger",
+              "kills": 1,
+              "deaths": 6,
+              "assists": 2
+            },
+            {
+              "playerId": "samuel-venancio",
+              "champion": "Diana",
+              "kills": 5,
+              "deaths": 12,
+              "assists": 7
+            },
+            {
+              "playerId": "midas",
+              "champion": "Ezreal",
+              "kills": 8,
+              "deaths": 9,
+              "assists": 7
+            },
+            {
+              "playerId": "innellea",
+              "champion": "Nautilus",
+              "kills": 1,
+              "deaths": 5,
+              "assists": 12
+            },
+            {
+              "playerId": "tapa-de-doido",
+              "champion": "Urgot",
+              "kills": 11,
+              "deaths": 2,
+              "assists": 12
+            },
+            {
+              "playerId": "nak4y",
+              "champion": "Viego",
+              "kills": 8,
+              "deaths": 5,
+              "assists": 15
+            },
+            {
+              "playerId": "tikin-d-calcinha",
+              "champion": "Katarina",
+              "kills": 9,
+              "deaths": 6,
+              "assists": 9
+            },
+            {
+              "playerId": "gar3na",
+              "champion": "Mel",
+              "kills": 13,
+              "deaths": 3,
+              "assists": 6
+            },
+            {
+              "playerId": "iranildo-gari",
+              "champion": "Maokai",
+              "kills": 1,
+              "deaths": 5,
+              "assists": 24
+            }
+          ],
+          "bans": [
+            {
+              "teamId": "capangas-motomoto",
+              "championName": "Lee Sin"
+            },
+            {
+              "teamId": "capangas-motomoto",
+              "championName": "Akali"
+            },
+            {
+              "teamId": "capangas-motomoto",
+              "championName": "Locke"
+            },
+            {
+              "teamId": "capangas-motomoto",
+              "championName": "Lulu"
+            },
+            {
+              "teamId": "capangas-motomoto",
+              "championName": "Sett"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Yasuo"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Cassiopeia"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Syndra"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Karma"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Malphite"
+            }
+          ]
+        },
+        {
+          "winnerTeamId": "capangas-motomoto",
+          "mvpPlayerId": "midas",
+          "durationMin": 33,
+          "statsByPlayer": [
+            {
+              "playerId": "razeral",
+              "champion": "Viktor",
+              "kills": 11,
+              "deaths": 5,
+              "assists": 12
+            },
+            {
+              "playerId": "innellea",
+              "champion": "Lissandra",
+              "kills": 8,
+              "deaths": 8,
+              "assists": 22
+            },
+            {
+              "playerId": "samuel-venancio",
+              "champion": "Nocturne",
+              "kills": 4,
+              "deaths": 5,
+              "assists": 19
+            },
+            {
+              "playerId": "midas",
+              "champion": "Kai'Sa",
+              "kills": 15,
+              "deaths": 6,
+              "assists": 13
+            },
+            {
+              "playerId": "motomoto",
+              "champion": "Tahm Kench",
+              "kills": 3,
+              "deaths": 6,
+              "assists": 22
+            },
+            {
+              "playerId": "tapa-de-doido",
+              "champion": "Shen",
+              "kills": 5,
+              "deaths": 8,
+              "assists": 11
+            },
+            {
+              "playerId": "nak4y",
+              "champion": "Lillia",
+              "kills": 5,
+              "deaths": 9,
+              "assists": 16
+            },
+            {
+              "playerId": "tikin-d-calcinha",
+              "champion": "Ahri",
+              "kills": 6,
+              "deaths": 6,
+              "assists": 12
+            },
+            {
+              "playerId": "iranildo-gari",
+              "champion": "Vayne",
+              "kills": 11,
+              "deaths": 9,
+              "assists": 7
+            },
+            {
+              "playerId": "gar3na",
+              "champion": "Rakan",
+              "kills": 3,
+              "deaths": 9,
+              "assists": 19
+            }
+          ],
+          "bans": [
+            {
+              "teamId": "capangas-motomoto",
+              "championName": "Akali"
+            },
+            {
+              "teamId": "capangas-motomoto",
+              "championName": "Swain"
+            },
+            {
+              "teamId": "capangas-motomoto",
+              "championName": "Sett"
+            },
+            {
+              "teamId": "capangas-motomoto",
+              "championName": "Sylas"
+            },
+            {
+              "teamId": "capangas-motomoto",
+              "championName": "Locke"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Cassiopeia"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Yasuo"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Syndra"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Amumu"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Malphite"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "serie-09",
@@ -1775,6 +2133,105 @@
               "championName": "Caitlyn"
             }
           ]
+        },
+        {
+          "winnerTeamId": "lgtv-wins",
+          "mvpPlayerId": "vidotti-agiota",
+          "durationMin": 34,
+          "statsByPlayer": [
+            {
+              "playerId": "z0e-baiana",
+              "champion": "Syndra",
+              "kills": 1,
+              "deaths": 3,
+              "assists": 8
+            },
+            {
+              "playerId": "png-gala",
+              "champion": "Sylas",
+              "kills": 2,
+              "deaths": 2,
+              "assists": 9
+            },
+            {
+              "playerId": "vidotti-agiota",
+              "champion": "Shyvana",
+              "kills": 6,
+              "deaths": 0,
+              "assists": 1
+            },
+            {
+              "playerId": "wrgamer",
+              "champion": "Sivir",
+              "kills": 5,
+              "deaths": 0,
+              "assists": 7
+            },
+            {
+              "playerId": "maxmp",
+              "champion": "Milio",
+              "kills": 1,
+              "deaths": 0,
+              "assists": 12
+            },
+            {
+              "playerId": "sr-hades",
+              "champion": "Shen",
+              "kills": 0,
+              "deaths": 2,
+              "assists": 3
+            },
+            {
+              "playerId": "famoso-parrudao",
+              "champion": "Sejuani",
+              "kills": 0,
+              "deaths": 4,
+              "assists": 4
+            },
+            {
+              "playerId": "n4firida-agiota",
+              "champion": "Swain",
+              "kills": 2,
+              "deaths": 3,
+              "assists": 2
+            },
+            {
+              "playerId": "hikolin",
+              "champion": "Aphelios",
+              "kills": 2,
+              "deaths": 3,
+              "assists": 2
+            },
+            {
+              "playerId": "onigami",
+              "champion": "Mel",
+              "kills": 0,
+              "deaths": 3,
+              "assists": 2
+            }
+          ],
+          "bans": [
+            {
+              "teamId": "lgtv-wins",
+              "championName": "Mordekaiser"
+            },
+            {
+              "teamId": "lgtv-wins",
+              "championName": "Naafiri"
+            },
+            {
+              "teamId": "lgtv-wins",
+              "championName": "Heimerdinger"
+            },
+            {
+              "teamId": "lgtv-wins",
+              "championName": "Vayne"
+            },
+            {
+              "teamId": "lgtv-wins",
+              "championName": "Renekton"
+            }
+          ]
         }
       ]
     },
@@ -1794,7 +2251,237 @@
       "teamBId": "lgtv-wins",
       "stage": "REGULAR_SEASON",
       "format": "BO3",
-      "games": []
+      "games": [
+        {
+          "winnerTeamId": "vanguarda-de-ferro",
+          "mvpPlayerId": "ctz",
+          "durationMin": 24,
+          "statsByPlayer": [
+            {
+              "playerId": "satoshi",
+              "champion": "Yone",
+              "kills": 4,
+              "deaths": 2,
+              "assists": 3
+            },
+            {
+              "playerId": "peideicaldinho",
+              "champion": "Trundle",
+              "kills": 2,
+              "deaths": 1,
+              "assists": 3
+            },
+            {
+              "playerId": "mxxdragonxxm",
+              "champion": "Pantheon",
+              "kills": 5,
+              "deaths": 2,
+              "assists": 4
+            },
+            {
+              "playerId": "ctz",
+              "champion": "Ezreal",
+              "kills": 7,
+              "deaths": 3,
+              "assists": 4
+            },
+            {
+              "playerId": "thalao",
+              "champion": "Seraphine",
+              "kills": 0,
+              "deaths": 1,
+              "assists": 11
+            },
+            {
+              "playerId": "png-gala",
+              "kills": 2,
+              "deaths": 5,
+              "assists": 2
+            },
+            {
+              "playerId": "vidotti-agiota",
+              "champion": "Shyvana",
+              "kills": 2,
+              "deaths": 5,
+              "assists": 4
+            },
+            {
+              "playerId": "z0e-baiana",
+              "champion": "Galio",
+              "kills": 3,
+              "deaths": 1,
+              "assists": 2
+            },
+            {
+              "playerId": "wrgamer",
+              "champion": "Smolder",
+              "kills": 2,
+              "deaths": 3,
+              "assists": 1
+            },
+            {
+              "playerId": "maxmp",
+              "champion": "Karma",
+              "kills": 0,
+              "deaths": 4,
+              "assists": 5
+            }
+          ],
+          "bans": [
+            {
+              "teamId": "vanguarda-de-ferro",
+              "championName": "Zoe"
+            },
+            {
+              "teamId": "vanguarda-de-ferro",
+              "championName": "Nasus"
+            },
+            {
+              "teamId": "vanguarda-de-ferro",
+              "championName": "Jhin"
+            },
+            {
+              "teamId": "vanguarda-de-ferro",
+              "championName": "Sivir"
+            },
+            {
+              "teamId": "lgtv-wins",
+              "championName": "Diana"
+            },
+            {
+              "teamId": "lgtv-wins",
+              "championName": "Sylas"
+            },
+            {
+              "teamId": "lgtv-wins",
+              "championName": "Katarina"
+            },
+            {
+              "teamId": "lgtv-wins",
+              "championName": "Vladimir"
+            }
+          ]
+        },
+        {
+          "winnerTeamId": "vanguarda-de-ferro",
+          "mvpPlayerId": "satoshi",
+          "durationMin": 25,
+          "statsByPlayer": [
+            {
+              "playerId": "satoshi",
+              "champion": "Yorick",
+              "kills": 5,
+              "deaths": 3,
+              "assists": 1
+            },
+            {
+              "playerId": "peideicaldinho",
+              "champion": "Olaf",
+              "kills": 3,
+              "deaths": 3,
+              "assists": 0
+            },
+            {
+              "playerId": "mxxdragonxxm",
+              "champion": "Wukong",
+              "kills": 1,
+              "deaths": 2,
+              "assists": 6
+            },
+            {
+              "playerId": "ctz",
+              "champion": "Yasuo",
+              "kills": 4,
+              "deaths": 3,
+              "assists": 4
+            },
+            {
+              "playerId": "thalao",
+              "champion": "Zac",
+              "kills": 1,
+              "deaths": 3,
+              "assists": 4
+            },
+            {
+              "playerId": "png-gala",
+              "champion": "Urgot",
+              "kills": 2,
+              "deaths": 1,
+              "assists": 5
+            },
+            {
+              "playerId": "vidotti-agiota",
+              "champion": "Lillia",
+              "kills": 9,
+              "deaths": 1,
+              "assists": 3
+            },
+            {
+              "playerId": "z0e-baiana",
+              "champion": "Jayce",
+              "kills": 0,
+              "deaths": 4,
+              "assists": 2
+            },
+            {
+              "playerId": "wrgamer",
+              "champion": "Nilah",
+              "kills": 2,
+              "deaths": 3,
+              "assists": 4
+            },
+            {
+              "playerId": "maxmp",
+              "champion": "Gragas",
+              "kills": 0,
+              "deaths": 5,
+              "assists": 5
+            }
+          ],
+          "bans": [
+            {
+              "teamId": "vanguarda-de-ferro",
+              "championName": "Briar"
+            },
+            {
+              "teamId": "vanguarda-de-ferro",
+              "championName": "Nasus"
+            },
+            {
+              "teamId": "vanguarda-de-ferro",
+              "championName": "Mordekaiser"
+            },
+            {
+              "teamId": "vanguarda-de-ferro",
+              "championName": "Garen"
+            },
+            {
+              "teamId": "vanguarda-de-ferro",
+              "championName": "Sett"
+            },
+            {
+              "teamId": "lgtv-wins",
+              "championName": "Diana"
+            },
+            {
+              "teamId": "lgtv-wins",
+              "championName": "Viego"
+            },
+            {
+              "teamId": "lgtv-wins",
+              "championName": "Vladimir"
+            },
+            {
+              "teamId": "lgtv-wins",
+              "championName": "Gnar"
+            },
+            {
+              "teamId": "lgtv-wins",
+              "championName": "Poppy"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "serie-12",
