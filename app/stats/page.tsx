@@ -1,16 +1,28 @@
 import { StatsToggles, type ChampStatRow, type PlayerStatRow } from "@/components/lob/stats-toggles";
 import { Eyebrow, EloCrest, GoldTitle, Pill } from "@/components/lob/ui";
-import { ELO_ORDER } from "@/lib/design";
+import { ELO_ORDER, eloSvgUrl } from "@/lib/design";
 import { buildDesignPlayers, buildDesignTeams } from "@/lib/roster";
 import { getServerDataset } from "@/lib/server-data";
 import { buildChampionLeaderboards, buildLeaderboards } from "@/lib/tournament";
 
 export const dynamic = "force-dynamic";
 
-function BarRow({ label, color, count, pct }: Readonly<{ label: string; color: string; count: number; pct: number }>) {
+function BarRow({ label, color, count, pct, eloKey }: Readonly<{ label: string; color: string; count: number; pct: number; eloKey?: string }>) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "78px 1fr 24px", alignItems: "center", gap: 10 }}>
-      <span style={{ fontSize: 12, color, fontWeight: 600 }}>{label}</span>
+      {eloKey ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={eloSvgUrl(eloKey)}
+          alt={label}
+          title={label}
+          width={28}
+          height={28}
+          style={{ width: 28, height: 28, objectFit: "contain", filter: "drop-shadow(0 3px 7px rgba(0,0,0,.8))" }}
+        />
+      ) : (
+        <span style={{ fontSize: 12, color, fontWeight: 600 }}>{label}</span>
+      )}
       <div style={{ height: 10, background: "rgba(201,138,75,.10)", borderRadius: 2, overflow: "hidden" }}>
         <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 2 }} />
       </div>
@@ -43,6 +55,7 @@ export default async function EstatisticasPage() {
   const statElo = ELO_ORDER.map((elo) => ({
     label: elo.label,
     color: elo.color,
+    eloKey: elo.key,
     count: players.filter((player) => player.eloMeta?.label === elo.label).length,
   }))
     .filter((row) => row.count > 0)
@@ -113,7 +126,7 @@ export default async function EstatisticasPage() {
         <StatCard title="DISTRIBUIÇÃO POR ELO">
           <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
             {statElo.map((row) => (
-              <BarRow key={row.label} label={row.label} color={row.color} count={row.count} pct={Math.round((row.count / eloMax) * 100)} />
+              <BarRow key={row.label} label={row.label} color={row.color} eloKey={row.eloKey} count={row.count} pct={Math.round((row.count / eloMax) * 100)} />
             ))}
           </div>
         </StatCard>
