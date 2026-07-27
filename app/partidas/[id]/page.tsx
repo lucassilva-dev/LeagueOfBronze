@@ -424,6 +424,7 @@ export default async function PartidaDetalhePage({ params }: PartidaDetalhePageP
         teamA={teamA}
         teamB={teamB}
         initialCards={series.cardsUsed ?? []}
+        initialBlueSideTeamId={series.blueSideTeamId ?? null}
       />
 
       <section className="grid gap-4 md:grid-cols-2">

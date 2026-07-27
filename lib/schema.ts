@@ -343,6 +343,8 @@ export const seriesMatchSchema = z.object({
   walkoverReason: z.string().trim().optional(),
   games: z.array(seriesGameSchema).max(5),
   cardsUsed: z.array(cardUsageSchema).max(20).optional(),
+  // Time que começa no lado azul no jogo 1 (sorteio de lados). O outro começa no vermelho.
+  blueSideTeamId: z.string().trim().optional(),
 });
 
 export const standingsSeedRowSchema = z.object({

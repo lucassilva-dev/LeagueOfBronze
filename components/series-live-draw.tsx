@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Shuffle, Users } from "lucide-react";
+import { Shuffle, Swords, Users } from "lucide-react";
 
 import type { CardId } from "@/lib/schema";
 import { ALL_CARDS, CARDS, CARDS_BY_ID } from "@/lib/cards";
@@ -49,13 +49,20 @@ export function SeriesLiveDraw({
   teamA,
   teamB,
   initialCards,
+  initialBlueSideTeamId,
 }: Readonly<{
   seriesId: string;
   teamA: TeamRef | null;
   teamB: TeamRef | null;
   initialCards: Drawn[];
+  initialBlueSideTeamId?: string | null;
 }>) {
   const [isAdmin, setIsAdmin] = useState(false);
+  const [blueSideTeamId, setBlueSideTeamId] = useState<string | null>(
+    initialBlueSideTeamId ?? null,
+  );
+  const [sideSpinning, setSideSpinning] = useState(false);
+  const sideTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const [cardByTeam, setCardByTeam] = useState<Record<string, string | null>>(() => {
     const map: Record<string, string | null> = {};
     for (const card of initialCards) map[card.teamId] = card.cardId;
@@ -73,8 +80,31 @@ export function SeriesLiveDraw({
       .catch(() => {});
     return () => {
       if (timer.current) clearInterval(timer.current);
+      if (sideTimer.current) clearInterval(sideTimer.current);
     };
   }, []);
+
+  // Sorteio de lados do jogo 1: define quem começa no azul (o outro fica no vermelho).
+  const drawSides = () => {
+    if (!teamA || !teamB || sideSpinning || spinTarget) return;
+    setSideSpinning(true);
+    let ticks = 0;
+    sideTimer.current = setInterval(() => {
+      setBlueSideTeamId(Math.random() < 0.5 ? teamA.id : teamB.id);
+      ticks += 1;
+      if (ticks <= 14) return;
+      if (sideTimer.current) clearInterval(sideTimer.current);
+      const blueId = Math.random() < 0.5 ? teamA.id : teamB.id;
+      setBlueSideTeamId(blueId);
+      setSideSpinning(false);
+      void fetch("/api/admin/series/sides", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ seriesId, blueSideTeamId: blueId }),
+      }).catch(() => {});
+    }, 80);
+  };
 
   // Roleta: sorteia entre `pool` e aplica o resultado via `onResult`.
   const spin = (target: string, pool: typeof CARDS, onResult: (cardId: CardId) => void) => {
@@ -145,8 +175,47 @@ export function SeriesLiveDraw({
     );
   };
 
+  const blueTeam = teamA && teamB ? (blueSideTeamId === teamB.id ? teamB : blueSideTeamId === teamA.id ? teamA : null) : null;
+  const redTeam = blueTeam ? (blueTeam.id === teamA?.id ? teamB : teamA) : null;
+
+  const SideChip = ({ label, color, team }: { label: string; color: string; team: TeamRef | null }) => (
+    <div className="flex flex-1 flex-col items-center gap-1 rounded-2xl border p-3" style={{ borderColor: `${color}55`, background: `${color}12` }}>
+      <span className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color }}>{label}</span>
+      <span className="text-sm font-semibold text-center">
+        {sideSpinning ? "Sorteando…" : (team?.name ?? "—")}
+      </span>
+    </div>
+  );
+
   return (
     <Card className="p-5">
+      {teamA && teamB ? (
+        <div className="mb-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs uppercase tracking-[0.14em] text-muted">Lados · Jogo 1</p>
+            {isAdmin ? (
+              <span className="text-[11px] text-accent2">Sorteio ao vivo — grava na partida</span>
+            ) : null}
+          </div>
+          <div className="mt-3 flex items-stretch gap-3">
+            <SideChip label="Lado Azul" color="#4d9bff" team={blueTeam} />
+            <SideChip label="Lado Vermelho" color="#ff5d5d" team={redTeam} />
+          </div>
+          {isAdmin ? (
+            <div className="mt-3 flex justify-center">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={drawSides}
+                disabled={sideSpinning || Boolean(spinTarget)}
+              >
+                <Swords className="h-4 w-4" /> Sortear lados
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs uppercase tracking-[0.14em] text-muted">Cartinhas da série</p>
         {isAdmin ? (
