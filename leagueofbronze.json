@@ -1676,7 +1676,107 @@
       "teamBId": "lgtv-wins",
       "stage": "REGULAR_SEASON",
       "format": "BO3",
-      "games": []
+      "games": [
+        {
+          "winnerTeamId": "lgtv-wins",
+          "mvpPlayerId": "vidotti-agiota",
+          "durationMin": 30,
+          "statsByPlayer": [
+            {
+              "playerId": "z0e-baiana",
+              "champion": "Seraphine",
+              "kills": 3,
+              "deaths": 3,
+              "assists": 8
+            },
+            {
+              "playerId": "png-gala",
+              "champion": "Malphite",
+              "kills": 9,
+              "deaths": 1,
+              "assists": 11
+            },
+            {
+              "playerId": "vidotti-agiota",
+              "champion": "Nasus",
+              "kills": 11,
+              "deaths": 1,
+              "assists": 9
+            },
+            {
+              "playerId": "wrgamer",
+              "champion": "Jhin",
+              "kills": 5,
+              "deaths": 1,
+              "assists": 8
+            },
+            {
+              "playerId": "maxmp",
+              "champion": "Zilean",
+              "kills": 1,
+              "deaths": 2,
+              "assists": 13
+            },
+            {
+              "playerId": "sr-hades",
+              "champion": "Zaahen",
+              "kills": 1,
+              "deaths": 7,
+              "assists": 1
+            },
+            {
+              "playerId": "famoso-parrudao",
+              "champion": "Bel'Veth",
+              "kills": 1,
+              "deaths": 7,
+              "assists": 2
+            },
+            {
+              "playerId": "onigami",
+              "champion": "Brand",
+              "kills": 5,
+              "deaths": 6,
+              "assists": 2
+            },
+            {
+              "playerId": "hikolin",
+              "champion": "Ziggs",
+              "kills": 1,
+              "deaths": 3,
+              "assists": 3
+            },
+            {
+              "playerId": "n4firida-agiota",
+              "champion": "Zyra",
+              "kills": 0,
+              "deaths": 6,
+              "assists": 2
+            }
+          ],
+          "bans": [
+            {
+              "teamId": "presas-shurima",
+              "championName": "Zoe"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Briar"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Lillia"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Amumu"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Caitlyn"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "serie-10",
