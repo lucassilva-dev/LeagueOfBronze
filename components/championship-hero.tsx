@@ -76,13 +76,22 @@ export function ChampionshipHero({
   championship,
   teamsById,
   playersById,
+  championTeamHref,
+  grandFinalHref,
 }: Readonly<{
   championship: ChampionshipResult | null;
   teamsById: Map<string, Team>;
   playersById: Map<string, Player>;
+  // Sobrescreve os destinos dos atalhos (usado nas temporadas arquivadas, cujos
+  // dados não vivem nas rotas do campeonato ativo).
+  championTeamHref?: string;
+  grandFinalHref?: string;
 }>) {
   const data = getChampionshipHeroData(championship, teamsById, playersById);
   if (!data) return null;
+
+  const championHref = championTeamHref ?? `/times/${data.championTeam.slug}`;
+  const finalHref = grandFinalHref ?? `/partidas/${data.championship.summary.series.id}`;
 
   return (
     <section>
@@ -136,14 +145,14 @@ export function ChampionshipHero({
               </div>
               <div className="mt-4 space-y-2">
                 <Link
-                  href={`/times/${data.championTeam.slug}`}
+                  href={championHref}
                   className="inline-flex items-center gap-2 text-sm font-semibold text-accent2 transition hover:text-text"
                 >
                   Ver time campeão
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link
-                  href={`/partidas/${data.championship.summary.series.id}`}
+                  href={finalHref}
                   className="inline-flex items-center gap-2 text-sm font-semibold text-accent transition hover:text-text"
                 >
                   Abrir grande final

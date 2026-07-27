@@ -15,6 +15,9 @@ type SeriesSummaryCardProps = Readonly<{
   teamsById: Map<string, Team>;
   playersById: Map<string, Player>;
   readOnly?: boolean;
+  // Destino do clique. Se omitido no modo normal, usa /partidas/{id}. No modo readOnly,
+  // o card só vira link quando um href é informado (ex.: partida de temporada arquivada).
+  href?: string;
 }>;
 
 function isGrandFinal(summary: SeriesSummary) {
@@ -90,6 +93,7 @@ export function SeriesSummaryCard({
   teamsById,
   playersById,
   readOnly = false,
+  href,
 }: SeriesSummaryCardProps) {
   const teamA = teamsById.get(summary.series.teamAId);
   const teamB = teamsById.get(summary.series.teamBId);
@@ -182,12 +186,14 @@ export function SeriesSummaryCard({
       </Card>
   );
 
-  if (readOnly) {
+  const target = href ?? (readOnly ? null : `/partidas/${summary.series.id}`);
+
+  if (!target) {
     return <div className="block">{body}</div>;
   }
 
   return (
-    <Link href={`/partidas/${summary.series.id}`} className="block">
+    <Link href={target} className="block">
       {body}
     </Link>
   );

@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 
 import { ChampionshipHero } from "@/components/championship-hero";
 import { EmptyState } from "@/components/empty-state";
+import { StatsToggles } from "@/components/lob/stats-toggles";
 import { PageHero } from "@/components/page-hero";
 import { PageShell } from "@/components/page-shell";
 import { SectionTitle } from "@/components/section-title";
@@ -12,6 +13,7 @@ import { StandingsPageClient } from "@/components/standings-page-client";
 import { Badge } from "@/components/ui/badge";
 import { formatDateLabel } from "@/lib/format";
 import { getServerArchivedSeason } from "@/lib/server-data";
+import { buildStatsRows } from "@/lib/stats-view";
 
 export const dynamic = "force-dynamic";
 
@@ -27,8 +29,13 @@ export default async function TemporadaDetailPage({ params }: TemporadaPageParam
     notFound();
   }
 
-  const { archived, indexes, overview } = result;
+  const { archived, dataset, indexes, overview } = result;
   const endedLabel = formatDateLabel(archived.endedAtISO ?? archived.archivedAtISO);
+  const { playerRankings, champRankings } = buildStatsRows(dataset);
+  const championTeamSlug = overview.championship
+    ? indexes.teamsById.get(overview.championship.championTeamId)?.slug
+    : undefined;
+  const finalSeriesId = overview.championship?.summary.series.id;
 
   return (
     <PageShell className="space-y-6">
@@ -53,6 +60,8 @@ export default async function TemporadaDetailPage({ params }: TemporadaPageParam
         championship={overview.championship}
         teamsById={indexes.teamsById}
         playersById={indexes.playersById}
+        championTeamHref={championTeamSlug ? `/temporadas/${seasonId}/times/${championTeamSlug}` : undefined}
+        grandFinalHref={finalSeriesId ? `/temporadas/${seasonId}/partidas/${finalSeriesId}` : undefined}
       />
 
       <section className="space-y-4">
@@ -79,10 +88,19 @@ export default async function TemporadaDetailPage({ params }: TemporadaPageParam
                 teamsById={indexes.teamsById}
                 playersById={indexes.playersById}
                 readOnly
+                href={`/temporadas/${seasonId}/partidas/${summary.series.id}`}
               />
             ))}
           </div>
         )}
+      </section>
+
+      <section className="space-y-4">
+        <SectionTitle
+          title="Estatísticas"
+          subtitle="Rankings de jogadores e campeões registrados nesta temporada."
+        />
+        <StatsToggles playerRankings={playerRankings} champRankings={champRankings} />
       </section>
     </PageShell>
   );
