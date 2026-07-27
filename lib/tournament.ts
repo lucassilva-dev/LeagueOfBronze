@@ -11,7 +11,7 @@ import type {
 } from "@/lib/schema";
 import { toDateEnd, toDateStart } from "@/lib/format";
 import { resolveChampion } from "@/lib/champions";
-import { CARDS } from "@/lib/cards";
+import { ALL_CARDS } from "@/lib/cards";
 import type {
   CardStat,
   ChampionAggregate,
@@ -558,6 +558,7 @@ type PlayerAccumulator = {
   deaths: number;
   assists: number;
   gamesPlayed: number;
+  wins: number;
   gameMvps: number;
   seriesMvps: number;
 };
@@ -574,6 +575,7 @@ function ensurePlayerAccumulator(
     deaths: 0,
     assists: 0,
     gamesPlayed: 0,
+    wins: 0,
     gameMvps: 0,
     seriesMvps: 0,
   };
@@ -597,6 +599,7 @@ function applyPlayerGameStats(
     bucket.deaths += stats.deaths;
     bucket.assists += stats.assists;
     bucket.gamesPlayed += 1;
+    if (game.winnerTeamId === player.teamId) bucket.wins += 1;
   }
 }
 
@@ -636,6 +639,8 @@ function toPlayerAggregate(
   const kills = bucket?.kills ?? 0;
   const deaths = bucket?.deaths ?? 0;
   const assists = bucket?.assists ?? 0;
+  const gamesPlayed = bucket?.gamesPlayed ?? 0;
+  const wins = bucket?.wins ?? 0;
 
   return {
     playerId: player.id,
@@ -647,7 +652,9 @@ function toPlayerAggregate(
     kills,
     deaths,
     assists,
-    gamesPlayed: bucket?.gamesPlayed ?? 0,
+    gamesPlayed,
+    wins,
+    winRate: gamesPlayed > 0 ? (wins / gamesPlayed) * 100 : 0,
     gameMvps: bucket?.gameMvps ?? 0,
     seriesMvps: bucket?.seriesMvps ?? 0,
     kda: getKda(kills, deaths, assists),
@@ -1197,15 +1204,24 @@ export function calculateCardStats(dataset: TournamentDataset): CardStat[] {
   const usage = new Map<string, { count: number; byTeam: Map<string, number> }>();
 
   for (const series of dataset.seriesMatches) {
+    // Um sorteio duplo grava a mesma carta nos dois times, mas foi sorteada uma única vez.
+    const duplaCounted = new Set<string>();
     for (const card of series.cardsUsed ?? []) {
       const bucket = usage.get(card.cardId) ?? { count: 0, byTeam: new Map<string, number>() };
-      bucket.count += 1;
+      if (card.dupla) {
+        if (!duplaCounted.has(card.cardId)) {
+          duplaCounted.add(card.cardId);
+          bucket.count += 1;
+        }
+      } else {
+        bucket.count += 1;
+      }
       bucket.byTeam.set(card.teamId, (bucket.byTeam.get(card.teamId) ?? 0) + 1);
       usage.set(card.cardId, bucket);
     }
   }
 
-  return CARDS.map<CardStat>((cardDef) => {
+  return ALL_CARDS.map<CardStat>((cardDef) => {
     const bucket = usage.get(cardDef.id);
     const byTeam = bucket
       ? [...bucket.byTeam.entries()]

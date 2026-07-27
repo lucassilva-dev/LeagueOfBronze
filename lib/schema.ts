@@ -11,6 +11,9 @@ const cardIds = [
   "INVASAO_YUUMI",
   "INVERSAO_ROTAS",
   "TUDO_LIBERADO",
+  // Duplas — sorteadas uma única vez quando os DOIS capitães usam a carta.
+  "AMIGOS_NATUREZA",
+  "DRAFT_INVERTIDO",
 ] as const;
 
 function addCustomIssue(
@@ -325,6 +328,8 @@ export const cardUsageSchema = z.object({
   teamId: nonEmpty,
   cardId: cardIdSchema,
   gameIndex: z.number().int().min(1).optional(),
+  // true quando os dois capitães usaram a carta e o sorteio (único) valeu para os dois times.
+  dupla: z.boolean().optional(),
 });
 
 export const seriesMatchSchema = z.object({

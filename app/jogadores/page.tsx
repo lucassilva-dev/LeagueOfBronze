@@ -1,13 +1,28 @@
-import { JogadoresClient } from "@/components/lob/jogadores-client";
+import { JogadoresClient, type PlayerPerf } from "@/components/lob/jogadores-client";
 import { Eyebrow, GoldTitle, Pill } from "@/components/lob/ui";
 import { buildDesignPlayers } from "@/lib/roster";
 import { getServerDataset } from "@/lib/server-data";
+import { calculatePlayerAggregates } from "@/lib/tournament";
 
 export const dynamic = "force-dynamic";
 
 export default async function JogadoresPage() {
   const { dataset } = await getServerDataset();
   const players = buildDesignPlayers(dataset);
+
+  const perfByPlayer: Record<string, PlayerPerf> = {};
+  for (const agg of calculatePlayerAggregates(dataset)) {
+    perfByPlayer[agg.playerId] = {
+      games: agg.gamesPlayed,
+      wins: agg.wins,
+      kills: agg.kills,
+      deaths: agg.deaths,
+      assists: agg.assists,
+      kda: agg.kda,
+      mvps: agg.gameMvps,
+      winRate: agg.winRate,
+    };
+  }
 
   return (
     <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "0 clamp(16px,4vw,24px) 96px" }}>
@@ -23,7 +38,7 @@ export default async function JogadoresPage() {
           <Pill>5 ROTAS</Pill>
         </div>
       </section>
-      <JogadoresClient players={players} />
+      <JogadoresClient players={players} perfByPlayer={perfByPlayer} />
     </div>
   );
 }

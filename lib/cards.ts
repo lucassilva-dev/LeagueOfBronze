@@ -2,7 +2,7 @@ import type { CardId } from "@/lib/schema";
 
 export type CardDef = {
   id: string;
-  cardId?: CardId; // definido só nas 6 individuais (usadas no sorteio/registro)
+  cardId: CardId; // id tipado usado no sorteio/registro (6 individuais + 2 duplas)
   letter?: string; // A–F nas individuais
   title: string;
   description: string; // regra completa
@@ -111,6 +111,7 @@ export const CARDS: CardDef[] = [
 export const DUPLAS: CardDef[] = [
   {
     id: "AMIGOS_NATUREZA",
+    cardId: "AMIGOS_NATUREZA",
     title: "AMIGOS DA NATUREZA",
     emoji: "🌿",
     color: "#57d8cb",
@@ -124,6 +125,7 @@ export const DUPLAS: CardDef[] = [
   },
   {
     id: "DRAFT_INVERTIDO",
+    cardId: "DRAFT_INVERTIDO",
     title: "DRAFT INVERTIDO",
     emoji: "🔃",
     color: "#f2e2b3",
@@ -139,17 +141,21 @@ export const DUPLAS: CardDef[] = [
 
 export const ALL_CARDS: CardDef[] = [...CARDS, ...DUPLAS];
 
-export const CARDS_BY_ID = Object.fromEntries(CARDS.map((c) => [c.cardId as CardId, c])) as Record<
+export const CARDS_BY_ID = Object.fromEntries(ALL_CARDS.map((c) => [c.cardId, c])) as Record<
   CardId,
   CardDef
 >;
 
-// Opções tipadas (CardId) das 6 cartas do sorteio/registro.
-export const CARD_OPTIONS: { id: CardId; title: string }[] = CARDS.map((c) => ({
-  id: c.cardId as CardId,
-  title: c.title,
+// Opções tipadas (CardId) de todas as cartas registráveis (6 individuais + 2 duplas).
+export const CARD_OPTIONS: { id: CardId; title: string }[] = ALL_CARDS.map((c) => ({
+  id: c.cardId,
+  title: c.dupla ? `${c.title} (dupla)` : c.title,
 }));
 
 export function getCardTitle(id: CardId): string {
   return CARDS_BY_ID[id]?.title ?? id;
+}
+
+export function isDuplaCard(id: CardId): boolean {
+  return CARDS_BY_ID[id]?.dupla === true;
 }

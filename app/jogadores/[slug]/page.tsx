@@ -26,13 +26,13 @@ export default async function PlayerFichaPage({ params }: PlayerPageParams) {
   const dash = (value: string) => (games > 0 ? value : "—");
   const tiles = [
     { label: "PARTIDAS", val: String(games) },
-    { label: "VITÓRIAS", val: "—" },
+    { label: "VITÓRIAS", val: dash(String(aggregate?.wins ?? 0)) },
     { label: "ABATES", val: dash(String(aggregate?.kills ?? 0)) },
     { label: "MORTES", val: dash(String(aggregate?.deaths ?? 0)) },
     { label: "ASSIST.", val: dash(String(aggregate?.assists ?? 0)) },
     { label: "KDA", val: dash(formatKda(aggregate?.kda ?? 0)) },
     { label: "MVPs", val: String(aggregate?.gameMvps ?? 0) },
-    { label: "WINRATE", val: "—" },
+    { label: "WINRATE", val: dash(`${Math.round(aggregate?.winRate ?? 0)}%`) },
   ];
   const opggUrl = getOpGgSummonerUrlFromNick(player.nick);
 

@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 
 import { isAdminConfigured, isAuthorizedAdminRequest } from "@/lib/admin-auth";
+import { isDuplaCard } from "@/lib/cards";
 import { readDataset, saveDataset } from "@/lib/data-store";
 import { cardIdSchema } from "@/lib/schema";
 
@@ -10,11 +11,14 @@ export const dynamic = "force-dynamic";
 
 const bodySchema = z.object({
   seriesId: z.string().trim().min(1),
-  teamId: z.string().trim().min(1),
+  // teamId é obrigatório no sorteio individual; no sorteio duplo a carta vale para os dois times.
+  teamId: z.string().trim().min(1).optional(),
   cardId: cardIdSchema,
+  dupla: z.boolean().optional(),
 });
 
-// Grava a carta sorteada ao vivo de um time numa série (1 carta por time — substitui a anterior).
+// Grava a carta sorteada ao vivo numa série (1 carta por time — substitui a anterior).
+// dupla: true → os DOIS capitães usaram, a carta sorteada vale para os dois times.
 export async function POST(request: NextRequest) {
   if (!isAdminConfigured()) {
     return NextResponse.json(
@@ -37,7 +41,18 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Dados inválidos." }, { status: 400 });
   }
-  const { seriesId, teamId, cardId } = parsed.data;
+  const { seriesId, teamId, cardId, dupla } = parsed.data;
+
+  // No sorteio duplo valem as 8 cartas; no individual, só as 6 (as duplas não entram no pool).
+  if (!dupla && isDuplaCard(cardId)) {
+    return NextResponse.json(
+      { error: "Cartas duplas só valem quando os dois capitães usam." },
+      { status: 400 },
+    );
+  }
+  if (!dupla && !teamId) {
+    return NextResponse.json({ error: "Time obrigatório no sorteio individual." }, { status: 400 });
+  }
 
   try {
     const dataset = await readDataset();
@@ -45,12 +60,23 @@ export async function POST(request: NextRequest) {
     if (!series) {
       return NextResponse.json({ error: "Série não encontrada." }, { status: 404 });
     }
-    if (teamId !== series.teamAId && teamId !== series.teamBId) {
-      return NextResponse.json({ error: "Time não pertence a esta série." }, { status: 400 });
-    }
 
-    const others = (series.cardsUsed ?? []).filter((card) => card.teamId !== teamId);
-    series.cardsUsed = [...others, { teamId, cardId }];
+    if (dupla) {
+      // Sorteio único que atinge os dois times — grava a mesma carta para ambos.
+      series.cardsUsed = [
+        { teamId: series.teamAId, cardId, dupla: true },
+        { teamId: series.teamBId, cardId, dupla: true },
+      ];
+    } else {
+      if (teamId !== series.teamAId && teamId !== series.teamBId) {
+        return NextResponse.json({ error: "Time não pertence a esta série." }, { status: 400 });
+      }
+      // Um sorteio individual descarta um sorteio duplo anterior (não convivem na mesma série).
+      const others = (series.cardsUsed ?? []).filter(
+        (card) => card.teamId !== teamId && !card.dupla,
+      );
+      series.cardsUsed = [...others, { teamId: teamId as string, cardId }];
+    }
 
     const saved = await saveDataset(dataset);
     const savedSeries = saved.seriesMatches.find((row) => row.id === seriesId);

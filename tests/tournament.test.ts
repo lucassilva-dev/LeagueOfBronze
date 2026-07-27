@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import type { TournamentDataset } from "../lib/schema";
 import {
   buildLeaderboards,
+  calculateCardStats,
+  calculatePlayerAggregates,
   calculateStandings,
   getChampionshipResult,
   inferGameMvpPlayerId,
@@ -1403,5 +1405,94 @@ describe("playoffs and MD5", () => {
     expect(aRow).toMatchObject({ points: 2, seriesWon: 2, gameDiff: 0 });
     expect(bRow).toMatchObject({ points: 2, seriesWon: 2, gameDiff: 0 });
     expect(aRow?.position).toBeLessThan(bRow!.position);
+  });
+});
+
+describe("calculatePlayerAggregates — vitorias e winrate", () => {
+  it("conta vitorias pelo winnerTeamId do jogo e calcula winRate", () => {
+    const dataset = baseDataset();
+    dataset.seriesMatches = [
+      {
+        id: "a-b",
+        date: "2026-02-20",
+        teamAId: "a",
+        teamBId: "b",
+        games: [
+          makeGame("a", "a1", [
+            { playerId: "a1", kills: 5, deaths: 1, assists: 3 },
+            { playerId: "b1", kills: 1, deaths: 5, assists: 2 },
+          ]),
+          makeGame("b", "b1", [
+            { playerId: "a1", kills: 2, deaths: 4, assists: 1 },
+            { playerId: "b1", kills: 6, deaths: 2, assists: 4 },
+          ]),
+          makeGame("a", "a1", [
+            { playerId: "a1", kills: 4, deaths: 2, assists: 3 },
+            { playerId: "b1", kills: 2, deaths: 4, assists: 1 },
+          ]),
+        ],
+      },
+    ];
+
+    const aggregates = calculatePlayerAggregates(dataset);
+    const a1 = aggregates.find((row) => row.playerId === "a1");
+    const b1 = aggregates.find((row) => row.playerId === "b1");
+
+    expect(a1).toMatchObject({ gamesPlayed: 3, wins: 2 });
+    expect(a1?.winRate).toBeCloseTo(66.6667, 2);
+    expect(b1).toMatchObject({ gamesPlayed: 3, wins: 1 });
+    expect(b1?.winRate).toBeCloseTo(33.3333, 2);
+
+    // Jogador que nunca entrou: zero-fill sem dividir por zero.
+    const c1 = aggregates.find((row) => row.playerId === "c1");
+    expect(c1).toMatchObject({ gamesPlayed: 0, wins: 0, winRate: 0 });
+  });
+});
+
+describe("calculateCardStats — cartas duplas", () => {
+  it("conta um sorteio duplo uma unica vez mesmo gravado nos dois times", () => {
+    const dataset = baseDataset();
+    dataset.seriesMatches = [
+      {
+        id: "a-b",
+        date: "2026-02-20",
+        teamAId: "a",
+        teamBId: "b",
+        games: [
+          makeGame("a", "a1", [
+            { playerId: "a1", kills: 5, deaths: 1, assists: 3 },
+            { playerId: "b1", kills: 1, deaths: 5, assists: 2 },
+          ]),
+        ],
+        cardsUsed: [
+          { teamId: "a", cardId: "AMIGOS_NATUREZA", dupla: true },
+          { teamId: "b", cardId: "AMIGOS_NATUREZA", dupla: true },
+        ],
+      },
+      {
+        id: "a-c",
+        date: "2026-02-21",
+        teamAId: "a",
+        teamBId: "c",
+        games: [
+          makeGame("a", "a1", [
+            { playerId: "a1", kills: 5, deaths: 1, assists: 3 },
+            { playerId: "c1", kills: 1, deaths: 5, assists: 2 },
+          ]),
+        ],
+        cardsUsed: [{ teamId: "a", cardId: "TUDO_LIBERADO" }],
+      },
+    ];
+
+    const stats = calculateCardStats(dataset);
+    const dupla = stats.find((row) => row.cardId === "AMIGOS_NATUREZA");
+    const individual = stats.find((row) => row.cardId === "TUDO_LIBERADO");
+
+    // Sorteio unico -> count 1, mas presente nos dois times.
+    expect(dupla?.count).toBe(1);
+    expect(dupla?.byTeam.map((entry) => entry.teamId).sort()).toEqual(["a", "b"]);
+    expect(individual?.count).toBe(1);
+    // Todas as 8 cartas aparecem no ranking (inclusive as de contagem zero).
+    expect(stats).toHaveLength(8);
   });
 });

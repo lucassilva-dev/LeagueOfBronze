@@ -4,22 +4,43 @@ import { useEffect, useState } from "react";
 
 import { PlayerCard } from "@/components/lob/player-card";
 import { EloCrest, RoleIcon } from "@/components/lob/ui";
+import { formatKda } from "@/lib/format";
 import type { DesignPlayer } from "@/lib/roster";
 
 const ROLE_ORDER = ["TOP", "SEL", "MID", "ADC", "SUP"];
 
-const PERF_TILES = [
-  { label: "PARTIDAS", val: "0" },
-  { label: "VITÓRIAS", val: "0" },
-  { label: "ABATES", val: "—" },
-  { label: "MORTES", val: "—" },
-  { label: "ASSIST.", val: "—" },
-  { label: "KDA", val: "—" },
-  { label: "MVPs", val: "0" },
-  { label: "WINRATE", val: "—" },
-];
+export type PlayerPerf = {
+  games: number;
+  wins: number;
+  kills: number;
+  deaths: number;
+  assists: number;
+  kda: number;
+  mvps: number;
+  winRate: number;
+};
 
-function PlayerModal({ player, onClose }: Readonly<{ player: DesignPlayer; onClose: () => void }>) {
+// Tiles de performance: mostram "—" enquanto o jogador não entrou em nenhum jogo.
+function buildPerfTiles(perf: PlayerPerf | undefined) {
+  const games = perf?.games ?? 0;
+  const dash = (value: string) => (games > 0 ? value : "—");
+  return [
+    { label: "PARTIDAS", val: String(games) },
+    { label: "VITÓRIAS", val: dash(String(perf?.wins ?? 0)) },
+    { label: "ABATES", val: dash(String(perf?.kills ?? 0)) },
+    { label: "MORTES", val: dash(String(perf?.deaths ?? 0)) },
+    { label: "ASSIST.", val: dash(String(perf?.assists ?? 0)) },
+    { label: "KDA", val: dash(formatKda(perf?.kda ?? 0)) },
+    { label: "MVPs", val: String(perf?.mvps ?? 0) },
+    { label: "WINRATE", val: dash(`${Math.round(perf?.winRate ?? 0)}%`) },
+  ];
+}
+
+function PlayerModal({
+  player,
+  perf,
+  onClose,
+}: Readonly<{ player: DesignPlayer; perf?: PlayerPerf; onClose: () => void }>) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -97,7 +118,7 @@ function PlayerModal({ player, onClose }: Readonly<{ player: DesignPlayer; onClo
               <div style={{ height: 1, flex: 1, background: "linear-gradient(90deg,rgba(201,138,75,.3),transparent)" }} />
             </div>
             <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
-              {PERF_TILES.map((tile) => (
+              {buildPerfTiles(perf).map((tile) => (
                 <div key={tile.label} style={{ padding: "13px 6px", textAlign: "center", background: "linear-gradient(180deg,rgba(201,138,75,.08),rgba(201,138,75,.02))", border: "1px solid rgba(201,138,75,.16)", borderRadius: 3 }}>
                   <div className="lob-display" style={{ fontSize: 23, color: "#e6c592", lineHeight: 1 }}>{tile.val}</div>
                   <div style={{ fontSize: 8, letterSpacing: ".04em", color: "#8f8472", marginTop: 5 }}>{tile.label}</div>
@@ -115,7 +136,10 @@ function PlayerModal({ player, onClose }: Readonly<{ player: DesignPlayer; onClo
   );
 }
 
-export function JogadoresClient({ players }: Readonly<{ players: DesignPlayer[] }>) {
+export function JogadoresClient({
+  players,
+  perfByPlayer,
+}: Readonly<{ players: DesignPlayer[]; perfByPlayer?: Record<string, PlayerPerf> }>) {
   const [modal, setModal] = useState<DesignPlayer | null>(null);
 
   const byRole = new Map<string, DesignPlayer[]>();
@@ -149,7 +173,13 @@ export function JogadoresClient({ players }: Readonly<{ players: DesignPlayer[] 
           </div>
         </section>
       ))}
-      {modal ? <PlayerModal player={modal} onClose={() => setModal(null)} /> : null}
+      {modal ? (
+        <PlayerModal
+          player={modal}
+          perf={perfByPlayer?.[modal.id]}
+          onClose={() => setModal(null)}
+        />
+      ) : null}
     </>
   );
 }

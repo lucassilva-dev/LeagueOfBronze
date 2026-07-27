@@ -66,6 +66,8 @@ export interface PlayerAggregate {
   deaths: number;
   assists: number;
   gamesPlayed: number;
+  wins: number;
+  winRate: number;
   gameMvps: number;
   seriesMvps: number;
   kda: number;
