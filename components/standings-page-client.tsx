@@ -17,8 +17,11 @@ import { Input } from "@/components/ui/input";
 type StandingsPageClientProps = Readonly<{
   rows: StandingsRow[];
   source: StandingsSource;
+  // Base do link do time. Default: campeonato atual (/times/). Temporadas arquivadas
+  // passam /temporadas/{seasonId}/times/ para não caírem em 404 na rota do campeonato ativo.
+  teamHrefBase?: string;
 }>;
-type StandingsRowProps = Readonly<{ row: StandingsRow }>;
+type StandingsRowProps = Readonly<{ row: StandingsRow; teamHrefBase: string }>;
 type PositionProps = Readonly<{ position: number }>;
 type GameDiffProps = Readonly<{ value: number }>;
 
@@ -26,10 +29,10 @@ function StandingsPosition({ position }: PositionProps) {
   return <span className={cn("font-semibold", position <= 3 && "text-accent")}>#{position}</span>;
 }
 
-function StandingsTeamLink({ row }: StandingsRowProps) {
+function StandingsTeamLink({ row, teamHrefBase }: StandingsRowProps) {
   return (
     <Link
-      href={`/times/${row.teamSlug}`}
+      href={`${teamHrefBase}${row.teamSlug}`}
       className="inline-flex items-center gap-2 font-semibold hover:text-accent"
     >
       <TeamCrest team={{ name: row.teamName, imageUrl: row.teamImageUrl }} size={26} />
@@ -56,7 +59,7 @@ function GameDiffValue({ value }: GameDiffProps) {
   return <span className={colorClassName}>{label}</span>;
 }
 
-function MobileRowDetails({ row }: StandingsRowProps) {
+function MobileRowDetails({ row }: Readonly<{ row: StandingsRow }>) {
   return (
     <div className="text-right text-xs text-muted">
       <p>V-D séries: {row.seriesWon}-{row.seriesLost}</p>
@@ -81,7 +84,8 @@ function SourceBadge({ source }: Readonly<{ source: StandingsSource }>) {
   return <Badge variant="success">Tabela calculada pelas séries registradas</Badge>;
 }
 
-const TABLE_COLUMNS: ColumnDef<StandingsRow>[] = [
+function buildColumns(teamHrefBase: string): ColumnDef<StandingsRow>[] {
+  return [
   {
     accessorKey: "position",
     header: "Pos",
@@ -90,7 +94,7 @@ const TABLE_COLUMNS: ColumnDef<StandingsRow>[] = [
   {
     accessorKey: "teamName",
     header: "Time",
-    cell: ({ row }) => <StandingsTeamLink row={row.original} />,
+    cell: ({ row }) => <StandingsTeamLink row={row.original} teamHrefBase={teamHrefBase} />,
   },
   {
     id: "seriesRecord",
@@ -119,11 +123,13 @@ const TABLE_COLUMNS: ColumnDef<StandingsRow>[] = [
     header: "Pts",
     cell: ({ getValue }) => <StandingsPoints value={getValue<number>()} />,
   },
-];
+  ];
+}
 
-export function StandingsPageClient({ rows, source }: StandingsPageClientProps) {
+export function StandingsPageClient({ rows, source, teamHrefBase = "/times/" }: StandingsPageClientProps) {
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
+  const columns = useMemo(() => buildColumns(teamHrefBase), [teamHrefBase]);
 
   const filteredRows = useMemo(() => {
     const q = deferredQuery.trim().toLowerCase();
@@ -170,7 +176,7 @@ export function StandingsPageClient({ rows, source }: StandingsPageClientProps) 
                     <span className="font-display text-2xl text-accent">#{row.position}</span>
                     {row.position <= 3 ? <Trophy className="h-4 w-4 text-accent2" /> : null}
                   </div>
-                  <StandingsTeamLink row={row} />
+                  <StandingsTeamLink row={row} teamHrefBase={teamHrefBase} />
                   <p className="mt-1 text-xs text-muted">
                     Séries: {row.seriesPlayed} | Pontos: {row.points}
                   </p>
@@ -184,7 +190,7 @@ export function StandingsPageClient({ rows, source }: StandingsPageClientProps) 
 
       <Card className="hidden p-2 md:block">
         <DataTable
-          columns={TABLE_COLUMNS}
+          columns={columns}
           data={filteredRows}
           emptyMessage="Nenhum time encontrado."
           rowClassName={(row) => {

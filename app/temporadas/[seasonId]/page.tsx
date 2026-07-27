@@ -11,9 +11,13 @@ import { SectionTitle } from "@/components/section-title";
 import { SeriesSummaryCard } from "@/components/series-summary-card";
 import { StandingsPageClient } from "@/components/standings-page-client";
 import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { CARDS_BY_ID } from "@/lib/cards";
 import { formatDateLabel } from "@/lib/format";
+import type { CardId } from "@/lib/schema";
 import { getServerArchivedSeason } from "@/lib/server-data";
 import { buildStatsRows } from "@/lib/stats-view";
+import { calculateCardStats } from "@/lib/tournament";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +40,23 @@ export default async function TemporadaDetailPage({ params }: TemporadaPageParam
     ? indexes.teamsById.get(overview.championship.championTeamId)?.slug
     : undefined;
   const finalSeriesId = overview.championship?.summary.series.id;
+
+  // Séries agrupadas por fase (Final / Semifinais / Fase regular).
+  const stageBuckets = { FINAL: [], SEMIFINAL: [], REGULAR_SEASON: [] } as Record<
+    string,
+    typeof overview.seriesSummaries
+  >;
+  for (const summary of overview.seriesSummaries) {
+    const stage = summary.series.stage ?? "REGULAR_SEASON";
+    (stageBuckets[stage] ?? stageBuckets.REGULAR_SEASON).push(summary);
+  }
+  const seriesGroups = [
+    { key: "FINAL", title: "Grande Final", list: stageBuckets.FINAL },
+    { key: "SEMIFINAL", title: "Semifinais", list: stageBuckets.SEMIFINAL },
+    { key: "REGULAR_SEASON", title: "Fase regular", list: stageBuckets.REGULAR_SEASON },
+  ].filter((group) => group.list.length > 0);
+
+  const cardStats = calculateCardStats(dataset).filter((c) => c.count > 0);
 
   return (
     <PageShell className="space-y-6">
@@ -69,31 +90,61 @@ export default async function TemporadaDetailPage({ params }: TemporadaPageParam
           title="Classificação final"
           subtitle="Tabela da fase regular no encerramento desta temporada."
         />
-        <StandingsPageClient rows={overview.standings.rows} source={overview.standings.source} />
+        <StandingsPageClient rows={overview.standings.rows} source={overview.standings.source} teamHrefBase={`/temporadas/${seasonId}/times/`} />
       </section>
 
-      <section className="space-y-4">
-        <SectionTitle title="Séries" subtitle="Todas as séries registradas nesta temporada." />
+      <section className="space-y-6">
+        <SectionTitle title="Séries" subtitle="Todas as séries registradas nesta temporada, por fase." />
         {overview.seriesSummaries.length === 0 ? (
           <EmptyState
             title="Sem séries"
             description="Esta temporada não registrou séries antes de ser encerrada."
           />
         ) : (
-          <div className="space-y-3">
-            {overview.seriesSummaries.map((summary) => (
-              <SeriesSummaryCard
-                key={summary.series.id}
-                summary={summary}
-                teamsById={indexes.teamsById}
-                playersById={indexes.playersById}
-                readOnly
-                href={`/temporadas/${seasonId}/partidas/${summary.series.id}`}
-              />
-            ))}
-          </div>
+          seriesGroups.map((group) => (
+            <div key={group.key} className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent2/80">
+                {group.title} · {group.list.length}
+              </p>
+              {group.list.map((summary) => (
+                <SeriesSummaryCard
+                  key={summary.series.id}
+                  summary={summary}
+                  teamsById={indexes.teamsById}
+                  playersById={indexes.playersById}
+                  readOnly
+                  href={`/temporadas/${seasonId}/partidas/${summary.series.id}`}
+                />
+              ))}
+            </div>
+          ))
         )}
       </section>
+
+      {cardStats.length > 0 ? (
+        <section className="space-y-4">
+          <SectionTitle title="Cartinhas mais sorteadas" subtitle="Cartas usadas ao longo desta temporada." />
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {cardStats.map((card) => {
+              const def = CARDS_BY_ID[card.cardId as CardId];
+              return (
+                <Card key={card.cardId} className="flex items-center gap-3 p-4">
+                  <span
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-2xl"
+                    style={{ background: def ? `linear-gradient(135deg, ${def.from}, ${def.to})` : "rgba(255,255,255,0.04)" }}
+                  >
+                    {def?.emoji ?? "🎴"}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold">{card.title}{def?.dupla ? " (dupla)" : ""}</p>
+                    <p className="text-xs text-muted">{card.count} sorteio{card.count === 1 ? "" : "s"}</p>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
 
       <section className="space-y-4">
         <SectionTitle

@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 import { EloCrest, RoleTag, TeamMark } from "@/components/lob/ui";
-import { PageHero } from "@/components/page-hero";
 import { PageShell } from "@/components/page-shell";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -51,12 +50,32 @@ export default async function TemporadaTimePage({ params }: PageParams) {
         </Link>
       </div>
 
-      <PageHero
-        badge="Time · temporada arquivada"
-        title={team.name}
-        description={`Elenco e desempenho de cada jogador em ${archived.name}.`}
-        extra={<Badge variant="bronze">Somente leitura</Badge>}
-      />
+      <Card className="overflow-hidden p-0">
+        <div style={{ height: 4, background: `linear-gradient(90deg,${team.color},transparent)` }} />
+        <div className="flex flex-wrap items-center gap-4 p-5">
+          <TeamMark imageUrl={team.imageUrl} color={team.color} name={team.name} size={64} diamond={22} />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="bronze">Time · temporada arquivada</Badge>
+              <Badge variant="outline">Somente leitura</Badge>
+            </div>
+            <h1 className="mt-2 font-heading text-2xl font-bold tracking-tight sm:text-3xl" style={{ color: "#f4ecdd" }}>{team.name}</h1>
+            <p className="mt-1 text-sm text-muted">Elenco e desempenho de cada jogador em {archived.name}.</p>
+          </div>
+          <div className="flex items-center gap-3">
+            {team.captain ? (
+              <div className="rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-2 text-center">
+                <p className="text-[10px] uppercase tracking-[0.14em] text-muted">Capitão</p>
+                <p className="mt-1 font-semibold" style={{ color: "#e6c592" }}>{team.captain.displayNick}</p>
+              </div>
+            ) : null}
+            <div className="rounded-2xl border border-accent2/20 bg-accent2/[0.06] px-4 py-2 text-center">
+              <p className="text-[10px] uppercase tracking-[0.14em] text-muted">Pts de elenco</p>
+              <p className="mt-1 font-display text-2xl" style={{ color: "#e6c592" }}>{team.total}</p>
+            </div>
+          </div>
+        </div>
+      </Card>
 
       <Card className="p-4 sm:p-5">
         <div className="max-w-full overflow-x-auto pb-1 scrollbar-thin">
@@ -93,7 +112,9 @@ export default async function TemporadaTimePage({ params }: PageParams) {
                         ) : (
                           <TeamMark imageUrl={team.imageUrl} color={team.color} name={team.name} size={24} diamond={9} />
                         )}
-                        <span className="font-semibold">{player.displayNick}</span>
+                        <Link href={`/temporadas/${seasonId}/jogadores/${player.slug}`} className="font-semibold hover:text-accent">
+                          {player.displayNick}
+                        </Link>
                       </span>
                     </TableCell>
                     <TableCell><RoleTag role={player.role1} /></TableCell>
