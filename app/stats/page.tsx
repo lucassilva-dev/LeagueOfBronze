@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 function BarRow({ label, color, count, pct, eloKey }: Readonly<{ label: string; color: string; count: number; pct: number; eloKey?: string }>) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "78px 1fr 24px", alignItems: "center", gap: 10 }}>
+    <div style={{ display: "grid", gridTemplateColumns: eloKey ? "34px 1fr 24px" : "78px 1fr 24px", alignItems: "center", gap: 10 }}>
       {eloKey ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
