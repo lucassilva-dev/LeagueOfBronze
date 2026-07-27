@@ -2296,7 +2296,8 @@
               "playerId": "png-gala",
               "kills": 2,
               "deaths": 5,
-              "assists": 2
+              "assists": 2,
+              "champion": "Shen"
             },
             {
               "playerId": "vidotti-agiota",
