@@ -1658,7 +1658,246 @@
       "teamBId": "vanguarda-de-ferro",
       "stage": "REGULAR_SEASON",
       "format": "BO3",
-      "games": []
+      "games": [
+        {
+          "winnerTeamId": "vanguarda-de-ferro",
+          "mvpPlayerId": "peideicaldinho",
+          "durationMin": 21,
+          "statsByPlayer": [
+            {
+              "playerId": "satoshi",
+              "champion": "Vladimir",
+              "kills": 3,
+              "deaths": 2,
+              "assists": 5
+            },
+            {
+              "playerId": "peideicaldinho",
+              "champion": "Fiora",
+              "kills": 10,
+              "deaths": 4,
+              "assists": 2
+            },
+            {
+              "playerId": "mxxdragonxxm",
+              "champion": "Nasus",
+              "kills": 6,
+              "deaths": 2,
+              "assists": 2
+            },
+            {
+              "playerId": "ctz",
+              "champion": "Ashe",
+              "kills": 6,
+              "deaths": 0,
+              "assists": 6
+            },
+            {
+              "playerId": "thalao",
+              "champion": "Seraphine",
+              "kills": 2,
+              "deaths": 2,
+              "assists": 10
+            },
+            {
+              "playerId": "top-lane-666",
+              "champion": "Mordekaiser",
+              "kills": 3,
+              "deaths": 7,
+              "assists": 1
+            },
+            {
+              "playerId": "malasartes",
+              "champion": "Olaf",
+              "kills": 3,
+              "deaths": 5,
+              "assists": 3
+            },
+            {
+              "playerId": "sabor-energetico",
+              "champion": "Mel",
+              "kills": 0,
+              "deaths": 7,
+              "assists": 2
+            },
+            {
+              "playerId": "sou-adc-nao-deus",
+              "champion": "Tristana",
+              "kills": 3,
+              "deaths": 5,
+              "assists": 3
+            },
+            {
+              "playerId": "miva",
+              "champion": "Milio",
+              "kills": 1,
+              "deaths": 3,
+              "assists": 5
+            }
+          ],
+          "bans": [
+            {
+              "teamId": "vanguarda-de-ferro",
+              "championName": "Zac"
+            },
+            {
+              "teamId": "vanguarda-de-ferro",
+              "championName": "Heimerdinger"
+            },
+            {
+              "teamId": "vanguarda-de-ferro",
+              "championName": "Illaoi"
+            },
+            {
+              "teamId": "vanguarda-de-ferro",
+              "championName": "Caitlyn"
+            },
+            {
+              "teamId": "vanguarda-de-ferro",
+              "championName": "Jinx"
+            },
+            {
+              "teamId": "time4",
+              "championName": "Shyvana"
+            },
+            {
+              "teamId": "time4",
+              "championName": "Locke"
+            },
+            {
+              "teamId": "time4",
+              "championName": "Pantheon"
+            },
+            {
+              "teamId": "time4",
+              "championName": "Garen"
+            },
+            {
+              "teamId": "time4",
+              "championName": "Malzahar"
+            }
+          ]
+        },
+        {
+          "winnerTeamId": "vanguarda-de-ferro",
+          "mvpPlayerId": "ctz",
+          "durationMin": 22,
+          "statsByPlayer": [
+            {
+              "playerId": "satoshi",
+              "champion": "Zed",
+              "kills": 0,
+              "deaths": 2,
+              "assists": 1
+            },
+            {
+              "playerId": "peideicaldinho",
+              "champion": "Senna",
+              "kills": 7,
+              "deaths": 1,
+              "assists": 13
+            },
+            {
+              "playerId": "mxxdragonxxm",
+              "champion": "Sett",
+              "kills": 7,
+              "deaths": 4,
+              "assists": 7
+            },
+            {
+              "playerId": "ctz",
+              "champion": "Kai'Sa",
+              "kills": 10,
+              "deaths": 0,
+              "assists": 5
+            },
+            {
+              "playerId": "thalao",
+              "champion": "Thresh",
+              "kills": 1,
+              "deaths": 4,
+              "assists": 11
+            },
+            {
+              "playerId": "sabor-energetico",
+              "champion": "Galio",
+              "kills": 1,
+              "deaths": 5,
+              "assists": 4
+            },
+            {
+              "playerId": "sou-adc-nao-deus",
+              "champion": "Vayne",
+              "kills": 5,
+              "deaths": 6,
+              "assists": 2
+            },
+            {
+              "playerId": "top-lane-666",
+              "champion": "Malzahar",
+              "kills": 2,
+              "deaths": 4,
+              "assists": 5
+            },
+            {
+              "playerId": "miva",
+              "champion": "Karma",
+              "kills": 1,
+              "deaths": 1,
+              "assists": 7
+            },
+            {
+              "playerId": "malasartes",
+              "champion": "Amumu",
+              "kills": 2,
+              "deaths": 9,
+              "assists": 4
+            }
+          ],
+          "bans": [
+            {
+              "teamId": "vanguarda-de-ferro",
+              "championName": "Illaoi"
+            },
+            {
+              "teamId": "vanguarda-de-ferro",
+              "championName": "Zac"
+            },
+            {
+              "teamId": "vanguarda-de-ferro",
+              "championName": "Heimerdinger"
+            },
+            {
+              "teamId": "vanguarda-de-ferro",
+              "championName": "Caitlyn"
+            },
+            {
+              "teamId": "vanguarda-de-ferro",
+              "championName": "Jinx"
+            },
+            {
+              "teamId": "time4",
+              "championName": "Shyvana"
+            },
+            {
+              "teamId": "time4",
+              "championName": "Locke"
+            },
+            {
+              "teamId": "time4",
+              "championName": "Pantheon"
+            },
+            {
+              "teamId": "time4",
+              "championName": "Yunara"
+            },
+            {
+              "teamId": "time4",
+              "championName": "Jhin"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "serie-08",
