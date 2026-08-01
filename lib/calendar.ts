@@ -1,6 +1,6 @@
 import { teamColor } from "@/lib/design";
 import type { TournamentDataset } from "@/lib/schema";
-import { getSeriesScore, getSeriesWinnerTeamId } from "@/lib/tournament";
+import { getSeriesScore, getSeriesWinnerTeamId, isWalkoverSeries } from "@/lib/tournament";
 
 export type CalTeamRef = { id: string; name: string; color: string; imageUrl?: string };
 export type CalGame = {
@@ -17,6 +17,8 @@ export type CalGame = {
   scoreA: number;
   scoreB: number;
   winnerId: string | null;
+  walkover: boolean;
+  walkoverReason?: string;
 };
 export type CalDay = { dateKey: string; dateLabel: string; dia: string; games: CalGame[] };
 
@@ -64,6 +66,8 @@ export function buildRegularGames(dataset: TournamentDataset): CalGame[] {
         scoreA: score.teamAWins,
         scoreB: score.teamBWins,
         winnerId,
+        walkover: isWalkoverSeries(series),
+        walkoverReason: series.walkoverReason,
       };
     });
 }

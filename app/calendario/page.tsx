@@ -44,11 +44,15 @@ export default async function CalendarioPage() {
               const bWon = game.done && game.winnerId === game.teamB.id;
               const nameColor = (won: boolean) => (game.done ? (won ? "#f5d79a" : "#7c715e") : "#e9dfcd");
               return (
-              <Link key={game.id} href={`/partidas/${game.id}`} className="lob-card-2 lob-lift" style={{ padding: "16px 18px", textDecoration: "none", display: "block", background: game.done ? "linear-gradient(180deg,#15170f,#0c0d07)" : undefined, borderColor: game.done ? "rgba(95,191,106,.32)" : undefined }}>
+              <Link key={game.id} href={`/partidas/${game.id}`} className="lob-card-2 lob-lift" style={{ padding: "16px 18px", textDecoration: "none", display: "block", background: game.done ? "linear-gradient(180deg,#15170f,#0c0d07)" : undefined, borderColor: game.done ? (game.walkover ? "rgba(232,184,120,.42)" : "rgba(95,191,106,.32)") : undefined }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 10.5, letterSpacing: ".08em", color: "#8f8472", marginBottom: 14 }}>
                   <span>JOGO {game.n} · {game.turno.toUpperCase()}</span>
                   {game.done ? (
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 2, background: "rgba(95,191,106,.16)", border: "1px solid rgba(95,191,106,.5)", color: "#8fe0a0", fontWeight: 700 }}>✓ FINALIZADO</span>
+                    game.walkover ? (
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 2, background: "rgba(232,184,120,.16)", border: "1px solid rgba(232,184,120,.5)", color: "#e6c592", fontWeight: 700 }}>⚖ W.O.</span>
+                    ) : (
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 2, background: "rgba(95,191,106,.16)", border: "1px solid rgba(95,191,106,.5)", color: "#8fe0a0", fontWeight: 700 }}>✓ FINALIZADO</span>
+                    )
                   ) : (
                     <span style={{ padding: "2px 8px", border: "1px solid rgba(201,138,75,.3)", borderRadius: 2, color: "#cfa877" }}>{game.hora}</span>
                   )}
@@ -67,6 +71,12 @@ export default async function CalendarioPage() {
                     <TeamMark imageUrl={game.teamB.imageUrl} color={game.teamB.color} name={game.teamB.name} size={24} />
                   </div>
                 </div>
+                {game.walkover ? (
+                  <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid rgba(201,138,75,.14)", fontSize: 11, lineHeight: 1.45, color: "#cbb892" }}>
+                    <span style={{ color: "#e6b356", fontWeight: 700 }}>Vitória por W.O.</span>
+                    {game.walkoverReason ? <> · {game.walkoverReason}</> : null}
+                  </div>
+                ) : null}
               </Link>
               );
             })}
