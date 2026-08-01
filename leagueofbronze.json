@@ -2927,7 +2927,9 @@
       "teamBId": "presas-shurima",
       "stage": "REGULAR_SEASON",
       "format": "BO3",
-      "games": []
+      "games": [],
+      "walkoverWinnerTeamId": "presas-shurima",
+      "walkoverReason": "Capangas do Moto Moto desclassificado (toplaner trocou de nick durante o campeonato) — W.O."
     },
     {
       "id": "serie-13",
@@ -2945,7 +2947,246 @@
       "teamBId": "presas-shurima",
       "stage": "REGULAR_SEASON",
       "format": "BO3",
-      "games": []
+      "games": [
+        {
+          "winnerTeamId": "pantera-cor-de-goza",
+          "mvpPlayerId": "tapa-de-doido",
+          "durationMin": 35,
+          "statsByPlayer": [
+            {
+              "playerId": "tikin-d-calcinha",
+              "champion": "Diana",
+              "kills": 10,
+              "deaths": 11,
+              "assists": 12
+            },
+            {
+              "playerId": "tapa-de-doido",
+              "champion": "Urgot",
+              "kills": 14,
+              "deaths": 4,
+              "assists": 13
+            },
+            {
+              "playerId": "iranildo-gari",
+              "champion": "Amumu",
+              "kills": 1,
+              "deaths": 4,
+              "assists": 24
+            },
+            {
+              "playerId": "nak4y",
+              "champion": "Kai'Sa",
+              "kills": 12,
+              "deaths": 3,
+              "assists": 14
+            },
+            {
+              "playerId": "gar3na",
+              "champion": "Thresh",
+              "kills": 1,
+              "deaths": 5,
+              "assists": 24
+            },
+            {
+              "playerId": "sr-hades",
+              "champion": "Renekton",
+              "kills": 5,
+              "deaths": 8,
+              "assists": 8
+            },
+            {
+              "playerId": "famoso-parrudao",
+              "champion": "Xin Zhao",
+              "kills": 8,
+              "deaths": 8,
+              "assists": 9
+            },
+            {
+              "playerId": "n4firida-agiota",
+              "champion": "Heimerdinger",
+              "kills": 11,
+              "deaths": 7,
+              "assists": 5
+            },
+            {
+              "playerId": "hikolin",
+              "champion": "Ezreal",
+              "kills": 3,
+              "deaths": 7,
+              "assists": 11
+            },
+            {
+              "playerId": "onigami",
+              "champion": "Taric",
+              "kills": 0,
+              "deaths": 8,
+              "assists": 11
+            }
+          ],
+          "bans": [
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Jarvan IV"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Naafiri"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Caitlyn"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Mordekaiser"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Milio"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Katarina"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Vayne"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Jinx"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Leona"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Sett"
+            }
+          ]
+        },
+        {
+          "winnerTeamId": "pantera-cor-de-goza",
+          "mvpPlayerId": "iranildo-gari",
+          "durationMin": 21,
+          "statsByPlayer": [
+            {
+              "playerId": "tikin-d-calcinha",
+              "champion": "Akali",
+              "kills": 4,
+              "deaths": 2,
+              "assists": 8
+            },
+            {
+              "playerId": "tapa-de-doido",
+              "champion": "Aatrox",
+              "kills": 2,
+              "deaths": 0,
+              "assists": 2
+            },
+            {
+              "playerId": "nak4y",
+              "champion": "Locke",
+              "kills": 6,
+              "deaths": 4,
+              "assists": 4
+            },
+            {
+              "playerId": "iranildo-gari",
+              "champion": "Ashe",
+              "kills": 12,
+              "deaths": 3,
+              "assists": 13
+            },
+            {
+              "playerId": "gar3na",
+              "champion": "Nautilus",
+              "kills": 3,
+              "deaths": 2,
+              "assists": 21
+            },
+            {
+              "playerId": "hikolin",
+              "champion": "Jayce",
+              "kills": 0,
+              "deaths": 2,
+              "assists": 0
+            },
+            {
+              "playerId": "famoso-parrudao",
+              "champion": "Kindred",
+              "kills": 2,
+              "deaths": 5,
+              "assists": 3
+            },
+            {
+              "playerId": "n4firida-agiota",
+              "champion": "Morgana",
+              "kills": 2,
+              "deaths": 5,
+              "assists": 2
+            },
+            {
+              "playerId": "sr-hades",
+              "champion": "Lucian",
+              "kills": 3,
+              "deaths": 8,
+              "assists": 1
+            },
+            {
+              "playerId": "onigami",
+              "champion": "Yuumi",
+              "kills": 4,
+              "deaths": 7,
+              "assists": 2
+            }
+          ],
+          "bans": [
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Heimerdinger"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Naafiri"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Jarvan IV"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Sejuani"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Swain"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Katarina"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Lee Sin"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Mordekaiser"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Sett"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Lillia"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "serie-15",
@@ -2954,7 +3195,9 @@
       "teamBId": "capangas-motomoto",
       "stage": "REGULAR_SEASON",
       "format": "BO3",
-      "games": []
+      "games": [],
+      "walkoverWinnerTeamId": "capangas-motomoto",
+      "walkoverReason": "Vanguarda de Ferro não compareceu — W.O."
     }
   ],
   "standingsSeed": [],
