@@ -835,6 +835,39 @@ export interface PlayerGameHistoryRow {
   mvp: boolean;
 }
 
+export interface GameDurationRow {
+  seriesId: string;
+  gameIndex: number;
+  durationMin: number;
+  teamAName: string;
+  teamBName: string;
+  winnerTeamId: string;
+  winnerName: string;
+  date: string;
+}
+
+// Todos os jogos que têm duração registrada, ordenados do mais longo para o mais curto.
+export function getGameDurations(dataset: TournamentDataset): GameDurationRow[] {
+  const indexes = createIndexes(dataset);
+  const rows: GameDurationRow[] = [];
+  for (const series of dataset.seriesMatches) {
+    series.games.forEach((game, i) => {
+      if (typeof game.durationMin !== "number" || game.durationMin <= 0) return;
+      rows.push({
+        seriesId: series.id,
+        gameIndex: i + 1,
+        durationMin: game.durationMin,
+        teamAName: indexes.teamsById.get(series.teamAId)?.name ?? series.teamAId,
+        teamBName: indexes.teamsById.get(series.teamBId)?.name ?? series.teamBId,
+        winnerTeamId: game.winnerTeamId,
+        winnerName: indexes.teamsById.get(game.winnerTeamId)?.name ?? game.winnerTeamId,
+        date: series.date,
+      });
+    });
+  }
+  return rows.sort((a, b) => b.durationMin - a.durationMin || a.seriesId.localeCompare(b.seriesId));
+}
+
 export function getPlayerGameHistory(
   dataset: TournamentDataset,
   playerId: string,

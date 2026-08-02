@@ -1,9 +1,11 @@
+import { DurationRanking } from "@/components/lob/duration-ranking";
 import { StatsToggles } from "@/components/lob/stats-toggles";
 import { Eyebrow, EloCrest, GoldTitle, Pill } from "@/components/lob/ui";
 import { ELO_ORDER, eloSvgUrl } from "@/lib/design";
 import { buildDesignPlayers, buildDesignTeams } from "@/lib/roster";
 import { getServerDataset } from "@/lib/server-data";
 import { buildStatsRows } from "@/lib/stats-view";
+import { getGameDurations } from "@/lib/tournament";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +74,7 @@ export default async function EstatisticasPage() {
 
   // Rankings reais dos jogos registrados
   const { playerRankings, champRankings } = buildStatsRows(dataset);
+  const gameDurations = getGameDurations(dataset);
 
   return (
     <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "0 clamp(16px,4vw,24px) 96px" }}>
@@ -127,6 +130,8 @@ export default async function EstatisticasPage() {
       </section>
 
       <StatsToggles playerRankings={playerRankings} champRankings={champRankings} />
+
+      <DurationRanking rows={gameDurations} />
     </div>
   );
 }

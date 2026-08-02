@@ -3482,6 +3482,125 @@
               "championName": "Lillia"
             }
           ]
+        },
+        {
+          "winnerTeamId": "presas-shurima",
+          "mvpPlayerId": "hikolin",
+          "durationMin": 29,
+          "statsByPlayer": [
+            {
+              "playerId": "tikin-d-calcinha",
+              "champion": "Xerath",
+              "kills": 3,
+              "deaths": 7,
+              "assists": 6
+            },
+            {
+              "playerId": "tapa-de-doido",
+              "champion": "Irelia",
+              "kills": 4,
+              "deaths": 6,
+              "assists": 6
+            },
+            {
+              "playerId": "nak4y",
+              "champion": "Shaco",
+              "kills": 10,
+              "deaths": 8,
+              "assists": 5
+            },
+            {
+              "playerId": "iranildo-gari",
+              "champion": "Twitch",
+              "kills": 4,
+              "deaths": 12,
+              "assists": 3
+            },
+            {
+              "playerId": "gar3na",
+              "champion": "Lulu",
+              "kills": 0,
+              "deaths": 7,
+              "assists": 11
+            },
+            {
+              "playerId": "hikolin",
+              "champion": "Gnar",
+              "kills": 13,
+              "deaths": 1,
+              "assists": 5
+            },
+            {
+              "playerId": "famoso-parrudao",
+              "champion": "Nocturne",
+              "kills": 6,
+              "deaths": 5,
+              "assists": 19
+            },
+            {
+              "playerId": "n4firida-agiota",
+              "champion": "Mel",
+              "kills": 7,
+              "deaths": 3,
+              "assists": 6
+            },
+            {
+              "playerId": "sr-hades",
+              "champion": "Aphelios",
+              "kills": 9,
+              "deaths": 7,
+              "assists": 10
+            },
+            {
+              "playerId": "onigami",
+              "champion": "Pyke",
+              "kills": 5,
+              "deaths": 5,
+              "assists": 15
+            }
+          ],
+          "bans": [
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Naafiri"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Jarvan IV"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Caitlyn"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Sejuani"
+            },
+            {
+              "teamId": "pantera-cor-de-goza",
+              "championName": "Malphite"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Lee Sin"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Locke"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Mordekaiser"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Lillia"
+            },
+            {
+              "teamId": "presas-shurima",
+              "championName": "Sett"
+            }
+          ]
         }
       ]
     },
