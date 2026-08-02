@@ -72,6 +72,35 @@ export function buildRegularGames(dataset: TournamentDataset): CalGame[] {
     });
 }
 
+// Série da Grande Final (stage FINAL), se já existir no dataset.
+export function buildFinalGame(dataset: TournamentDataset): CalGame | null {
+  const teamsById = new Map(dataset.teams.map((team) => [team.id, team]));
+  const series = dataset.seriesMatches.find((s) => (s.stage ?? "REGULAR_SEASON") === "FINAL");
+  if (!series) return null;
+  const parts = parseParts(series.date);
+  const teamA = teamsById.get(series.teamAId);
+  const teamB = teamsById.get(series.teamBId);
+  const winnerId = getSeriesWinnerTeamId(series, dataset);
+  const score = getSeriesScore(series, dataset);
+  return {
+    id: series.id,
+    n: 0,
+    dateKey: parts.dateKey,
+    dateLabel: parts.dateLabel,
+    turno: parts.turno,
+    hora: parts.hora,
+    teamA: { id: series.teamAId, name: teamA?.name ?? series.teamAId, color: teamColor(series.teamAId), imageUrl: teamA?.imageUrl },
+    teamB: { id: series.teamBId, name: teamB?.name ?? series.teamBId, color: teamColor(series.teamBId), imageUrl: teamB?.imageUrl },
+    stage: "FINAL",
+    done: winnerId != null,
+    scoreA: score.teamAWins,
+    scoreB: score.teamBWins,
+    winnerId,
+    walkover: isWalkoverSeries(series),
+    walkoverReason: series.walkoverReason,
+  };
+}
+
 export function buildCalendarDays(dataset: TournamentDataset): CalDay[] {
   const games = buildRegularGames(dataset);
   const byDay = new Map<string, CalGame[]>();

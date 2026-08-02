@@ -2938,7 +2938,304 @@
       "teamBId": "lgtv-wins",
       "stage": "REGULAR_SEASON",
       "format": "BO3",
-      "games": []
+      "games": [
+        {
+          "winnerTeamId": "time4",
+          "mvpPlayerId": "sou-adc-nao-deus",
+          "durationMin": 37,
+          "statsByPlayer": [
+            {
+              "playerId": "png-gala",
+              "champion": "Caitlyn",
+              "kills": 4,
+              "deaths": 4,
+              "assists": 4
+            },
+            {
+              "playerId": "vidotti-agiota",
+              "champion": "Nasus",
+              "kills": 0,
+              "deaths": 8,
+              "assists": 9
+            },
+            {
+              "playerId": "z0e-baiana",
+              "champion": "Syndra",
+              "kills": 5,
+              "deaths": 2,
+              "assists": 3
+            },
+            {
+              "playerId": "maxmp",
+              "champion": "Taric",
+              "kills": 3,
+              "deaths": 3,
+              "assists": 10
+            },
+            {
+              "playerId": "top-lane-666",
+              "champion": "Illaoi",
+              "kills": 5,
+              "deaths": 7,
+              "assists": 6
+            },
+            {
+              "playerId": "malasartes",
+              "champion": "Sejuani",
+              "kills": 1,
+              "deaths": 5,
+              "assists": 13
+            },
+            {
+              "playerId": "sabor-energetico",
+              "champion": "Zac",
+              "kills": 6,
+              "deaths": 2,
+              "assists": 8
+            },
+            {
+              "playerId": "sou-adc-nao-deus",
+              "champion": "Jinx",
+              "kills": 8,
+              "deaths": 2,
+              "assists": 6
+            },
+            {
+              "playerId": "miva",
+              "champion": "Zyra",
+              "kills": 2,
+              "deaths": 4,
+              "assists": 10
+            }
+          ],
+          "bans": [
+            {
+              "teamId": "time4",
+              "championName": "Mordekaiser"
+            },
+            {
+              "teamId": "time4",
+              "championName": "Zoe"
+            },
+            {
+              "teamId": "time4",
+              "championName": "Lillia"
+            },
+            {
+              "teamId": "time4",
+              "championName": "Lux"
+            },
+            {
+              "teamId": "time4",
+              "championName": "Shaco"
+            }
+          ]
+        },
+        {
+          "winnerTeamId": "lgtv-wins",
+          "mvpPlayerId": "vidotti-agiota",
+          "durationMin": 23,
+          "statsByPlayer": [
+            {
+              "playerId": "png-gala",
+              "champion": "Gwen",
+              "kills": 6,
+              "deaths": 5,
+              "assists": 4
+            },
+            {
+              "playerId": "vidotti-agiota",
+              "champion": "Shyvana",
+              "kills": 12,
+              "deaths": 1,
+              "assists": 10
+            },
+            {
+              "playerId": "wrgamer",
+              "champion": "Kog'Maw",
+              "kills": 5,
+              "deaths": 1,
+              "assists": 12
+            },
+            {
+              "playerId": "maxmp",
+              "champion": "Zilean",
+              "kills": 3,
+              "deaths": 1,
+              "assists": 17
+            },
+            {
+              "playerId": "top-lane-666",
+              "champion": "Tahm Kench",
+              "kills": 5,
+              "deaths": 4,
+              "assists": 1
+            },
+            {
+              "playerId": "malasartes",
+              "champion": "Poppy",
+              "kills": 1,
+              "deaths": 8,
+              "assists": 2
+            },
+            {
+              "playerId": "sabor-energetico",
+              "champion": "Shen",
+              "kills": 1,
+              "deaths": 6,
+              "assists": 4
+            },
+            {
+              "playerId": "sou-adc-nao-deus",
+              "champion": "Galio",
+              "kills": 1,
+              "deaths": 5,
+              "assists": 0
+            },
+            {
+              "playerId": "miva",
+              "champion": "Braum",
+              "kills": 0,
+              "deaths": 6,
+              "assists": 1
+            }
+          ],
+          "bans": [
+            {
+              "teamId": "time4",
+              "championName": "Vayne"
+            },
+            {
+              "teamId": "time4",
+              "championName": "Lillia"
+            },
+            {
+              "teamId": "time4",
+              "championName": "Garen"
+            },
+            {
+              "teamId": "time4",
+              "championName": "Mordekaiser"
+            },
+            {
+              "teamId": "time4",
+              "championName": "Cassiopeia"
+            }
+          ]
+        },
+        {
+          "winnerTeamId": "lgtv-wins",
+          "mvpPlayerId": "vidotti-agiota",
+          "durationMin": 28,
+          "statsByPlayer": [
+            {
+              "playerId": "png-gala",
+              "champion": "Vayne",
+              "kills": 6,
+              "deaths": 2,
+              "assists": 2
+            },
+            {
+              "playerId": "vidotti-agiota",
+              "champion": "Zaahen",
+              "kills": 8,
+              "deaths": 0,
+              "assists": 7
+            },
+            {
+              "playerId": "wrgamer",
+              "champion": "Ziggs",
+              "kills": 5,
+              "deaths": 2,
+              "assists": 3
+            },
+            {
+              "playerId": "maxmp",
+              "champion": "Orianna",
+              "kills": 0,
+              "deaths": 1,
+              "assists": 15
+            },
+            {
+              "playerId": "top-lane-666",
+              "champion": "Mordekaiser",
+              "kills": 2,
+              "deaths": 6,
+              "assists": 0
+            },
+            {
+              "playerId": "malasartes",
+              "champion": "Master Yi",
+              "kills": 1,
+              "deaths": 7,
+              "assists": 0
+            },
+            {
+              "playerId": "sabor-energetico",
+              "champion": "Vel'Koz",
+              "kills": 1,
+              "deaths": 5,
+              "assists": 2
+            },
+            {
+              "playerId": "sou-adc-nao-deus",
+              "champion": "Draven",
+              "kills": 3,
+              "deaths": 5,
+              "assists": 0
+            },
+            {
+              "playerId": "miva",
+              "champion": "Karma",
+              "kills": 0,
+              "deaths": 3,
+              "assists": 2
+            }
+          ],
+          "bans": [
+            {
+              "teamId": "lgtv-wins",
+              "championName": "Jax"
+            },
+            {
+              "teamId": "lgtv-wins",
+              "championName": "Seraphine"
+            },
+            {
+              "teamId": "lgtv-wins",
+              "championName": "Milio"
+            },
+            {
+              "teamId": "lgtv-wins",
+              "championName": "Mel"
+            },
+            {
+              "teamId": "lgtv-wins",
+              "championName": "Amumu"
+            },
+            {
+              "teamId": "time4",
+              "championName": "Lillia"
+            },
+            {
+              "teamId": "time4",
+              "championName": "Ezreal"
+            },
+            {
+              "teamId": "time4",
+              "championName": "Garen"
+            },
+            {
+              "teamId": "time4",
+              "championName": "Jarvan IV"
+            },
+            {
+              "teamId": "time4",
+              "championName": "Rammus"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "serie-14",
@@ -3198,6 +3495,15 @@
       "games": [],
       "walkoverWinnerTeamId": "capangas-motomoto",
       "walkoverReason": "Vanguarda de Ferro não compareceu — W.O."
+    },
+    {
+      "id": "grande-final",
+      "date": "2026-08-02T14:00",
+      "teamAId": "vanguarda-de-ferro",
+      "teamBId": "lgtv-wins",
+      "format": "BO5",
+      "stage": "FINAL",
+      "games": []
     }
   ],
   "standingsSeed": [],
