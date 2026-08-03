@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-import { isAdminConfigured, isAuthorizedAdminRequest } from "@/lib/admin-auth";
+import { getAdminIdentity, isAdminConfigured, isNewAuthEnabled } from "@/lib/admin-auth";
 import { getConfiguredDataProvider, getDataProviderLabel, isSupabaseConfigured } from "@/lib/data-store";
 
 export const dynamic = "force-dynamic";
@@ -15,16 +15,29 @@ export const dynamic = "force-dynamic";
  * está autenticado — antes vazava para qualquer visitante anônimo.
  */
 export async function GET(request: NextRequest) {
-  const authorized = await isAuthorizedAdminRequest(request);
+  const identity = await getAdminIdentity(request);
 
-  if (!authorized) {
-    return NextResponse.json({ configured: isAdminConfigured(), authorized: false });
+  // authMode diz apenas QUAL FORMULÁRIO desenhar (com ou sem campo de usuário).
+  // Não revela nada sensível — equivale a olhar os campos da tela de login.
+  const authMode = isNewAuthEnabled() ? "accounts" : "legacy";
+
+  if (!identity) {
+    return NextResponse.json({ configured: isAdminConfigured(), authorized: false, authMode });
   }
 
   const provider = getConfiguredDataProvider();
   return NextResponse.json({
     configured: isAdminConfigured(),
     authorized: true,
+    authMode,
+    user: {
+      username: identity.username,
+      displayName: identity.displayName,
+      isMaster: identity.isMaster,
+      scopes: identity.scopes,
+      mustChangePassword: identity.mustChangePassword,
+      legacy: identity.legacy,
+    },
     dataProvider: provider,
     dataProviderLabel: getDataProviderLabel(provider),
     supabaseConfigured: isSupabaseConfigured(),

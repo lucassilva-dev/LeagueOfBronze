@@ -33,6 +33,16 @@ type StartTournamentPayload = Readonly<{
 type SessionResponse = {
   configured: boolean;
   authorized: boolean;
+  /** "accounts" = contas individuais (pede usuário); "legacy" = senha única */
+  authMode?: "accounts" | "legacy";
+  user?: {
+    username: string;
+    displayName: string;
+    isMaster: boolean;
+    scopes: string[];
+    mustChangePassword: boolean;
+    legacy: boolean;
+  };
   dataProvider?: "local" | "supabase";
   dataProviderLabel?: string;
   supabaseConfigured?: boolean;
@@ -60,10 +70,14 @@ type AlertBannerProps = Readonly<{
 type AdminLoginCardProps = Readonly<{
   error: string | null;
   message: string | null;
+  username: string;
+  setUsername: (value: string) => void;
   password: string;
   setPassword: (value: string) => void;
   onLogin: () => void;
   isBusy: boolean;
+  /** "accounts" mostra o campo de usuário; "legacy" mantém só a senha */
+  authMode: "accounts" | "legacy";
 }>;
 
 type AdminTabContentProps = Readonly<{
@@ -106,40 +120,65 @@ function AlertBanner({ kind, text, className }: AlertBannerProps) {
 function AdminLoginCard({
   error,
   message,
+  username,
+  setUsername,
   password,
   setPassword,
   onLogin,
   isBusy,
+  authMode,
 }: AdminLoginCardProps) {
-  const handlePasswordKeyDown = (key: string) => {
-    if (key === "Enter") {
-      onLogin();
-    }
+  const usaContas = authMode === "accounts";
+  const podeEnviar = Boolean(password) && (!usaContas || Boolean(username));
+
+  const handleKeyDown = (key: string) => {
+    if (key === "Enter" && podeEnviar) onLogin();
   };
 
   return (
     <Card className="mx-auto max-w-md p-5">
       <h3 className="font-display text-lg font-bold tracking-wide">Entrar no Admin</h3>
       <p className="mt-1 text-sm text-muted">
-        Proteção simples por senha via ENV. Não é auth enterprise (intencional).
+        {usaContas
+          ? "Acesso por conta individual, com sessão que expira e pode ser revogada."
+          : "Modo de transição por senha única. Configure as contas para ativar o acesso individual."}
       </p>
       {error ? <AlertBanner kind="error" text={error} className="mt-3" /> : null}
       {message ? <AlertBanner kind="success" text={message} className="mt-3" /> : null}
+
+      {usaContas ? (
+        <div className="mt-4">
+          <Label htmlFor="admin-username">Usuário</Label>
+          <Input
+            id="admin-username"
+            type="text"
+            autoComplete="username"
+            value={username}
+            onChange={(event) => setUsername(event.target.value)}
+            onKeyDown={(event) => {
+              handleKeyDown(event.key);
+            }}
+            placeholder="Seu usuário"
+          />
+        </div>
+      ) : null}
+
       <div className="mt-4">
         <Label htmlFor="admin-password">Senha</Label>
         <Input
           id="admin-password"
           type="password"
+          autoComplete="current-password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           onKeyDown={(event) => {
-            handlePasswordKeyDown(event.key);
+            handleKeyDown(event.key);
           }}
-          placeholder="Digite a senha do admin"
+          placeholder="Digite sua senha"
         />
       </div>
       <div className="mt-4">
-        <Button onClick={onLogin} disabled={isBusy || !password}>
+        <Button onClick={onLogin} disabled={isBusy || !podeEnviar}>
           {isBusy ? "Entrando..." : "Entrar"}
         </Button>
       </div>
@@ -191,6 +230,7 @@ function AdminTabContent({
 export function AdminDashboardClient() {
   const [session, setSession] = useState<SessionResponse | null>(null);
   const [draft, setDraft] = useState<TournamentDataset | null>(null);
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
   const [message, setMessage] = useState<string | null>(null);
@@ -262,7 +302,7 @@ export function AdminDashboardClient() {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ username: username.trim(), password }),
       });
       const data = (await response.json()) as MessageResponse;
       if (!response.ok) {
@@ -456,10 +496,13 @@ export function AdminDashboardClient() {
       <AdminLoginCard
         error={error}
         message={message}
+        username={username}
+        setUsername={setUsername}
         password={password}
         setPassword={setPassword}
         onLogin={login}
         isBusy={isBusy}
+        authMode={session.authMode ?? "legacy"}
       />
     );
   }
