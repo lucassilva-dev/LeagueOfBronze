@@ -46,6 +46,22 @@ alter default privileges in schema public revoke all on tables    from anon, aut
 alter default privileges in schema public revoke all on sequences from anon, authenticated;
 alter default privileges in schema public revoke all on functions from anon, authenticated;
 
+-- =====================================================================
+-- HISTÓRICO E BACKUP (Fase 3)
+-- =====================================================================
+-- Os schemas "history" e "backup" NÃO são expostos ao PostgREST. Consequência
+-- prática: mesmo quem vazar a chave de serviço — que fala com o banco pela API —
+-- consegue no máximo alterar o dataset, mas não apaga o rastro nem os backups.
+-- O encadeamento por hash torna qualquer remoção/edição de revisão detectável.
+--
+-- As migrations completas estão versionadas no Supabase:
+--   f3_historico_append_only    → schema history + trigger + trava append-only
+--   f3_backups_automaticos      → schema backup + resgate da cópia órfã
+--   f3_agenda_snapshot_diario   → pg_cron: snapshot diário (60 dias) e higiene de auth
+--
+-- Verificado em produção: apagar ou editar uma revisão é BLOQUEADO; anon e
+-- service_role não alcançam history nem backup.
+
 -- Opcional: inserir dataset vazio inicial (se quiser)
 -- insert into public.tournament_state (id, payload)
 -- values ('leagueofbronze', '{}'::jsonb)
