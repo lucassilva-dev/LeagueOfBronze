@@ -1,10 +1,11 @@
 import { DurationRanking } from "@/components/lob/duration-ranking";
+import { RoleBests } from "@/components/lob/role-bests";
 import { StatsToggles } from "@/components/lob/stats-toggles";
 import { Eyebrow, EloCrest, GoldTitle, Pill } from "@/components/lob/ui";
 import { ELO_ORDER, eloSvgUrl } from "@/lib/design";
 import { buildDesignPlayers, buildDesignTeams } from "@/lib/roster";
 import { getServerDataset } from "@/lib/server-data";
-import { buildStatsRows } from "@/lib/stats-view";
+import { buildRoleBests, buildStatsRows } from "@/lib/stats-view";
 import { getGameDurations } from "@/lib/tournament";
 
 export const dynamic = "force-dynamic";
@@ -128,6 +129,8 @@ export default async function EstatisticasPage() {
           ))}
         </StatCard>
       </section>
+
+      <RoleBests groups={buildRoleBests(dataset)} />
 
       <StatsToggles playerRankings={playerRankings} champRankings={champRankings} />
 

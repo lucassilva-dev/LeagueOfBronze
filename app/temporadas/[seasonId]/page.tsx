@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { ChampionshipHero } from "@/components/championship-hero";
 import { DurationRanking } from "@/components/lob/duration-ranking";
 import { EmptyState } from "@/components/empty-state";
+import { RoleBests } from "@/components/lob/role-bests";
 import { StatsToggles } from "@/components/lob/stats-toggles";
 import { PageHero } from "@/components/page-hero";
 import { PageShell } from "@/components/page-shell";
@@ -17,7 +18,7 @@ import { CARDS_BY_ID } from "@/lib/cards";
 import { formatDateLabel } from "@/lib/format";
 import type { CardId } from "@/lib/schema";
 import { getServerArchivedSeason } from "@/lib/server-data";
-import { buildStatsRows } from "@/lib/stats-view";
+import { buildRoleBests, buildStatsRows } from "@/lib/stats-view";
 import { calculateCardStats, getGameDurations } from "@/lib/tournament";
 
 export const dynamic = "force-dynamic";
@@ -154,6 +155,8 @@ export default async function TemporadaDetailPage({ params }: TemporadaPageParam
         />
         <StatsToggles playerRankings={playerRankings} champRankings={champRankings} />
       </section>
+
+      <RoleBests groups={buildRoleBests(dataset)} hrefBase={`/temporadas/${seasonId}/jogadores/`} />
 
       <DurationRanking rows={getGameDurations(dataset)} hrefBase={`/temporadas/${seasonId}/partidas/`} />
     </PageShell>
