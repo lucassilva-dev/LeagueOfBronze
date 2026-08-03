@@ -41,7 +41,18 @@ export default async function CartasPage() {
               return (
                 <div key={stat.cardId} className="lob-card-2" style={{ padding: 16 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <span style={{ display: "flex", width: 40, height: 40, alignItems: "center", justifyContent: "center", borderRadius: 8, fontSize: 22, background: def ? `linear-gradient(135deg,${def.from}55,#0e0a05)` : undefined }} aria-hidden>{def?.emoji ?? "🎴"}</span>
+                    {def?.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={def.imageUrl}
+                        alt=""
+                        width={40}
+                        height={40}
+                        style={{ width: 40, height: 40, borderRadius: 8, objectFit: "cover", flexShrink: 0, border: `1px solid ${def.border}` }}
+                      />
+                    ) : (
+                      <span style={{ display: "flex", width: 40, height: 40, alignItems: "center", justifyContent: "center", borderRadius: 8, fontSize: 22, background: def ? `linear-gradient(135deg,${def.from}55,#0e0a05)` : undefined }} aria-hidden>{def?.emoji ?? "🎴"}</span>
+                    )}
                     <div>
                       <p className="lob-display" style={{ margin: 0, fontSize: 15, color: "#f2ebdf" }}>{stat.title}</p>
                       <p style={{ margin: 0, fontSize: 12, color: "#8f8472" }}>{stat.count} sorteio(s)</p>

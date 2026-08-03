@@ -131,12 +131,24 @@ export default async function TemporadaDetailPage({ params }: TemporadaPageParam
               const def = CARDS_BY_ID[card.cardId as CardId];
               return (
                 <Card key={card.cardId} className="flex items-center gap-3 p-4">
-                  <span
-                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-2xl"
-                    style={{ background: def ? `linear-gradient(135deg, ${def.from}, ${def.to})` : "rgba(255,255,255,0.04)" }}
-                  >
-                    {def?.emoji ?? "🎴"}
-                  </span>
+                  {def?.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={def.imageUrl}
+                      alt=""
+                      width={48}
+                      height={48}
+                      className="h-12 w-12 shrink-0 rounded-xl object-cover"
+                      style={{ border: `1px solid ${def.border}` }}
+                    />
+                  ) : (
+                    <span
+                      className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-2xl"
+                      style={{ background: def ? `linear-gradient(135deg, ${def.from}, ${def.to})` : "rgba(255,255,255,0.04)" }}
+                    >
+                      {def?.emoji ?? "🎴"}
+                    </span>
+                  )}
                   <div className="min-w-0">
                     <p className="truncate font-semibold">{card.title}{def?.dupla ? " (dupla)" : ""}</p>
                     <p className="text-xs text-muted">{card.count} sorteio{card.count === 1 ? "" : "s"}</p>

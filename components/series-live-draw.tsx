@@ -44,16 +44,27 @@ function CardFace({
   return (
     <div className="flex flex-col items-center gap-2 text-center">
       <div
-        className={`flex h-24 w-24 items-center justify-center rounded-2xl text-5xl shadow-glow transition ${
+        className={`relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl text-5xl shadow-glow transition ${
           spinning ? "scale-105 animate-pulse" : ""
         }`}
         style={{
           background: def
             ? `linear-gradient(135deg, ${def.from}, ${def.to})`
             : "rgba(255,255,255,0.04)",
+          border: def ? `1px solid ${def.border}` : undefined,
         }}
       >
-        <span aria-hidden>{def?.emoji ?? "🎴"}</span>
+        {def?.imageUrl ? (
+          // Mesma arte da página /cartas — o emoji fica só como reserva.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={def.imageUrl}
+            alt={def.title}
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        ) : (
+          <span aria-hidden>{def?.emoji ?? "🎴"}</span>
+        )}
       </div>
       <p className="text-sm font-semibold">
         {def?.title ?? (spinning ? "Sorteando…" : "Sem carta")}
