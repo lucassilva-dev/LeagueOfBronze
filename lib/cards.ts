@@ -27,7 +27,7 @@ export const CARDS: CardDef[] = [
     border: "rgba(224,137,74,.55)",
     from: "#ff8a3d",
     to: "#0e0a05",
-    flavor: "Sorteou A e B? Boa sorte fechando o time só com Aatrox e Blitzcrank.",
+    flavor: "Sorteou L e M? Torce pra Lillia não estar banida — ela levou 11 bans nesta edição.",
     description:
       "Duas letras são sorteadas. O capitão adversário monta a composição só com campeões cujos nomes iniciam com essas letras. Não há banimentos nesta carta.",
     dupla: false,
@@ -42,7 +42,7 @@ export const CARDS: CardDef[] = [
     border: "rgba(90,162,255,.55)",
     from: "#5aa2ff",
     to: "#0e0a05",
-    flavor: "O inimigo escolhe os campeões de dois dos seus. Respeitando a role... teoricamente.",
+    flavor: "O adversário monta metade do seu time. Respeitando a rota — pelo menos foi o combinado.",
     description:
       "Quem usou a carta escolhe o campeão de dois jogadores adversários, respeitando a role de cada um (ex.: nada de Yuumi na jungle). Banimentos normais.",
     dupla: false,
@@ -57,7 +57,7 @@ export const CARDS: CardDef[] = [
     border: "rgba(95,191,106,.55)",
     from: "#5fbf6a",
     to: "#0e0a05",
-    flavor: "Uma classe é sorteada e é ela o jogo todo. Prepare o coração pro time de tanks.",
+    flavor: "Saiu tanque? Boa sorte fazendo dano. Saiu assassino? Boa sorte segurando torre.",
     description:
       "Uma classe de campeões é sorteada. O time adversário só pode escolher campeões daquela classe no draft. Banimentos normais.",
     dupla: false,
@@ -72,7 +72,7 @@ export const CARDS: CardDef[] = [
     border: "rgba(230,179,37,.55)",
     from: "#e6b325",
     to: "#0e0a05",
-    flavor: "O Presidente vira refém do time, sendo obrigado a entrar, pra jogar de Yuumi.",
+    flavor: "O suporte adversário não escolhe nada: cola na Yuumi e reza. THALAO e Onigami sabem como é.",
     description: "O suporte do time adversário é obrigado a jogar de Yuumi na partida. Banimentos normais.",
     dupla: false,
   },
@@ -86,7 +86,7 @@ export const CARDS: CardDef[] = [
     border: "rgba(232,92,106,.55)",
     from: "#e85c6a",
     to: "#0e0a05",
-    flavor: "Seu ADC vai pro topo, seu top vai pro bot. Que comece a bagunça.",
+    flavor: "Seu ADC vai pro topo, seu top vai pro bot. A rota que você treinou a vida toda? Hoje não.",
     description:
       "Quem usou a carta escolhe dois jogadores adversários para trocarem de lane entre si. Banimentos normais.",
     dupla: false,
@@ -101,7 +101,7 @@ export const CARDS: CardDef[] = [
     border: "rgba(176,107,214,.55)",
     from: "#b06bd6",
     to: "#0e0a05",
-    flavor: "Ninguém bane nada essa partida. Aquele one-trick de Yasuo agradece de coração.",
+    flavor: "O adversário perde os bans. O Mordekaiser, banido 12 vezes no campeonato, finalmente respira.",
     description: "O time adversário fica proibido de banir qualquer campeão durante a fase de banimentos.",
     dupla: false,
   },
@@ -118,7 +118,7 @@ export const DUPLAS: CardDef[] = [
     border: "rgba(87,216,203,.6)",
     from: "#57d8cb",
     to: "#0e0a05",
-    flavor: "Sem jungler e sem Smite pros DOIS times. A selva finalmente vai descansar.",
+    flavor: "Sem jungler e sem Smite pros DOIS times. O vidotti agiota, 100 abates na selva, não aprovou.",
     description:
       "Nenhum dos dois times pode escolher Jungler nem levar o feitiço de invocador Smite na partida. Banimentos normais.",
     dupla: true,
@@ -132,7 +132,7 @@ export const DUPLAS: CardDef[] = [
     border: "rgba(242,226,179,.6)",
     from: "#f2e2b3",
     to: "#0e0a05",
-    flavor: "Cada time monta o draft do outro. Confie no inimigo — se tiver coragem.",
+    flavor: "Você não escolhe seu campeão: o inimigo escolhe. E ele viu seu histórico.",
     description:
       "Cada time escolhe o draft do outro — os campeões precisam ser da rota de cada jogador, sem trocar campeões entre rotas diferentes. Banimentos normais.",
     dupla: true,
