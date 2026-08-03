@@ -3,10 +3,14 @@ import Link from "next/link";
 import { Eyebrow, GoldTitle, RoleIcon, SectionTitle } from "@/components/lob/ui";
 import { buildDesignTeams, type DesignTeam } from "@/lib/roster";
 import { getServerDataset } from "@/lib/server-data";
+import { calculateStandings } from "@/lib/tournament";
 
 export const dynamic = "force-dynamic";
 
-function TeamCard({ team }: Readonly<{ team: DesignTeam }>) {
+// Campanha do time na fase de pontos (vitórias/derrotas em séries e pontos).
+type Campaign = { position: number; wins: number; losses: number; points: number } | null;
+
+function TeamCard({ team, campaign }: Readonly<{ team: DesignTeam; campaign: Campaign }>) {
   return (
     <Link
       href={`/times/${team.slug}`}
@@ -41,7 +45,7 @@ function TeamCard({ team }: Readonly<{ team: DesignTeam }>) {
         <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "linear-gradient(180deg,rgba(0,0,0,.28) 0%,transparent 30%,transparent 42%,rgba(13,10,5,.97) 100%)" }} />
         <div style={{ position: "absolute", top: 11, right: 11, display: "flex", alignItems: "baseline", gap: 4, padding: "5px 10px", borderRadius: 2, background: "linear-gradient(180deg,#f0c88a,#b97e40)", color: "#160f06", fontWeight: 700, boxShadow: "0 4px 14px -4px rgba(0,0,0,.6)" }}>
           <span className="lob-display" style={{ fontSize: 17, lineHeight: 1 }}>{team.total}</span>
-          <span style={{ fontSize: 10, letterSpacing: ".10em" }}>PTS</span>
+          <span style={{ fontSize: 10, letterSpacing: ".10em" }}>PTS DRAFT</span>
         </div>
         <div style={{ position: "absolute", left: 14, bottom: 12, right: 14 }}>
           <div className="lob-display" style={{ fontSize: "clamp(22px,3.4vw,30px)", lineHeight: 0.9, color: "#f4ede1", letterSpacing: ".01em" }}>{team.name}</div>
@@ -63,8 +67,15 @@ function TeamCard({ team }: Readonly<{ team: DesignTeam }>) {
           ))}
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 11, letterSpacing: ".05em", color: "#8f8472" }}>
-          <span>CAMPANHA</span>
-          <span style={{ color: "#b8ab97" }}>0V · 0D · <span style={{ color: "#cfa877" }}>0 PTS</span></span>
+          <span>CAMPANHA{campaign ? ` · #${campaign.position}` : ""}</span>
+          {campaign ? (
+            <span style={{ color: "#b8ab97" }}>
+              {campaign.wins}V · {campaign.losses}D ·{" "}
+              <span style={{ color: "#cfa877" }}>{campaign.points} PTS</span>
+            </span>
+          ) : (
+            <span style={{ color: "#6f6656" }}>sem séries</span>
+          )}
         </div>
         <span className="lob-btn-ghost" style={{ width: "100%", padding: 12, fontSize: 12, letterSpacing: ".16em" }}>VER ELENCO →</span>
       </div>
@@ -75,6 +86,14 @@ function TeamCard({ team }: Readonly<{ team: DesignTeam }>) {
 export default async function TimesPage() {
   const { dataset } = await getServerDataset();
   const teams = buildDesignTeams(dataset);
+
+  const standings = calculateStandings(dataset);
+  const campaignByTeam = new Map<string, NonNullable<Campaign>>(
+    standings.rows.map((row) => [
+      row.teamId,
+      { position: row.position, wins: row.seriesWon, losses: row.seriesLost, points: row.points },
+    ]),
+  );
 
   return (
     <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "0 clamp(16px,4vw,24px) 96px" }}>
@@ -92,7 +111,7 @@ export default async function TimesPage() {
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 18 }}>
           {teams.map((team) => (
-            <TeamCard key={team.id} team={team} />
+            <TeamCard key={team.id} team={team} campaign={campaignByTeam.get(team.id) ?? null} />
           ))}
         </div>
       </section>
