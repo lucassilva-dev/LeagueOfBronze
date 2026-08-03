@@ -405,7 +405,10 @@ export const startTournamentSchema = z.object({
 });
 
 export const adminLoginSchema = z.object({
-  password: z.string().min(1, "Senha obrigatória."),
+  // Opcional para manter compatibilidade com o modo legado (senha única, sem usuário).
+  username: z.string().trim().max(120).optional(),
+  // O teto importa: senha sem limite vira ataque de CPU contra o scrypt.
+  password: z.string().min(1, "Senha obrigatória.").max(200, "Senha longa demais."),
 });
 
 export type TournamentDataset = z.infer<typeof tournamentDatasetSchema>;

@@ -19,7 +19,7 @@ function notConfiguredResponse() {
 
 export async function GET(request: NextRequest) {
   if (!isAdminConfigured()) return notConfiguredResponse();
-  if (!isAuthorizedAdminRequest(request)) return unauthorizedResponse();
+  if (!(await isAuthorizedAdminRequest(request))) return unauthorizedResponse();
 
   try {
     const dataset = await readDataset();
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   if (!isAdminConfigured()) return notConfiguredResponse();
-  if (!isAuthorizedAdminRequest(request)) return unauthorizedResponse();
+  if (!(await isAuthorizedAdminRequest(request))) return unauthorizedResponse();
 
   let body: unknown;
   try {

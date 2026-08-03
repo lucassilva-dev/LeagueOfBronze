@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
  * está autenticado — antes vazava para qualquer visitante anônimo.
  */
 export async function GET(request: NextRequest) {
-  const authorized = isAuthorizedAdminRequest(request);
+  const authorized = await isAuthorizedAdminRequest(request);
 
   if (!authorized) {
     return NextResponse.json({ configured: isAdminConfigured(), authorized: false });

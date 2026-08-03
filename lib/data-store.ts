@@ -114,7 +114,11 @@ function getDatasetValidationErrorPrefix() {
   return "Dados do campeonato inválidos";
 }
 
-function createSupabaseAdminClient() {
+/**
+ * Cliente Supabase com a chave de serviço. SOMENTE servidor — nunca importar
+ * a partir de um componente com "use client".
+ */
+export function createSupabaseAdminClient() {
   const url = getSupabaseUrl();
   const key = getSupabaseServiceRoleKey();
   if (!url || !key) {

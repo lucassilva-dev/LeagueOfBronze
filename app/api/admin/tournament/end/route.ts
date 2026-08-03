@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
-  if (!isAuthorizedAdminRequest(request)) {
+  if (!(await isAuthorizedAdminRequest(request))) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 
