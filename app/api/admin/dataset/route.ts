@@ -1,25 +1,18 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-import { isAdminConfigured, isAuthorizedAdminRequest } from "@/lib/admin-auth";
 import { readDataset, saveDataset } from "@/lib/data-store";
+import { authorizeDatasetChange } from "@/lib/security/dataset-diff";
+import { requireAdmin } from "@/lib/security/route-guard";
+import { scopeLabel } from "@/lib/security/scopes";
+import { tournamentDatasetSchema } from "@/lib/schema";
 
 export const dynamic = "force-dynamic";
 
-function unauthorizedResponse() {
-  return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
-}
-
-function notConfiguredResponse() {
-  return NextResponse.json(
-    { error: "ADMIN_PASSWORD não configurado no ambiente." },
-    { status: 500 },
-  );
-}
-
 export async function GET(request: NextRequest) {
-  if (!isAdminConfigured()) return notConfiguredResponse();
-  if (!(await isAuthorizedAdminRequest(request))) return unauthorizedResponse();
+  // Qualquer pessoa autenticada pode LER o dataset — é o que carrega o editor.
+  const guarda = await requireAdmin(request);
+  if (!guarda.ok) return guarda.response;
 
   try {
     const dataset = await readDataset();
@@ -32,9 +25,19 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/**
+ * Salva o dataset inteiro. A permissão é calculada pela DIFERENÇA entre o dado atual
+ * e o enviado: cada seção alterada exige o seu escopo (ver lib/security/dataset-diff).
+ */
 export async function PUT(request: NextRequest) {
-  if (!isAdminConfigured()) return notConfiguredResponse();
-  if (!(await isAuthorizedAdminRequest(request))) return unauthorizedResponse();
+  const guarda = await requireAdmin(request);
+  if (!guarda.ok) return guarda.response;
+
+  // Teto de tamanho antes de ler o corpo: payload gigante não pode virar DoS de memória.
+  const tamanho = Number(request.headers.get("content-length") ?? 0);
+  if (tamanho > 3_000_000) {
+    return NextResponse.json({ error: "Payload grande demais." }, { status: 413 });
+  }
 
   let body: unknown;
   try {
@@ -45,8 +48,36 @@ export async function PUT(request: NextRequest) {
 
   const payload = (body as { dataset?: unknown })?.dataset ?? body;
 
+  // Valida ANTES de comparar, para o diff trabalhar sobre dados confiáveis.
+  const parsed = tournamentDatasetSchema.safeParse(payload);
+  if (!parsed.success) {
+    const resumo = parsed.error.issues
+      .slice(0, 10)
+      .map((i) => `${i.path.join(".") || "root"}: ${i.message}`)
+      .join(" | ");
+    return NextResponse.json({ error: `Validação falhou: ${resumo}` }, { status: 400 });
+  }
+
   try {
-    const dataset = await saveDataset(payload);
+    const atual = await readDataset();
+    const veredito = authorizeDatasetChange(guarda.identity, atual, parsed.data);
+
+    if (!veredito.ok) {
+      return NextResponse.json(
+        {
+          error: `Você não tem permissão para alterar: ${veredito.missing.map(scopeLabel).join(", ")}.`,
+          missing: veredito.missing,
+          changes: veredito.changes.slice(0, 20),
+        },
+        { status: 403 },
+      );
+    }
+
+    if (veredito.changes.length === 0) {
+      return NextResponse.json({ dataset: atual, message: "Nada mudou." });
+    }
+
+    const dataset = await saveDataset(parsed.data);
     return NextResponse.json({ dataset, message: "Dados salvos com sucesso." });
   } catch (error) {
     return NextResponse.json(

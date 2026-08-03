@@ -5,9 +5,11 @@ import { LogOut, RefreshCcw, Save } from "lucide-react";
 
 import type { SeriesFormat, TournamentDataset } from "@/lib/schema";
 import { applyAutoGameMvpsToDataset, calculateStandings } from "@/lib/tournament";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { scopeLabel } from "@/lib/security/scopes";
 import { Label } from "@/components/ui/label";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { AdminOverviewPanel } from "@/components/admin/admin-overview-panel";
@@ -16,6 +18,7 @@ import { AdminPlayersPanel } from "@/components/admin/admin-players-panel";
 import { AdminSeriesPanel } from "@/components/admin/admin-series-panel";
 import { AdminBackupPanel } from "@/components/admin/admin-backup-panel";
 import { AdminTournamentPanel } from "@/components/admin/admin-tournament-panel";
+import { AdminUsersPanel } from "@/components/admin/admin-users-panel";
 import {
   cloneDataset,
   type AdminTab,
@@ -89,6 +92,7 @@ type AdminTabContentProps = Readonly<{
   onImportText: (text: string) => Promise<void>;
   onEndTournament: () => void;
   onStartTournament: (payload: StartTournamentPayload) => void;
+  onAlert: (kind: "ok" | "erro", text: string) => void;
 }>;
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -195,7 +199,10 @@ function AdminTabContent({
   onImportText,
   onEndTournament,
   onStartTournament,
+  onAlert,
 }: AdminTabContentProps) {
+  if (activeTab === "users") return <AdminUsersPanel onAlert={onAlert} />;
+
   switch (activeTab) {
     case "tournament":
       return (
@@ -435,15 +442,20 @@ export function AdminDashboardClient() {
   };
 
   const tabOptions = useMemo(
-    () => [
-      { value: "tournament" as const, label: "Torneio" },
-      { value: "overview" as const, label: "Visão geral" },
-      { value: "teams" as const, label: "Times" },
-      { value: "players" as const, label: "Jogadores" },
-      { value: "series" as const, label: "Séries" },
-      { value: "backup" as const, label: "Importar/Exportar" },
-    ],
-    [],
+    () => {
+      const abas: { value: AdminTab; label: string }[] = [
+        { value: "tournament", label: "Torneio" },
+        { value: "overview", label: "Visão geral" },
+        { value: "teams", label: "Times" },
+        { value: "players", label: "Jogadores" },
+        { value: "series", label: "Séries" },
+        { value: "backup", label: "Importar/Exportar" },
+      ];
+      // Aba de usuários só para o master (a decisão real é sempre do servidor).
+      if (session?.user?.isMaster) abas.push({ value: "users", label: "Usuários" });
+      return abas;
+    },
+    [session?.user?.isMaster],
   );
   const isSupabaseProvider = session?.dataProvider === "supabase";
   const isBusy = isPending || isImporting;
@@ -520,6 +532,35 @@ export function AdminDashboardClient() {
       {error ? <AlertBanner kind="error" text={error} /> : null}
       {message ? <AlertBanner kind="success" text={message} /> : null}
 
+      {session.user ? (
+        <Card className="p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-muted">Conectado como</span>
+              <span className="font-semibold">{session.user.displayName}</span>
+              <span className="text-sm text-muted">@{session.user.username}</span>
+              {session.user.isMaster ? (
+                <Badge variant="bronze">MASTER · acesso total</Badge>
+              ) : (
+                <Badge variant="outline">
+                  {session.user.scopes.length} permissão(ões)
+                </Badge>
+              )}
+              {session.user.legacy ? <Badge variant="muted">modo de transição</Badge> : null}
+            </div>
+            {!session.user.isMaster && session.user.scopes.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {session.user.scopes.map((s) => (
+                  <Badge key={s} variant="outline" className="text-[10px]">
+                    {scopeLabel(s)}
+                  </Badge>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </Card>
+      ) : null}
+
       <Card className="p-4">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex flex-wrap gap-2">
@@ -566,6 +607,11 @@ export function AdminDashboardClient() {
         onImportText={handleImportText}
         onEndTournament={endTournament}
         onStartTournament={startTournament}
+        onAlert={(kind, text) => {
+          clearAlerts();
+          if (kind === "ok") setMessage(text);
+          else setError(text);
+        }}
       />
     </div>
   );

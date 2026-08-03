@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 
-import { isAdminConfigured, isAuthorizedAdminRequest } from "@/lib/admin-auth";
+import { requireAdmin } from "@/lib/security/route-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -104,16 +104,8 @@ function getWinningSide(blueWins: number, redWins: number) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!isAdminConfigured()) {
-    return NextResponse.json(
-      { error: "ADMIN_PASSWORD não configurado no ambiente." },
-      { status: 500 },
-    );
-  }
-
-  if (!(await isAuthorizedAdminRequest(request))) {
-    return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
-  }
+  const guarda = await requireAdmin(request, "riot:import");
+  if (!guarda.ok) return guarda.response;
 
   const riotApiKey = getRiotApiKey();
   if (!riotApiKey) {

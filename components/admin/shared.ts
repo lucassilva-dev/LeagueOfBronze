@@ -14,7 +14,8 @@ export type AdminTab =
   | "teams"
   | "players"
   | "series"
-  | "backup";
+  | "backup"
+  | "users";
 export type MutateDraft = (recipe: (draft: TournamentDataset) => void) => void;
 
 function isCombiningMark(char: string) {

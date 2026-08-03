@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 
-import { isAdminConfigured, isAuthorizedAdminRequest } from "@/lib/admin-auth";
+import { requireAdmin } from "@/lib/security/route-guard";
 import { readDataset, saveDataset } from "@/lib/data-store";
 
 export const dynamic = "force-dynamic";
@@ -14,15 +14,8 @@ const bodySchema = z.object({
 
 // Grava o time que começa no lado azul no jogo 1 (sorteio de lados). O outro começa no vermelho.
 export async function POST(request: NextRequest) {
-  if (!isAdminConfigured()) {
-    return NextResponse.json(
-      { error: "ADMIN_PASSWORD não configurado no ambiente." },
-      { status: 500 },
-    );
-  }
-  if (!(await isAuthorizedAdminRequest(request))) {
-    return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
-  }
+  const guarda = await requireAdmin(request, "series:sides");
+  if (!guarda.ok) return guarda.response;
 
   let body: unknown;
   try {

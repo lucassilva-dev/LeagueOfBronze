@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-import { isAdminConfigured, isAuthorizedAdminRequest } from "@/lib/admin-auth";
+import { requireAdmin } from "@/lib/security/route-guard";
 import { seedDatasetFromLocalSeed } from "@/lib/data-store";
 
 export const dynamic = "force-dynamic";
@@ -16,15 +16,9 @@ export const dynamic = "force-dynamic";
  * Só roda autenticado e só quando a linha AINDA NÃO existe.
  */
 export async function POST(request: NextRequest) {
-  if (!isAdminConfigured()) {
-    return NextResponse.json(
-      { error: "ADMIN_PASSWORD não configurado no ambiente." },
-      { status: 500 },
-    );
-  }
-  if (!(await isAuthorizedAdminRequest(request))) {
-    return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
-  }
+  const guarda = await requireAdmin(request, "dataset:import");
+  if (!guarda.ok) return guarda.response;
+
 
   try {
     const dataset = await seedDatasetFromLocalSeed();

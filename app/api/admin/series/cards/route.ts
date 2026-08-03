@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 
-import { isAdminConfigured, isAuthorizedAdminRequest } from "@/lib/admin-auth";
+import { requireAdmin } from "@/lib/security/route-guard";
 import { isDuplaCard } from "@/lib/cards";
 import { readDataset, saveDataset } from "@/lib/data-store";
 import { cardIdSchema } from "@/lib/schema";
@@ -20,15 +20,8 @@ const bodySchema = z.object({
 // Grava a carta sorteada ao vivo numa série (1 carta por time — substitui a anterior).
 // dupla: true → os DOIS capitães usaram, a carta sorteada vale para os dois times.
 export async function POST(request: NextRequest) {
-  if (!isAdminConfigured()) {
-    return NextResponse.json(
-      { error: "ADMIN_PASSWORD não configurado no ambiente." },
-      { status: 500 },
-    );
-  }
-  if (!(await isAuthorizedAdminRequest(request))) {
-    return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
-  }
+  const guarda = await requireAdmin(request, "series:cards");
+  if (!guarda.ok) return guarda.response;
 
   let body: unknown;
   try {
