@@ -5,6 +5,9 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname),
+      // A trava "server-only" é de build (impede a chave de serviço vazar para o
+      // cliente). Em teste Node ela lançaria erro, então é substituída por um vazio.
+      "server-only": path.resolve(__dirname, "tests/stubs/server-only.ts"),
     },
   },
   test: {

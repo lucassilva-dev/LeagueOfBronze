@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+
+import { respostaDeErro } from "@/lib/security/resposta-erro";
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 
@@ -75,9 +77,6 @@ export async function POST(request: NextRequest) {
     const savedSeries = saved.seriesMatches.find((row) => row.id === seriesId);
     return NextResponse.json({ ok: true, cardsUsed: savedSeries?.cardsUsed ?? [] });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Falha ao salvar a carta." },
-      { status: 400 },
-    );
+    return respostaDeErro("admin/series/cards", error, "Falha ao salvar a carta.", 500);
   }
 }

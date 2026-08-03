@@ -1,3 +1,8 @@
+// Trava de build: se este módulo for importado por um componente "use client",
+// a compilação FALHA. Protege a chave de serviço do Supabase de ser arrastada para
+// o navegador num refactor futuro.
+import "server-only";
+
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
@@ -9,6 +14,7 @@ import {
   type SeriesFormat,
   type TournamentDataset,
 } from "@/lib/schema";
+import { ErroDeRegra } from "@/lib/security/erros";
 import {
   applyAutoGameMvpsToDataset,
   buildArchivedSeason,
@@ -57,7 +63,7 @@ function parseAndValidateDataset(json: unknown) {
       .slice(0, 20)
       .map((issue) => `${issue.path.join(".") || "root"}: ${issue.message}`)
       .join(" | ");
-    throw new Error(`Validação falhou: ${summary}`);
+    throw new ErroDeRegra(`Validação falhou: ${summary}`);
   }
   return parsed.data;
 }
@@ -122,7 +128,7 @@ export function createSupabaseAdminClient() {
   const url = getSupabaseUrl();
   const key = getSupabaseServiceRoleKey();
   if (!url || !key) {
-    throw new Error(
+    throw new ErroDeRegra(
       "Supabase não configurado. Defina SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY.",
     );
   }
@@ -147,14 +153,14 @@ async function readLocalDataset(): Promise<TournamentDataset> {
   try {
     json = JSON.parse(raw);
   } catch {
-    throw new Error("JSON inválido em leagueofbronze.json.");
+    throw new ErroDeRegra("JSON inválido em leagueofbronze.json.");
   }
 
   try {
     return parseAndValidateDataset(json);
   } catch (error) {
     if (error instanceof Error) {
-      throw new Error(
+      throw new ErroDeRegra(
         `${getDatasetValidationErrorPrefix()}: ${error.message.replace(/^Validação falhou:\s*/i, "")}`,
       );
     }
@@ -268,12 +274,12 @@ export async function saveDataset(input: unknown): Promise<TournamentDataset> {
  */
 export async function seedDatasetFromLocalSeed(): Promise<TournamentDataset> {
   if (getConfiguredDataProvider() !== "supabase") {
-    throw new Error("Semeadura só se aplica ao provedor Supabase.");
+    throw new ErroDeRegra("Semeadura só se aplica ao provedor Supabase.");
   }
 
   const existing = await readSupabaseRow();
   if (existing) {
-    throw new Error(
+    throw new ErroDeRegra(
       "A linha já existe no Supabase — semeadura recusada para não sobrescrever os dados atuais.",
     );
   }
@@ -290,7 +296,7 @@ export async function importDatasetFromText(raw: string) {
   try {
     json = JSON.parse(raw);
   } catch {
-    throw new Error("Arquivo importado não contém JSON válido.");
+    throw new ErroDeRegra("Arquivo importado não contém JSON válido.");
   }
 
   return saveDataset(json);
@@ -304,7 +310,7 @@ export async function endCurrentTournament(): Promise<TournamentDataset> {
   const current = await readDataset();
 
   if (current.tournament.status === "finished") {
-    throw new Error("A temporada atual já está encerrada.");
+    throw new ErroDeRegra("A temporada atual já está encerrada.");
   }
 
   const now = new Date().toISOString();
@@ -346,7 +352,7 @@ export async function startNewTournament(options: {
     current.tournament.status !== "finished" && current.seriesMatches.length > 0;
 
   if (activeWithData && !options.archiveCurrent) {
-    throw new Error(
+    throw new ErroDeRegra(
       "A temporada atual tem séries e ainda está ativa. Encerre-a antes de iniciar uma nova (ou marque para arquivar).",
     );
   }

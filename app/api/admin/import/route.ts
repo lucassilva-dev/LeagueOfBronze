@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+
+import { respostaDeErro } from "@/lib/security/resposta-erro";
 import type { NextRequest } from "next/server";
 
 import { requireAdmin } from "@/lib/security/route-guard";
@@ -31,9 +33,6 @@ export async function POST(request: NextRequest) {
     const dataset = await importDatasetFromText(content);
     return NextResponse.json({ dataset, message: "Importação concluída com sucesso." });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Falha ao importar JSON." },
-      { status: 400 },
-    );
+    return respostaDeErro("admin/import", error, "Falha ao importar JSON.", 500);
   }
 }

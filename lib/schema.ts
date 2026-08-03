@@ -1,6 +1,57 @@
 ﻿import { z } from "zod";
 
-const nonEmpty = z.string().trim().min(1);
+/**
+ * Tetos de tamanho.
+ *
+ * Sem eles, uma única string podia ter 50 MB e os arrays eram ilimitados — cada
+ * temporada arquivada embute um dataset inteiro, então o payload crescia sem
+ * qualquer freio (bomba de payload / esgotamento de memória).
+ *
+ * Os números foram dimensionados pelos dados REAIS de produção, incluindo a
+ * temporada arquivada (maiores observados: id 21, nick 22, motivo de W.O. 91,
+ * imageUrl 30, 13 times, 66 jogadores, 37 séries). A folga é de ~3x.
+ */
+const LIMITES = {
+  id: 64,
+  slug: 80,
+  nome: 120,
+  nick: 64,
+  rota: 24,
+  elo: 24,
+  texto: 300,
+  url: 512,
+  iso: 40,
+  campeao: 60,
+} as const;
+
+const nonEmpty = z.string().trim().min(1).max(LIMITES.texto);
+const limitado = (max: number) => z.string().trim().min(1).max(max);
+
+/**
+ * imageUrl só pode apontar para as pastas de imagem do próprio site ou para o
+ * Data Dragon (ícones de campeão). Antes aceitava qualquer URL: um valor apontando
+ * para um host externo transformaria cada visitante numa requisição rastreada por
+ * terceiro (vazando IP e navegador). Verificado: as 36 imagens em produção são locais.
+ */
+const CAMINHO_LOCAL = /^\/(players|teams|cartas|elo|roles|borders)\/[A-Za-z0-9._-]+\.(png|jpe?g|webp|avif|gif|svg)$/i;
+const HOSTS_PERMITIDOS = new Set(["ddragon.leagueoflegends.com"]);
+
+export const imageUrlField = z
+  .string()
+  .trim()
+  .max(LIMITES.url)
+  .refine((valor) => {
+    if (valor === "") return true;
+    if (valor.includes("..") || valor.includes("\\")) return false;
+    if (CAMINHO_LOCAL.test(valor)) return true; // ancorado em "/" => rejeita //evil.com/x.png
+    try {
+      const u = new URL(valor);
+      return u.protocol === "https:" && HOSTS_PERMITIDOS.has(u.hostname);
+    } catch {
+      return false;
+    }
+  }, "URL de imagem não permitida (use um arquivo do próprio site).");
+
 type IssuePath = Array<string | number>;
 const seriesFormats = ["BO3", "BO5"] as const;
 const seriesStages = ["REGULAR_SEASON", "SEMIFINAL", "FINAL"] as const;
@@ -284,36 +335,36 @@ export const tournamentSchema = z.object({
 export const cardIdSchema = z.enum(cardIds);
 
 export const teamSchema = z.object({
-  id: nonEmpty,
-  name: nonEmpty,
-  slug: nonEmpty,
-  imageUrl: z.string().trim().optional(),
+  id: limitado(LIMITES.id),
+  name: limitado(LIMITES.nome),
+  slug: limitado(LIMITES.slug),
+  imageUrl: imageUrlField.optional(),
 });
 
 export const playerSchema = z.object({
-  id: nonEmpty,
-  nick: nonEmpty,
-  slug: nonEmpty,
-  teamId: nonEmpty,
-  role1: nonEmpty,
-  role2: z.string().trim().optional(),
-  elo: nonEmpty,
-  imageUrl: z.string().trim().optional(),
-  name: z.string().trim().optional(),
+  id: limitado(LIMITES.id),
+  nick: limitado(LIMITES.nick),
+  slug: limitado(LIMITES.slug),
+  teamId: limitado(LIMITES.id),
+  role1: limitado(LIMITES.rota),
+  role2: z.string().trim().max(LIMITES.rota).optional(),
+  elo: limitado(LIMITES.elo),
+  imageUrl: imageUrlField.optional(),
+  name: z.string().trim().max(LIMITES.nome).optional(),
   mono: z.boolean().optional(),
 });
 
 export const playerGameStatsSchema = z.object({
-  playerId: nonEmpty,
-  champion: z.string().trim().optional(),
-  kills: z.number().int().min(0),
-  deaths: z.number().int().min(0),
-  assists: z.number().int().min(0),
+  playerId: limitado(LIMITES.id),
+  champion: z.string().trim().max(LIMITES.campeao).optional(),
+  kills: z.number().int().min(0).max(999),
+  deaths: z.number().int().min(0).max(999),
+  assists: z.number().int().min(0).max(999),
 });
 
 export const championBanSchema = z.object({
-  teamId: nonEmpty,
-  championName: z.string().trim().min(1),
+  teamId: limitado(LIMITES.id),
+  championName: limitado(LIMITES.campeao),
 });
 
 export const seriesGameSchema = z.object({
@@ -333,18 +384,18 @@ export const cardUsageSchema = z.object({
 });
 
 export const seriesMatchSchema = z.object({
-  id: nonEmpty,
-  date: nonEmpty,
-  teamAId: nonEmpty,
-  teamBId: nonEmpty,
+  id: limitado(LIMITES.id),
+  date: limitado(LIMITES.iso),
+  teamAId: limitado(LIMITES.id),
+  teamBId: limitado(LIMITES.id),
   format: seriesFormatSchema.optional(),
   stage: seriesStageSchema.optional(),
-  walkoverWinnerTeamId: z.string().trim().optional(),
-  walkoverReason: z.string().trim().optional(),
+  walkoverWinnerTeamId: z.string().trim().max(LIMITES.id).optional(),
+  walkoverReason: z.string().trim().max(LIMITES.texto).optional(),
   games: z.array(seriesGameSchema).max(5),
   cardsUsed: z.array(cardUsageSchema).max(20).optional(),
   // Time que começa no lado azul no jogo 1 (sorteio de lados). O outro começa no vermelho.
-  blueSideTeamId: z.string().trim().optional(),
+  blueSideTeamId: z.string().trim().max(LIMITES.id).optional(),
 });
 
 export const standingsSeedRowSchema = z.object({
@@ -353,12 +404,13 @@ export const standingsSeedRowSchema = z.object({
   points: z.number().int().min(0),
 });
 
+// Tetos com folga sobre a produção atual (13 times, 66 jogadores, 37 séries).
 const datasetCoreSchema = z.object({
   tournament: tournamentSchema,
-  teams: z.array(teamSchema),
-  players: z.array(playerSchema),
-  seriesMatches: z.array(seriesMatchSchema),
-  standingsSeed: z.array(standingsSeedRowSchema).default([]),
+  teams: z.array(teamSchema).max(64),
+  players: z.array(playerSchema).max(400),
+  seriesMatches: z.array(seriesMatchSchema).max(400),
+  standingsSeed: z.array(standingsSeedRowSchema).max(64).default([]),
 });
 
 type DatasetCore = z.infer<typeof datasetCoreSchema>;
@@ -391,7 +443,9 @@ export const archivedSeasonSchema = z.object({
 
 export const tournamentDatasetSchema = datasetCoreSchema
   .extend({
-    archivedSeasons: z.array(archivedSeasonSchema).default([]),
+    // Teto importante: cada temporada arquivada embute um dataset COMPLETO,
+    // então este era o array com maior potencial de explodir o payload.
+    archivedSeasons: z.array(archivedSeasonSchema).max(30).default([]),
   })
   .superRefine(refineDatasetIntegrity);
 

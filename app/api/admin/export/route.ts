@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+
+import { respostaDeErro } from "@/lib/security/resposta-erro";
 import type { NextRequest } from "next/server";
 
 import { requireAdmin } from "@/lib/security/route-guard";
@@ -25,9 +27,6 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Falha ao exportar." },
-      { status: 500 },
-    );
+    return respostaDeErro("admin/export", error, "Falha ao exportar.", 500);
   }
 }

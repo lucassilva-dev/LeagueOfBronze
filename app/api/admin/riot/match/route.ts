@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+
+import { respostaDeErro } from "@/lib/security/resposta-erro";
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 
@@ -209,11 +211,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Falha ao importar partida da Riot.",
-      },
-      { status: 500 },
-    );
+    return respostaDeErro("admin/riot/match", error, "Falha ao importar partida da Riot.");
   }
 }

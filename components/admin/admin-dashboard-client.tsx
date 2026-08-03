@@ -243,6 +243,8 @@ export function AdminDashboardClient() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  /** Alguém gravou por cima enquanto este rascunho estava aberto (resposta 409). */
+  const [conflict, setConflict] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const clearAlerts = () => {
@@ -339,6 +341,7 @@ export function AdminDashboardClient() {
     runTransitionTask(async () => {
       clearAlerts();
       await fetchDataset();
+      setConflict(false);
       setMessage(
         session?.dataProvider === "supabase"
           ? "Rascunho recarregado do Supabase."
@@ -347,7 +350,7 @@ export function AdminDashboardClient() {
     }, "Falha ao recarregar.");
   };
 
-  const saveDraft = () => {
+  const saveDraft = (force = false) => {
     if (!draft) return;
     runTransitionTask(async () => {
       clearAlerts();
@@ -356,12 +359,21 @@ export function AdminDashboardClient() {
         method: "PUT",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dataset: datasetToSave }),
+        body: JSON.stringify({ dataset: datasetToSave, force }),
       });
       const data = (await response.json()) as DatasetResponse;
+
+      // 409: outra pessoa gravou enquanto este rascunho estava aberto. O rascunho NÃO é
+      // descartado — quem está editando decide entre recarregar ou sobrescrever.
+      if (response.status === 409) {
+        setConflict(true);
+        throw new Error(data.error || "Outra pessoa salvou alterações enquanto você editava.");
+      }
+
       if (!response.ok || !data.dataset) {
         throw new Error(data.error || "Falha ao salvar.");
       }
+      setConflict(false);
       setDraft(data.dataset);
       const standings = calculateStandings(data.dataset);
       setMessage(
@@ -561,10 +573,32 @@ export function AdminDashboardClient() {
         </Card>
       ) : null}
 
+      {conflict ? (
+        <Card className="border-amber-500/40 bg-amber-500/10 p-4">
+          <p className="text-sm font-semibold text-text">Alguém salvou antes de você</p>
+          <p className="mt-1 text-xs text-muted">
+            Outra pessoa gravou alterações enquanto este rascunho estava aberto (pode ter sido
+            um sorteio de carta ou de lado). Seu rascunho continua aqui — escolha o que fazer:
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={reloadDataset} disabled={isBusy}>
+              <RefreshCcw className="h-4 w-4" />
+              Trazer a versão nova (descarta seu rascunho)
+            </Button>
+            <Button onClick={() => saveDraft(true)} disabled={isBusy}>
+              <Save className="h-4 w-4" />
+              Salvar por cima assim mesmo
+            </Button>
+          </div>
+        </Card>
+      ) : null}
+
       <Card className="p-4">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex flex-wrap gap-2">
-            <Button onClick={saveDraft} disabled={isBusy}>
+            {/* Sem a arrow, o evento do clique chegaria como `force` e a trava de
+                concorrência ficaria sempre desligada. */}
+            <Button onClick={() => saveDraft()} disabled={isBusy}>
               <Save className="h-4 w-4" />
               {getSaveButtonLabel(isPending, isSupabaseProvider)}
             </Button>

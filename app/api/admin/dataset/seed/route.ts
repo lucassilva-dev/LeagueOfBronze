@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+
+import { respostaDeErro } from "@/lib/security/resposta-erro";
 import type { NextRequest } from "next/server";
 
 import { requireAdmin } from "@/lib/security/route-guard";
@@ -24,9 +26,6 @@ export async function POST(request: NextRequest) {
     const dataset = await seedDatasetFromLocalSeed();
     return NextResponse.json({ dataset, message: "Banco semeado a partir do seed do repositório." });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Falha ao semear o banco." },
-      { status: 400 },
-    );
+    return respostaDeErro("admin/dataset/seed", error, "Falha ao semear o banco.", 500);
   }
 }

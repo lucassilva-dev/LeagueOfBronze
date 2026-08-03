@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 
 import { readDataset, saveDataset } from "@/lib/data-store";
 import { authorizeDatasetChange } from "@/lib/security/dataset-diff";
+import { respostaDeErro } from "@/lib/security/resposta-erro";
 import { requireAdmin } from "@/lib/security/route-guard";
 import { scopeLabel } from "@/lib/security/scopes";
 import { tournamentDatasetSchema } from "@/lib/schema";
@@ -18,10 +19,7 @@ export async function GET(request: NextRequest) {
     const dataset = await readDataset();
     return NextResponse.json({ dataset });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Falha ao carregar os dados do campeonato." },
-      { status: 500 },
-    );
+    return respostaDeErro("admin/dataset GET", error, "Falha ao carregar os dados do campeonato.");
   }
 }
 
@@ -47,6 +45,7 @@ export async function PUT(request: NextRequest) {
   }
 
   const payload = (body as { dataset?: unknown })?.dataset ?? body;
+  const forcar = (body as { force?: unknown })?.force === true;
 
   // Valida ANTES de comparar, para o diff trabalhar sobre dados confiáveis.
   const parsed = tournamentDatasetSchema.safeParse(payload);
@@ -60,6 +59,25 @@ export async function PUT(request: NextRequest) {
 
   try {
     const atual = await readDataset();
+
+    // Trava de concorrência. O painel carrega o dataset e edita em rascunho; se outra
+    // pessoa gravar nesse meio-tempo (inclusive um sorteio de carta ou de lado, que
+    // gravam por conta própria), salvar por cima apagaria o trabalho dela em silêncio.
+    // `lastUpdatedISO` é carimbado pelo servidor a cada gravação, então serve de versão.
+    const versaoEnviada = parsed.data.tournament.lastUpdatedISO;
+    const versaoAtual = atual.tournament.lastUpdatedISO;
+    if (!forcar && versaoEnviada && versaoAtual && versaoEnviada !== versaoAtual) {
+      return NextResponse.json(
+        {
+          error:
+            "Outra pessoa salvou alterações enquanto você editava. Recarregue para ver a versão atual, ou salve novamente para sobrescrever.",
+          conflict: true,
+          serverVersion: versaoAtual,
+        },
+        { status: 409 },
+      );
+    }
+
     const veredito = authorizeDatasetChange(guarda.identity, atual, parsed.data);
 
     if (!veredito.ok) {
@@ -80,9 +98,6 @@ export async function PUT(request: NextRequest) {
     const dataset = await saveDataset(parsed.data);
     return NextResponse.json({ dataset, message: "Dados salvos com sucesso." });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Falha ao salvar os dados do campeonato." },
-      { status: 400 },
-    );
+    return respostaDeErro("admin/dataset PUT", error, "Falha ao salvar os dados do campeonato.");
   }
 }
