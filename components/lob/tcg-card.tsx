@@ -86,7 +86,24 @@ export function TcgCard({ card }: Readonly<{ card: CardDef }>) {
         <div style={{ width: 40, height: 2, margin: "9px auto 0", background: card.color, boxShadow: `0 0 8px ${card.border}` }} />
       </div>
       <div style={{ position: "relative", margin: "0 12px", aspectRatio: "1 / 1", borderRadius: 4, overflow: "hidden", background: `linear-gradient(160deg,${card.from}33,#0b0804 70%)`, border: "1px solid rgba(201,138,75,.20)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <span ref={artRef} style={{ display: "inline-block", fontSize: 64, filter: "drop-shadow(0 4px 10px rgba(0,0,0,.5))", transition: EASE_RETURN, willChange: "transform" }} aria-hidden>{card.emoji}</span>
+        {card.imageUrl ? (
+          <span
+            ref={artRef}
+            style={{ position: "absolute", inset: 0, display: "block", transition: EASE_RETURN, willChange: "transform" }}
+            aria-hidden
+          >
+            {/* a arte é maior que a moldura para o parallax nunca revelar as bordas */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={card.imageUrl}
+              alt=""
+              loading="lazy"
+              style={{ position: "absolute", top: "-9%", left: "-9%", width: "118%", height: "118%", objectFit: "cover" }}
+            />
+          </span>
+        ) : (
+          <span ref={artRef} style={{ display: "inline-block", fontSize: 64, filter: "drop-shadow(0 4px 10px rgba(0,0,0,.5))", transition: EASE_RETURN, willChange: "transform" }} aria-hidden>{card.emoji}</span>
+        )}
         <div style={{ position: "absolute", inset: 0, pointerEvents: "none", boxShadow: "inset 0 -30px 40px -20px rgba(11,8,4,.9)" }} />
       </div>
       <div style={{ padding: "14px 16px 17px", display: "flex", flexDirection: "column", gap: 11, flex: 1 }}>

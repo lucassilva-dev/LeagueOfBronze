@@ -53,6 +53,29 @@ export default async function CartasPage() {
           </div>
         </section>
       ) : null}
+
+      {/* Créditos das artes — exigido pela licença CC BY-SA 4.0 da arte do Draft Invertido. */}
+      <section className="lob-fade" style={{ marginTop: 44, paddingTop: 18, borderTop: "1px solid rgba(201,138,75,.16)" }}>
+        <p style={{ margin: 0, fontSize: 11, letterSpacing: ".10em", color: "#8f8472" }}>CRÉDITOS DAS ARTES</p>
+        <p style={{ margin: "8px 0 0", maxWidth: 720, fontSize: 11.5, lineHeight: 1.6, color: "#6f6656" }}>
+          Artes feitas a partir de memes brasileiros, para uso humorístico neste campeonato amador.
+          A arte de <strong style={{ color: "#8f8472" }}>Draft Invertido</strong> deriva da foto de Jojo Todynho por
+          Renato Cipriano (Cipriano1976), sob{" "}
+          <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noreferrer" style={{ color: "#a98a5f" }}>
+            CC BY-SA 4.0
+          </a>{" "}
+          (
+          <a href="https://commons.wikimedia.org/wiki/File:Jojo_Todynho_-_46678168382.jpg" target="_blank" rel="noreferrer" style={{ color: "#a98a5f" }}>
+            fonte
+          </a>
+          ) — alterada com recorte, cor, sobreposição, setas e texto; a arte derivada permanece sob CC BY-SA 4.0.
+          Créditos completos em{" "}
+          <a href="/cartas/CREDITOS.txt" target="_blank" rel="noreferrer" style={{ color: "#a98a5f" }}>
+            /cartas/CREDITOS.txt
+          </a>
+          .
+        </p>
+      </section>
     </div>
   );
 }

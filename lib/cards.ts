@@ -8,6 +8,7 @@ export type CardDef = {
   description: string; // regra completa
   flavor: string; // frase de "sabor" (TCG)
   emoji: string;
+  imageUrl?: string; // arte (meme) da carta; sem ela a carta cai no emoji
   color: string;
   border: string;
   from: string;
@@ -23,6 +24,7 @@ export const CARDS: CardDef[] = [
     letter: "A",
     title: "ABCDRAFT",
     emoji: "🔤",
+    imageUrl: "/cartas/abcdraft.jpg",
     color: "#e0894a",
     border: "rgba(224,137,74,.55)",
     from: "#ff8a3d",
@@ -38,6 +40,7 @@ export const CARDS: CardDef[] = [
     letter: "B",
     title: "DRAFT SABOTADO",
     emoji: "🎭",
+    imageUrl: "/cartas/draft-sabotado.jpg",
     color: "#5aa2ff",
     border: "rgba(90,162,255,.55)",
     from: "#5aa2ff",
@@ -53,6 +56,7 @@ export const CARDS: CardDef[] = [
     letter: "C",
     title: "INTER CLASSE",
     emoji: "⚔️",
+    imageUrl: "/cartas/inter-classe.jpg",
     color: "#5fbf6a",
     border: "rgba(95,191,106,.55)",
     from: "#5fbf6a",
@@ -68,6 +72,7 @@ export const CARDS: CardDef[] = [
     letter: "D",
     title: "INVASÃO DA YUUMI",
     emoji: "🐱",
+    imageUrl: "/cartas/invasao-yuumi.jpg",
     color: "#e6b325",
     border: "rgba(230,179,37,.55)",
     from: "#e6b325",
@@ -82,6 +87,7 @@ export const CARDS: CardDef[] = [
     letter: "E",
     title: "INVERSÃO DE ROTAS",
     emoji: "🔀",
+    imageUrl: "/cartas/inversao-rotas.jpg",
     color: "#e85c6a",
     border: "rgba(232,92,106,.55)",
     from: "#e85c6a",
@@ -97,6 +103,7 @@ export const CARDS: CardDef[] = [
     letter: "F",
     title: "TUDO LIBERADO",
     emoji: "🚫",
+    imageUrl: "/cartas/tudo-liberado.jpg",
     color: "#b06bd6",
     border: "rgba(176,107,214,.55)",
     from: "#b06bd6",
@@ -114,6 +121,7 @@ export const DUPLAS: CardDef[] = [
     cardId: "AMIGOS_NATUREZA",
     title: "AMIGOS DA NATUREZA",
     emoji: "🌿",
+    imageUrl: "/cartas/amigos-natureza.jpg",
     color: "#57d8cb",
     border: "rgba(87,216,203,.6)",
     from: "#57d8cb",
@@ -128,6 +136,7 @@ export const DUPLAS: CardDef[] = [
     cardId: "DRAFT_INVERTIDO",
     title: "DRAFT INVERTIDO",
     emoji: "🔃",
+    imageUrl: "/cartas/draft-invertido.jpg",
     color: "#f2e2b3",
     border: "rgba(242,226,179,.6)",
     from: "#f2e2b3",
