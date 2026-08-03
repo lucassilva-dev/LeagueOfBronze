@@ -23,6 +23,27 @@ const SUPABASE_DEFAULT_ROW_ID = "leagueofbronze";
 
 export type DataProvider = "local" | "supabase";
 
+/** A linha do dataset não existe no banco. Semeadura é ação explícita de admin. */
+export class DatasetMissingError extends Error {
+  readonly code = "DATASET_MISSING";
+}
+
+/** O payload gravado no banco não passa na validação (possível adulteração). */
+export class DatasetInvalidError extends Error {
+  readonly code = "DATASET_INVALID";
+}
+
+/**
+ * Última cópia válida lida nesta instância. Serve para as páginas públicas
+ * continuarem no ar caso o payload do banco seja adulterado — sem isso, uma única
+ * escrita maliciosa direta no banco derrubava o site inteiro.
+ */
+let lastGoodDataset: TournamentDataset | null = null;
+
+export function getLastGoodDataset(): TournamentDataset | null {
+  return lastGoodDataset;
+}
+
 type SupabaseRow = {
   id: string;
   payload: unknown;
@@ -167,21 +188,22 @@ async function readSupabaseRow(): Promise<SupabaseRow | null> {
 async function readSupabaseDataset(): Promise<TournamentDataset> {
   const row = await readSupabaseRow();
   if (!row) {
-    // Bootstrap automático: usa o seed local na primeira execução e cria o registro no Supabase.
-    const localSeed = normalizeDatasetForSave(await readLocalDataset());
-    await saveSupabaseDataset(localSeed);
-    return localSeed;
+    // SEGURANÇA: ler NUNCA pode gravar. Antes, um visitante anônimo em qualquer página
+    // recriava a linha a partir do seed do repositório — o que permitia a um atacante
+    // alternar "apagar linha" + "abrir o site" para sobrescrever o dado vivo pelo seed antigo.
+    // A semeadura passou a ser ação explícita de admin (POST /api/admin/dataset/seed).
+    throw new DatasetMissingError(
+      `Registro "${getSupabaseDatasetRowId()}" não existe em ${SUPABASE_TABLE}. Use a semeadura no painel admin.`,
+    );
   }
 
   try {
-    return parseAndValidateDataset(row.payload);
+    const dataset = parseAndValidateDataset(row.payload);
+    lastGoodDataset = dataset;
+    return dataset;
   } catch (error) {
-    if (error instanceof Error) {
-      throw new Error(
-        `${getDatasetValidationErrorPrefix()} no Supabase: ${error.message.replace(/^Validação falhou:\s*/i, "")}`,
-      );
-    }
-    throw error;
+    const detail = error instanceof Error ? error.message.replace(/^Validação falhou:\s*/i, "") : String(error);
+    throw new DatasetInvalidError(`${getDatasetValidationErrorPrefix()} no Supabase: ${detail}`);
   }
 }
 
@@ -231,7 +253,31 @@ export async function saveDataset(input: unknown): Promise<TournamentDataset> {
     await saveLocalDataset(dataset);
   }
 
+  lastGoodDataset = dataset;
   return dataset;
+}
+
+/**
+ * Semeadura explícita da linha no Supabase a partir do seed do repositório.
+ * Substitui o antigo "bootstrap na leitura": recusa se a linha já existir,
+ * para nunca sobrescrever dado vivo.
+ */
+export async function seedDatasetFromLocalSeed(): Promise<TournamentDataset> {
+  if (getConfiguredDataProvider() !== "supabase") {
+    throw new Error("Semeadura só se aplica ao provedor Supabase.");
+  }
+
+  const existing = await readSupabaseRow();
+  if (existing) {
+    throw new Error(
+      "A linha já existe no Supabase — semeadura recusada para não sobrescrever os dados atuais.",
+    );
+  }
+
+  const seed = normalizeDatasetForSave(await readLocalDataset());
+  await saveSupabaseDataset(seed);
+  lastGoodDataset = seed;
+  return seed;
 }
 
 export async function importDatasetFromText(raw: string) {

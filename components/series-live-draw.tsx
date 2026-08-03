@@ -13,6 +13,29 @@ type Drawn = { teamId: string; cardId: string; dupla?: boolean };
 
 const DUPLA_TARGET = "__DUPLA__";
 
+// Declarado fora do render: componente criado durante o render perde o estado a cada
+// re-render (e o lint do React barra).
+function SideChip({
+  label,
+  color,
+  team,
+  spinning,
+}: Readonly<{ label: string; color: string; team: TeamRef | null; spinning: boolean }>) {
+  return (
+    <div
+      className="flex flex-1 flex-col items-center gap-1 rounded-2xl border p-3"
+      style={{ borderColor: `${color}55`, background: `${color}12` }}
+    >
+      <span className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color }}>
+        {label}
+      </span>
+      <span className="text-sm font-semibold text-center">
+        {spinning ? "Sorteando…" : (team?.name ?? "—")}
+      </span>
+    </div>
+  );
+}
+
 function CardFace({
   cardId,
   spinning,
@@ -178,15 +201,6 @@ export function SeriesLiveDraw({
   const blueTeam = teamA && teamB ? (blueSideTeamId === teamB.id ? teamB : blueSideTeamId === teamA.id ? teamA : null) : null;
   const redTeam = blueTeam ? (blueTeam.id === teamA?.id ? teamB : teamA) : null;
 
-  const SideChip = ({ label, color, team }: { label: string; color: string; team: TeamRef | null }) => (
-    <div className="flex flex-1 flex-col items-center gap-1 rounded-2xl border p-3" style={{ borderColor: `${color}55`, background: `${color}12` }}>
-      <span className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color }}>{label}</span>
-      <span className="text-sm font-semibold text-center">
-        {sideSpinning ? "Sorteando…" : (team?.name ?? "—")}
-      </span>
-    </div>
-  );
-
   return (
     <Card className="p-5">
       {teamA && teamB ? (
@@ -198,8 +212,8 @@ export function SeriesLiveDraw({
             ) : null}
           </div>
           <div className="mt-3 flex items-stretch gap-3">
-            <SideChip label="Lado Azul" color="#4d9bff" team={blueTeam} />
-            <SideChip label="Lado Vermelho" color="#ff5d5d" team={redTeam} />
+            <SideChip label="Lado Azul" color="#4d9bff" team={blueTeam} spinning={sideSpinning} />
+            <SideChip label="Lado Vermelho" color="#ff5d5d" team={redTeam} spinning={sideSpinning} />
           </div>
           {isAdmin ? (
             <div className="mt-3 flex justify-center">

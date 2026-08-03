@@ -222,11 +222,16 @@ Objetivo: substituir o JSON local por Postgres + Auth, mantendo a mesma lógica 
 ### Deploy em produção (recomendado)
 
 - Vercel (app Next)
-- Supabase (Postgres + Auth)
-- ENV no Vercel:
-  - `NEXT_PUBLIC_SUPABASE_URL`
-  - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-  - `SUPABASE_SERVICE_ROLE_KEY` (server-only)
+- Supabase (Postgres)
+- ENV no Vercel (todas **server-only** — nenhuma vai para o navegador):
+  - `SUPABASE_URL`
+  - `SUPABASE_SERVICE_ROLE_KEY`
+  - `SUPABASE_DATASET_ROW_ID`
+  - `ADMIN_PASSWORD`
+
+> **Não use `NEXT_PUBLIC_SUPABASE_*`.** O prefixo `NEXT_PUBLIC_` embute a variável no
+> bundle do navegador. A aplicação acessa o Supabase apenas no servidor, e expor uma
+> chave anon no cliente reabriria o acesso público ao banco.
 
 ## Estrutura principal
 

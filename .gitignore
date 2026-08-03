@@ -1,8 +1,10 @@
 .next
 node_modules
 coverage
-.env
-.env.local
+# Ignora TODA variante de .env (.env.production, .env.local, .env.*.local, ...).
+# Antes eram só ".env" e ".env.local" literais, entao um .env.production seria commitado.
+.env*
+!.env.example
 *.log
 *.tsbuildinfo
 .scannerwork

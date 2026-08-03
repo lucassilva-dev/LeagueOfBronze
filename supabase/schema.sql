@@ -22,6 +22,30 @@ comment on column public.tournament_state.updated_at is
 create index if not exists tournament_state_updated_at_idx
   on public.tournament_state (updated_at desc);
 
+-- =====================================================================
+-- SEGURANÇA (obrigatório — não remover)
+-- =====================================================================
+-- A aplicação acessa o banco com a chave service_role, que tem o atributo
+-- BYPASSRLS. Portanto, ligar RLS e revogar os papéis públicos NÃO afeta o site,
+-- mas remove por completo o acesso de quem tiver apenas a chave anon/publishable
+-- (que é pública por natureza).
+--
+-- Sem isto, a tabela nasce com INSERT/UPDATE/DELETE/TRUNCATE liberados para
+-- "anon" e "authenticated" via PostgREST — ou seja, qualquer pessoa com a chave
+-- pública poderia apagar ou reescrever o campeonato inteiro sem passar pelo site.
+
+alter table public.tournament_state enable row level security;
+alter table public.tournament_state force  row level security;
+
+-- Sem nenhuma policy: anon/authenticated ficam com acesso zero.
+revoke all on public.tournament_state from anon, authenticated;
+
+-- RAIZ DO PROBLEMA: o Supabase concede privilégios padrão em "public" para anon.
+-- Sem as linhas abaixo, QUALQUER tabela nova criada aqui volta a nascer aberta.
+alter default privileges in schema public revoke all on tables    from anon, authenticated;
+alter default privileges in schema public revoke all on sequences from anon, authenticated;
+alter default privileges in schema public revoke all on functions from anon, authenticated;
+
 -- Opcional: inserir dataset vazio inicial (se quiser)
 -- insert into public.tournament_state (id, payload)
 -- values ('leagueofbronze', '{}'::jsonb)

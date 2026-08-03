@@ -6,11 +6,25 @@ import { getConfiguredDataProvider, getDataProviderLabel, isSupabaseConfigured }
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Estado da sessão de admin.
+ *
+ * É PÚBLICO por necessidade: `components/series-live-draw.tsx` chama daqui, de páginas
+ * públicas de série, para decidir se mostra os botões de sorteio. Por isso, a topologia
+ * do backend (provedor de dados, se o Supabase está configurado) só é devolvida a quem
+ * está autenticado — antes vazava para qualquer visitante anônimo.
+ */
 export async function GET(request: NextRequest) {
+  const authorized = isAuthorizedAdminRequest(request);
+
+  if (!authorized) {
+    return NextResponse.json({ configured: isAdminConfigured(), authorized: false });
+  }
+
   const provider = getConfiguredDataProvider();
   return NextResponse.json({
     configured: isAdminConfigured(),
-    authorized: isAuthorizedAdminRequest(request),
+    authorized: true,
     dataProvider: provider,
     dataProviderLabel: getDataProviderLabel(provider),
     supabaseConfigured: isSupabaseConfigured(),
