@@ -3695,7 +3695,8 @@
               "playerId": "thalao",
               "kills": 0,
               "deaths": 2,
-              "assists": 8
+              "assists": 8,
+              "champion": "Swain"
             }
           ],
           "bans": [
@@ -3930,7 +3931,7 @@
             },
             {
               "playerId": "thalao",
-              "champion": "Viego",
+              "champion": "Veigar",
               "kills": 8,
               "deaths": 11,
               "assists": 19
@@ -3944,6 +3945,10 @@
             {
               "teamId": "lgtv-wins",
               "championName": "Vladimir"
+            },
+            {
+              "teamId": "lgtv-wins",
+              "championName": "Viego"
             },
             {
               "teamId": "lgtv-wins",
