@@ -69,14 +69,56 @@ describe("diferença do dataset → escopos exigidos", () => {
     expect(escoposDe(base, depois)).toEqual(["series:sides"]);
   });
 
-  it("criar ou remover série exige series:manage", () => {
-    const removida = clone(base);
-    removida.seriesMatches.pop();
-    expect(escoposDe(base, removida)).toEqual(["series:manage"]);
-
+  it("editar o invólucro de uma série (data) exige series:manage", () => {
     const comData = clone(base);
     comData.seriesMatches[0].date = "2026-12-31T20:00";
     expect(escoposDe(base, comData)).toEqual(["series:manage"]);
+  });
+
+  it("criar uma série VAZIA (só o invólucro, sem resultado) exige só series:manage", () => {
+    const vazia = clone({ ...base, seriesMatches: [base.seriesMatches[0]] }).seriesMatches[0];
+    vazia.id = "fixture-vazia-teste";
+    vazia.games = [];
+    vazia.cardsUsed = [];
+    delete vazia.blueSideTeamId;
+    delete vazia.walkoverWinnerTeamId;
+    delete vazia.walkoverReason;
+
+    const comFixtureNova = clone(base);
+    comFixtureNova.seriesMatches.push(vazia);
+    expect(escoposDe(base, comFixtureNova)).toEqual(["series:manage"]);
+  });
+
+  // Regressão da escalação achada no pentest: o ramo de "add"/"remove" do diff colapsava
+  // TODA série nova/removida em series:manage, deixando um admin sem results:write injetar
+  // ou apagar resultado só criando/removendo a série inteira em vez de editá-la no lugar.
+  it("criar uma série NOVA já com resultado/carta/lado exige os escopos granulares", () => {
+    const comJogos = base.seriesMatches.find((s) => s.games.length > 0)!;
+    const forjada = clone({ ...base, seriesMatches: [comJogos] }).seriesMatches[0];
+    forjada.id = "serie-forjada-001";
+    forjada.cardsUsed = [{ teamId: forjada.teamAId, cardId: "TUDO_LIBERADO" }];
+    forjada.blueSideTeamId = forjada.teamBId;
+
+    const depois = clone(base);
+    depois.seriesMatches.push(forjada);
+
+    const escopos = escoposDe(base, depois);
+    expect(escopos).toEqual(
+      expect.arrayContaining(["series:manage", "results:write", "series:cards", "series:sides"]),
+    );
+    // um admin com SÓ series:manage é negado — o buraco original
+    expect(authorizeDatasetChange(usuario(["series:manage"]), base, depois).ok).toBe(false);
+  });
+
+  it("remover uma série QUE TEM resultado exige results:write além de series:manage", () => {
+    const depois = clone(base);
+    const idx = depois.seriesMatches.findIndex((s) => s.games.length > 0);
+    depois.seriesMatches.splice(idx, 1);
+
+    const escopos = escoposDe(base, depois);
+    expect(escopos).toContain("series:manage");
+    expect(escopos).toContain("results:write");
+    expect(authorizeDatasetChange(usuario(["series:manage"]), base, depois).ok).toBe(false);
   });
 
   it("alterar W.O. exige results:write", () => {
@@ -129,6 +171,15 @@ describe("autorização por permissão", () => {
     const depois = clone(base);
     depois.teams[0].name = "Q";
     expect(authorizeDatasetChange(null, base, depois).ok).toBe(false);
+  });
+
+  it("escopo masterOnly na lista de um não-master não vale (defesa em profundidade)", () => {
+    // Simula um escopo masterOnly que jamais deveria ter sido atribuído chegando à lista
+    // (por seed/migração/edição direta no banco). hasScope tem de ignorá-lo.
+    const depois = clone(base);
+    depois.tournament.name = "Sequestrado"; // exige tournament:lifecycle (masterOnly)
+    const naoMaster = usuario(["tournament:lifecycle"]);
+    expect(authorizeDatasetChange(naoMaster, base, depois).ok).toBe(false);
   });
 
   it("quem só sorteia carta NÃO consegue mexer em time nem em jogador", () => {

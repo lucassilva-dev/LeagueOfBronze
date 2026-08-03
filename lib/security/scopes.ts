@@ -32,6 +32,11 @@ export const SCOPE_KEYS = SCOPES.map((s) => s.key) as readonly Scope[];
 /** Escopos que podem ser atribuídos a um usuário comum. */
 export const ASSIGNABLE_SCOPES = SCOPES.filter((s) => !s.masterOnly).map((s) => s.key) as readonly Scope[];
 
+/** Escopos que só o master pode exercer — nunca valem para um não-master. */
+const MASTER_ONLY_SCOPES = new Set<Scope>(
+  SCOPES.filter((s) => s.masterOnly).map((s) => s.key),
+);
+
 export function isValidScope(value: string): value is Scope {
   return (SCOPE_KEYS as readonly string[]).includes(value);
 }
@@ -51,6 +56,9 @@ export function sanitizeScopes(values: unknown): Scope[] {
 export function hasScope(identity: AdminIdentity | null, scope: Scope): boolean {
   if (!identity) return false;
   if (identity.isMaster) return true;
+  // Defesa em profundidade: um escopo masterOnly nunca vale para não-master, mesmo que
+  // tenha entrado na lista dele por seed, migração ou edição direta no banco.
+  if (MASTER_ONLY_SCOPES.has(scope)) return false;
   return identity.scopes.includes(scope);
 }
 

@@ -74,6 +74,34 @@ function indexar<T extends ComChave>(itens: readonly T[], chave: string): Map<st
   return mapa;
 }
 
+/** Um campo protegido só "conta" se estiver de fato preenchido. */
+function campoPreenchido(valor: unknown): boolean {
+  if (valor === undefined || valor === null || valor === "") return false;
+  if (Array.isArray(valor)) return valor.length > 0;
+  return true;
+}
+
+/**
+ * Escopos exigidos para CRIAR ou REMOVER um item inteiro: o escopo-base do "invólucro"
+ * MAIS o escopo de cada campo protegido que o item carrega preenchido.
+ *
+ * Sem isto havia escalação: criar uma série NOVA já com resultado/carta/lado forjados —
+ * ou remover uma série que já tinha resultado — custava apenas `series:manage`, driblando
+ * a permissão granular que a edição no lugar exige. Aqui add e remove viram simétricos ao
+ * update: quem cria/apaga uma série COM resultado precisa também de `results:write`.
+ * Para times/jogadores nada muda (todos os campos mapeiam para o mesmo escopo).
+ */
+function escoposDoItem<T extends ComChave>(
+  item: T,
+  escopoDoCampo: (campo: string) => Scope,
+): Scope[] {
+  const escopos = new Set<Scope>([escopoDoCampo("__base__")]);
+  for (const [campo, valor] of Object.entries(item)) {
+    if (campoPreenchido(valor)) escopos.add(escopoDoCampo(campo));
+  }
+  return [...escopos];
+}
+
 function diffLista<T extends ComChave>(
   antes: readonly T[],
   depois: readonly T[],
@@ -84,15 +112,20 @@ function diffLista<T extends ComChave>(
   const mudancas: DatasetChange[] = [];
   const mapaAntes = indexar(antes, chave);
   const mapaDepois = indexar(depois, chave);
-  const escopoBase = escopoDoCampo("__base__");
 
-  for (const [id] of mapaAntes) {
-    if (!mapaDepois.has(id)) mudancas.push({ scope: escopoBase, path: `${caminho}[${id}]`, kind: "remove" });
+  for (const [id, anterior] of mapaAntes) {
+    if (!mapaDepois.has(id)) {
+      for (const scope of escoposDoItem(anterior, escopoDoCampo)) {
+        mudancas.push({ scope, path: `${caminho}[${id}]`, kind: "remove" });
+      }
+    }
   }
   for (const [id, item] of mapaDepois) {
     const anterior = mapaAntes.get(id);
     if (!anterior) {
-      mudancas.push({ scope: escopoBase, path: `${caminho}[${id}]`, kind: "add" });
+      for (const scope of escoposDoItem(item, escopoDoCampo)) {
+        mudancas.push({ scope, path: `${caminho}[${id}]`, kind: "add" });
+      }
       continue;
     }
     const campos = new Set([...Object.keys(anterior), ...Object.keys(item)]);
