@@ -38,7 +38,6 @@ const PLAYER_METRICS = [
 const CHAMP_METRICS = [
   { key: "jogados", label: "Mais jogados", head: "PICKS", desc: "Os campeões mais escolhidos no draft das partidas." },
   { key: "banidos", label: "Mais banidos", head: "BANS", desc: "Os campeões que o pessoal não quer ver na Rift." },
-  { key: "taxaban", label: "Taxa de ban", head: "BAN%", desc: "Percentual de partidas em que o campeão foi banido." },
   { key: "presenca", label: "Presença", head: "PRES%", desc: "Partidas em que foi escolhido ou banido (pick + ban)." },
   { key: "winrate", label: "Winrate", head: "WIN%", desc: "Taxa de vitória de cada campeão no campeonato." },
   { key: "kda", label: "KDA", head: "KDA", desc: "Melhor média de KDA registrada por campeão." },
