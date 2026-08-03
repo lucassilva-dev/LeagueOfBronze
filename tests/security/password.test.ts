@@ -1,8 +1,30 @@
+import { createHmac, randomBytes, scryptSync } from "node:crypto";
 import { describe, expect, it } from "vitest";
 
 import { hashPassword, validatePasswordStrength, verifyPassword } from "@/lib/security/password";
 
 const PEPPER = "pepper-de-teste-abc123";
+
+/**
+ * Réplica exata do algoritmo de scripts/criar-admin.mjs. Se um dos dois mudar sem o
+ * outro, este teste quebra — evitando o cenário em que o hash gerado para criar a
+ * conta não é aceito no login.
+ */
+function hashComoOScript(senha: string, pepper: string): string {
+  const pre = createHmac("sha256", pepper).update(senha, "utf8").digest();
+  const salt = randomBytes(16);
+  const derivado = scryptSync(pre, salt, 32, { N: 32768, r: 8, p: 1, maxmem: 96 * 1024 * 1024 });
+  return ["scrypt", "1", 32768, 8, 1, salt.toString("base64url"), derivado.toString("base64url")].join("$");
+}
+
+describe("compatibilidade entre o script de criação e a verificação do app", () => {
+  it("o hash gerado pelo script é aceito no login", async () => {
+    const hash = hashComoOScript("senha-forte-teste-123", PEPPER);
+    await expect(verifyPassword("senha-forte-teste-123", hash, PEPPER)).resolves.toBe(true);
+    await expect(verifyPassword("senha-errada-999", hash, PEPPER)).resolves.toBe(false);
+    await expect(verifyPassword("senha-forte-teste-123", hash, "outro-pepper")).resolves.toBe(false);
+  });
+});
 
 describe("hash de senha (scrypt + pepper)", () => {
   it("aceita a senha correta", async () => {
