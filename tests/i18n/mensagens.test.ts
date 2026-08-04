@@ -50,8 +50,9 @@ describe("aviso obrigatório da Riot Games", () => {
   });
 
   it("o rodapé em inglês É a constante, sem uma letra de diferença", () => {
-    // O rodapé mostra UMA frase, no idioma de quem lê. Em inglês ela precisa ser o texto
-    // exigido literalmente — por isso aponta para a constante em vez de ser redigitada.
+    // Em inglês o rodapé mostra só esta frase — e ela precisa ser o texto exigido
+    // literalmente, por isso aponta para a constante em vez de ser redigitada.
+    // (Em português o rodapé mostra a constante MAIS a tradução; ver site-frame.tsx.)
     expect(MESSAGES.en.comum.rodapeAviso).toBe(AVISO_RIOT_OFICIAL);
   });
 

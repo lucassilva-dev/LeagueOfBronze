@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { LanguageToggle } from "@/components/language-toggle";
 import { MainNav, type NavLabel } from "@/components/main-nav";
-import { CONTATO_EMAIL } from "@/lib/i18n/messages/legal";
+import { AVISO_RIOT_OFICIAL, CONTATO_EMAIL } from "@/lib/i18n/messages/legal";
 import { getLocale, getMessages } from "@/lib/i18n/server";
 
 type SiteFrameProps = Readonly<{ children: React.ReactNode }>;
@@ -165,25 +165,36 @@ export async function SiteFrame({ children }: SiteFrameProps) {
             </div>
 
             {/*
-              Aviso exigido pelas políticas da Riot Games para produtos de terceiros, em
-              local prontamente visível: rodapé de TODAS as páginas.
+              Aviso exigido pelas políticas da Riot Games, em local prontamente visível:
+              rodapé de TODAS as páginas.
 
-              Uma frase só, no idioma de quem está lendo. Em inglês, `rodapeAviso` É o texto
-              exigido palavra por palavra (vem da constante AVISO_RIOT_OFICIAL, com teste
-              garantindo que não se separem); em português, a tradução fiel dele. Mostrar os
-              dois ao mesmo tempo era redundante depois que o site virou bilíngue — e a
-              versão literal segue sempre disponível, em destaque, na /legal.
+              O texto obrigatório é a redação EM INGLÊS, e a exigência não depende do idioma
+              de quem visita — então ele aparece sempre, em qualquer locale. Já tentamos
+              mostrar só a versão traduzida para quem lê em português; isso tirou a frase
+              obrigatória de 13 das 14 rotas e foi revertido.
+
+              Em inglês não há repetição: `rodapeAviso` JÁ É a constante, então o parágrafo
+              extra é suprimido. Em português aparecem os dois — o obrigatório em inglês,
+              marcado com lang="en" para leitores de tela, e a tradução fiel logo abaixo.
             */}
             <div
               style={{
                 borderTop: "1px solid rgba(201,138,75,.10)",
                 paddingTop: 13,
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
                 fontSize: 11,
                 lineHeight: 1.6,
                 color: "#7d7263",
               }}
             >
-              <p style={{ margin: 0 }}>
+              {locale === "en" ? null : (
+                <p lang="en" style={{ margin: 0 }}>
+                  {AVISO_RIOT_OFICIAL}
+                </p>
+              )}
+              <p style={{ margin: 0, color: locale === "en" ? undefined : "#6f6656" }}>
                 {t.comum.rodapeAviso}{" "}
                 <Link href="/legal" style={{ color: "#c98a4b", textDecoration: "none" }}>
                   {t.comum.rodapeLinkLegal}
