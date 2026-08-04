@@ -32,7 +32,7 @@ export const conformidade = definir({
     consentimentoLink: "Saiba mais no aviso legal",
 
     proximaEdicaoSelo: "Em organização",
-    proximaEdicaoTitulo: "4ª Edição dos Bronzes",
+    proximaEdicaoTitulo: "League of Bronze — 4ª Edição",
     proximaEdicaoTexto:
       "A próxima edição já está sendo montada, com início previsto para o começo de novembro de 2026. A data exata ainda será confirmada — acompanhe por aqui e pelo Discord do grupo.",
 
@@ -59,7 +59,7 @@ export const conformidade = definir({
     consentimentoLink: "Read more in the legal notice",
 
     proximaEdicaoSelo: "Being organised",
-    proximaEdicaoTitulo: "Os Bronzes — 4th Edition",
+    proximaEdicaoTitulo: "League of Bronze — 4th Edition",
     proximaEdicaoTexto:
       "The next edition is already being put together, expected to start in early November 2026. The exact date is still to be confirmed — follow it here and on the group's Discord.",
 

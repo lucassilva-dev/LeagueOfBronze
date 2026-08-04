@@ -39,7 +39,7 @@ export const paginasCompeticao = definir({
     tabelaInfoClassificacaoDepois: " avançam para a Grande Final em MD5.",
 
     // ---------- /calendario ----------
-    calendarioEyebrow: "3ª Edição dos Bronzes",
+    calendarioEyebrow: "League of Bronze — 3ª Edição",
     calendarioTitulo: "CALENDÁRIO",
     calendarioIntro:
       "Fase de pontos corridos: todos contra todos, cada confronto em melhor de 3 (MD3). Os dois primeiros da tabela decidem tudo na Grande Final em MD5.",
@@ -153,7 +153,7 @@ export const paginasCompeticao = definir({
     tabelaInfoClassificacaoDepois: " advance to the Grand Final, a Bo5.",
 
     // ---------- /calendario ----------
-    calendarioEyebrow: "Os Bronzes · 3rd Edition",
+    calendarioEyebrow: "League of Bronze — 3rd Edition",
     calendarioTitulo: "SCHEDULE",
     calendarioIntro:
       "Group stage: round robin, every series played as a best of 3 (Bo3). The top two in the standings settle it all in the Grand Final, a Bo5.",

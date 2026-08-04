@@ -44,8 +44,10 @@ describe("aviso obrigatório da Riot Games", () => {
   it("está gravado palavra por palavra como a política exige", () => {
     // Este texto NÃO pode ser traduzido, abreviado nem reescrito: é copiado da política da
     // Riot. Qualquer edição aqui quebra o teste de propósito.
+    // O nome do produto tem de ser o MESMO registrado na aplicação da Riot
+    // (app LEAGUE-OF-BRONZE, URL league-of-bronze.vercel.app) — daí "League of Bronze".
     expect(AVISO_RIOT_OFICIAL).toBe(
-      "Os Bronzes isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.",
+      "League of Bronze isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.",
     );
   });
 

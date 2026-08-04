@@ -11,7 +11,7 @@ import { definir } from "@/lib/i18n/definir";
 export const paginasHome = definir({
   pt: {
     // ---------- compartilhado pelas três áreas ----------
-    edicaoSobretitulo: "3ª Edição dos Bronzes",
+    edicaoSobretitulo: "League of Bronze — 3ª Edição",
     ptsDraft: "PTS DRAFT",
     capitao: "◆ CAPITÃO",
     ficha: "FICHA →",
@@ -19,7 +19,7 @@ export const paginasHome = definir({
     // ---------- home · hero ----------
     homeSobretitulo: "Campeonato amador de League of Legends",
     homeTituloLinha1: "3ª EDIÇÃO",
-    homeTituloLinha2: "DOS BRONZES",
+    homeTituloLinha2: "LEAGUE OF BRONZE",
     homeIntro:
       "Onde o low elo é o protagonista. Seis times forjados no draft, trinta feras do Ferro ao Mestre e uma taça em disputa — de 25 de julho a 02 de agosto.",
     homeBotaoTimes: "VER OS TIMES →",
@@ -146,14 +146,14 @@ export const paginasHome = definir({
   },
   en: {
     // ---------- compartilhado pelas três áreas ----------
-    edicaoSobretitulo: "Os Bronzes · 3rd Edition",
+    edicaoSobretitulo: "League of Bronze — 3rd Edition",
     ptsDraft: "DRAFT PTS",
     capitao: "◆ CAPTAIN",
     ficha: "PROFILE →",
 
     // ---------- home · hero ----------
     homeSobretitulo: "Amateur League of Legends tournament",
-    homeTituloLinha1: "OS BRONZES",
+    homeTituloLinha1: "LEAGUE OF BRONZE",
     homeTituloLinha2: "3RD EDITION",
     homeIntro:
       "Where low elo takes the spotlight. Six teams forged in the draft, thirty players from Iron to Master and one trophy on the line — from July 25 to August 2.",

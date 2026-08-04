@@ -1,6 +1,6 @@
 // ============================================================
 // Design system "esports Bronze Hextech" — mapas de cor/rótulo
-// por elo, rota e time. Fonte: design oficial "Os Bronzes".
+// por elo, rota e time. Fonte: design oficial "League of Bronze".
 // ============================================================
 
 function normalizeKey(value: string) {

@@ -17,12 +17,12 @@ export const comum = definir({
     navAbrirMenu: "Abrir menu",
 
     edicao: "3ª EDIÇÃO",
-    rodapeAssinatura: "OS BRONZES · 3ª EDIÇÃO · 2026",
+    rodapeAssinatura: "LEAGUE OF BRONZE · 3ª EDIÇÃO · 2026",
     rodapeLema: "MECÂNICA DUVIDOSA · ENTRETENIMENTO IMACULADO",
     // Tradução fiel do aviso obrigatório. A versão em inglês (abaixo, no bloco `en`) é o
     // texto EXIGIDO literalmente pela Riot e não pode ser reescrita.
     rodapeAviso:
-      "Os Bronzes não é endossado pela Riot Games e não reflete as visões ou opiniões da Riot Games ou de qualquer pessoa oficialmente envolvida na produção ou gestão das propriedades da Riot Games. Riot Games e todas as propriedades associadas são marcas comerciais ou marcas registradas da Riot Games, Inc.",
+      "League of Bronze não é endossado pela Riot Games e não reflete as visões ou opiniões da Riot Games ou de qualquer pessoa oficialmente envolvida na produção ou gestão das propriedades da Riot Games. Riot Games e todas as propriedades associadas são marcas comerciais ou marcas registradas da Riot Games, Inc.",
     rodapeLinkLegal: "Aviso legal e privacidade",
     rodapeContato: "Contato",
 
@@ -46,7 +46,7 @@ export const comum = definir({
     navAbrirMenu: "Open menu",
 
     edicao: "3RD EDITION",
-    rodapeAssinatura: "OS BRONZES · 3RD EDITION · 2026",
+    rodapeAssinatura: "LEAGUE OF BRONZE · 3RD EDITION · 2026",
     rodapeLema: "QUESTIONABLE MECHANICS · IMMACULATE ENTERTAINMENT",
     // NÃO substituir por outra redação: é o texto obrigatório, palavra por palavra.
     rodapeAviso: AVISO_RIOT_OFICIAL,

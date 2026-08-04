@@ -24,14 +24,14 @@ export async function generateMetadata(): Promise<Metadata> {
 
   return locale === "en"
     ? {
-        title: "Os Bronzes · 3rd Edition",
+        title: "League of Bronze · 3rd Edition",
         description:
-          "Os Bronzes 3rd Edition — amateur League of Legends tournament. Teams, players, schedule, standings and statistics.",
+          "League of Bronze 3rd Edition — amateur League of Legends tournament. Teams, players, schedule, standings and statistics.",
       }
     : {
-        title: "Os Bronzes · 3ª Edição",
+        title: "League of Bronze · 3ª Edição",
         description:
-          "3ª Edição dos Bronzes — campeonato amador de League of Legends. Times, jogadores, calendário, tabela e estatísticas.",
+          "League of Bronze, 3ª Edição — campeonato amador de League of Legends. Times, jogadores, calendário, tabela e estatísticas.",
       };
 }
 

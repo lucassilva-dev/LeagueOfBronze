@@ -14,13 +14,13 @@ export const CONTATO_EMAIL = "lucasfullstackdeveloper@gmail.com";
  * Não editar, não traduzir, não abreviar — é copiada da política, palavra por palavra.
  */
 export const AVISO_RIOT_OFICIAL =
-  "Os Bronzes isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.";
+  "League of Bronze isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.";
 
 export const legal = definir({
   pt: {
-    metaTitulo: "Aviso legal e privacidade · Os Bronzes",
+    metaTitulo: "Aviso legal e privacidade · League of Bronze",
     metaDescricao:
-      "Aviso legal exigido pela Riot Games, atribuição de propriedade intelectual e política de privacidade do site Os Bronzes.",
+      "Aviso legal exigido pela Riot Games, atribuição de propriedade intelectual e política de privacidade do site League of Bronze.",
     sobretitulo: "Aviso legal",
     titulo: "LEGAL & PRIVACIDADE",
     subtitulo: "Quem somos, nossa relação com a Riot Games e o que este site guarda sobre você.",
@@ -28,7 +28,7 @@ export const legal = definir({
     secaoNaoSomos: "NÃO SOMOS A RIOT GAMES",
     traducaoPrefixo: "Em português:",
     traducaoAviso:
-      "Os Bronzes não é endossado pela Riot Games e não reflete as visões ou opiniões da Riot Games ou de qualquer pessoa oficialmente envolvida na produção ou gestão das propriedades da Riot Games.",
+      "League of Bronze não é endossado pela Riot Games e não reflete as visões ou opiniões da Riot Games ou de qualquer pessoa oficialmente envolvida na produção ou gestão das propriedades da Riot Games.",
     projetoAmador:
       "Este é um projeto amador, feito por e para um grupo de amigos, sem qualquer vínculo oficial, patrocínio ou aprovação da Riot Games.",
 
@@ -73,9 +73,9 @@ export const legal = definir({
       "Respondemos e atendemos pedidos de correção ou remoção de dados em até 30 dias. Participantes também podem falar com a organização pelo Discord ou pelo grupo de WhatsApp do campeonato.",
   },
   en: {
-    metaTitulo: "Legal notice & privacy · Os Bronzes",
+    metaTitulo: "Legal notice & privacy · League of Bronze",
     metaDescricao:
-      "Riot Games required legal notice, intellectual property attribution and privacy policy for the Os Bronzes website.",
+      "Riot Games required legal notice, intellectual property attribution and privacy policy for the League of Bronze website.",
     sobretitulo: "Legal notice",
     titulo: "LEGAL & PRIVACY",
     subtitulo: "Who we are, our relationship with Riot Games, and what this site stores about you.",
@@ -83,7 +83,7 @@ export const legal = definir({
     secaoNaoSomos: "WE ARE NOT RIOT GAMES",
     traducaoPrefixo: "In Portuguese:",
     traducaoAviso:
-      "Os Bronzes não é endossado pela Riot Games e não reflete as visões ou opiniões da Riot Games ou de qualquer pessoa oficialmente envolvida na produção ou gestão das propriedades da Riot Games.",
+      "League of Bronze não é endossado pela Riot Games e não reflete as visões ou opiniões da Riot Games ou de qualquer pessoa oficialmente envolvida na produção ou gestão das propriedades da Riot Games.",
     projetoAmador:
       "This is an amateur project, built by and for a group of friends, with no official affiliation, sponsorship or approval from Riot Games.",
 

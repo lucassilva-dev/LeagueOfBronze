@@ -13,7 +13,7 @@ const pt = {
   regrasSobretitulo: "Regulamento oficial",
   regrasTitulo: "REGRAS",
   regrasSubtitulo:
-    "Tudo que rege a 3ª Edição dos Bronzes — formato, draft por pontos, conduta e as cartinhas surpresa.",
+    "Tudo que rege a 3ª Edição do League of Bronze — formato, draft por pontos, conduta e as cartinhas surpresa.",
 
   // ---------- app/regras: ficha rápida ----------
   fichaTitulo: "FICHA RÁPIDA",
@@ -209,7 +209,7 @@ export const paginasRegras = definir<ChavesPaginasRegras>({
     regrasSobretitulo: "Official rulebook",
     regrasTitulo: "RULES",
     regrasSubtitulo:
-      "Everything that governs the 3rd edition of Os Bronzes — format, points draft, conduct and the surprise wildcards.",
+      "Everything that governs the 3rd edition of League of Bronze — format, points draft, conduct and the surprise wildcards.",
 
     // ---------- app/regras: ficha rápida ----------
     fichaTitulo: "QUICK FACTS",

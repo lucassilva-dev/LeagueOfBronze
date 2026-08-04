@@ -83,7 +83,7 @@ export async function SiteFrame({ children }: SiteFrameProps) {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/logo.png"
-                alt="Os Bronzes"
+                alt="League of Bronze"
                 width={44}
                 height={44}
                 style={{
@@ -100,7 +100,7 @@ export async function SiteFrame({ children }: SiteFrameProps) {
                   className="lob-display"
                   style={{ fontSize: 16, letterSpacing: ".05em", color: "#f3ece0" }}
                 >
-                  OS BRONZES
+                  LEAGUE OF BRONZE
                 </span>
                 <span style={{ fontSize: 9, letterSpacing: ".34em", color: "#a98a5f", marginTop: 4 }}>
                   {t.comum.edicao}
