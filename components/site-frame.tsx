@@ -1,13 +1,31 @@
 import Link from "next/link";
 
-import { MainNav } from "@/components/main-nav";
+import { LanguageToggle } from "@/components/language-toggle";
+import { MainNav, type NavLabel } from "@/components/main-nav";
+import { AVISO_RIOT_OFICIAL, CONTATO_EMAIL } from "@/lib/i18n/messages/legal";
+import { getLocale, getMessages } from "@/lib/i18n/server";
 
 type SiteFrameProps = Readonly<{ children: React.ReactNode }>;
 
 const NOISE =
   "url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22140%22 height=%22140%22%3E%3Cfilter id=%22n%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.85%22 numOctaves=%222%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23n)%22/%3E%3C/svg%3E')";
 
-export function SiteFrame({ children }: SiteFrameProps) {
+export async function SiteFrame({ children }: SiteFrameProps) {
+  const locale = await getLocale();
+  const t = await getMessages();
+
+  const navLabels: NavLabel[] = [
+    { href: "/", label: t.comum.navInicio },
+    { href: "/times", label: t.comum.navTimes },
+    { href: "/jogadores", label: t.comum.navJogadores },
+    { href: "/calendario", label: t.comum.navCalendario },
+    { href: "/tabela", label: t.comum.navTabela },
+    { href: "/stats", label: t.comum.navEstatisticas },
+    { href: "/cartas", label: t.comum.navCartas },
+    { href: "/regras", label: t.comum.navRegras },
+    { href: "/temporadas", label: t.comum.navTemporadas },
+  ];
+
   return (
     <div style={{ position: "relative", minHeight: "100vh", color: "#b8ab97", overflowX: "hidden" }}>
       {/* Camada de glows bronze + teal + listras diagonais */}
@@ -85,11 +103,29 @@ export function SiteFrame({ children }: SiteFrameProps) {
                   OS BRONZES
                 </span>
                 <span style={{ fontSize: 9, letterSpacing: ".34em", color: "#a98a5f", marginTop: 4 }}>
-                  3ª EDIÇÃO
+                  {t.comum.edicao}
                 </span>
               </div>
             </Link>
-            <MainNav />
+            {/*
+              Wrapper sem `position` para não virar o bloco de referência do menu
+              hambúrguer, que se posiciona em relação ao <header>.
+            */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <MainNav
+                labels={navLabels}
+                ariaLabel={t.comum.navAriaPrincipal}
+                abrirMenu={t.comum.navAbrirMenu}
+              />
+              <LanguageToggle
+                locale={locale}
+                rotulo={t.comum.idioma}
+                titulos={{
+                  pt: locale === "pt" ? t.comum.idiomaPt : t.comum.trocarParaPt,
+                  en: locale === "en" ? t.comum.idiomaEn : t.comum.trocarParaEn,
+                }}
+              />
+            </div>
           </div>
           <div
             style={{
@@ -124,16 +160,17 @@ export function SiteFrame({ children }: SiteFrameProps) {
                 color: "#6f6656",
               }}
             >
-              <span>OS BRONZES · 3ª EDIÇÃO · 2026</span>
-              <span>MECÂNICA DUVIDOSA · ENTRETENIMENTO IMACULADO</span>
+              <span>{t.comum.rodapeAssinatura}</span>
+              <span>{t.comum.rodapeLema}</span>
             </div>
 
             {/*
               Aviso exigido pelas políticas da Riot Games para produtos de terceiros.
               O texto em inglês é o EXIGIDO literalmente pela política e não deve ser
-              editado nem traduzido; a versão em português abaixo é cortesia para o
-              público do site. Precisa ficar em local prontamente visível — por isso
-              está no rodapé de TODAS as páginas, e não escondido só na /legal.
+              editado nem traduzido (vem de AVISO_RIOT_OFICIAL); a segunda linha é a
+              versão localizada, cortesia para o público do site. Precisa ficar em local
+              prontamente visível — por isso está no rodapé de TODAS as páginas, e não
+              escondido só na /legal.
             */}
             <div
               style={{
@@ -147,19 +184,21 @@ export function SiteFrame({ children }: SiteFrameProps) {
                 color: "#7d7263",
               }}
             >
-              <p style={{ margin: 0 }}>
-                Os Bronzes isn&rsquo;t endorsed by Riot Games and doesn&rsquo;t reflect the views or
-                opinions of Riot Games or anyone officially involved in producing or managing Riot
-                Games properties. Riot Games, and all associated properties are trademarks or
-                registered trademarks of Riot Games, Inc.
+              <p lang="en" style={{ margin: 0 }}>
+                {AVISO_RIOT_OFICIAL}
               </p>
               <p style={{ margin: 0, color: "#6f6656" }}>
-                Os Bronzes não é endossado pela Riot Games e não reflete as visões ou opiniões da
-                Riot Games ou de qualquer pessoa oficialmente envolvida na produção ou gestão das
-                propriedades da Riot Games.{" "}
+                {t.comum.rodapeAvisoPt}{" "}
                 <Link href="/legal" style={{ color: "#c98a4b", textDecoration: "none" }}>
-                  Aviso legal e privacidade
+                  {t.comum.rodapeLinkLegal}
                 </Link>
+                {" · "}
+                <a
+                  href={`mailto:${CONTATO_EMAIL}`}
+                  style={{ color: "#c98a4b", textDecoration: "none" }}
+                >
+                  {t.comum.rodapeContato}
+                </a>
               </p>
             </div>
           </div>

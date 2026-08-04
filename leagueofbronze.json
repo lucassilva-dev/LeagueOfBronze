@@ -14,9 +14,9 @@
   "teams": [
     {
       "id": "pantera-cor-de-goza",
-      "name": "PANTERA COR DE GOZA",
-      "slug": "pantera-cor-de-goza",
-      "imageUrl": "/teams/pantera-cor-de-goza.png"
+      "name": "PANTERA",
+      "slug": "pantera",
+      "imageUrl": "/teams/pantera.png"
     },
     {
       "id": "vanguarda-de-ferro",

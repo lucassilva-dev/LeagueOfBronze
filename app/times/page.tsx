@@ -1,6 +1,8 @@
 import Link from "next/link";
 
 import { Eyebrow, GoldTitle, RoleIcon, SectionTitle } from "@/components/lob/ui";
+import { rotaCurto, type PaginasHomeTextos } from "@/lib/i18n/messages/paginas-home";
+import { getMessages } from "@/lib/i18n/server";
 import { buildDesignTeams, type DesignTeam } from "@/lib/roster";
 import { getServerDataset } from "@/lib/server-data";
 import { calculateStandings } from "@/lib/tournament";
@@ -10,7 +12,11 @@ export const dynamic = "force-dynamic";
 // Campanha do time na fase de pontos (vitórias/derrotas em séries e pontos).
 type Campaign = { position: number; wins: number; losses: number; points: number } | null;
 
-function TeamCard({ team, campaign }: Readonly<{ team: DesignTeam; campaign: Campaign }>) {
+function TeamCard({
+  team,
+  campaign,
+  t,
+}: Readonly<{ team: DesignTeam; campaign: Campaign; t: PaginasHomeTextos }>) {
   return (
     <Link
       href={`/times/${team.slug}`}
@@ -45,12 +51,12 @@ function TeamCard({ team, campaign }: Readonly<{ team: DesignTeam; campaign: Cam
         <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "linear-gradient(180deg,rgba(0,0,0,.28) 0%,transparent 30%,transparent 42%,rgba(13,10,5,.97) 100%)" }} />
         <div style={{ position: "absolute", top: 11, right: 11, display: "flex", alignItems: "baseline", gap: 4, padding: "5px 10px", borderRadius: 2, background: "linear-gradient(180deg,#f0c88a,#b97e40)", color: "#160f06", fontWeight: 700, boxShadow: "0 4px 14px -4px rgba(0,0,0,.6)" }}>
           <span className="lob-display" style={{ fontSize: 17, lineHeight: 1 }}>{team.total}</span>
-          <span style={{ fontSize: 10, letterSpacing: ".10em" }}>PTS DRAFT</span>
+          <span style={{ fontSize: 10, letterSpacing: ".10em" }}>{t.ptsDraft}</span>
         </div>
         <div style={{ position: "absolute", left: 14, bottom: 12, right: 14 }}>
           <div className="lob-display" style={{ fontSize: "clamp(22px,3.4vw,30px)", lineHeight: 0.9, color: "#f4ede1", letterSpacing: ".01em" }}>{team.name}</div>
           {team.captain ? (
-            <div style={{ marginTop: 6, fontSize: 11, letterSpacing: ".05em", color: "#cfa877" }}>◆ CAP · {team.captain.displayNick}</div>
+            <div style={{ marginTop: 6, fontSize: 11, letterSpacing: ".05em", color: "#cfa877" }}>{t.timesCapitaoCurto} · {team.captain.displayNick}</div>
           ) : null}
         </div>
       </div>
@@ -62,28 +68,29 @@ function TeamCard({ team, campaign }: Readonly<{ team: DesignTeam; campaign: Cam
               style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "6px 0", borderRadius: 2, background: "rgba(201,138,75,.10)", borderBottom: `2px solid ${player.roleMeta.color}`, color: "#cdbfa8", fontSize: 9.5, fontWeight: 600, letterSpacing: ".03em" }}
             >
               <RoleIcon role={player.role1} size={15} color={player.roleMeta.color} />
-              {player.roleMeta.short}
+              {rotaCurto(t, player.roleMeta.short)}
             </span>
           ))}
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 11, letterSpacing: ".05em", color: "#8f8472" }}>
-          <span>CAMPANHA{campaign ? ` · #${campaign.position}` : ""}</span>
+          <span>{t.timesCampanha}{campaign ? ` · #${campaign.position}` : ""}</span>
           {campaign ? (
             <span style={{ color: "#b8ab97" }}>
-              {campaign.wins}V · {campaign.losses}D ·{" "}
-              <span style={{ color: "#cfa877" }}>{campaign.points} PTS</span>
+              {campaign.wins}{t.timesVitoriasCurto} · {campaign.losses}{t.timesDerrotasCurto} ·{" "}
+              <span style={{ color: "#cfa877" }}>{campaign.points} {t.timesPontosCurto}</span>
             </span>
           ) : (
-            <span style={{ color: "#6f6656" }}>sem séries</span>
+            <span style={{ color: "#6f6656" }}>{t.timesSemSeries}</span>
           )}
         </div>
-        <span className="lob-btn-ghost" style={{ width: "100%", padding: 12, fontSize: 12, letterSpacing: ".16em" }}>VER ELENCO →</span>
+        <span className="lob-btn-ghost" style={{ width: "100%", padding: 12, fontSize: 12, letterSpacing: ".16em" }}>{t.timesVerElenco}</span>
       </div>
     </Link>
   );
 }
 
 export default async function TimesPage() {
+  const { paginasHome: t } = await getMessages();
   const { dataset } = await getServerDataset();
   const teams = buildDesignTeams(dataset);
 
@@ -98,20 +105,20 @@ export default async function TimesPage() {
   return (
     <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "0 clamp(16px,4vw,24px) 96px" }}>
       <section className="lob-fade" style={{ padding: "clamp(40px,7vw,56px) 0 26px" }}>
-        <Eyebrow>3ª Edição dos Bronzes</Eyebrow>
-        <GoldTitle style={{ fontSize: "clamp(52px,11vw,138px)", lineHeight: 0.88, margin: "10px 0 16px" }}>TIMES</GoldTitle>
+        <Eyebrow>{t.edicaoSobretitulo}</Eyebrow>
+        <GoldTitle style={{ fontSize: "clamp(52px,11vw,138px)", lineHeight: 0.88, margin: "10px 0 16px" }}>{t.timesTitulo}</GoldTitle>
         <p style={{ maxWidth: 560, fontSize: 16, lineHeight: 1.55, color: "#a99e8b", margin: 0 }}>
-          Seis elencos forjados no draft por pontos. Só um levanta a taça no dia 02 de agosto.
+          {t.timesIntro}
         </p>
       </section>
       <section className="lob-fade">
         <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
-          <SectionTitle size={26}>OS {teams.length} TIMES</SectionTitle>
-          <span style={{ fontSize: 11, letterSpacing: ".10em", color: "#8f8472" }}>CLIQUE EM VER ELENCO PARA ABRIR O LINEUP</span>
+          <SectionTitle size={26}>{t.timesSecao.replace("{n}", String(teams.length))}</SectionTitle>
+          <span style={{ fontSize: 11, letterSpacing: ".10em", color: "#8f8472" }}>{t.timesDica}</span>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 18 }}>
           {teams.map((team) => (
-            <TeamCard key={team.id} team={team} campaign={campaignByTeam.get(team.id) ?? null} />
+            <TeamCard key={team.id} team={team} campaign={campaignByTeam.get(team.id) ?? null} t={t} />
           ))}
         </div>
       </section>

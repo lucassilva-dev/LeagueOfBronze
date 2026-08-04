@@ -27,21 +27,67 @@ export type ChampStatRow = {
   sub: string;
 };
 
-const PLAYER_METRICS = [
-  { key: "abates", label: "Abates", head: "ABATES", desc: "Quem mais elimina adversários ao longo do campeonato." },
-  { key: "kda", label: "KDA", head: "KDA", desc: "Média de (abates + assistências) dividida pelas mortes." },
-  { key: "mvps", label: "MVPs", head: "MVPs", desc: "Jogadores eleitos MVP do jogo mais vezes." },
-  { key: "assist", label: "Assistências", head: "ASSIST", desc: "Quem mais participa das jogadas do time." },
-  { key: "mortes", label: "Mortes", head: "MORTES", desc: "Quem menos cai em combate lidera aqui — menos é melhor." },
-];
+/** Uma métrica: rótulo do botão, cabeçalho da coluna e legenda embaixo da tabela. */
+type Metrica = { label: string; head: string; desc: string };
 
-const CHAMP_METRICS = [
-  { key: "jogados", label: "Mais jogados", head: "PICKS", desc: "Os campeões mais escolhidos no draft das partidas." },
-  { key: "banidos", label: "Mais banidos", head: "BANS", desc: "Os campeões que o pessoal não quer ver na Rift." },
-  { key: "presenca", label: "Presença", head: "PRES%", desc: "Partidas em que foi escolhido ou banido (pick + ban)." },
-  { key: "winrate", label: "Winrate", head: "WIN%", desc: "Taxa de vitória de cada campeão no campeonato." },
-  { key: "kda", label: "KDA", head: "KDA", desc: "Melhor média de KDA registrada por campeão." },
-];
+/** Textos da seção. Opcional: sem eles a seção fica em português (padrão do site). */
+export type TextosRankings = {
+  jogadoresTitulo: string;
+  aoVivo: string;
+  jogadoresDescricao: string;
+  colJogador: string;
+  colTime: string;
+  colCampeao: string;
+  campeoesTitulo: string;
+  campeoesDescricao: string;
+  vazioJogadores: string;
+  vazioCampeoes: string;
+  vazioTexto: string;
+  ordemDesc: string;
+  ordemAsc: string;
+  metricasJogador: Record<string, Metrica>;
+  metricasCampeao: Record<string, Metrica>;
+};
+
+// A ordem dos botões é fixa; só os rótulos mudam de idioma.
+const PLAYER_KEYS = ["abates", "kda", "mvps", "assist", "mortes"];
+const CHAMP_KEYS = ["jogados", "banidos", "presenca", "winrate", "kda"];
+
+const TEXTOS_PT: TextosRankings = {
+  jogadoresTitulo: "RANKING DE JOGADORES",
+  aoVivo: "AO VIVO · ATUALIZA A CADA JOGO",
+  jogadoresDescricao: "Abates, KDA, MVPs, assistências e mortes — só de quem já entrou em jogo.",
+  colJogador: "JOGADOR",
+  colTime: "TIME",
+  colCampeao: "CAMPEÃO",
+  campeoesTitulo: "CAMPEÕES",
+  campeoesDescricao: "Mais jogados, mais banidos, taxa de ban, presença e winrate.",
+  vazioJogadores: "Sem partidas registradas ainda",
+  vazioCampeoes: "Nenhum campeão registrado ainda",
+  vazioTexto: "Assim que os jogos forem registrados, o ranking aparece aqui automaticamente.",
+  ordemDesc: "Ordenado do maior para o menor · clique para inverter",
+  ordemAsc: "Ordenado do menor para o maior · clique para inverter",
+  metricasJogador: {
+    abates: { label: "Abates", head: "ABATES", desc: "Quem mais elimina adversários ao longo do campeonato." },
+    kda: { label: "KDA", head: "KDA", desc: "Média de (abates + assistências) dividida pelas mortes." },
+    mvps: { label: "MVPs", head: "MVPs", desc: "Jogadores eleitos MVP do jogo mais vezes." },
+    assist: { label: "Assistências", head: "ASSIST", desc: "Quem mais participa das jogadas do time." },
+    mortes: { label: "Mortes", head: "MORTES", desc: "Quem menos cai em combate lidera aqui — menos é melhor." },
+  },
+  metricasCampeao: {
+    jogados: { label: "Mais jogados", head: "PICKS", desc: "Os campeões mais escolhidos no draft das partidas." },
+    banidos: { label: "Mais banidos", head: "BANS", desc: "Os campeões que o pessoal não quer ver na Rift." },
+    presenca: { label: "Presença", head: "PRES%", desc: "Partidas em que foi escolhido ou banido (pick + ban)." },
+    winrate: { label: "Winrate", head: "WIN%", desc: "Taxa de vitória de cada campeão no campeonato." },
+    kda: { label: "KDA", head: "KDA", desc: "Melhor média de KDA registrada por campeão." },
+  },
+};
+
+const METRICA_FALLBACK: Metrica = { label: "—", head: "—", desc: "" };
+
+function montaMetricas(keys: string[], mapa: Record<string, Metrica>) {
+  return keys.map((key) => ({ key, ...(mapa[key] ?? METRICA_FALLBACK) }));
+}
 
 const GRID_P = "44px minmax(130px,1fr) 210px 84px";
 const GRID_C = "44px 1fr 92px";
@@ -85,12 +131,14 @@ function SortButton({
   head,
   dir,
   onToggle,
-}: Readonly<{ head: string; dir: "desc" | "asc"; onToggle: () => void }>) {
+  titleDesc,
+  titleAsc,
+}: Readonly<{ head: string; dir: "desc" | "asc"; onToggle: () => void; titleDesc: string; titleAsc: string }>) {
   return (
     <button
       type="button"
       onClick={onToggle}
-      title={dir === "desc" ? "Ordenado do maior para o menor · clique para inverter" : "Ordenado do menor para o maior · clique para inverter"}
+      title={dir === "desc" ? titleDesc : titleAsc}
       style={{ display: "inline-flex", alignItems: "center", gap: 5, marginLeft: "auto", padding: 0, border: "none", background: "transparent", color: "#a98a5f", fontSize: 10.5, letterSpacing: ".10em", fontWeight: 700, cursor: "pointer" }}
     >
       {head}
@@ -99,12 +147,12 @@ function SortButton({
   );
 }
 
-function EmptyState({ title }: Readonly<{ title: string }>) {
+function EmptyState({ title, texto }: Readonly<{ title: string; texto: string }>) {
   return (
     <div style={{ padding: "40px 24px", textAlign: "center", border: "1px dashed rgba(201,138,75,.28)", borderRadius: 4, background: "rgba(201,138,75,.03)" }}>
       <div className="lob-display" style={{ fontSize: 22, color: "#f2ebdf" }}>{title}</div>
       <p style={{ margin: "8px auto 0", maxWidth: 420, fontSize: 13, color: "#a99e8b" }}>
-        Assim que os jogos forem registrados, o ranking aparece aqui automaticamente.
+        {texto}
       </p>
     </div>
   );
@@ -113,16 +161,20 @@ function EmptyState({ title }: Readonly<{ title: string }>) {
 export function StatsToggles({
   playerRankings,
   champRankings,
+  t = TEXTOS_PT,
 }: Readonly<{
   playerRankings: Record<string, PlayerStatRow[]>;
   champRankings: Record<string, ChampStatRow[]>;
+  t?: TextosRankings;
 }>) {
   const [playerMetric, setPlayerMetric] = useState("abates");
   const [champMetric, setChampMetric] = useState("jogados");
   const [playerDir, setPlayerDir] = useState<"desc" | "asc">("desc");
   const [champDir, setChampDir] = useState<"desc" | "asc">("desc");
-  const pm = PLAYER_METRICS.find((m) => m.key === playerMetric) ?? PLAYER_METRICS[0];
-  const cm = CHAMP_METRICS.find((m) => m.key === champMetric) ?? CHAMP_METRICS[0];
+  const playerMetrics = montaMetricas(PLAYER_KEYS, t.metricasJogador);
+  const champMetrics = montaMetricas(CHAMP_KEYS, t.metricasCampeao);
+  const pm = playerMetrics.find((m) => m.key === playerMetric) ?? playerMetrics[0];
+  const cm = champMetrics.find((m) => m.key === champMetric) ?? champMetrics[0];
   const rowsAll = playerRankings[playerMetric] ?? [];
   const rows = playerDir === "asc" ? [...rowsAll].reverse() : rowsAll;
   const crowsAll = champRankings[champMetric] ?? [];
@@ -134,23 +186,23 @@ export function StatsToggles({
         <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 14, flexWrap: "wrap", marginBottom: 6 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <span style={{ width: 11, height: 11, background: "#c98a4b", transform: "rotate(45deg)" }} />
-            <h2 className="lob-display" style={{ fontSize: 23, color: "#f2ebdf", margin: 0 }}>RANKING DE JOGADORES</h2>
+            <h2 className="lob-display" style={{ fontSize: 23, color: "#f2ebdf", margin: 0 }}>{t.jogadoresTitulo}</h2>
           </div>
-          <span style={{ padding: "5px 12px", border: "1px solid rgba(201,138,75,.35)", borderRadius: 999, fontSize: 10, letterSpacing: ".12em", color: "#cfa877", whiteSpace: "nowrap" }}>AO VIVO · ATUALIZA A CADA JOGO</span>
+          <span style={{ padding: "5px 12px", border: "1px solid rgba(201,138,75,.35)", borderRadius: 999, fontSize: 10, letterSpacing: ".12em", color: "#cfa877", whiteSpace: "nowrap" }}>{t.aoVivo}</span>
         </div>
-        <p style={{ margin: "0 0 14px", fontSize: 13, color: "#8f8472" }}>Abates, KDA, MVPs, assistências e mortes — só de quem já entrou em jogo.</p>
-        <Toggle items={PLAYER_METRICS} value={playerMetric} onChange={setPlayerMetric} />
+        <p style={{ margin: "0 0 14px", fontSize: 13, color: "#8f8472" }}>{t.jogadoresDescricao}</p>
+        <Toggle items={playerMetrics} value={playerMetric} onChange={setPlayerMetric} />
         {rows.length === 0 ? (
-          <EmptyState title="Sem partidas registradas ainda" />
+          <EmptyState title={t.vazioJogadores} texto={t.vazioTexto} />
         ) : (
           <div className="lob-scroll" style={{ overflow: "auto", maxHeight: 560, border: "1px solid rgba(201,138,75,.20)", borderRadius: 3, background: "linear-gradient(180deg,#1a150d,#120e08)" }}>
             <div style={{ minWidth: 600 }}>
               <div style={{ position: "sticky", top: 0, zIndex: 1, display: "grid", gridTemplateColumns: GRID_P, alignItems: "center", gap: 8, padding: "12px 16px", background: "#1d1710", borderBottom: "1px solid rgba(201,138,75,.20)", fontSize: 10.5, letterSpacing: ".10em", color: "#a98a5f" }}>
                 <span>#</span>
-                <span>JOGADOR</span>
-                <span>TIME</span>
+                <span>{t.colJogador}</span>
+                <span>{t.colTime}</span>
                 <span style={{ display: "flex", justifyContent: "flex-end" }}>
-                  <SortButton head={pm.head} dir={playerDir} onToggle={() => setPlayerDir((d) => (d === "desc" ? "asc" : "desc"))} />
+                  <SortButton head={pm.head} dir={playerDir} titleDesc={t.ordemDesc} titleAsc={t.ordemAsc} onToggle={() => setPlayerDir((d) => (d === "desc" ? "asc" : "desc"))} />
                 </span>
               </div>
               {rows.map((row) => (
@@ -184,20 +236,20 @@ export function StatsToggles({
       <section className="lob-fade" style={{ marginTop: 36 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 5 }}>
           <span style={{ width: 11, height: 11, background: "#c98a4b", transform: "rotate(45deg)" }} />
-          <h2 className="lob-display" style={{ fontSize: 23, color: "#f2ebdf", margin: 0 }}>CAMPEÕES</h2>
+          <h2 className="lob-display" style={{ fontSize: 23, color: "#f2ebdf", margin: 0 }}>{t.campeoesTitulo}</h2>
         </div>
-        <p style={{ margin: "0 0 14px", fontSize: 13, color: "#8f8472" }}>Mais jogados, mais banidos, taxa de ban, presença e winrate.</p>
-        <Toggle items={CHAMP_METRICS} value={champMetric} onChange={setChampMetric} />
+        <p style={{ margin: "0 0 14px", fontSize: 13, color: "#8f8472" }}>{t.campeoesDescricao}</p>
+        <Toggle items={champMetrics} value={champMetric} onChange={setChampMetric} />
         {crows.length === 0 ? (
-          <EmptyState title="Nenhum campeão registrado ainda" />
+          <EmptyState title={t.vazioCampeoes} texto={t.vazioTexto} />
         ) : (
           <div className="lob-scroll" style={{ overflow: "auto", maxHeight: 560, border: "1px solid rgba(201,138,75,.20)", borderRadius: 3, background: "linear-gradient(180deg,#1a150d,#120e08)" }}>
             <div style={{ minWidth: 360 }}>
               <div style={{ position: "sticky", top: 0, zIndex: 1, display: "grid", gridTemplateColumns: GRID_C, alignItems: "center", gap: 8, padding: "12px 16px", background: "#1d1710", borderBottom: "1px solid rgba(201,138,75,.20)", fontSize: 10.5, letterSpacing: ".10em", color: "#a98a5f" }}>
                 <span>#</span>
-                <span>CAMPEÃO</span>
+                <span>{t.colCampeao}</span>
                 <span style={{ display: "flex", justifyContent: "flex-end" }}>
-                  <SortButton head={cm.head} dir={champDir} onToggle={() => setChampDir((d) => (d === "desc" ? "asc" : "desc"))} />
+                  <SortButton head={cm.head} dir={champDir} titleDesc={t.ordemDesc} titleAsc={t.ordemAsc} onToggle={() => setChampDir((d) => (d === "desc" ? "asc" : "desc"))} />
                 </span>
               </div>
               {crows.map((c) => (

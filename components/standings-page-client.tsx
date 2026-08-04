@@ -13,6 +13,10 @@ import { TeamCrest } from "@/components/team-crest";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { compartilhados } from "@/lib/i18n/messages/compartilhados";
+
+/** Textos da tabela. Opcional: sem eles a tabela fica em português (padrão do site). */
+type TextosTabela = (typeof compartilhados)["pt"];
 
 type StandingsPageClientProps = Readonly<{
   rows: StandingsRow[];
@@ -20,6 +24,7 @@ type StandingsPageClientProps = Readonly<{
   // Base do link do time. Default: campeonato atual (/times/). Temporadas arquivadas
   // passam /temporadas/{seasonId}/times/ para não caírem em 404 na rota do campeonato ativo.
   teamHrefBase?: string;
+  textos?: TextosTabela;
 }>;
 type StandingsRowProps = Readonly<{ row: StandingsRow; teamHrefBase: string }>;
 type PositionProps = Readonly<{ position: number }>;
@@ -59,77 +64,78 @@ function GameDiffValue({ value }: GameDiffProps) {
   return <span className={colorClassName}>{label}</span>;
 }
 
-function MobileRowDetails({ row }: Readonly<{ row: StandingsRow }>) {
+function MobileRowDetails({ row, t }: Readonly<{ row: StandingsRow; t: TextosTabela }>) {
   return (
     <div className="text-right text-xs text-muted">
-      <p>V-D séries: {row.seriesWon}-{row.seriesLost}</p>
-      <p>Jogos: {row.gamesWon}-{row.gamesLost}</p>
+      <p>{t.tabelaLinhaSeriesVD} {row.seriesWon}-{row.seriesLost}</p>
+      <p>{t.tabelaLinhaJogos} {row.gamesWon}-{row.gamesLost}</p>
       <p>
-        Saldo: <GameDiffValue value={row.gameDiff} />
+        {t.tabelaLinhaSaldo} <GameDiffValue value={row.gameDiff} />
       </p>
-      <p>% vitórias: {formatPercent(row.seriesWinRate)}</p>
+      <p>{t.tabelaLinhaVitorias} {formatPercent(row.seriesWinRate)}</p>
     </div>
   );
 }
 
-function SourceBadge({ source }: Readonly<{ source: StandingsSource }>) {
+function SourceBadge({ source, t }: Readonly<{ source: StandingsSource; t: TextosTabela }>) {
   if (source === "seed") {
-    return (
-      <Badge variant="muted">
-        Tabela inicial pela classificação inicial (será ignorada após a 1ª série)
-      </Badge>
-    );
+    return <Badge variant="muted">{t.tabelaFonteSeed}</Badge>;
   }
 
-  return <Badge variant="success">Tabela calculada pelas séries registradas</Badge>;
+  return <Badge variant="success">{t.tabelaFonteCalculada}</Badge>;
 }
 
-function buildColumns(teamHrefBase: string): ColumnDef<StandingsRow>[] {
+function buildColumns(teamHrefBase: string, t: TextosTabela): ColumnDef<StandingsRow>[] {
   return [
   {
     accessorKey: "position",
-    header: "Pos",
+    header: t.tabelaColPos,
     cell: ({ row }) => <StandingsPosition position={row.original.position} />,
   },
   {
     accessorKey: "teamName",
-    header: "Time",
+    header: t.tabelaColTime,
     cell: ({ row }) => <StandingsTeamLink row={row.original} teamHrefBase={teamHrefBase} />,
   },
   {
     id: "seriesRecord",
-    header: "Séries (V-D)",
+    header: t.tabelaColSeries,
     accessorFn: (row) => row.seriesWon - row.seriesLost,
     cell: ({ row }) => `${row.original.seriesWon}-${row.original.seriesLost}`,
   },
   {
     id: "gamesRecord",
-    header: "Jogos (V-D)",
+    header: t.tabelaColJogos,
     accessorFn: (row) => row.gamesWon - row.gamesLost,
     cell: ({ row }) => `${row.original.gamesWon}-${row.original.gamesLost}`,
   },
   {
     accessorKey: "gameDiff",
-    header: "Saldo",
+    header: t.tabelaColSaldo,
     cell: ({ getValue }) => <GameDiffValue value={getValue<number>()} />,
   },
   {
     accessorKey: "seriesWinRate",
-    header: "% Vit.",
+    header: t.tabelaColVitorias,
     cell: ({ getValue }) => formatPercent(getValue<number>()),
   },
   {
     accessorKey: "points",
-    header: "Pts",
+    header: t.tabelaColPontos,
     cell: ({ getValue }) => <StandingsPoints value={getValue<number>()} />,
   },
   ];
 }
 
-export function StandingsPageClient({ rows, source, teamHrefBase = "/times/" }: StandingsPageClientProps) {
+export function StandingsPageClient({
+  rows,
+  source,
+  teamHrefBase = "/times/",
+  textos: t = compartilhados.pt,
+}: StandingsPageClientProps) {
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
-  const columns = useMemo(() => buildColumns(teamHrefBase), [teamHrefBase]);
+  const columns = useMemo(() => buildColumns(teamHrefBase, t), [teamHrefBase, t]);
 
   const filteredRows = useMemo(() => {
     const q = deferredQuery.trim().toLowerCase();
@@ -144,23 +150,23 @@ export function StandingsPageClient({ rows, source, teamHrefBase = "/times/" }: 
           htmlFor="team-search"
           className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-muted"
         >
-          Buscar time
+          {t.tabelaBuscarTime}
         </label>
         <Input
           id="team-search"
-          placeholder="Nome do time"
+          placeholder={t.tabelaNomeDoTime}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <SourceBadge source={source} />
+        <SourceBadge source={source} t={t} />
       </div>
 
       <div className="grid gap-3 md:hidden">
         {filteredRows.length === 0 ? (
-          <Card className="p-5 text-sm text-muted">Nenhum time encontrado.</Card>
+          <Card className="p-5 text-sm text-muted">{t.tabelaNenhumTime}</Card>
         ) : (
           filteredRows.map((row) => (
             <Card
@@ -178,10 +184,10 @@ export function StandingsPageClient({ rows, source, teamHrefBase = "/times/" }: 
                   </div>
                   <StandingsTeamLink row={row} teamHrefBase={teamHrefBase} />
                   <p className="mt-1 text-xs text-muted">
-                    Séries: {row.seriesPlayed} | Pontos: {row.points}
+                    {t.tabelaLinhaSeries} {row.seriesPlayed} | {t.tabelaLinhaPontos} {row.points}
                   </p>
                 </div>
-                <MobileRowDetails row={row} />
+                <MobileRowDetails row={row} t={t} />
               </div>
             </Card>
           ))
@@ -192,7 +198,7 @@ export function StandingsPageClient({ rows, source, teamHrefBase = "/times/" }: 
         <DataTable
           columns={columns}
           data={filteredRows}
-          emptyMessage="Nenhum time encontrado."
+          emptyMessage={t.tabelaNenhumTime}
           rowClassName={(row) => {
             if (row.position === 1) {
               return "bg-accent/[0.06] shadow-[inset_0_0_0_1px_rgba(255,106,43,0.2)]";

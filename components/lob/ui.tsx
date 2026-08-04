@@ -66,15 +66,26 @@ export function EloCrest({
   elo,
   size = 40,
   title = true,
-}: Readonly<{ elo?: string | null; size?: number; title?: boolean }>) {
+  labels,
+}: Readonly<{
+  elo?: string | null;
+  size?: number;
+  title?: boolean;
+  /**
+   * Rótulos de elo por chave do design system (ferro, bronze, …), para o alt e o title.
+   * Opcional e aditivo: sem ele vale o rótulo em português de lib/design.ts.
+   */
+  labels?: Record<string, string>;
+}>) {
   const meta = resolveElo(elo);
   if (!meta) return null;
+  const rotulo = labels?.[meta.key] ?? meta.label;
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={eloSvgUrl(meta.key)}
-      alt={meta.label}
-      title={title ? meta.label : undefined}
+      alt={rotulo}
+      title={title ? rotulo : undefined}
       width={size}
       style={{ height: "auto", filter: "drop-shadow(0 3px 7px rgba(0,0,0,.8))" }}
     />
@@ -115,7 +126,12 @@ export function RoleIcon({
 }
 
 // Etiqueta de rota (badge colorido) com ícone oficial da posição.
-export function RoleTag({ role, size = 10.5 }: Readonly<{ role?: string | null; size?: number }>) {
+// `label` permite passar a sigla já traduzida (ex.: SEL → JG); sem ela, usa a do design.
+export function RoleTag({
+  role,
+  size = 10.5,
+  label,
+}: Readonly<{ role?: string | null; size?: number; label?: string }>) {
   const rm = resolveRole(role);
   return (
     <span
@@ -133,7 +149,7 @@ export function RoleTag({ role, size = 10.5 }: Readonly<{ role?: string | null; 
       }}
     >
       <RoleIcon role={role} size={size + 3} color="#120d06" opacity={0.82} />
-      {rm.short}
+      {label ?? rm.short}
     </span>
   );
 }

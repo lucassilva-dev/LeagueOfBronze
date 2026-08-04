@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+import { LOCALE_COOKIE, LOCALE_HEADER, resolveLocale } from "@/lib/i18n/config";
+
 /**
  * Content-Security-Policy por requisição, com nonce.
  *
@@ -63,8 +65,18 @@ export function proxy(request: NextRequest) {
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("Content-Security-Policy", csp);
 
+  // Idioma: escolha salva no cookie vence; senão, o Accept-Language do navegador.
+  // Resolvido aqui e repassado por cabeçalho para os Server Components não repetirem a lógica.
+  const locale = resolveLocale(
+    request.cookies.get(LOCALE_COOKIE)?.value,
+    request.headers.get("accept-language"),
+  );
+  requestHeaders.set(LOCALE_HEADER, locale);
+
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("Content-Security-Policy", csp);
+  // Sem isto, um cache intermediário serviria a versão em inglês para quem pede português.
+  response.headers.set("Vary", "Accept-Language, Cookie");
   return response;
 }
 

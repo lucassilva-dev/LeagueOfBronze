@@ -5,6 +5,12 @@ import { useEffect, useState } from "react";
 import { PlayerCard } from "@/components/lob/player-card";
 import { EloCrest, RoleIcon } from "@/components/lob/ui";
 import { formatKda } from "@/lib/format";
+import {
+  eloLabel,
+  rotaCurto,
+  rotaLabel,
+  type PaginasHomeTextos,
+} from "@/lib/i18n/messages/paginas-home";
 import type { DesignPlayer } from "@/lib/roster";
 
 const ROLE_ORDER = ["TOP", "SEL", "MID", "ADC", "SUP"];
@@ -21,18 +27,18 @@ export type PlayerPerf = {
 };
 
 // Tiles de performance: mostram "—" enquanto o jogador não entrou em nenhum jogo.
-function buildPerfTiles(perf: PlayerPerf | undefined) {
+function buildPerfTiles(perf: PlayerPerf | undefined, t: PaginasHomeTextos) {
   const games = perf?.games ?? 0;
   const dash = (value: string) => (games > 0 ? value : "—");
   return [
-    { label: "PARTIDAS", val: String(games) },
-    { label: "VITÓRIAS", val: dash(String(perf?.wins ?? 0)) },
-    { label: "ABATES", val: dash(String(perf?.kills ?? 0)) },
-    { label: "MORTES", val: dash(String(perf?.deaths ?? 0)) },
-    { label: "ASSIST.", val: dash(String(perf?.assists ?? 0)) },
-    { label: "KDA", val: dash(formatKda(perf?.kda ?? 0)) },
-    { label: "MVPs", val: String(perf?.mvps ?? 0) },
-    { label: "WINRATE", val: dash(`${Math.round(perf?.winRate ?? 0)}%`) },
+    { label: t.statPartidas, val: String(games) },
+    { label: t.statVitorias, val: dash(String(perf?.wins ?? 0)) },
+    { label: t.statAbates, val: dash(String(perf?.kills ?? 0)) },
+    { label: t.statMortes, val: dash(String(perf?.deaths ?? 0)) },
+    { label: t.statAssistencias, val: dash(String(perf?.assists ?? 0)) },
+    { label: t.statKda, val: dash(formatKda(perf?.kda ?? 0)) },
+    { label: t.statMvps, val: String(perf?.mvps ?? 0) },
+    { label: t.statWinrate, val: dash(`${Math.round(perf?.winRate ?? 0)}%`) },
   ];
 }
 
@@ -40,7 +46,15 @@ function PlayerModal({
   player,
   perf,
   onClose,
-}: Readonly<{ player: DesignPlayer; perf?: PlayerPerf; onClose: () => void }>) {
+  t,
+  elos,
+}: Readonly<{
+  player: DesignPlayer;
+  perf?: PlayerPerf;
+  onClose: () => void;
+  t: PaginasHomeTextos;
+  elos?: Record<string, string>;
+}>) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -63,7 +77,7 @@ function PlayerModal({
         <button
           type="button"
           onClick={onClose}
-          aria-label="Fechar"
+          aria-label={t.jogadorFechar}
           style={{ position: "absolute", top: 16, right: 16, zIndex: 6, width: 36, height: 36, borderRadius: "50%", background: "rgba(10,8,4,.75)", border: "1px solid rgba(201,138,75,.4)", color: "#e6c592", fontSize: 15, cursor: "pointer", lineHeight: 1 }}
         >
           ✕
@@ -79,13 +93,13 @@ function PlayerModal({
             ) : null}
             <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "linear-gradient(180deg,rgba(8,6,3,.45) 0%,transparent 24%,transparent 44%,rgba(13,10,5,.96) 100%)" }} />
             <div style={{ position: "absolute", top: 14, left: 14, display: "flex", flexDirection: "column", gap: 7 }}>
-              <span style={{ alignSelf: "flex-start", padding: "4px 10px", borderRadius: 2, background: player.roleMeta.color, color: "#120d06", fontWeight: 700, fontSize: 10.5, letterSpacing: ".08em" }}>{player.roleMeta.label}</span>
+              <span style={{ alignSelf: "flex-start", padding: "4px 10px", borderRadius: 2, background: player.roleMeta.color, color: "#120d06", fontWeight: 700, fontSize: 10.5, letterSpacing: ".08em" }}>{rotaLabel(t, player.roleMeta.short, player.roleMeta.label)}</span>
               {player.captain ? (
-                <span style={{ alignSelf: "flex-start", padding: "4px 10px", borderRadius: 2, background: "linear-gradient(180deg,#f0c88a,#b97e40)", color: "#160f06", fontWeight: 700, fontSize: 9.5, letterSpacing: ".08em" }}>◆ CAPITÃO</span>
+                <span style={{ alignSelf: "flex-start", padding: "4px 10px", borderRadius: 2, background: "linear-gradient(180deg,#f0c88a,#b97e40)", color: "#160f06", fontWeight: 700, fontSize: 9.5, letterSpacing: ".08em" }}>{t.capitao}</span>
               ) : null}
             </div>
             <div style={{ position: "absolute", top: 12, right: 12 }}>
-              <EloCrest elo={player.elo} size={52} title={false} />
+              <EloCrest elo={player.elo} size={52} title={false} labels={elos} />
             </div>
             <div style={{ position: "absolute", left: 18, right: 18, bottom: 16 }}>
               <div style={{ fontSize: 11, letterSpacing: ".12em", color: player.teamColor, marginBottom: 5 }}>{player.teamName}</div>
@@ -102,23 +116,23 @@ function PlayerModal({
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 16 }}>
               <span className="lob-pill" style={{ fontSize: 11.5 }}>
                 <RoleIcon role={player.role1} size={14} color={player.roleMeta.color} />
-                {player.roleMeta.label}
+                {rotaLabel(t, player.roleMeta.short, player.roleMeta.label)}
               </span>
               <span className="lob-pill" style={{ fontSize: 11.5 }}>
-                <EloCrest elo={player.elo} size={20} title={false} />
-                {player.eloMeta?.label ?? player.elo}
+                <EloCrest elo={player.elo} size={20} title={false} labels={elos} />
+                {eloLabel(t, player.eloMeta?.key, player.eloMeta?.label ?? player.elo)}
               </span>
               <span style={{ display: "inline-flex", alignItems: "baseline", gap: 5, padding: "8px 13px", background: "linear-gradient(180deg,#f0c88a,#b97e40)", color: "#160f06", borderRadius: 2, fontWeight: 700 }}>
                 <span className="lob-display" style={{ fontSize: 16 }}>{player.pts}</span>
-                <span style={{ fontSize: 9, letterSpacing: ".08em" }}>PTS DRAFT</span>
+                <span style={{ fontSize: 9, letterSpacing: ".08em" }}>{t.ptsDraft}</span>
               </span>
             </div>
             <div style={{ marginTop: 22, display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontSize: 11, letterSpacing: ".14em", color: "#c98a4b", whiteSpace: "nowrap" }}>PERFORMANCE NO CAMPEONATO</span>
+              <span style={{ fontSize: 11, letterSpacing: ".14em", color: "#c98a4b", whiteSpace: "nowrap" }}>{t.jogadorPerformance}</span>
               <div style={{ height: 1, flex: 1, background: "linear-gradient(90deg,rgba(201,138,75,.3),transparent)" }} />
             </div>
             <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
-              {buildPerfTiles(perf).map((tile) => (
+              {buildPerfTiles(perf, t).map((tile) => (
                 <div key={tile.label} style={{ padding: "13px 6px", textAlign: "center", background: "linear-gradient(180deg,rgba(201,138,75,.08),rgba(201,138,75,.02))", border: "1px solid rgba(201,138,75,.16)", borderRadius: 3 }}>
                   <div className="lob-display" style={{ fontSize: 23, color: "#e6c592", lineHeight: 1 }}>{tile.val}</div>
                   <div style={{ fontSize: 8, letterSpacing: ".04em", color: "#8f8472", marginTop: 5 }}>{tile.label}</div>
@@ -126,8 +140,7 @@ function PlayerModal({
               ))}
             </div>
             <p style={{ margin: "16px 0 0", fontSize: 11.5, lineHeight: 1.5, color: "#6f6656" }}>
-              As estatísticas de performance zeram no apito inicial e são atualizadas a cada rodada do
-              campeonato.
+              {t.jogadorNota}
             </p>
           </div>
         </div>
@@ -139,7 +152,15 @@ function PlayerModal({
 export function JogadoresClient({
   players,
   perfByPlayer,
-}: Readonly<{ players: DesignPlayer[]; perfByPlayer?: Record<string, PlayerPerf> }>) {
+  textos: t,
+  elos,
+}: Readonly<{
+  players: DesignPlayer[];
+  perfByPlayer?: Record<string, PlayerPerf>;
+  textos: PaginasHomeTextos;
+  /** Rótulos de elo por chave, para o alt/title das cristas. */
+  elos?: Record<string, string>;
+}>) {
   const [modal, setModal] = useState<DesignPlayer | null>(null);
 
   const byRole = new Map<string, DesignPlayer[]>();
@@ -151,7 +172,12 @@ export function JogadoresClient({
   const sections = ROLE_ORDER.map((short) => {
     const list = (byRole.get(short) ?? []).slice().sort((a, b) => b.pts - a.pts);
     if (list.length === 0) return null;
-    return { short, label: list[0].roleMeta.label, color: list[0].roleMeta.color, players: list };
+    return {
+      short,
+      label: rotaLabel(t, short, list[0].roleMeta.label),
+      color: list[0].roleMeta.color,
+      players: list,
+    };
   }).filter((section): section is NonNullable<typeof section> => section !== null);
 
   return (
@@ -164,11 +190,21 @@ export function JogadoresClient({
               <h2 className="lob-display" style={{ fontSize: 27, color: "#f2ebdf", margin: 0 }}>{section.label}</h2>
             </div>
             <div style={{ height: 1, flex: 1, background: "linear-gradient(90deg,rgba(201,138,75,.4),transparent)" }} />
-            <span style={{ fontSize: 11, letterSpacing: ".10em", color: "#8f8472", whiteSpace: "nowrap" }}>{section.players.length} JOGADORES</span>
+            <span style={{ fontSize: 11, letterSpacing: ".10em", color: "#8f8472", whiteSpace: "nowrap" }}>{section.players.length} {t.jogadoresContagem}</span>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(188px,1fr))", gap: 16 }}>
             {section.players.map((player) => (
-              <PlayerCard key={player.id} player={player} onOpen={() => setModal(player)} />
+              <PlayerCard
+                key={player.id}
+                player={player}
+                onOpen={() => setModal(player)}
+                textos={{
+                  capitao: t.capitao,
+                  ficha: t.ficha,
+                  rotaCurto: rotaCurto(t, player.roleMeta.short),
+                  elos,
+                }}
+              />
             ))}
           </div>
         </section>
@@ -178,6 +214,8 @@ export function JogadoresClient({
           player={modal}
           perf={perfByPlayer?.[modal.id]}
           onClose={() => setModal(null)}
+          t={t}
+          elos={elos}
         />
       ) : null}
     </>

@@ -1,6 +1,7 @@
 import { TcgCard } from "@/components/lob/tcg-card";
 import { Eyebrow, GoldTitle, SectionTitle } from "@/components/lob/ui";
 import { CARDS_BY_ID, ALL_CARDS } from "@/lib/cards";
+import { getMessages } from "@/lib/i18n/server";
 import type { CardId } from "@/lib/schema";
 import { getServerDataset } from "@/lib/server-data";
 import { calculateCardStats } from "@/lib/tournament";
@@ -9,31 +10,45 @@ export const dynamic = "force-dynamic";
 
 export default async function CartasPage() {
   const { dataset } = await getServerDataset();
+  const t = (await getMessages()).paginasStats;
   const used = calculateCardStats(dataset).filter((stat) => stat.count > 0);
+
+  // Os ids das cartas (e o dataset) continuam iguais: só o texto exibido muda de idioma.
+  const nomeDaCarta = (id: string) => t.cartas[id as CardId]?.nome ?? CARDS_BY_ID[id as CardId]?.title ?? id;
+  const selos = {
+    chipDupla: t.cartasChipDupla,
+    chipSurpresa: t.cartasChipSurpresa,
+    rodapeDupla: t.cartasRodapeDupla,
+    rodapeIndividual: t.cartasRodapeIndividual,
+  };
 
   return (
     <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "0 clamp(16px,4vw,24px) 96px" }}>
       <section className="lob-fade" style={{ padding: "clamp(40px,7vw,56px) 0 26px" }}>
-        <Eyebrow>Mecânica duvidosa · entretenimento imaculado</Eyebrow>
-        <GoldTitle style={{ fontSize: "clamp(48px,11vw,128px)", lineHeight: 0.88, margin: "10px 0 16px" }}>CARTAS</GoldTitle>
+        <Eyebrow>{t.cartasEyebrow}</Eyebrow>
+        <GoldTitle style={{ fontSize: "clamp(48px,11vw,128px)", lineHeight: 0.88, margin: "10px 0 16px" }}>{t.cartasTitulo}</GoldTitle>
         <p style={{ maxWidth: 660, fontSize: 16, lineHeight: 1.55, color: "#a99e8b", margin: 0 }}>
-          Em cada série (MD3), cada capitão pode sortear uma cartinha surpresa — ao vivo, antes do
-          pick &amp; ban, valendo só para aquela partida. O sorteio acontece nos detalhes de cada
-          série. São 6 cartas individuais (afetam o adversário) e 2 duplas que entram quando os dois
-          capitães usam na mesma partida.
+          {t.cartasIntro}
         </p>
       </section>
 
       <section className="lob-fade" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(236px,1fr))", gap: 20 }}>
-        {ALL_CARDS.map((card) => (
-          <TcgCard key={card.id} card={card} />
-        ))}
+        {ALL_CARDS.map((card) => {
+          const texto = t.cartas[card.cardId];
+          return (
+            <TcgCard
+              key={card.id}
+              card={texto ? { ...card, title: texto.nome, flavor: texto.flavor, description: texto.descricao } : card}
+              t={selos}
+            />
+          );
+        })}
       </section>
 
       {used.length > 0 ? (
         <section className="lob-fade" style={{ marginTop: 44 }}>
           <div style={{ marginBottom: 16 }}>
-            <SectionTitle size={23}>CARTAS MAIS SORTEADAS</SectionTitle>
+            <SectionTitle size={23}>{t.cartasMaisSorteadas}</SectionTitle>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 12 }}>
             {used.map((stat) => {
@@ -54,8 +69,8 @@ export default async function CartasPage() {
                       <span style={{ display: "flex", width: 40, height: 40, alignItems: "center", justifyContent: "center", borderRadius: 8, fontSize: 22, background: def ? `linear-gradient(135deg,${def.from}55,#0e0a05)` : undefined }} aria-hidden>{def?.emoji ?? "🎴"}</span>
                     )}
                     <div>
-                      <p className="lob-display" style={{ margin: 0, fontSize: 15, color: "#f2ebdf" }}>{stat.title}</p>
-                      <p style={{ margin: 0, fontSize: 12, color: "#8f8472" }}>{stat.count} sorteio(s)</p>
+                      <p className="lob-display" style={{ margin: 0, fontSize: 15, color: "#f2ebdf" }}>{nomeDaCarta(stat.cardId)}</p>
+                      <p style={{ margin: 0, fontSize: 12, color: "#8f8472" }}>{stat.count} {t.cartasSorteios}</p>
                     </div>
                   </div>
                 </div>
@@ -67,20 +82,20 @@ export default async function CartasPage() {
 
       {/* Créditos das artes — exigido pela licença CC BY-SA 4.0 da arte do Draft Invertido. */}
       <section className="lob-fade" style={{ marginTop: 44, paddingTop: 18, borderTop: "1px solid rgba(201,138,75,.16)" }}>
-        <p style={{ margin: 0, fontSize: 11, letterSpacing: ".10em", color: "#8f8472" }}>CRÉDITOS DAS ARTES</p>
+        <p style={{ margin: 0, fontSize: 11, letterSpacing: ".10em", color: "#8f8472" }}>{t.cartasCreditosTitulo}</p>
         <p style={{ margin: "8px 0 0", maxWidth: 720, fontSize: 11.5, lineHeight: 1.6, color: "#6f6656" }}>
-          Artes feitas a partir de memes brasileiros, para uso humorístico neste campeonato amador.
-          A arte de <strong style={{ color: "#8f8472" }}>Draft Invertido</strong> deriva da foto de Jojo Todynho por
-          Renato Cipriano (Cipriano1976), sob{" "}
+          {t.cartasCreditosA}
+          <strong style={{ color: "#8f8472" }}>{nomeDaCarta("DRAFT_INVERTIDO")}</strong>
+          {t.cartasCreditosB}
           <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noreferrer" style={{ color: "#a98a5f" }}>
             CC BY-SA 4.0
           </a>{" "}
           (
           <a href="https://commons.wikimedia.org/wiki/File:Jojo_Todynho_-_46678168382.jpg" target="_blank" rel="noreferrer" style={{ color: "#a98a5f" }}>
-            fonte
+            {t.cartasCreditosFonte}
           </a>
-          ) — alterada com recorte, cor, sobreposição, setas e texto; a arte derivada permanece sob CC BY-SA 4.0.
-          Créditos completos em{" "}
+          )
+          {t.cartasCreditosC}
           <a href="/cartas/CREDITOS.txt" target="_blank" rel="noreferrer" style={{ color: "#a98a5f" }}>
             /cartas/CREDITOS.txt
           </a>

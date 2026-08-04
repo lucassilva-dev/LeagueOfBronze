@@ -5,8 +5,12 @@ import { Shuffle, Swords, Users } from "lucide-react";
 
 import type { CardId } from "@/lib/schema";
 import { ALL_CARDS, CARDS, CARDS_BY_ID } from "@/lib/cards";
+import { compartilhados } from "@/lib/i18n/messages/compartilhados";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+
+/** Textos do bloco. Opcional: sem eles o sorteio fica em português (padrão do site). */
+type TextosSorteio = (typeof compartilhados)["pt"];
 
 type TeamRef = { id: string; name: string };
 type Drawn = { teamId: string; cardId: string; dupla?: boolean };
@@ -20,7 +24,14 @@ function SideChip({
   color,
   team,
   spinning,
-}: Readonly<{ label: string; color: string; team: TeamRef | null; spinning: boolean }>) {
+  t,
+}: Readonly<{
+  label: string;
+  color: string;
+  team: TeamRef | null;
+  spinning: boolean;
+  t: TextosSorteio;
+}>) {
   return (
     <div
       className="flex flex-1 flex-col items-center gap-1 rounded-2xl border p-3"
@@ -30,7 +41,7 @@ function SideChip({
         {label}
       </span>
       <span className="text-sm font-semibold text-center">
-        {spinning ? "Sorteando…" : (team?.name ?? "—")}
+        {spinning ? t.sorteioSorteando : (team?.name ?? "—")}
       </span>
     </div>
   );
@@ -39,8 +50,17 @@ function SideChip({
 function CardFace({
   cardId,
   spinning,
-}: Readonly<{ cardId?: string | null; spinning?: boolean }>) {
+  t,
+  nomesCartas,
+}: Readonly<{
+  cardId?: string | null;
+  spinning?: boolean;
+  t: TextosSorteio;
+  nomesCartas?: Record<string, string>;
+}>) {
   const def = cardId ? CARDS_BY_ID[cardId as CardId] : undefined;
+  // O nome traduzido vem da página; sem ele vale o título em português de lib/cards.ts.
+  const nome = def ? (nomesCartas?.[def.id] ?? def.title) : undefined;
   return (
     <div className="flex flex-col items-center gap-2 text-center">
       <div
@@ -67,11 +87,11 @@ function CardFace({
         )}
       </div>
       <p className="text-sm font-semibold">
-        {def?.title ?? (spinning ? "Sorteando…" : "Sem carta")}
+        {nome ?? (spinning ? t.sorteioSorteando : t.sorteioSemCarta)}
       </p>
       {def?.dupla ? (
         <span className="text-[10px] uppercase tracking-[0.12em] text-accent2">
-          Carta dupla · afeta os 2 times
+          {t.sorteioCartaDupla}
         </span>
       ) : null}
     </div>
@@ -84,12 +104,17 @@ export function SeriesLiveDraw({
   teamB,
   initialCards,
   initialBlueSideTeamId,
+  textos: t = compartilhados.pt,
+  nomesCartas,
 }: Readonly<{
   seriesId: string;
   teamA: TeamRef | null;
   teamB: TeamRef | null;
   initialCards: Drawn[];
   initialBlueSideTeamId?: string | null;
+  textos?: TextosSorteio;
+  /** Nome de cada cartinha por id, traduzido. Opcional: sem ele vale lib/cards.ts (pt). */
+  nomesCartas?: Record<string, string>;
 }>) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [blueSideTeamId, setBlueSideTeamId] = useState<string | null>(
@@ -194,7 +219,7 @@ export function SeriesLiveDraw({
     return (
       <div className="flex flex-col items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.02] p-4">
         <p className="text-xs uppercase tracking-[0.14em] text-muted">{team.name}</p>
-        <CardFace cardId={shown} spinning={spinning} />
+        <CardFace cardId={shown} spinning={spinning} t={t} nomesCartas={nomesCartas} />
         {isAdmin ? (
           <Button
             variant="secondary"
@@ -202,7 +227,7 @@ export function SeriesLiveDraw({
             onClick={() => drawSingle(team)}
             disabled={Boolean(spinTarget)}
           >
-            <Shuffle className="h-4 w-4" /> Sortear
+            <Shuffle className="h-4 w-4" /> {t.sorteioBotaoSortear}
           </Button>
         ) : null}
       </div>
@@ -217,14 +242,24 @@ export function SeriesLiveDraw({
       {teamA && teamB ? (
         <div className="mb-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs uppercase tracking-[0.14em] text-muted">Lados · Jogo 1</p>
-            {isAdmin ? (
-              <span className="text-[11px] text-accent2">Sorteio ao vivo — grava na partida</span>
-            ) : null}
+            <p className="text-xs uppercase tracking-[0.14em] text-muted">{t.sorteioLadosTitulo}</p>
+            {isAdmin ? <span className="text-[11px] text-accent2">{t.sorteioAoVivo}</span> : null}
           </div>
           <div className="mt-3 flex items-stretch gap-3">
-            <SideChip label="Lado Azul" color="#4d9bff" team={blueTeam} spinning={sideSpinning} />
-            <SideChip label="Lado Vermelho" color="#ff5d5d" team={redTeam} spinning={sideSpinning} />
+            <SideChip
+              label={t.sorteioLadoAzul}
+              color="#4d9bff"
+              team={blueTeam}
+              spinning={sideSpinning}
+              t={t}
+            />
+            <SideChip
+              label={t.sorteioLadoVermelho}
+              color="#ff5d5d"
+              team={redTeam}
+              spinning={sideSpinning}
+              t={t}
+            />
           </div>
           {isAdmin ? (
             <div className="mt-3 flex justify-center">
@@ -234,7 +269,7 @@ export function SeriesLiveDraw({
                 onClick={drawSides}
                 disabled={sideSpinning || Boolean(spinTarget)}
               >
-                <Swords className="h-4 w-4" /> Sortear lados
+                <Swords className="h-4 w-4" /> {t.sorteioBotaoLados}
               </Button>
             </div>
           ) : null}
@@ -242,14 +277,14 @@ export function SeriesLiveDraw({
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs uppercase tracking-[0.14em] text-muted">Cartinhas da série</p>
-        {isAdmin ? (
-          <span className="text-[11px] text-accent2">Sorteio ao vivo — grava na partida</span>
-        ) : null}
+        <p className="text-xs uppercase tracking-[0.14em] text-muted">
+          {t.sorteioCartinhasTitulo}
+        </p>
+        {isAdmin ? <span className="text-[11px] text-accent2">{t.sorteioAoVivo}</span> : null}
       </div>
       {isDupla ? (
         <p className="mt-2 rounded-lg border border-accent2/30 bg-accent2/[0.06] px-3 py-2 text-[11px] uppercase tracking-[0.12em] text-accent2">
-          Sorteio duplo · os dois capitães usaram · uma carta para os dois times
+          {t.sorteioDuplo}
         </p>
       ) : null}
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -264,12 +299,9 @@ export function SeriesLiveDraw({
             onClick={drawDupla}
             disabled={Boolean(spinTarget)}
           >
-            <Users className="h-4 w-4" /> Sortear carta dupla (2 capitães)
+            <Users className="h-4 w-4" /> {t.sorteioBotaoDupla}
           </Button>
-          <p className="text-center text-[11px] text-muted">
-            Quando os dois capitães usam a carta na mesma partida: sorteio único entre as 8 cartas
-            (as 6 individuais + as 2 duplas), valendo para os dois times.
-          </p>
+          <p className="text-center text-[11px] text-muted">{t.sorteioDuplaExplicacao}</p>
         </div>
       ) : null}
     </Card>

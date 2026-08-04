@@ -4,12 +4,37 @@ import type { GameDurationRow } from "@/lib/tournament";
 
 const GRID = "40px 1fr 78px";
 
+/** Textos da seção. Opcional: sem eles a seção fica em português (padrão do site). */
+export type TextosDuracao = {
+  titulo: string;
+  /** Aceita o marcador {n} para a quantidade de jogos com tempo registrado. */
+  descricao: string;
+  maisLongas: string;
+  maisLongasDesc: string;
+  maisCurtas: string;
+  maisCurtasDesc: string;
+  jogo: string;
+  vitoria: string;
+};
+
+const TEXTOS_PT: TextosDuracao = {
+  titulo: "DURAÇÃO DAS PARTIDAS",
+  descricao: "Os jogos mais demorados e os mais rápidos do campeonato ({n} jogos com tempo registrado).",
+  maisLongas: "MAIS LONGAS",
+  maisLongasDesc: "Do jogo mais demorado para o mais rápido.",
+  maisCurtas: "MAIS CURTAS",
+  maisCurtasDesc: "Os jogos mais rápidos do campeonato.",
+  jogo: "Jogo",
+  vitoria: "vitória",
+};
+
 function DurationList({
   title,
   desc,
   rows,
   hrefBase,
-}: Readonly<{ title: string; desc: string; rows: GameDurationRow[]; hrefBase: string }>) {
+  t,
+}: Readonly<{ title: string; desc: string; rows: GameDurationRow[]; hrefBase: string; t: TextosDuracao }>) {
   return (
     <div className="lob-card-2" style={{ padding: 18 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
@@ -29,7 +54,7 @@ function DurationList({
               <div style={{ fontSize: 12.5, color: "#e9dfcd", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {row.teamAName} <span style={{ color: "#7c715e" }}>×</span> {row.teamBName}
               </div>
-              <div style={{ fontSize: 10, color: "#8f8472", marginTop: 2 }}>Jogo {row.gameIndex} · vitória {row.winnerName}</div>
+              <div style={{ fontSize: 10, color: "#8f8472", marginTop: 2 }}>{t.jogo} {row.gameIndex} · {t.vitoria} {row.winnerName}</div>
             </div>
             <span className="lob-display" style={{ textAlign: "right", fontSize: 17, color: "#e6c592" }}>
               {row.durationMin}<span style={{ fontSize: 10, color: "#8f8472", marginLeft: 3 }}>min</span>
@@ -45,7 +70,8 @@ export function DurationRanking({
   rows,
   limit = 8,
   hrefBase = "/partidas/",
-}: Readonly<{ rows: GameDurationRow[]; limit?: number; hrefBase?: string }>) {
+  t = TEXTOS_PT,
+}: Readonly<{ rows: GameDurationRow[]; limit?: number; hrefBase?: string; t?: TextosDuracao }>) {
   if (rows.length === 0) return null;
   const longest = rows.slice(0, limit);
   const shortest = [...rows].reverse().slice(0, limit);
@@ -54,14 +80,14 @@ export function DurationRanking({
     <section className="lob-fade" style={{ marginTop: 36 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 5 }}>
         <span style={{ width: 11, height: 11, background: "#c98a4b", transform: "rotate(45deg)" }} />
-        <h2 className="lob-display" style={{ fontSize: 23, color: "#f2ebdf", margin: 0 }}>DURAÇÃO DAS PARTIDAS</h2>
+        <h2 className="lob-display" style={{ fontSize: 23, color: "#f2ebdf", margin: 0 }}>{t.titulo}</h2>
       </div>
       <p style={{ margin: "0 0 14px", fontSize: 13, color: "#8f8472" }}>
-        Os jogos mais demorados e os mais rápidos do campeonato ({rows.length} jogos com tempo registrado).
+        {t.descricao.replace("{n}", String(rows.length))}
       </p>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 16 }}>
-        <DurationList title="MAIS LONGAS" desc="Do jogo mais demorado para o mais rápido." rows={longest} hrefBase={hrefBase} />
-        <DurationList title="MAIS CURTAS" desc="Os jogos mais rápidos do campeonato." rows={shortest} hrefBase={hrefBase} />
+        <DurationList title={t.maisLongas} desc={t.maisLongasDesc} rows={longest} hrefBase={hrefBase} t={t} />
+        <DurationList title={t.maisCurtas} desc={t.maisCurtasDesc} rows={shortest} hrefBase={hrefBase} t={t} />
       </div>
     </section>
   );

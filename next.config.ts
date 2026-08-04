@@ -38,6 +38,21 @@ const nextConfig: NextConfig = {
       { source: "/api/admin/:path*", headers: adminHeaders },
     ];
   },
+  /**
+   * Apelidos de URL.
+   *
+   * `/stats` é a única rota em inglês no meio de URLs em português, e `/estatisticas`
+   * dava 404 — quem digita o endereço na mão erra. Os demais são as grafias que a pessoa
+   * tenta naturalmente. Redirect permanente para não dividir o histórico dos buscadores.
+   */
+  async redirects() {
+    return [
+      { source: "/estatisticas", destination: "/stats", permanent: true },
+      { source: "/estatísticas", destination: "/stats", permanent: true },
+      { source: "/classificacao", destination: "/tabela", permanent: true },
+      { source: "/jogos", destination: "/partidas", permanent: true },
+    ];
+  },
 };
 
 export default nextConfig;

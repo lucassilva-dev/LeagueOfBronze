@@ -4,27 +4,25 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
-const items = [
-  { href: "/", label: "INÍCIO" },
-  { href: "/times", label: "TIMES" },
-  { href: "/jogadores", label: "JOGADORES" },
-  { href: "/calendario", label: "CALENDÁRIO" },
-  { href: "/tabela", label: "TABELA" },
-  { href: "/stats", label: "ESTATÍSTICAS" },
-  { href: "/cartas", label: "CARTAS" },
-  { href: "/regras", label: "REGRAS" },
-  { href: "/temporadas", label: "TEMPORADAS" },
-];
+export type NavLabel = { href: string; label: string };
+
+type MainNavProps = Readonly<{
+  /** Itens já traduzidos, montados no Server Component (o cliente não lê mensagens). */
+  labels: NavLabel[];
+  ariaLabel: string;
+  abrirMenu: string;
+}>;
 
 function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function MainNav() {
+export function MainNav({ labels, ariaLabel, abrirMenu }: MainNavProps) {
   const pathname = usePathname();
   const [collapse, setCollapse] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [rotaAnterior, setRotaAnterior] = useState(pathname);
 
   useEffect(() => {
     const onResize = () => setCollapse(window.innerWidth < 1060);
@@ -33,14 +31,19 @@ export function MainNav() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  useEffect(() => {
+  // Fecha o menu ao mudar de rota. Ajustar o estado durante a renderização (em vez de num
+  // useEffect) é o padrão recomendado pelo React para reagir a uma prop/valor que mudou:
+  // evita o flash do menu aberto no primeiro frame da página nova e não dispara o aviso
+  // react-hooks/set-state-in-effect.
+  if (rotaAnterior !== pathname) {
+    setRotaAnterior(pathname);
     setMenuOpen(false);
-  }, [pathname]);
+  }
 
   if (!collapse) {
     return (
-      <nav aria-label="Navegação principal" style={{ display: "flex", alignItems: "center", gap: 2 }}>
-        {items.map((item) => {
+      <nav aria-label={ariaLabel} style={{ display: "flex", alignItems: "center", gap: 2 }}>
+        {labels.map((item) => {
           const active = isActive(pathname, item.href);
           return (
             <Link
@@ -83,7 +86,7 @@ export function MainNav() {
     <>
       <button
         type="button"
-        aria-label="Abrir menu"
+        aria-label={abrirMenu}
         aria-expanded={menuOpen}
         onClick={() => setMenuOpen((open) => !open)}
         style={{
@@ -116,7 +119,7 @@ export function MainNav() {
             zIndex: 50,
           }}
         >
-          {items.map((item) => {
+          {labels.map((item) => {
             const active = isActive(pathname, item.href);
             return (
               <Link

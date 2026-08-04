@@ -15,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatKda } from "@/lib/format";
+import { getMessages } from "@/lib/i18n/server";
 import { buildDesignTeams } from "@/lib/roster";
 import { getServerArchivedSeason } from "@/lib/server-data";
 import { calculatePlayerAggregates } from "@/lib/tournament";
@@ -30,8 +31,9 @@ export default async function TemporadaTimePage({ params }: PageParams) {
   const result = await getServerArchivedSeason(seasonId);
   if (!result) notFound();
 
+  const { paginasRegras: t, paginasStats: ts } = await getMessages();
   const { archived, dataset } = result;
-  const team = buildDesignTeams(dataset).find((t) => t.slug === teamSlug);
+  const team = buildDesignTeams(dataset).find((time) => time.slug === teamSlug);
   if (!team) notFound();
 
   const aggByPlayer = new Map(
@@ -46,7 +48,7 @@ export default async function TemporadaTimePage({ params }: PageParams) {
           className="inline-flex items-center gap-1 text-sm font-semibold text-muted transition hover:text-text"
         >
           <ArrowLeft className="h-4 w-4" />
-          Voltar para {archived.name}
+          {t.voltarPara} {archived.name}
         </Link>
       </div>
 
@@ -56,21 +58,21 @@ export default async function TemporadaTimePage({ params }: PageParams) {
           <TeamMark imageUrl={team.imageUrl} color={team.color} name={team.name} size={64} diamond={22} />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="bronze">Time · temporada arquivada</Badge>
-              <Badge variant="outline">Somente leitura</Badge>
+              <Badge variant="bronze">{t.timeBadge}</Badge>
+              <Badge variant="outline">{t.somenteLeitura}</Badge>
             </div>
             <h1 className="mt-2 font-heading text-2xl font-bold tracking-tight sm:text-3xl" style={{ color: "#f4ecdd" }}>{team.name}</h1>
-            <p className="mt-1 text-sm text-muted">Elenco e desempenho de cada jogador em {archived.name}.</p>
+            <p className="mt-1 text-sm text-muted">{t.timeElencoDescricaoPre} {archived.name}.</p>
           </div>
           <div className="flex items-center gap-3">
             {team.captain ? (
               <div className="rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-2 text-center">
-                <p className="text-[10px] uppercase tracking-[0.14em] text-muted">Capitão</p>
+                <p className="text-[10px] uppercase tracking-[0.14em] text-muted">{t.capitao}</p>
                 <p className="mt-1 font-semibold" style={{ color: "#e6c592" }}>{team.captain.displayNick}</p>
               </div>
             ) : null}
             <div className="rounded-2xl border border-accent2/20 bg-accent2/[0.06] px-4 py-2 text-center">
-              <p className="text-[10px] uppercase tracking-[0.14em] text-muted">Pts de elenco</p>
+              <p className="text-[10px] uppercase tracking-[0.14em] text-muted">{t.ptsElenco}</p>
               <p className="mt-1 font-display text-2xl" style={{ color: "#e6c592" }}>{team.total}</p>
             </div>
           </div>
@@ -82,14 +84,14 @@ export default async function TemporadaTimePage({ params }: PageParams) {
           <Table className="min-w-[720px]">
             <TableHeader>
               <TableRow>
-                <TableHeadCell className="min-w-[190px]">Jogador</TableHeadCell>
-                <TableHeadCell>Rota</TableHeadCell>
-                <TableHeadCell>Elo</TableHeadCell>
-                <TableHeadCell className="text-right">Jogos</TableHeadCell>
-                <TableHeadCell className="text-right">Vitórias</TableHeadCell>
+                <TableHeadCell className="min-w-[190px]">{t.colJogador}</TableHeadCell>
+                <TableHeadCell>{t.colRota}</TableHeadCell>
+                <TableHeadCell>{t.colElo}</TableHeadCell>
+                <TableHeadCell className="text-right">{t.colJogos}</TableHeadCell>
+                <TableHeadCell className="text-right">{t.colVitorias}</TableHeadCell>
                 <TableHeadCell className="whitespace-nowrap text-right">K/D/A</TableHeadCell>
-                <TableHeadCell className="text-right">KDA</TableHeadCell>
-                <TableHeadCell className="text-right">MVPs</TableHeadCell>
+                <TableHeadCell className="text-right">{t.colKda}</TableHeadCell>
+                <TableHeadCell className="text-right">{t.colMvps}</TableHeadCell>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -120,7 +122,7 @@ export default async function TemporadaTimePage({ params }: PageParams) {
                     <TableCell><RoleTag role={player.role1} /></TableCell>
                     <TableCell>
                       <span className="inline-flex items-center gap-1.5">
-                        <EloCrest elo={player.eloMeta?.key} size={20} title={false} />
+                        <EloCrest elo={player.eloMeta?.key} size={20} title={false} labels={ts.elos} />
                         <span className="text-sm text-muted">{player.eloMeta?.label ?? player.elo}</span>
                       </span>
                     </TableCell>

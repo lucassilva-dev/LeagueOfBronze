@@ -4,6 +4,25 @@ import { RoleIcon, TeamMark } from "@/components/lob/ui";
 import { formatKda } from "@/lib/format";
 import type { RoleBestGroup, RoleBestRow } from "@/lib/stats-view";
 
+/** Textos da seção. Opcional: sem eles a seção fica em português (padrão do site). */
+export type TextosRoleBests = {
+  titulo: string;
+  descricao: string;
+  /** Prefixo do rótulo de cada card: "MELHOR TOPO" / "BEST TOP". */
+  melhor: string;
+  jogos: string;
+  /** Rótulo da rota pela sigla do design system (TOP, SEL, MID, ADC, SUP). */
+  rotas: Record<string, string>;
+};
+
+const TEXTOS_PT: TextosRoleBests = {
+  titulo: "MELHOR POR ROTA",
+  descricao: "O destaque de cada posição, pelo melhor KDA entre quem entrou em jogo.",
+  melhor: "MELHOR",
+  jogos: "jogos",
+  rotas: { TOP: "Topo", SEL: "Selva", MID: "Meio", ADC: "Atirador", SUP: "Suporte" },
+};
+
 function Photo({ row, size }: Readonly<{ row: RoleBestRow; size: number }>) {
   if (row.imageUrl) {
     return (
@@ -20,7 +39,7 @@ function Photo({ row, size }: Readonly<{ row: RoleBestRow; size: number }>) {
   return <TeamMark imageUrl={row.teamImageUrl} color={row.teamColor} name={row.teamName} size={size} diamond={Math.round(size / 2.6)} />;
 }
 
-function RoleCard({ group, hrefBase }: Readonly<{ group: RoleBestGroup; hrefBase: string }>) {
+function RoleCard({ group, hrefBase, t }: Readonly<{ group: RoleBestGroup; hrefBase: string; t: TextosRoleBests }>) {
   const [first, ...rest] = group.rows;
 
   return (
@@ -28,7 +47,7 @@ function RoleCard({ group, hrefBase }: Readonly<{ group: RoleBestGroup; hrefBase
       <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 14 }}>
         <RoleIcon role={group.role1} size={18} color={group.color} />
         <span style={{ fontSize: 11.5, letterSpacing: ".14em", color: group.color, fontWeight: 700 }}>
-          MELHOR {group.label.toUpperCase()}
+          {t.melhor} {(t.rotas[group.short] ?? group.label).toUpperCase()}
         </span>
       </div>
 
@@ -54,7 +73,7 @@ function RoleCard({ group, hrefBase }: Readonly<{ group: RoleBestGroup; hrefBase
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 12 }}>
         <span className="lob-pill" style={{ fontSize: 10.5 }}>{first.kills}/{first.deaths}/{first.assists}</span>
-        <span className="lob-pill" style={{ fontSize: 10.5 }}>{first.games} jogos</span>
+        <span className="lob-pill" style={{ fontSize: 10.5 }}>{first.games} {t.jogos}</span>
         {first.mvps > 0 ? <span className="lob-pill" style={{ fontSize: 10.5 }}>⭐ {first.mvps} MVP{first.mvps > 1 ? "s" : ""}</span> : null}
       </div>
 
@@ -81,21 +100,22 @@ function RoleCard({ group, hrefBase }: Readonly<{ group: RoleBestGroup; hrefBase
 export function RoleBests({
   groups,
   hrefBase = "/jogadores/",
-}: Readonly<{ groups: RoleBestGroup[]; hrefBase?: string }>) {
+  t = TEXTOS_PT,
+}: Readonly<{ groups: RoleBestGroup[]; hrefBase?: string; t?: TextosRoleBests }>) {
   if (groups.length === 0) return null;
 
   return (
     <section className="lob-fade" style={{ marginTop: 36 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 5 }}>
         <span style={{ width: 11, height: 11, background: "#c98a4b", transform: "rotate(45deg)" }} />
-        <h2 className="lob-display" style={{ fontSize: 23, color: "#f2ebdf", margin: 0 }}>MELHOR POR ROTA</h2>
+        <h2 className="lob-display" style={{ fontSize: 23, color: "#f2ebdf", margin: 0 }}>{t.titulo}</h2>
       </div>
       <p style={{ margin: "0 0 14px", fontSize: 13, color: "#8f8472" }}>
-        O destaque de cada posição, pelo melhor KDA entre quem entrou em jogo.
+        {t.descricao}
       </p>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(250px,1fr))", gap: 14 }}>
         {groups.map((group) => (
-          <RoleCard key={group.short} group={group} hrefBase={hrefBase} />
+          <RoleCard key={group.short} group={group} hrefBase={hrefBase} t={t} />
         ))}
       </div>
     </section>

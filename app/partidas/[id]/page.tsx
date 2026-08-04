@@ -19,6 +19,8 @@ import {
 import { ChampionIcon } from "@/components/champion-icon";
 import { SeriesLiveDraw } from "@/components/series-live-draw";
 import { formatKda, formatSeriesDateLabel } from "@/lib/format";
+import type { Messages } from "@/lib/i18n/messages";
+import { getMessages } from "@/lib/i18n/server";
 import { getServerDataset } from "@/lib/server-data";
 import {
   getGameMvpPlayerId,
@@ -28,7 +30,6 @@ import {
   getSeriesGamesWithTeamRows,
   getSeriesMvp,
   getSeriesScore,
-  getSeriesStageLabel,
   getSeriesTeamKillTotals,
   getSeriesWinnerTeamId,
   isWalkoverSeries,
@@ -36,6 +37,9 @@ import {
 import type { Player, Team } from "@/lib/schema";
 
 export const dynamic = "force-dynamic";
+
+/** Textos desta página no idioma da requisição. */
+type Textos = Messages["paginasCompeticao"];
 
 type PartidaDetalhePageParams = Readonly<{
   params: Promise<{ id: string }>;
@@ -53,6 +57,7 @@ type SeriesExtraBadgesProps = Readonly<{
   winnerTeamId: string | null;
   isWalkover: boolean;
   seriesMvpNick: string | null;
+  textos: Textos;
 }>;
 type FinalChampionPanelProps = Readonly<{
   winnerTeam: Team;
@@ -61,10 +66,13 @@ type FinalChampionPanelProps = Readonly<{
   runnerUpWins: number;
   finalSummaryText: string;
   date: string;
+  textos: Textos;
+  localeTag: string;
 }>;
 type QuickLinksCardProps = Readonly<{
   teamA: Team | null;
   teamB: Team | null;
+  textos: Textos;
 }>;
 type GameTeamBlock = Readonly<{
   teamName: string;
@@ -81,10 +89,24 @@ type GameDetailsCardProps = Readonly<{
   teamBName: string;
   blocks: readonly [GameTeamBlock, GameTeamBlock];
   playersById: Map<string, Player>;
+  textos: Textos;
 }>;
 
 function isGrandFinalStage(stage: string | undefined) {
   return (stage ?? "REGULAR_SEASON") === "FINAL";
+}
+
+/** Rótulo da fase no idioma da requisição (o helper do lib devolve só em português). */
+function stageLabelTraduzido(stage: string | undefined, textos: Textos) {
+  const atual = stage ?? "REGULAR_SEASON";
+  if (atual === "SEMIFINAL") return textos.faseSemifinal;
+  if (atual === "FINAL") return textos.faseFinal;
+  return textos.faseRegular;
+}
+
+/** MD3/MD5 vindos do lib viram Bo3/Bo5 em inglês. */
+function formatLabelTraduzido(formatLabel: string, textos: Textos) {
+  return formatLabel === "MD5" ? textos.formatoBo5 : textos.formatoBo3;
 }
 
 function getWinnerScore(score: ReturnType<typeof getSeriesScore>, winnerTeamId: string, teamAId: string) {
@@ -103,43 +125,48 @@ function getWinnerScore(score: ReturnType<typeof getSeriesScore>, winnerTeamId: 
   };
 }
 
-function getSeriesStatusText(isWalkover: boolean, hasWinner: boolean) {
-  if (isWalkover) return "Série encerrada por W.O.";
-  if (hasWinner) return "Série finalizada";
-  return "Série em andamento";
+function getSeriesStatusText(isWalkover: boolean, hasWinner: boolean, textos: Textos) {
+  if (isWalkover) return textos.detalheStatusWo;
+  if (hasWinner) return textos.detalheStatusFinalizada;
+  return textos.detalheStatusEmAndamento;
 }
 
-function getSeriesMvpLabel(isWalkover: boolean, winnerTeamName: string | null, seriesMvpNick: string | null) {
+function getSeriesMvpLabel(
+  isWalkover: boolean,
+  winnerTeamName: string | null,
+  seriesMvpNick: string | null,
+  textos: Textos,
+) {
   if (isWalkover) {
     return {
       variant: "accent" as const,
-      text: `Vencedor por W.O.: ${winnerTeamName ?? "—"}`,
+      text: `${textos.detalheVencedorWo} ${winnerTeamName ?? textos.vazio}`,
     };
   }
 
   if (seriesMvpNick) {
     return {
       variant: "accent" as const,
-      text: `MVP da série: ${seriesMvpNick}`,
+      text: `${textos.detalheMvpSerie} ${seriesMvpNick}`,
     };
   }
 
   return {
     variant: "muted" as const,
-    text: "MVP da série: —",
+    text: `${textos.detalheMvpSerie} ${textos.vazio}`,
   };
 }
 
-function getFinalSummaryText(isWalkover: boolean, seriesMvpNick: string | null) {
-  if (isWalkover) return "O resultado foi definido por W.O.";
-  if (seriesMvpNick) return `MVP da final: ${seriesMvpNick}.`;
+function getFinalSummaryText(isWalkover: boolean, seriesMvpNick: string | null, textos: Textos) {
+  if (isWalkover) return textos.detalheResultadoWo;
+  if (seriesMvpNick) return `${textos.detalheMvpFinal} ${seriesMvpNick}.`;
   return "";
 }
 
-function getEmptyGamesText(isWalkover: boolean, walkoverReason: string | undefined) {
-  if (!isWalkover) return "Esta série ainda não possui jogos lançados.";
+function getEmptyGamesText(isWalkover: boolean, walkoverReason: string | undefined, textos: Textos) {
+  if (!isWalkover) return textos.detalheSemJogos;
   const reasonText = walkoverReason ? ` ${walkoverReason}` : "";
-  return `Esta série foi encerrada por W.O.${reasonText}`;
+  return `${textos.detalheEncerradaWo}${reasonText}`;
 }
 
 function SeriesExtraBadges({
@@ -148,8 +175,14 @@ function SeriesExtraBadges({
   winnerTeamId,
   isWalkover,
   seriesMvpNick,
+  textos,
 }: SeriesExtraBadgesProps) {
-  const mvpLabel = getSeriesMvpLabel(isWalkover, winnerTeam?.name ?? winnerTeamId ?? null, seriesMvpNick);
+  const mvpLabel = getSeriesMvpLabel(
+    isWalkover,
+    winnerTeam?.name ?? winnerTeamId ?? null,
+    seriesMvpNick,
+    textos,
+  );
   const hasWinner = Boolean(winnerTeamId);
 
   return (
@@ -164,7 +197,7 @@ function SeriesExtraBadges({
         {identity.stageLabel}
       </Badge>
       <Badge variant={hasWinner ? "success" : "muted"}>
-        {getSeriesStatusText(isWalkover, hasWinner)}
+        {getSeriesStatusText(isWalkover, hasWinner, textos)}
       </Badge>
       <Badge variant={mvpLabel.variant}>{mvpLabel.text}</Badge>
     </div>
@@ -178,6 +211,8 @@ function FinalChampionPanel({
   runnerUpWins,
   finalSummaryText,
   date,
+  textos,
+  localeTag,
 }: FinalChampionPanelProps) {
   return (
     <section>
@@ -185,9 +220,9 @@ function FinalChampionPanel({
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-3xl">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="bronze">Campeão do campeonato</Badge>
+              <Badge variant="bronze">{textos.detalheCampeaoBadge}</Badge>
               <Badge variant="outline">{identity.seriesFormatLabel}</Badge>
-              <Badge variant="outline">{formatSeriesDateLabel(date)}</Badge>
+              <Badge variant="outline">{formatSeriesDateLabel(date, localeTag)}</Badge>
             </div>
 
             <div className="mt-4 flex items-start gap-3">
@@ -196,13 +231,14 @@ function FinalChampionPanel({
               </span>
               <div>
                 <p className="text-[11px] uppercase tracking-[0.22em] text-accent2/80">
-                  Título confirmado
+                  {textos.detalheTituloConfirmado}
                 </p>
                 <h2 className="mt-1 font-heading text-2xl font-bold tracking-tight sm:text-3xl">
                   {winnerTeam.name}
                 </h2>
                 <p className="mt-2 text-sm text-text/75 sm:text-base">
-                  Fechou a grande final por {championWins}-{runnerUpWins}.
+                  {textos.detalheFechouFinalAntes}
+                  {championWins}-{runnerUpWins}.
                   {finalSummaryText ? ` ${finalSummaryText}` : ""}
                 </p>
               </div>
@@ -211,7 +247,7 @@ function FinalChampionPanel({
 
           <div className="grid gap-3 sm:grid-cols-2 lg:w-[22rem]">
             <div className="rounded-2xl border border-accent2/20 bg-bg/40 p-4 text-center">
-              <p className="text-xs uppercase tracking-[0.16em] text-muted">Placar da final</p>
+              <p className="text-xs uppercase tracking-[0.16em] text-muted">{textos.detalhePlacarFinal}</p>
               <p className="mt-2 font-display text-5xl tracking-wide text-accent2">
                 <AnimatedCounter to={championWins} />
                 <span className="mx-2 text-white/35">-</span>
@@ -222,16 +258,16 @@ function FinalChampionPanel({
 
             <div className="flex flex-col justify-between rounded-2xl border border-border/60 bg-bg/40 p-4">
               <div>
-                <p className="text-xs uppercase tracking-[0.16em] text-muted">Time campeão</p>
+                <p className="text-xs uppercase tracking-[0.16em] text-muted">{textos.detalheTimeCampeao}</p>
                 <p className="mt-2 text-sm text-text/75">
-                  Abra a página do campeão para ver elenco, campanha e estatísticas.
+                  {textos.detalheTimeCampeaoTexto}
                 </p>
               </div>
               <Link
                 href={`/times/${winnerTeam.slug}`}
                 className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-accent2 transition hover:text-text"
               >
-                Ver time campeão
+                {textos.detalheVerTimeCampeao}
               </Link>
             </div>
           </div>
@@ -241,15 +277,15 @@ function FinalChampionPanel({
   );
 }
 
-function QuickLinksCard({ teamA, teamB }: QuickLinksCardProps) {
+function QuickLinksCard({ teamA, teamB, textos }: QuickLinksCardProps) {
   return (
     <Card className="p-5">
-      <p className="text-xs uppercase tracking-[0.14em] text-muted">Links rápidos</p>
+      <p className="text-xs uppercase tracking-[0.14em] text-muted">{textos.detalheLinksRapidos}</p>
       <div className="mt-3 grid gap-2">
-        {teamA ? <TeamLink href={`/times/${teamA.slug}`} name={`Ver time: ${teamA.name}`} /> : null}
-        {teamB ? <TeamLink href={`/times/${teamB.slug}`} name={`Ver time: ${teamB.name}`} /> : null}
+        {teamA ? <TeamLink href={`/times/${teamA.slug}`} name={`${textos.detalheVerTime} ${teamA.name}`} /> : null}
+        {teamB ? <TeamLink href={`/times/${teamB.slug}`} name={`${textos.detalheVerTime} ${teamB.name}`} /> : null}
         <Link href="/partidas" className="font-semibold text-accent hover:underline">
-          Voltar para lista de partidas
+          {textos.detalheVoltarPartidas}
         </Link>
       </div>
     </Card>
@@ -267,19 +303,25 @@ function GameDetailsCard({
   teamBName,
   blocks,
   playersById,
+  textos,
 }: GameDetailsCardProps) {
   return (
     <Card className="p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="font-heading text-lg font-semibold tracking-wide">Jogo {gameIndex}</p>
+          <p className="font-heading text-lg font-semibold tracking-wide">
+            {textos.detalheJogo} {gameIndex}
+          </p>
           <p className="mt-1 text-sm text-muted">
-            Vencedor: <span className="text-text">{winnerName}</span> • MVP:{" "}
-            <span className="text-text">{gameMvpNick ?? "—"}</span>
+            {textos.detalheVencedor} <span className="text-text">{winnerName}</span> •{" "}
+            {textos.detalheMvp} <span className="text-text">{gameMvpNick ?? textos.vazio}</span>
             {typeof durationMin === "number" ? (
               <>
                 {" "}
-                • Duração: <span className="text-text">{durationMin} min</span>
+                • {textos.detalheDuracao}{" "}
+                <span className="text-text">
+                  {durationMin} {textos.detalheMinutos}
+                </span>
               </>
             ) : null}
           </p>
@@ -310,20 +352,20 @@ function GameDetailsCard({
               <Table className="min-w-[500px]">
                 <TableHeader>
                   <TableRow>
-                    <TableHeadCell className="min-w-[170px]">Jogador</TableHeadCell>
+                    <TableHeadCell className="min-w-[170px]">{textos.detalheColJogador}</TableHeadCell>
                     <TableHeadCell className="min-w-[96px]">
-                      <span className="sm:hidden">Camp.</span>
-                      <span className="hidden sm:inline">Campeão</span>
+                      <span className="sm:hidden">{textos.detalheColCampeaoCurto}</span>
+                      <span className="hidden sm:inline">{textos.detalheColCampeao}</span>
                     </TableHeadCell>
-                    <TableHeadCell className="whitespace-nowrap">K/D/A</TableHeadCell>
-                    <TableHeadCell className="whitespace-nowrap text-right">KDA</TableHeadCell>
+                    <TableHeadCell className="whitespace-nowrap">{textos.detalheColKda}</TableHeadCell>
+                    <TableHeadCell className="whitespace-nowrap text-right">{textos.detalheColKdaMedia}</TableHeadCell>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {block.rows.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={4} className="text-muted">
-                        Sem estatísticas neste jogo.
+                        {textos.detalheSemEstatisticas}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -361,6 +403,8 @@ function GameDetailsCard({
 
 export default async function PartidaDetalhePage({ params }: PartidaDetalhePageParams) {
   const { id } = await params;
+  const t = await getMessages();
+  const textos = t.paginasCompeticao;
   const { dataset, indexes } = await getServerDataset();
   const series = getSeriesById(dataset, id);
 
@@ -381,20 +425,20 @@ export default async function PartidaDetalhePage({ params }: PartidaDetalhePageP
   const identity: SeriesIdentity = {
     teamA,
     teamB,
-    stageLabel: getSeriesStageLabel(series),
-    seriesFormatLabel: getSeriesFormatLabel(series, dataset),
+    stageLabel: stageLabelTraduzido(series.stage, textos),
+    seriesFormatLabel: formatLabelTraduzido(getSeriesFormatLabel(series, dataset), textos),
     isGrandFinal: isGrandFinalStage(series.stage),
   };
   const finalScore =
     winnerTeamId === null ? null : getWinnerScore(score, winnerTeamId, series.teamAId);
-  const finalSummaryText = getFinalSummaryText(isWalkover, seriesMvpNick);
+  const finalSummaryText = getFinalSummaryText(isWalkover, seriesMvpNick, textos);
   const title = `${teamA?.name ?? series.teamAId} ${score.teamAWins}–${score.teamBWins} ${teamB?.name ?? series.teamBId}`;
-  const description = `${identity.stageLabel} • ${identity.seriesFormatLabel} • Série ${series.id} • ${formatSeriesDateLabel(series.date)}`;
+  const description = `${identity.stageLabel} • ${identity.seriesFormatLabel} • ${textos.detalheSerieRotulo} ${series.id} • ${formatSeriesDateLabel(series.date, t.compartilhados.localeTag)}`;
 
   return (
     <PageShell className="space-y-6">
       <PageHero
-        badge={identity.isGrandFinal ? "Grande Final" : "Detalhe da Série"}
+        badge={identity.isGrandFinal ? textos.detalheBadgeGrandeFinal : textos.detalheBadgeSerie}
         title={title}
         description={description}
         extra={
@@ -404,6 +448,7 @@ export default async function PartidaDetalhePage({ params }: PartidaDetalhePageP
             winnerTeamId={winnerTeamId}
             isWalkover={isWalkover}
             seriesMvpNick={seriesMvpNick}
+            textos={textos}
           />
         }
       />
@@ -416,6 +461,8 @@ export default async function PartidaDetalhePage({ params }: PartidaDetalhePageP
           runnerUpWins={finalScore.runnerUpWins}
           finalSummaryText={finalSummaryText}
           date={series.date}
+          textos={textos}
+          localeTag={t.compartilhados.localeTag}
         />
       ) : null}
 
@@ -425,11 +472,15 @@ export default async function PartidaDetalhePage({ params }: PartidaDetalhePageP
         teamB={teamB}
         initialCards={series.cardsUsed ?? []}
         initialBlueSideTeamId={series.blueSideTeamId ?? null}
+        textos={t.compartilhados}
+        nomesCartas={Object.fromEntries(
+          Object.entries(t.paginasStats.cartas).map(([id, carta]) => [id, carta.nome]),
+        )}
       />
 
       <section className="grid gap-4 md:grid-cols-2">
         <Card className="p-5">
-          <p className="text-xs uppercase tracking-[0.14em] text-muted">Abates por time na série</p>
+          <p className="text-xs uppercase tracking-[0.14em] text-muted">{textos.detalheAbatesPorTime}</p>
           <div className="mt-3 grid grid-cols-2 gap-3">
             <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
               <p className="text-xs text-muted">{teamA?.name ?? series.teamAId}</p>
@@ -446,13 +497,13 @@ export default async function PartidaDetalhePage({ params }: PartidaDetalhePageP
           </div>
         </Card>
 
-        <QuickLinksCard teamA={teamA} teamB={teamB} />
+        <QuickLinksCard teamA={teamA} teamB={teamB} textos={textos} />
       </section>
 
       <section className="space-y-4">
         {gameRows.length === 0 ? (
           <Card className="p-5 text-sm text-muted">
-            {getEmptyGamesText(isWalkover, series.walkoverReason)}
+            {getEmptyGamesText(isWalkover, series.walkoverReason, textos)}
           </Card>
         ) : (
           gameRows.map(({ game, gameIndex, teamARows, teamBRows }) => {
@@ -477,6 +528,7 @@ export default async function PartidaDetalhePage({ params }: PartidaDetalhePageP
                   { teamName: teamB?.name ?? series.teamBId, rows: teamBRows },
                 ]}
                 playersById={indexes.playersById}
+                textos={textos}
               />
             );
           })

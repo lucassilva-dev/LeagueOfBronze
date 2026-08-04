@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Anton, Chakra_Petch } from "next/font/google";
 
 import { SiteFrame } from "@/components/site-frame";
+import { htmlLang } from "@/lib/i18n/config";
+import { getLocale } from "@/lib/i18n/server";
 
 import "./globals.css";
 
@@ -17,17 +19,31 @@ const body = Chakra_Petch({
   variable: "--font-body",
 });
 
-export const metadata: Metadata = {
-  title: "Os Bronzes · 3ª Edição",
-  description:
-    "3ª Edição dos Bronzes — campeonato amador de League of Legends. Times, jogadores, calendário, tabela e estatísticas.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
 
-export default function RootLayout({
+  return locale === "en"
+    ? {
+        title: "Os Bronzes · 3rd Edition",
+        description:
+          "Os Bronzes 3rd Edition — amateur League of Legends tournament. Teams, players, schedule, standings and statistics.",
+      }
+    : {
+        title: "Os Bronzes · 3ª Edição",
+        description:
+          "3ª Edição dos Bronzes — campeonato amador de League of Legends. Times, jogadores, calendário, tabela e estatísticas.",
+      };
+}
+
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  // O idioma do documento tem de acompanhar o conteúdo: leitores de tela usam isso para
+  // escolher a pronúncia e os buscadores para saber a quem servir a página.
+  const locale = await getLocale();
+
   return (
-    <html lang="pt-BR" suppressHydrationWarning>
+    <html lang={htmlLang(locale)} suppressHydrationWarning>
       <body
         suppressHydrationWarning
         className={`${display.variable} ${body.variable}`}

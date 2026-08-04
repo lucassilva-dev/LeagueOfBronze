@@ -7,25 +7,27 @@ import { PageShell } from "@/components/page-shell";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { formatDateLabel } from "@/lib/format";
+import { getMessages } from "@/lib/i18n/server";
 import { getServerArchivedSeasons } from "@/lib/server-data";
 
 export const dynamic = "force-dynamic";
 
 export default async function TemporadasPage() {
   const seasons = await getServerArchivedSeasons();
+  const { paginasRegras: t, compartilhados: tc } = await getMessages();
 
   return (
     <PageShell className="space-y-6">
       <PageHero
-        badge="Histórico"
-        title="Temporadas"
-        description="Campeonatos encerrados, arquivados com tabela final, séries e campeão de cada temporada."
+        badge={t.temporadasBadge}
+        title={t.temporadasTitulo}
+        description={t.temporadasDescricao}
       />
 
       {seasons.length === 0 ? (
         <EmptyState
-          title="Nenhuma temporada arquivada"
-          description="Quando uma temporada for encerrada no admin, ela aparece aqui com tudo o que aconteceu."
+          title={t.temporadasVazioTitulo}
+          description={t.temporadasVazioDescricao}
         />
       ) : (
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -37,9 +39,9 @@ export default async function TemporadasPage() {
             >
               <Card className="group h-full p-5 transition hover:-translate-y-0.5 hover:shadow-glow-strong">
                 <div className="flex items-center justify-between gap-2">
-                  <Badge variant="bronze">Encerrada</Badge>
+                  <Badge variant="bronze">{t.temporadaEncerradaSelo}</Badge>
                   <span className="text-xs text-muted">
-                    {formatDateLabel(season.endedAtISO ?? season.archivedAtISO)}
+                    {formatDateLabel(season.endedAtISO ?? season.archivedAtISO, undefined, tc.localeTag)}
                   </span>
                 </div>
 
@@ -50,16 +52,16 @@ export default async function TemporadasPage() {
                 <div className="mt-3 flex items-center gap-2 text-sm">
                   <Crown className="h-4 w-4 text-accent2" />
                   <span className="font-semibold text-accent2">
-                    {season.championTeamName ?? "Sem campeão"}
+                    {season.championTeamName ?? t.semCampeao}
                   </span>
                 </div>
 
                 <p className="mt-2 text-xs text-muted">
-                  {season.teamCount} times • {season.seriesCount} séries
+                  {season.teamCount} {t.rotuloTimes} • {season.seriesCount} {t.rotuloSeries}
                 </p>
 
                 <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-accent transition group-hover:gap-2">
-                  Ver temporada
+                  {t.verTemporada}
                   <ArrowRight className="h-4 w-4" />
                 </span>
               </Card>

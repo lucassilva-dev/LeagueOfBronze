@@ -3,6 +3,7 @@ import { RoleBests } from "@/components/lob/role-bests";
 import { StatsToggles } from "@/components/lob/stats-toggles";
 import { Eyebrow, EloCrest, GoldTitle, Pill } from "@/components/lob/ui";
 import { ELO_ORDER, eloSvgUrl } from "@/lib/design";
+import { getMessages } from "@/lib/i18n/server";
 import { buildDesignPlayers, buildDesignTeams } from "@/lib/roster";
 import { getServerDataset } from "@/lib/server-data";
 import { buildRoleBests, buildStatsRows } from "@/lib/stats-view";
@@ -48,6 +49,7 @@ function StatCard({ title, children }: Readonly<{ title: string; children: React
 
 export default async function EstatisticasPage() {
   const { dataset } = await getServerDataset();
+  const t = (await getMessages()).paginasStats;
   const players = buildDesignPlayers(dataset);
   const teams = buildDesignTeams(dataset);
 
@@ -56,7 +58,7 @@ export default async function EstatisticasPage() {
   const media = teams.length ? Math.round(poolTotal / teams.length) : 0;
 
   const statElo = ELO_ORDER.map((elo) => ({
-    label: elo.label,
+    label: t.elos[elo.key as keyof typeof t.elos] ?? elo.label,
     color: elo.color,
     eloKey: elo.key,
     count: players.filter((player) => player.eloMeta?.label === elo.label).length,
@@ -74,31 +76,39 @@ export default async function EstatisticasPage() {
   const topPlayers = byValue.slice(0, 8);
 
   // Rankings reais dos jogos registrados
-  const { playerRankings, champRankings } = buildStatsRows(dataset);
+  const { playerRankings, champRankings } = buildStatsRows(dataset, {
+    vitoria: t.siglaVitoria,
+    derrota: t.siglaDerrota,
+    jogo: t.siglaJogo,
+    pick: t.siglaPick,
+    ban: t.siglaBan,
+    dosJogos: t.siglaDosJogos,
+    rotas: t.rotas,
+  });
   const gameDurations = getGameDurations(dataset);
 
   return (
     <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "0 clamp(16px,4vw,24px) 96px" }}>
       <section className="lob-fade" style={{ padding: "clamp(40px,7vw,56px) 0 24px" }}>
-        <Eyebrow>Raio-x do pool · pré-torneio</Eyebrow>
-        <GoldTitle style={{ fontSize: "clamp(40px,9vw,116px)", lineHeight: 0.88, margin: "10px 0 16px" }}>ESTATÍSTICAS</GoldTitle>
+        <Eyebrow>{t.statsEyebrow}</Eyebrow>
+        <GoldTitle style={{ fontSize: "clamp(40px,9vw,116px)", lineHeight: 0.88, margin: "10px 0 16px" }}>{t.statsTitulo}</GoldTitle>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 9, marginTop: 6 }}>
-          <Pill dot={false}>{players.length} JOGADORES</Pill>
-          <Pill dot={false}>{poolTotal} PTS NO POOL</Pill>
-          <Pill dot={false}>{media} PTS · MÉDIA POR TIME</Pill>
-          <Pill dot={false}>{monoCount} MONO CHAMPIONS</Pill>
+          <Pill dot={false}>{players.length} {t.statsPillJogadores}</Pill>
+          <Pill dot={false}>{poolTotal} {t.statsPillPool}</Pill>
+          <Pill dot={false}>{media} {t.statsPillMedia}</Pill>
+          <Pill dot={false}>{monoCount} {t.statsPillMono}</Pill>
         </div>
       </section>
 
       <section className="lob-fade" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 16 }}>
-        <StatCard title="DISTRIBUIÇÃO POR ELO">
+        <StatCard title={t.statsDistribuicaoElo}>
           <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
             {statElo.map((row) => (
               <BarRow key={row.label} label={row.label} color={row.color} eloKey={row.eloKey} count={row.count} pct={Math.round((row.count / eloMax) * 100)} />
             ))}
           </div>
         </StatCard>
-        <StatCard title="FORÇA DOS TIMES">
+        <StatCard title={t.statsForcaTimes}>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {statTeam.map((row) => (
               <div key={row.name}>
@@ -113,7 +123,7 @@ export default async function EstatisticasPage() {
             ))}
           </div>
         </StatCard>
-        <StatCard title="TOP JOGADORES · POR VALOR">
+        <StatCard title={t.statsTopJogadores}>
           {topPlayers.map((player, i) => (
             <div key={player.id} style={{ display: "grid", gridTemplateColumns: "26px 1fr auto", alignItems: "center", gap: 12, padding: "9px 0", borderTop: i === 0 ? "none" : "1px solid rgba(201,138,75,.10)" }}>
               <span className="lob-display" style={{ fontSize: 15, color: "#6f6656" }}>{i + 1}</span>
@@ -122,7 +132,7 @@ export default async function EstatisticasPage() {
                 <div style={{ fontSize: 10.5, color: "#8f8472" }}>{player.teamName}</div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <EloCrest elo={player.elo} size={30} title={false} />
+                <EloCrest elo={player.elo} size={30} title={false} labels={t.elos} />
                 <span className="lob-display" style={{ fontSize: 16, color: "#e6c592", minWidth: 22, textAlign: "right" }}>{player.pts}</span>
               </div>
             </div>
@@ -130,11 +140,52 @@ export default async function EstatisticasPage() {
         </StatCard>
       </section>
 
-      <RoleBests groups={buildRoleBests(dataset)} />
+      <RoleBests
+        groups={buildRoleBests(dataset)}
+        t={{
+          titulo: t.rotaTitulo,
+          descricao: t.rotaDescricao,
+          melhor: t.rotaMelhor,
+          jogos: t.rotaJogos,
+          rotas: t.rotas,
+        }}
+      />
 
-      <StatsToggles playerRankings={playerRankings} champRankings={champRankings} />
+      <StatsToggles
+        playerRankings={playerRankings}
+        champRankings={champRankings}
+        t={{
+          jogadoresTitulo: t.rankJogadoresTitulo,
+          aoVivo: t.rankAoVivo,
+          jogadoresDescricao: t.rankJogadoresDescricao,
+          colJogador: t.rankColJogador,
+          colTime: t.rankColTime,
+          colCampeao: t.rankColCampeao,
+          campeoesTitulo: t.rankCampeoesTitulo,
+          campeoesDescricao: t.rankCampeoesDescricao,
+          vazioJogadores: t.rankVazioJogadores,
+          vazioCampeoes: t.rankVazioCampeoes,
+          vazioTexto: t.rankVazioTexto,
+          ordemDesc: t.rankOrdemDesc,
+          ordemAsc: t.rankOrdemAsc,
+          metricasJogador: t.metricasJogador,
+          metricasCampeao: t.metricasCampeao,
+        }}
+      />
 
-      <DurationRanking rows={gameDurations} />
+      <DurationRanking
+        rows={gameDurations}
+        t={{
+          titulo: t.duracaoTitulo,
+          descricao: t.duracaoDescricao,
+          maisLongas: t.duracaoMaisLongas,
+          maisLongasDesc: t.duracaoMaisLongasDesc,
+          maisCurtas: t.duracaoMaisCurtas,
+          maisCurtasDesc: t.duracaoMaisCurtasDesc,
+          jogo: t.duracaoJogo,
+          vitoria: t.duracaoVitoria,
+        }}
+      />
     </div>
   );
 }

@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/table";
 import { getCardTitle } from "@/lib/cards";
 import { formatKda, formatSeriesDateLabel } from "@/lib/format";
+import { getMessages } from "@/lib/i18n/server";
 import { getServerArchivedSeason } from "@/lib/server-data";
 import {
   getGameMvpPlayerId,
@@ -25,7 +26,6 @@ import {
   getSeriesFormatLabel,
   getSeriesMvp,
   getSeriesScore,
-  getSeriesStageLabel,
   getSeriesTeamKillTotals,
   getSeriesGamesWithTeamRows,
   getSeriesWinnerTeamId,
@@ -44,9 +44,14 @@ export default async function TemporadaPartidaPage({ params }: PageParams) {
   const result = await getServerArchivedSeason(seasonId);
   if (!result) notFound();
 
+  const { paginasRegras: t, compartilhados: tc } = await getMessages();
   const { archived, dataset, indexes } = result;
   const series = getSeriesById(dataset, seriesId);
   if (!series) notFound();
+
+  // Rótulo da fase no idioma da página (o helper do lib devolve sempre em português).
+  const stage = series.stage ?? "REGULAR_SEASON";
+  const stageLabel = stage === "FINAL" ? t.etapaFinal : stage === "SEMIFINAL" ? t.etapaSemifinal : t.etapaRegular;
 
   const teamA = indexes.teamsById.get(series.teamAId) ?? null;
   const teamB = indexes.teamsById.get(series.teamBId) ?? null;
@@ -60,11 +65,11 @@ export default async function TemporadaPartidaPage({ params }: PageParams) {
   const seriesMvp = getSeriesMvp(series, dataset);
   const seriesMvpNick = seriesMvp ? indexes.playersById.get(seriesMvp.playerId)?.nick ?? null : null;
   const killTotals = getSeriesTeamKillTotals(series, dataset);
-  const formatLabel = getSeriesFormatLabel(series, dataset);
+  const formatLabel = getSeriesFormatLabel(series, dataset) === "MD5" ? t.formatoMd5 : t.formatoMd3;
   const teamHref = (id: string, slug?: string) => `/temporadas/${seasonId}/times/${slug ?? id}`;
 
   const title = `${teamAName} ${score.teamAWins}–${score.teamBWins} ${teamBName}`;
-  const description = `${getSeriesStageLabel(series)} • ${formatSeriesDateLabel(series.date)} • ${archived.name}`;
+  const description = `${stageLabel} • ${formatSeriesDateLabel(series.date, tc.localeTag)} • ${archived.name}`;
 
   const cards = series.cardsUsed ?? [];
 
@@ -76,20 +81,20 @@ export default async function TemporadaPartidaPage({ params }: PageParams) {
           className="inline-flex items-center gap-1 text-sm font-semibold text-muted transition hover:text-text"
         >
           <ArrowLeft className="h-4 w-4" />
-          Voltar para {archived.name}
+          {t.voltarPara} {archived.name}
         </Link>
       </div>
 
       <PageHero
-        badge="Partida arquivada"
+        badge={t.partidaBadge}
         title={title}
         description={description}
         extra={
           <div className="flex flex-wrap gap-2">
-            <Badge variant="bronze">Somente leitura</Badge>
+            <Badge variant="bronze">{t.somenteLeitura}</Badge>
             <Badge variant="outline">{formatLabel}</Badge>
-            <Badge variant="outline">{getSeriesStageLabel(series)}</Badge>
-            {seriesMvpNick ? <Badge variant="outline">MVP da série: {seriesMvpNick}</Badge> : null}
+            <Badge variant="outline">{stageLabel}</Badge>
+            {seriesMvpNick ? <Badge variant="outline">{t.mvpDaSerie} {seriesMvpNick}</Badge> : null}
           </div>
         }
       />
@@ -101,9 +106,9 @@ export default async function TemporadaPartidaPage({ params }: PageParams) {
 
       {isWO ? (
         <Card className="p-5" style={{ borderColor: "rgba(232,184,120,.35)" }}>
-          <p className="text-xs uppercase tracking-[0.14em] text-accent2">Vitória por W.O.</p>
+          <p className="text-xs uppercase tracking-[0.14em] text-accent2">{t.woTitulo}</p>
           <p className="mt-2 text-sm text-text/80">
-            {winnerName ? <><span className="font-semibold text-text">{winnerName}</span> venceu por W.O.</> : "Série encerrada por W.O."}
+            {winnerName ? <><span className="font-semibold text-text">{winnerName}</span> {t.woVenceu}</> : t.woSerieEncerrada}
             {series.walkoverReason ? ` ${series.walkoverReason}` : ""}
           </p>
         </Card>
@@ -111,7 +116,7 @@ export default async function TemporadaPartidaPage({ params }: PageParams) {
 
       {!isWO && gameRows.length > 0 ? (
         <Card className="p-5">
-          <p className="text-xs uppercase tracking-[0.14em] text-muted">Abates por time na série</p>
+          <p className="text-xs uppercase tracking-[0.14em] text-muted">{t.abatesPorTime}</p>
           <div className="mt-3 grid grid-cols-2 gap-3">
             <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
               <p className="text-xs text-muted">{teamAName}</p>
@@ -127,12 +132,12 @@ export default async function TemporadaPartidaPage({ params }: PageParams) {
 
       {cards.length > 0 ? (
         <Card className="p-4">
-          <p className="text-xs uppercase tracking-[0.14em] text-muted">Cartinhas da série</p>
+          <p className="text-xs uppercase tracking-[0.14em] text-muted">{t.cartasDaSerie}</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {cards.map((card, i) => (
               <Badge key={`${card.teamId}-${card.cardId}-${i}`} variant="outline">
                 {(indexes.teamsById.get(card.teamId)?.name ?? card.teamId)}: {getCardTitle(card.cardId as CardId)}
-                {card.dupla ? " (dupla)" : ""}
+                {card.dupla ? t.duplaSufixo : ""}
               </Badge>
             ))}
           </div>
@@ -142,7 +147,7 @@ export default async function TemporadaPartidaPage({ params }: PageParams) {
       <section className="space-y-4">
         {gameRows.length === 0 ? (
           isWO ? null : (
-            <Card className="p-5 text-sm text-muted">Esta série não teve jogos registrados.</Card>
+            <Card className="p-5 text-sm text-muted">{t.serieSemJogos}</Card>
           )
         ) : (
           gameRows.map(({ game, gameIndex, teamARows, teamBRows }) => {
@@ -158,13 +163,13 @@ export default async function TemporadaPartidaPage({ params }: PageParams) {
               <Card key={`${series.id}-g${gameIndex}`} className="p-5">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="font-heading text-lg font-semibold tracking-wide">Jogo {gameIndex}</p>
+                    <p className="font-heading text-lg font-semibold tracking-wide">{t.jogoRotulo} {gameIndex}</p>
                     <p className="mt-1 text-sm text-muted">
-                      Vencedor: <span className="text-text">{winnerName}</span> • MVP:{" "}
+                      {t.vencedorRotulo} <span className="text-text">{winnerName}</span> • {t.mvpRotulo}{" "}
                       <span className="text-text">{gameMvpNick}</span>
                       {typeof game.durationMin === "number" ? (
                         <>
-                          {" "}• Duração: <span className="text-text">{game.durationMin} min</span>
+                          {" "}• {t.duracaoRotulo} <span className="text-text">{game.durationMin} {t.minutosAbreviacao}</span>
                         </>
                       ) : null}
                     </p>
@@ -191,16 +196,16 @@ export default async function TemporadaPartidaPage({ params }: PageParams) {
                         <Table className="min-w-[440px]">
                           <TableHeader>
                             <TableRow>
-                              <TableHeadCell className="min-w-[150px]">Jogador</TableHeadCell>
-                              <TableHeadCell className="min-w-[96px]">Campeão</TableHeadCell>
+                              <TableHeadCell className="min-w-[150px]">{t.colJogador}</TableHeadCell>
+                              <TableHeadCell className="min-w-[96px]">{t.colCampeao}</TableHeadCell>
                               <TableHeadCell className="whitespace-nowrap">K/D/A</TableHeadCell>
-                              <TableHeadCell className="whitespace-nowrap text-right">KDA</TableHeadCell>
+                              <TableHeadCell className="whitespace-nowrap text-right">{t.colKda}</TableHeadCell>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {block.rows.length === 0 ? (
                               <TableRow>
-                                <TableCell colSpan={4} className="text-muted">Sem estatísticas neste jogo.</TableCell>
+                                <TableCell colSpan={4} className="text-muted">{t.semEstatisticasJogo}</TableCell>
                               </TableRow>
                             ) : (
                               block.rows.map((row) => (

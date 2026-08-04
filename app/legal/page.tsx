@@ -1,21 +1,8 @@
 import type { Metadata } from "next";
 
 import { Eyebrow, GoldTitle, SectionTitle } from "@/components/lob/ui";
-
-export const metadata: Metadata = {
-  title: "Aviso legal e privacidade · Os Bronzes",
-  description:
-    "Aviso legal exigido pela Riot Games, atribuição de propriedade intelectual e política de privacidade do site Os Bronzes.",
-};
-
-/**
- * Página de aviso legal e privacidade.
- *
- * Existe para atender às políticas da Riot Games para produtos de terceiros: o aviso de
- * não-endosso precisa estar em local prontamente visível (ele também está no rodapé de
- * todas as páginas), e a origem dos assets precisa ser declarada. A parte de privacidade
- * descreve honestamente o que o site guarda — que é pouco: nada de dado de conta da Riot.
- */
+import { AVISO_RIOT_OFICIAL, CONTATO_EMAIL } from "@/lib/i18n/messages/legal";
+import { getMessages } from "@/lib/i18n/server";
 
 /**
  * Renderização por requisição — OBRIGATÓRIO enquanto a CSP usar nonce (ver proxy.ts).
@@ -23,6 +10,20 @@ export const metadata: Metadata = {
  * o JavaScript e o conteúdo preso no bloco de Suspense nunca aparece: página em branco.
  */
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getMessages();
+  return { title: t.legal.metaTitulo, description: t.legal.metaDescricao };
+}
+
+/**
+ * Página de aviso legal e privacidade.
+ *
+ * Atende às políticas da Riot Games para produtos de terceiros: o aviso de não-endosso em
+ * local prontamente visível (também está no rodapé de todas as páginas), a origem dos assets,
+ * e um canal de contato público para pedidos de correção/remoção de dados — inclusive os
+ * repassados pela Riot.
+ */
 
 const BLOCO = {
   background: "rgba(201,138,75,.06)",
@@ -38,6 +39,8 @@ const P = {
   color: "#b3a690",
 } as const;
 
+const DESTAQUE = { color: "#cfa877" } as const;
+
 function Secao({
   titulo,
   children,
@@ -52,7 +55,9 @@ function Secao({
   );
 }
 
-export default function LegalPage() {
+export default async function LegalPage() {
+  const t = await getMessages();
+
   return (
     <div
       style={{
@@ -63,60 +68,38 @@ export default function LegalPage() {
       }}
     >
       <section className="lob-fade" style={{ padding: "clamp(40px,7vw,56px) 0 8px" }}>
-        <Eyebrow>Aviso legal</Eyebrow>
+        <Eyebrow>{t.legal.sobretitulo}</Eyebrow>
         <GoldTitle
           style={{ fontSize: "clamp(40px,9vw,96px)", lineHeight: 0.9, margin: "10px 0 16px" }}
         >
-          LEGAL &amp; PRIVACIDADE
+          {t.legal.titulo}
         </GoldTitle>
         <p style={{ maxWidth: 620, fontSize: 15, lineHeight: 1.55, color: "#a99e8b", margin: 0 }}>
-          Quem somos, nossa relação com a Riot Games e o que este site guarda sobre você.
+          {t.legal.subtitulo}
         </p>
       </section>
 
-      <Secao titulo="NÃO SOMOS A RIOT GAMES">
+      <Secao titulo={t.legal.secaoNaoSomos}>
         {/*
-          Texto EXIGIDO literalmente pela política da Riot para produtos de terceiros.
-          Não editar nem traduzir esta versão — a tradução vem logo abaixo, à parte.
+          Texto EXIGIDO literalmente pela política da Riot. Vem de uma constante justamente
+          para nunca ser traduzido nem reescrito por engano — aparece igual nos dois idiomas.
         */}
         <div style={BLOCO}>
-          <p style={{ ...P, color: "#e2d6c0" }}>
-            Os Bronzes isn&rsquo;t endorsed by Riot Games and doesn&rsquo;t reflect the views or
-            opinions of Riot Games or anyone officially involved in producing or managing Riot Games
-            properties. Riot Games, and all associated properties are trademarks or registered
-            trademarks of Riot Games, Inc.
-          </p>
+          <p style={{ ...P, color: "#e2d6c0" }}>{AVISO_RIOT_OFICIAL}</p>
         </div>
         <p style={P}>
-          Em português: <strong style={{ color: "#cfa877" }}>Os Bronzes não é endossado pela Riot
-          Games</strong> e não reflete as visões ou opiniões da Riot Games ou de qualquer pessoa
-          oficialmente envolvida na produção ou gestão das propriedades da Riot Games.
+          <span style={DESTAQUE}>{t.legal.traducaoPrefixo}</span> {t.legal.traducaoAviso}
         </p>
-        <p style={P}>
-          Este é um projeto amador, feito por e para um grupo de amigos, sem qualquer vínculo
-          oficial, patrocínio ou aprovação da Riot Games.
-        </p>
+        <p style={P}>{t.legal.projetoAmador}</p>
       </Secao>
 
-      <Secao titulo="PROPRIEDADE INTELECTUAL E ASSETS">
-        <p style={P}>
-          League of Legends e Riot Games são marcas comerciais ou marcas registradas da Riot Games,
-          Inc. League of Legends &copy; Riot Games, Inc.
-        </p>
-        <p style={P}>
-          As imagens de campeões exibidas neste site vêm do{" "}
-          <strong style={{ color: "#cfa877" }}>Data Dragon</strong>, a fonte de assets pública e
-          aprovada pela Riot Games. Nenhum asset é obtido de fonte não aprovada. Logotipos, escudos
-          de elo, arte das cartinhas e fotos de jogadores são criações próprias da organização ou
-          material enviado pelos próprios participantes.
-        </p>
+      <Secao titulo={t.legal.secaoPropriedade}>
+        <p style={P}>{t.legal.marcas}</p>
+        <p style={P}>{t.legal.assets}</p>
       </Secao>
 
-      <Secao titulo="O QUE ESTE SITE GUARDA">
-        <p style={P}>
-          Bem pouco. Os dados publicados aqui são os do próprio campeonato, informados pelos
-          participantes à organização:
-        </p>
+      <Secao titulo={t.legal.secaoGuarda}>
+        <p style={P}>{t.legal.guardaIntro}</p>
         <div style={BLOCO}>
           <ul
             style={{
@@ -130,51 +113,34 @@ export default function LegalPage() {
               color: "#b3a690",
             }}
           >
-            <li>Nick (Riot ID), time, rota e elo de cada participante.</li>
-            <li>Resultados das partidas: campeões, banimentos, abates/mortes/assistências, duração.</li>
-            <li>Foto de perfil, quando o participante envia uma.</li>
+            <li>{t.legal.guardaItem1}</li>
+            <li>{t.legal.guardaItem2}</li>
+            <li>{t.legal.guardaItem3}</li>
           </ul>
         </div>
-        <p style={P}>
-          <strong style={{ color: "#cfa877" }}>Não coletamos nada de quem apenas visita o site.</strong>{" "}
-          Não há cadastro de visitante, não usamos cookies de rastreamento, não há anúncios e não há
-          rastreadores de terceiros. O único cookie existente é o de sessão do painel administrativo,
-          usado exclusivamente para manter a organização autenticada.
-        </p>
-        <p style={P}>
-          Também <strong style={{ color: "#cfa877" }}>não armazenamos identificadores de conta da
-          Riot</strong> (como PUUID) nem qualquer credencial de jogador.
-        </p>
-        <p style={P}>
-          Todos os participantes são membros do grupo privado que organiza o campeonato e{" "}
-          <strong style={{ color: "#cfa877" }}>autorizam expressamente</strong>, ao se inscrever, a
-          exibição pública do seu nick, apelido, foto e estatísticas das partidas do torneio,
-          conforme consta no regulamento. Não publicamos dados de nenhum jogador que não seja
-          participante inscrito, e não cruzamos informações para identificar jogadores fora do
-          torneio.
-        </p>
+        <p style={P}>{t.legal.guardaVisitante}</p>
+        <p style={P}>{t.legal.guardaConsentimento}</p>
       </Secao>
 
-      <Secao titulo="USO DA API DA RIOT GAMES">
-        <p style={P}>
-          Este site pode usar a API oficial da Riot Games para importar dados de partidas do
-          campeonato (campeões, placar e estatísticas). Esse acesso é feito apenas pelo servidor, em
-          conexão segura, e somente pela organização do torneio a partir do painel administrativo.
-        </p>
-        <p style={P}>
-          Os dados obtidos são usados exclusivamente para montar a classificação, o histórico de
-          partidas e as estatísticas deste campeonato. Não fazemos automação de jogo, scripts,
-          trapaça, integração dentro do jogo, apostas nem qualquer sistema alternativo de ranqueamento
-          de jogadores.
-        </p>
+      <Secao titulo={t.legal.secaoApi}>
+        <p style={P}>{t.legal.apiComoUsamos}</p>
+        <p style={P}>{t.legal.apiQuaisDados}</p>
+        <p style={P}>{t.legal.apiRetencao}</p>
+        <p style={P}>{t.legal.apiExclusao}</p>
+        <p style={P}>{t.legal.apiNaoFazemos}</p>
       </Secao>
 
-      <Secao titulo="CORREÇÕES E CONTATO">
-        <p style={P}>
-          Encontrou um dado errado sobre você, ou quer que sua foto ou seu nick sejam removidos?
-          Fale com a organização pelo Discord ou pelo grupo do WhatsApp do campeonato — ajustamos ou
-          removemos.
-        </p>
+      <Secao titulo={t.legal.secaoContato}>
+        <p style={P}>{t.legal.contatoTexto}</p>
+        <div style={BLOCO}>
+          <a
+            href={`mailto:${CONTATO_EMAIL}`}
+            style={{ ...P, color: "#e6c592", textDecoration: "none", fontSize: 15 }}
+          >
+            {CONTATO_EMAIL}
+          </a>
+        </div>
+        <p style={P}>{t.legal.contatoPrazo}</p>
       </Secao>
     </div>
   );

@@ -9,6 +9,15 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { TeamCrest } from "@/components/team-crest";
+import {
+  compartilhados,
+  faseLabel,
+  formatoLabel,
+  turnoLabel,
+} from "@/lib/i18n/messages/compartilhados";
+
+/** Textos do card. Opcional: sem eles o card fica em português (padrão do site). */
+type TextosCard = (typeof compartilhados)["pt"];
 
 type SeriesSummaryCardProps = Readonly<{
   summary: SeriesSummary;
@@ -18,6 +27,7 @@ type SeriesSummaryCardProps = Readonly<{
   // Destino do clique. Se omitido no modo normal, usa /partidas/{id}. No modo readOnly,
   // o card só vira link quando um href é informado (ex.: partida de temporada arquivada).
   href?: string;
+  textos?: TextosCard;
 }>;
 
 function isGrandFinal(summary: SeriesSummary) {
@@ -28,11 +38,11 @@ function hasChampion(summary: SeriesSummary) {
   return isGrandFinal(summary) && summary.isComplete && Boolean(summary.winnerTeamId);
 }
 
-function getStatusLabel(summary: SeriesSummary) {
-  if (isGrandFinal(summary)) return "Grande Final";
-  if (summary.isWalkover) return "W.O.";
-  if (summary.isComplete) return "Finalizada";
-  return "Em andamento";
+function getStatusLabel(summary: SeriesSummary, t: TextosCard) {
+  if (isGrandFinal(summary)) return t.serieGrandeFinal;
+  if (summary.isWalkover) return t.serieWalkover;
+  if (summary.isComplete) return t.serieFinalizada;
+  return t.serieEmAndamento;
 }
 
 function getStatusClassName(summary: SeriesSummary) {
@@ -40,8 +50,11 @@ function getStatusClassName(summary: SeriesSummary) {
   return "border-accent2/30 bg-accent2/15 text-accent2";
 }
 
-function getScoreLabel(summary: SeriesSummary) {
-  return summary.isWalkover ? `${summary.formatLabel} por W.O.` : `Série ${summary.formatLabel}`;
+function getScoreLabel(summary: SeriesSummary, t: TextosCard) {
+  const formato = formatoLabel(t, summary.formatLabel);
+  return summary.isWalkover
+    ? `${formato} ${t.seriePlacarWalkover}`
+    : `${t.seriePlacarPrefixo} ${formato}`;
 }
 
 function getWinnerTeamName(summary: SeriesSummary, teamsById: Map<string, Team>) {
@@ -59,19 +72,25 @@ function MetaLine({
   summary,
   winnerTeamName,
   mvpPlayerNick,
+  t,
 }: Readonly<{
   summary: SeriesSummary;
   winnerTeamName: string | undefined;
   mvpPlayerNick: string | undefined;
+  t: TextosCard;
 }>) {
   if (hasChampion(summary)) {
     return (
       <>
         <span className="inline-flex items-center gap-1 font-semibold text-accent2">
           <Crown className="h-3.5 w-3.5" />
-          Campeão: {winnerTeamName ?? summary.winnerTeamId}
+          {t.serieCampeao} {winnerTeamName ?? summary.winnerTeamId}
         </span>
-        {mvpPlayerNick ? <span>MVP da final: {mvpPlayerNick}</span> : null}
+        {mvpPlayerNick ? (
+          <span>
+            {t.serieMvpFinal} {mvpPlayerNick}
+          </span>
+        ) : null}
       </>
     );
   }
@@ -79,13 +98,17 @@ function MetaLine({
   if (summary.isWalkover) {
     return (
       <span>
-        Vitória por W.O.
+        {t.serieVitoriaWalkover}
         {summary.series.walkoverReason ? ` ${summary.series.walkoverReason}` : ""}
       </span>
     );
   }
 
-  return <span>MVP da série: {mvpPlayerNick ?? "—"}</span>;
+  return (
+    <span>
+      {t.serieMvp} {mvpPlayerNick ?? "—"}
+    </span>
+  );
 }
 
 export function SeriesSummaryCard({
@@ -94,6 +117,7 @@ export function SeriesSummaryCard({
   playersById,
   readOnly = false,
   href,
+  textos: t = compartilhados.pt,
 }: SeriesSummaryCardProps) {
   const teamA = teamsById.get(summary.series.teamAId);
   const teamB = teamsById.get(summary.series.teamBId);
@@ -101,6 +125,7 @@ export function SeriesSummaryCard({
   const mvpPlayerNick = getMvpPlayerNick(summary, playersById);
   const grandFinal = isGrandFinal(summary);
   const champion = hasChampion(summary);
+  const turno = getSeriesTurnoLabel(summary.series.date);
 
   const body = (
       <Card
@@ -117,20 +142,20 @@ export function SeriesSummaryCard({
                 variant={summary.isComplete ? "success" : "muted"}
                 className={getStatusClassName(summary)}
               >
-                {getStatusLabel(summary)}
+                {getStatusLabel(summary, t)}
               </Badge>
               <span className="text-xs text-muted">
-                {formatSeriesDateLabel(summary.series.date)}
+                {formatSeriesDateLabel(summary.series.date, t.localeTag)}
               </span>
-              {getSeriesTurnoLabel(summary.series.date) ? (
+              {turno ? (
                 <Badge variant="outline" className="text-[10px]">
-                  {getSeriesTurnoLabel(summary.series.date)}
+                  {turnoLabel(t, turno)}
                 </Badge>
               ) : null}
               <span
                 className={cn("text-xs text-muted", grandFinal && "font-semibold text-accent2/80")}
               >
-                {summary.stageLabel}
+                {faseLabel(t, summary.stageLabel)}
               </span>
             </div>
 
@@ -151,6 +176,7 @@ export function SeriesSummaryCard({
                 summary={summary}
                 winnerTeamName={winnerTeamName}
                 mvpPlayerNick={mvpPlayerNick}
+                t={t}
               />
             </p>
           </div>
@@ -172,7 +198,7 @@ export function SeriesSummaryCard({
                 {summary.score.teamBWins}
               </p>
               <p className="text-[10px] uppercase tracking-[0.16em] text-muted">
-                {getScoreLabel(summary)}
+                {getScoreLabel(summary, t)}
               </p>
             </div>
             <ArrowRight

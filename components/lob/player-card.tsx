@@ -3,7 +3,24 @@ import Link from "next/link";
 import { EloCrest, RoleIcon, RoleTag, TeamMark } from "@/components/lob/ui";
 import type { DesignPlayer } from "@/lib/roster";
 
-function PhotoArea({ player }: Readonly<{ player: DesignPlayer }>) {
+/**
+ * Textos do card. Vêm do Server Component (i18n) — o padrão em português mantém o
+ * comportamento antigo para qualquer uso que ainda não passe os textos.
+ */
+export type PlayerCardTextos = {
+  capitao: string;
+  ficha: string;
+  rotaCurto?: string;
+  /** Rótulos de elo por chave, para o alt/title da crista. Opcional. */
+  elos?: Record<string, string>;
+};
+
+const TEXTOS_PADRAO: PlayerCardTextos = { capitao: "◆ CAPITÃO", ficha: "FICHA →" };
+
+function PhotoArea({
+  player,
+  textos,
+}: Readonly<{ player: DesignPlayer; textos: PlayerCardTextos }>) {
   return (
     <div style={{ position: "relative", width: "100%", aspectRatio: "4 / 5", background: "linear-gradient(160deg,#2a2015,#140e07)" }}>
       <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -15,12 +32,12 @@ function PhotoArea({ player }: Readonly<{ player: DesignPlayer }>) {
       ) : null}
       <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "linear-gradient(180deg,rgba(8,6,3,.5) 0%,transparent 22%,transparent 48%,rgba(11,8,4,.96) 100%)" }} />
       <div style={{ position: "absolute", top: 10, left: 10, right: 10, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-        <RoleTag role={player.role1} />
-        <EloCrest elo={player.elo} size={40} />
+        <RoleTag role={player.role1} label={textos.rotaCurto} />
+        <EloCrest elo={player.elo} size={40} labels={textos.elos} />
       </div>
       <div style={{ position: "absolute", left: 12, right: 12, bottom: 11 }}>
         {player.captain ? (
-          <div style={{ display: "inline-block", marginBottom: 6, padding: "2px 8px", borderRadius: 2, background: "linear-gradient(180deg,#f0c88a,#b97e40)", color: "#160f06", fontWeight: 700, fontSize: 9, letterSpacing: ".10em" }}>◆ CAPITÃO</div>
+          <div style={{ display: "inline-block", marginBottom: 6, padding: "2px 8px", borderRadius: 2, background: "linear-gradient(180deg,#f0c88a,#b97e40)", color: "#160f06", fontWeight: 700, fontSize: 9, letterSpacing: ".10em" }}>{textos.capitao}</div>
         ) : null}
         <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
           <span className="lob-display" style={{ fontSize: 22, lineHeight: 1.08, color: "#f7f1e6", wordBreak: "break-word", textShadow: "0 2px 10px rgba(0,0,0,.75)" }}>{player.displayNick}</span>
@@ -33,7 +50,10 @@ function PhotoArea({ player }: Readonly<{ player: DesignPlayer }>) {
   );
 }
 
-function Footer({ player }: Readonly<{ player: DesignPlayer }>) {
+function Footer({
+  player,
+  textos,
+}: Readonly<{ player: DesignPlayer; textos: PlayerCardTextos }>) {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "11px 13px 12px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
@@ -43,7 +63,7 @@ function Footer({ player }: Readonly<{ player: DesignPlayer }>) {
           <div style={{ fontSize: 9.5, letterSpacing: ".05em", color: player.teamColor, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{player.teamName}</div>
         </div>
       </div>
-      <span style={{ flexShrink: 0, fontSize: 9, letterSpacing: ".10em", color: "#c98a4b", whiteSpace: "nowrap" }}>FICHA →</span>
+      <span style={{ flexShrink: 0, fontSize: 9, letterSpacing: ".10em", color: "#c98a4b", whiteSpace: "nowrap" }}>{textos.ficha}</span>
     </div>
   );
 }
@@ -52,7 +72,13 @@ export function PlayerCard({
   player,
   href,
   onOpen,
-}: Readonly<{ player: DesignPlayer; href?: string; onOpen?: () => void }>) {
+  textos = TEXTOS_PADRAO,
+}: Readonly<{
+  player: DesignPlayer;
+  href?: string;
+  onOpen?: () => void;
+  textos?: PlayerCardTextos;
+}>) {
   const cardStyle: React.CSSProperties = {
     position: "relative",
     display: "flex",
@@ -65,10 +91,10 @@ export function PlayerCard({
 
   return (
     <div className="lob-lift" style={cardStyle}>
-      <PhotoArea player={player} />
+      <PhotoArea player={player} textos={textos} />
       {href ? (
         <Link href={href} style={{ textDecoration: "none", display: "block" }}>
-          <Footer player={player} />
+          <Footer player={player} textos={textos} />
         </Link>
       ) : (
         <button
@@ -76,7 +102,7 @@ export function PlayerCard({
           onClick={onOpen}
           style={{ display: "block", width: "100%", background: "none", border: "none", cursor: "pointer", textAlign: "left", padding: 0 }}
         >
-          <Footer player={player} />
+          <Footer player={player} textos={textos} />
         </button>
       )}
     </div>

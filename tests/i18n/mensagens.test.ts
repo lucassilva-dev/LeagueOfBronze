@@ -1,0 +1,58 @@
+import { describe, expect, it } from "vitest";
+
+import { LOCALES } from "@/lib/i18n/config";
+import { MESSAGES } from "@/lib/i18n/messages";
+import { AVISO_RIOT_OFICIAL } from "@/lib/i18n/messages/legal";
+
+/** Caminhos "bloco.chave.subchave" de todos os textos de um locale, em ordem. */
+function caminhos(valor: unknown, prefixo = ""): string[] {
+  if (valor === null || typeof valor !== "object") return [prefixo];
+  return Object.entries(valor as Record<string, unknown>)
+    .flatMap(([chave, filho]) => caminhos(filho, prefixo ? `${prefixo}.${chave}` : chave))
+    .sort((a, b) => a.localeCompare(b));
+}
+
+describe("registro dos blocos de mensagens", () => {
+  it("registra os mesmos blocos nos dois idiomas", () => {
+    expect(Object.keys(MESSAGES.en).sort()).toEqual(Object.keys(MESSAGES.pt).sort());
+  });
+
+  it("tem exatamente as mesmas chaves em pt e en, sem faltar nem sobrar", () => {
+    // Se um agente esquecer de traduzir uma chave, ela aparece aqui em vez de sumir na tela.
+    expect(caminhos(MESSAGES.en)).toEqual(caminhos(MESSAGES.pt));
+  });
+
+  it("não deixa nenhum texto totalmente vazio", () => {
+    // Só string de comprimento zero conta como erro: alguns textos são separadores de uma
+    // frase montada por partes e valem um espaço só (ex.: "beating {time} {placar}" em inglês).
+    for (const locale of LOCALES) {
+      const vazios = caminhos(MESSAGES[locale]).filter((caminho) => {
+        const valor = caminho
+          .split(".")
+          .reduce<unknown>(
+            (atual, parte) => (atual as Record<string, unknown>)?.[parte],
+            MESSAGES[locale],
+          );
+        return valor === "";
+      });
+      expect(vazios, `textos vazios em ${locale}`).toEqual([]);
+    }
+  });
+});
+
+describe("aviso obrigatório da Riot Games", () => {
+  it("está gravado palavra por palavra como a política exige", () => {
+    // Este texto NÃO pode ser traduzido, abreviado nem reescrito: é copiado da política da
+    // Riot. Qualquer edição aqui quebra o teste de propósito.
+    expect(AVISO_RIOT_OFICIAL).toBe(
+      "Os Bronzes isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.",
+    );
+  });
+
+  it("é a mesma constante nos dois idiomas — nunca entra no dicionário traduzível", () => {
+    for (const locale of LOCALES) {
+      const textos = JSON.stringify(MESSAGES[locale]);
+      expect(textos).not.toContain(AVISO_RIOT_OFICIAL);
+    }
+  });
+});

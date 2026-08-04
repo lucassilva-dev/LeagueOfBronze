@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { CARDS_BY_ID } from "@/lib/cards";
 import { formatDateLabel } from "@/lib/format";
+import { getMessages } from "@/lib/i18n/server";
 import type { CardId } from "@/lib/schema";
 import { getServerArchivedSeason } from "@/lib/server-data";
 import { buildRoleBests, buildStatsRows } from "@/lib/stats-view";
@@ -35,6 +36,9 @@ export default async function TemporadaDetailPage({ params }: TemporadaPageParam
     notFound();
   }
 
+  // `paginasRegras` cobre os textos próprios desta página; `paginasStats` alimenta os painéis
+  // de estatísticas e `compartilhados` os componentes que também servem o campeonato ativo.
+  const { paginasRegras: t, paginasStats: ts, compartilhados: tc } = await getMessages();
   const { archived, dataset, indexes, overview } = result;
   const endedLabel = formatDateLabel(archived.endedAtISO ?? archived.archivedAtISO);
   const { playerRankings, champRankings } = buildStatsRows(dataset);
@@ -53,9 +57,9 @@ export default async function TemporadaDetailPage({ params }: TemporadaPageParam
     (stageBuckets[stage] ?? stageBuckets.REGULAR_SEASON).push(summary);
   }
   const seriesGroups = [
-    { key: "FINAL", title: "Grande Final", list: stageBuckets.FINAL },
-    { key: "SEMIFINAL", title: "Semifinais", list: stageBuckets.SEMIFINAL },
-    { key: "REGULAR_SEASON", title: "Fase regular", list: stageBuckets.REGULAR_SEASON },
+    { key: "FINAL", title: t.faseFinal, list: stageBuckets.FINAL },
+    { key: "SEMIFINAL", title: t.faseSemifinais, list: stageBuckets.SEMIFINAL },
+    { key: "REGULAR_SEASON", title: t.faseRegular, list: stageBuckets.REGULAR_SEASON },
   ].filter((group) => group.list.length > 0);
 
   const cardStats = calculateCardStats(dataset).filter((c) => c.count > 0);
@@ -68,15 +72,15 @@ export default async function TemporadaDetailPage({ params }: TemporadaPageParam
           className="inline-flex items-center gap-1 text-sm font-semibold text-muted transition hover:text-text"
         >
           <ArrowLeft className="h-4 w-4" />
-          Todas as temporadas
+          {t.voltarTodasTemporadas}
         </Link>
       </div>
 
       <PageHero
-        badge="Temporada encerrada"
+        badge={t.detalheBadge}
         title={archived.name}
-        description={`Encerrada em ${endedLabel}. Visualização somente leitura do que foi registrado nesta temporada.`}
-        extra={<Badge variant="bronze">Somente leitura</Badge>}
+        description={`${t.detalheEncerradaEm} ${endedLabel}. ${t.detalheSomenteLeituraTexto}`}
+        extra={<Badge variant="bronze">{t.somenteLeitura}</Badge>}
       />
 
       <ChampionshipHero
@@ -85,22 +89,28 @@ export default async function TemporadaDetailPage({ params }: TemporadaPageParam
         playersById={indexes.playersById}
         championTeamHref={championTeamSlug ? `/temporadas/${seasonId}/times/${championTeamSlug}` : undefined}
         grandFinalHref={finalSeriesId ? `/temporadas/${seasonId}/partidas/${finalSeriesId}` : undefined}
+        textos={tc}
       />
 
       <section className="space-y-4">
         <SectionTitle
-          title="Classificação final"
-          subtitle="Tabela da fase regular no encerramento desta temporada."
+          title={t.classificacaoTitulo}
+          subtitle={t.classificacaoSubtitulo}
         />
-        <StandingsPageClient rows={overview.standings.rows} source={overview.standings.source} teamHrefBase={`/temporadas/${seasonId}/times/`} />
+        <StandingsPageClient
+          rows={overview.standings.rows}
+          source={overview.standings.source}
+          teamHrefBase={`/temporadas/${seasonId}/times/`}
+          textos={tc}
+        />
       </section>
 
       <section className="space-y-6">
-        <SectionTitle title="Séries" subtitle="Todas as séries registradas nesta temporada, por fase." />
+        <SectionTitle title={t.seriesTitulo} subtitle={t.seriesSubtitulo} />
         {overview.seriesSummaries.length === 0 ? (
           <EmptyState
-            title="Sem séries"
-            description="Esta temporada não registrou séries antes de ser encerrada."
+            title={t.seriesVazioTitulo}
+            description={t.seriesVazioDescricao}
           />
         ) : (
           seriesGroups.map((group) => (
@@ -116,6 +126,7 @@ export default async function TemporadaDetailPage({ params }: TemporadaPageParam
                   playersById={indexes.playersById}
                   readOnly
                   href={`/temporadas/${seasonId}/partidas/${summary.series.id}`}
+                  textos={tc}
                 />
               ))}
             </div>
@@ -125,7 +136,7 @@ export default async function TemporadaDetailPage({ params }: TemporadaPageParam
 
       {cardStats.length > 0 ? (
         <section className="space-y-4">
-          <SectionTitle title="Cartinhas mais sorteadas" subtitle="Cartas usadas ao longo desta temporada." />
+          <SectionTitle title={t.cartasMaisSorteadasTitulo} subtitle={t.cartasMaisSorteadasSubtitulo} />
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {cardStats.map((card) => {
               const def = CARDS_BY_ID[card.cardId as CardId];
@@ -150,8 +161,8 @@ export default async function TemporadaDetailPage({ params }: TemporadaPageParam
                     </span>
                   )}
                   <div className="min-w-0">
-                    <p className="truncate font-semibold">{card.title}{def?.dupla ? " (dupla)" : ""}</p>
-                    <p className="text-xs text-muted">{card.count} sorteio{card.count === 1 ? "" : "s"}</p>
+                    <p className="truncate font-semibold">{card.title}{def?.dupla ? t.duplaSufixo : ""}</p>
+                    <p className="text-xs text-muted">{card.count} {card.count === 1 ? t.sorteioSingular : t.sorteioPlural}</p>
                   </div>
                 </Card>
               );
@@ -162,15 +173,58 @@ export default async function TemporadaDetailPage({ params }: TemporadaPageParam
 
       <section className="space-y-4">
         <SectionTitle
-          title="Estatísticas"
-          subtitle="Rankings de jogadores e campeões registrados nesta temporada."
+          title={t.estatisticasTitulo}
+          subtitle={t.estatisticasSubtitulo}
         />
-        <StatsToggles playerRankings={playerRankings} champRankings={champRankings} />
+        <StatsToggles
+          playerRankings={playerRankings}
+          champRankings={champRankings}
+          t={{
+            jogadoresTitulo: ts.rankJogadoresTitulo,
+            aoVivo: ts.rankAoVivo,
+            jogadoresDescricao: ts.rankJogadoresDescricao,
+            colJogador: ts.rankColJogador,
+            colTime: ts.rankColTime,
+            colCampeao: ts.rankColCampeao,
+            campeoesTitulo: ts.rankCampeoesTitulo,
+            campeoesDescricao: ts.rankCampeoesDescricao,
+            vazioJogadores: ts.rankVazioJogadores,
+            vazioCampeoes: ts.rankVazioCampeoes,
+            vazioTexto: ts.rankVazioTexto,
+            ordemDesc: ts.rankOrdemDesc,
+            ordemAsc: ts.rankOrdemAsc,
+            metricasJogador: ts.metricasJogador,
+            metricasCampeao: ts.metricasCampeao,
+          }}
+        />
       </section>
 
-      <RoleBests groups={buildRoleBests(dataset)} hrefBase={`/temporadas/${seasonId}/jogadores/`} />
+      <RoleBests
+        groups={buildRoleBests(dataset)}
+        hrefBase={`/temporadas/${seasonId}/jogadores/`}
+        t={{
+          titulo: ts.rotaTitulo,
+          descricao: ts.rotaDescricao,
+          melhor: ts.rotaMelhor,
+          jogos: ts.rotaJogos,
+          rotas: ts.rotas,
+        }}
+      />
 
-      <DurationRanking rows={getGameDurations(dataset)} hrefBase={`/temporadas/${seasonId}/partidas/`} />
+      <DurationRanking
+        rows={getGameDurations(dataset)}
+        hrefBase={`/temporadas/${seasonId}/partidas/`}
+        t={{
+          titulo: ts.duracaoTitulo,
+          descricao: ts.duracaoDescricao,
+          maisLongas: ts.duracaoMaisLongas,
+          maisLongasDesc: ts.duracaoMaisLongasDesc,
+          maisCurtas: ts.duracaoMaisCurtas,
+          maisCurtasDesc: ts.duracaoMaisCurtasDesc,
+          jogo: ts.duracaoJogo,
+          vitoria: ts.duracaoVitoria,
+        }}
+      />
     </PageShell>
   );
 }

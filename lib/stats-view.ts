@@ -86,9 +86,36 @@ export function buildRoleBests(dataset: TournamentDataset, limit = 3): RoleBestG
   }).filter((group) => group.rows.length > 0);
 }
 
+/**
+ * Siglas e rótulos usados nas linhas dos rankings (3V · 2D, 40% dos jogos, 5V/8J, rota do
+ * jogador). Opcional: sem eles as linhas saem em português, como sempre foram.
+ */
+export type StatsRowLabels = {
+  vitoria: string;
+  derrota: string;
+  jogo: string;
+  pick: string;
+  ban: string;
+  dosJogos: string;
+  /** Rótulo da rota pela sigla do design system (TOP, SEL, MID, ADC, SUP). */
+  rotas?: Record<string, string>;
+};
+
+const LABELS_PT: StatsRowLabels = {
+  vitoria: "V",
+  derrota: "D",
+  jogo: "J",
+  pick: "P",
+  ban: "B",
+  dosJogos: "dos jogos",
+};
+
 // Monta as linhas dos rankings (jogadores + campeões) do <StatsToggles> a partir de um dataset
 // qualquer — serve tanto para o campeonato ativo quanto para uma temporada arquivada.
-export function buildStatsRows(dataset: TournamentDataset): {
+export function buildStatsRows(
+  dataset: TournamentDataset,
+  labels: StatsRowLabels = LABELS_PT,
+): {
   playerRankings: Record<string, PlayerStatRow[]>;
   champRankings: Record<string, ChampStatRow[]>;
 } {
@@ -104,7 +131,7 @@ export function buildStatsRows(dataset: TournamentDataset): {
     return {
       rank: r.position,
       nick: d?.displayNick ?? r.player.playerNick,
-      roleLabel: d?.roleMeta.label ?? "",
+      roleLabel: d ? (labels.rotas?.[d.roleMeta.short] ?? d.roleMeta.label) : "",
       teamName: r.player.teamName,
       teamColor: d?.teamColor ?? "#c98a4b",
       teamImageUrl: d?.teamImageUrl,
@@ -125,10 +152,10 @@ export function buildStatsRows(dataset: TournamentDataset): {
 
   const cboards = buildChampionLeaderboards(dataset);
   const champRankings: Record<string, ChampStatRow[]> = {
-    jogados: cboards.picks.map((r) => ({ rank: r.position, championId: r.champion.championId, championName: r.champion.championName, valueLabel: `${r.value}×`, sub: `${r.champion.wins}V · ${r.champion.losses}D` })),
-    banidos: cboards.bans.map((r) => ({ rank: r.position, championId: r.champion.championId, championName: r.champion.championName, valueLabel: `${r.value}×`, sub: `${Math.round(r.champion.banRate)}% dos jogos` })),
-    presenca: cboards.presence.map((r) => ({ rank: r.position, championId: r.champion.championId, championName: r.champion.championName, valueLabel: `${Math.round(r.value)}%`, sub: `${r.champion.picks}P · ${r.champion.bans}B` })),
-    winrate: cboards.winRate.map((r) => ({ rank: r.position, championId: r.champion.championId, championName: r.champion.championName, valueLabel: `${Math.round(r.value)}%`, sub: `${r.champion.wins}V/${r.champion.games}J` })),
+    jogados: cboards.picks.map((r) => ({ rank: r.position, championId: r.champion.championId, championName: r.champion.championName, valueLabel: `${r.value}×`, sub: `${r.champion.wins}${labels.vitoria} · ${r.champion.losses}${labels.derrota}` })),
+    banidos: cboards.bans.map((r) => ({ rank: r.position, championId: r.champion.championId, championName: r.champion.championName, valueLabel: `${r.value}×`, sub: `${Math.round(r.champion.banRate)}% ${labels.dosJogos}` })),
+    presenca: cboards.presence.map((r) => ({ rank: r.position, championId: r.champion.championId, championName: r.champion.championName, valueLabel: `${Math.round(r.value)}%`, sub: `${r.champion.picks}${labels.pick} · ${r.champion.bans}${labels.ban}` })),
+    winrate: cboards.winRate.map((r) => ({ rank: r.position, championId: r.champion.championId, championName: r.champion.championName, valueLabel: `${Math.round(r.value)}%`, sub: `${r.champion.wins}${labels.vitoria}/${r.champion.games}${labels.jogo}` })),
     kda: cboards.kda.map((r) => ({ rank: r.position, championId: r.champion.championId, championName: r.champion.championName, valueLabel: r.value.toFixed(2), sub: `${r.champion.kills}/${r.champion.deaths}/${r.champion.assists}` })),
   };
 

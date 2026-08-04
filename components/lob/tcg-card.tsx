@@ -14,15 +14,30 @@ function prefersReducedMotion() {
   return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 }
 
-export function TcgCard({ card }: Readonly<{ card: CardDef }>) {
+/** Selos da carta. Opcional: sem eles a carta fica em português (padrão do site). */
+export type TextosTcgCard = {
+  chipDupla: string;
+  chipSurpresa: string;
+  rodapeDupla: string;
+  rodapeIndividual: string;
+};
+
+const TEXTOS_PT: TextosTcgCard = {
+  chipDupla: "DUPLA",
+  chipSurpresa: "SURPRESA",
+  rodapeDupla: "SÓ COM 2 CARTAS · AFETA OS 2 TIMES",
+  rodapeIndividual: "1× POR SÉRIE · AFETA O ADVERSÁRIO",
+};
+
+export function TcgCard({ card, t = TEXTOS_PT }: Readonly<{ card: CardDef; t?: TextosTcgCard }>) {
   const cardRef = useRef<HTMLDivElement>(null);
   const artRef = useRef<HTMLSpanElement>(null);
   const glareRef = useRef<HTMLDivElement>(null);
 
-  const chip = card.dupla ? "DUPLA" : "SURPRESA";
+  const chip = card.dupla ? t.chipDupla : t.chipSurpresa;
   const chipBg = card.dupla ? card.color : "rgba(10,8,4,.55)";
   const chipColor = card.dupla ? "#140d05" : "#cdbfa8";
-  const foot = card.dupla ? "SÓ COM 2 CARTAS · AFETA OS 2 TIMES" : "1× POR SÉRIE · AFETA O ADVERSÁRIO";
+  const foot = card.dupla ? t.rodapeDupla : t.rodapeIndividual;
 
   function handleMove(event: React.MouseEvent<HTMLDivElement>) {
     if (prefersReducedMotion()) return;
