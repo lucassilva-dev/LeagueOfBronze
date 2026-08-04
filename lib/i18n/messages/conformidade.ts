@@ -35,6 +35,14 @@ export const conformidade = definir({
     proximaEdicaoTitulo: "4ª Edição dos Bronzes",
     proximaEdicaoTexto:
       "A próxima edição já está sendo montada, com início previsto para o começo de novembro de 2026. A data exata ainda será confirmada — acompanhe por aqui e pelo Discord do grupo.",
+
+    formatoVariaTitulo: "CADA EDIÇÃO TEM O SEU FORMATO",
+    formatoVariaTexto:
+      "Não existe um formato fixo. Antes de cada campeonato, a organização decide o regulamento junto com o grupo — quantos times, se haverá semifinal, o tipo de série, se entra alguma regra especial — e publica tudo nesta página antes da primeira partida.",
+    formatoVariaExemplos:
+      "Por isso muda de uma edição para a outra: a 2ª Edição teve semifinal e final; a 3ª, que está descrita abaixo, foi disputada em pontos corridos com Grande Final direta, sem semifinal; a 4ª está sendo desenhada com um formato próprio, ainda em discussão com o grupo.",
+    formatoVariaGarantia:
+      "O que nunca muda: o regulamento vale igualmente para todos os times, é acordado com os participantes e fica publicado por completo antes de qualquer jogo ser disputado. Nenhuma regra é criada ou alterada com o campeonato em andamento.",
   },
   en: {
     cartasTituloAviso: "How this rule works",
@@ -54,5 +62,13 @@ export const conformidade = definir({
     proximaEdicaoTitulo: "Os Bronzes — 4th Edition",
     proximaEdicaoTexto:
       "The next edition is already being put together, expected to start in early November 2026. The exact date is still to be confirmed — follow it here and on the group's Discord.",
+
+    formatoVariaTitulo: "EACH EDITION HAS ITS OWN FORMAT",
+    formatoVariaTexto:
+      "There is no fixed format. Before each tournament, the organisation decides the rulebook together with the group — how many teams, whether there will be a semifinal, the series length, whether any special rule applies — and publishes all of it on this page before the first match.",
+    formatoVariaExemplos:
+      "That is why it changes between editions: the 2nd Edition had a semifinal and a final; the 3rd, described below, was a round robin with a direct Grand Final and no semifinal; the 4th is being designed with its own format, still under discussion with the group.",
+    formatoVariaGarantia:
+      "What never changes: the rulebook applies equally to every team, is agreed with the participants, and is published in full before any game is played. No rule is created or changed while a tournament is running.",
   },
 });

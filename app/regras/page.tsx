@@ -60,7 +60,38 @@ export default async function RegrasPage() {
         </p>
       </section>
 
+      {/*
+        O formato NÃO é fixo: muda a cada edição, decidido com o grupo. Isso precisa vir antes
+        da ficha, senão a página parece descrever um regulamento permanente. Também é a
+        resposta ao critério de "condições de vitória justas e transparentes": o que garante a
+        transparência não é o formato ser imutável, e sim ser publicado por completo antes da
+        primeira partida e valer igual para todos.
+      */}
       <section className="lob-fade" style={{ marginTop: 14 }}>
+        <div
+          style={{
+            padding: "18px 20px",
+            background: "rgba(201,138,75,.06)",
+            border: "1px solid rgba(201,138,75,.18)",
+            borderRadius: 4,
+          }}
+        >
+          <div style={{ marginBottom: 10 }}>
+            <SectionTitle size={17}>{conf.formatoVariaTitulo}</SectionTitle>
+          </div>
+          <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.65, color: "#b3a690" }}>
+            {conf.formatoVariaTexto}
+          </p>
+          <p style={{ margin: "10px 0 0", fontSize: 13.5, lineHeight: 1.65, color: "#b3a690" }}>
+            {conf.formatoVariaExemplos}
+          </p>
+          <p style={{ margin: "10px 0 0", fontSize: 13, lineHeight: 1.6, color: "#8f8472" }}>
+            {conf.formatoVariaGarantia}
+          </p>
+        </div>
+      </section>
+
+      <section className="lob-fade" style={{ marginTop: 34 }}>
         <div style={{ marginBottom: 14 }}>
           <SectionTitle size={23}>{t.fichaTitulo}</SectionTitle>
         </div>
