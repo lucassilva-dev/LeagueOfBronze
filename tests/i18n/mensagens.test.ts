@@ -49,10 +49,28 @@ describe("aviso obrigatório da Riot Games", () => {
     );
   });
 
-  it("é a mesma constante nos dois idiomas — nunca entra no dicionário traduzível", () => {
+  it("o rodapé em inglês É a constante, sem uma letra de diferença", () => {
+    // O rodapé mostra UMA frase, no idioma de quem lê. Em inglês ela precisa ser o texto
+    // exigido literalmente — por isso aponta para a constante em vez de ser redigitada.
+    expect(MESSAGES.en.comum.rodapeAviso).toBe(AVISO_RIOT_OFICIAL);
+  });
+
+  it("o rodapé em português é tradução, não o texto em inglês", () => {
+    const pt = MESSAGES.pt.comum.rodapeAviso;
+    expect(pt).not.toBe(AVISO_RIOT_OFICIAL);
+    expect(pt).toContain("não é endossado pela Riot Games");
+    // A tradução precisa cobrir as DUAS frases da política: não-endosso e marcas registradas.
+    expect(pt).toContain("marcas registradas");
+  });
+
+  it("nenhum outro texto do dicionário reescreve o aviso por conta própria", () => {
     for (const locale of LOCALES) {
-      const textos = JSON.stringify(MESSAGES[locale]);
-      expect(textos).not.toContain(AVISO_RIOT_OFICIAL);
+      const outros = Object.entries(MESSAGES[locale].comum)
+        .filter(([chave]) => chave !== "rodapeAviso")
+        .map(([, valor]) => String(valor));
+      for (const texto of outros) {
+        expect(texto).not.toContain("isn't endorsed by Riot Games");
+      }
     }
   });
 });

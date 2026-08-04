@@ -1,4 +1,5 @@
 import { definir } from "@/lib/i18n/definir";
+import { AVISO_RIOT_OFICIAL } from "@/lib/i18n/messages/legal";
 
 /** Navegação, rodapé e textos que aparecem no site inteiro. */
 export const comum = definir({
@@ -18,8 +19,10 @@ export const comum = definir({
     edicao: "3ª EDIÇÃO",
     rodapeAssinatura: "OS BRONZES · 3ª EDIÇÃO · 2026",
     rodapeLema: "MECÂNICA DUVIDOSA · ENTRETENIMENTO IMACULADO",
-    rodapeAvisoPt:
-      "Os Bronzes não é endossado pela Riot Games e não reflete as visões ou opiniões da Riot Games ou de qualquer pessoa oficialmente envolvida na produção ou gestão das propriedades da Riot Games.",
+    // Tradução fiel do aviso obrigatório. A versão em inglês (abaixo, no bloco `en`) é o
+    // texto EXIGIDO literalmente pela Riot e não pode ser reescrita.
+    rodapeAviso:
+      "Os Bronzes não é endossado pela Riot Games e não reflete as visões ou opiniões da Riot Games ou de qualquer pessoa oficialmente envolvida na produção ou gestão das propriedades da Riot Games. Riot Games e todas as propriedades associadas são marcas comerciais ou marcas registradas da Riot Games, Inc.",
     rodapeLinkLegal: "Aviso legal e privacidade",
     rodapeContato: "Contato",
 
@@ -45,8 +48,8 @@ export const comum = definir({
     edicao: "3RD EDITION",
     rodapeAssinatura: "OS BRONZES · 3RD EDITION · 2026",
     rodapeLema: "QUESTIONABLE MECHANICS · IMMACULATE ENTERTAINMENT",
-    rodapeAvisoPt:
-      "Os Bronzes is an amateur, community-run tournament with no official affiliation with Riot Games.",
+    // NÃO substituir por outra redação: é o texto obrigatório, palavra por palavra.
+    rodapeAviso: AVISO_RIOT_OFICIAL,
     rodapeLinkLegal: "Legal notice & privacy",
     rodapeContato: "Contact",
 

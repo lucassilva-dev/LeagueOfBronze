@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { LanguageToggle } from "@/components/language-toggle";
 import { MainNav, type NavLabel } from "@/components/main-nav";
-import { AVISO_RIOT_OFICIAL, CONTATO_EMAIL } from "@/lib/i18n/messages/legal";
+import { CONTATO_EMAIL } from "@/lib/i18n/messages/legal";
 import { getLocale, getMessages } from "@/lib/i18n/server";
 
 type SiteFrameProps = Readonly<{ children: React.ReactNode }>;
@@ -165,30 +165,26 @@ export async function SiteFrame({ children }: SiteFrameProps) {
             </div>
 
             {/*
-              Aviso exigido pelas políticas da Riot Games para produtos de terceiros.
-              O texto em inglês é o EXIGIDO literalmente pela política e não deve ser
-              editado nem traduzido (vem de AVISO_RIOT_OFICIAL); a segunda linha é a
-              versão localizada, cortesia para o público do site. Precisa ficar em local
-              prontamente visível — por isso está no rodapé de TODAS as páginas, e não
-              escondido só na /legal.
+              Aviso exigido pelas políticas da Riot Games para produtos de terceiros, em
+              local prontamente visível: rodapé de TODAS as páginas.
+
+              Uma frase só, no idioma de quem está lendo. Em inglês, `rodapeAviso` É o texto
+              exigido palavra por palavra (vem da constante AVISO_RIOT_OFICIAL, com teste
+              garantindo que não se separem); em português, a tradução fiel dele. Mostrar os
+              dois ao mesmo tempo era redundante depois que o site virou bilíngue — e a
+              versão literal segue sempre disponível, em destaque, na /legal.
             */}
             <div
               style={{
                 borderTop: "1px solid rgba(201,138,75,.10)",
                 paddingTop: 13,
-                display: "flex",
-                flexDirection: "column",
-                gap: 6,
                 fontSize: 11,
                 lineHeight: 1.6,
                 color: "#7d7263",
               }}
             >
-              <p lang="en" style={{ margin: 0 }}>
-                {AVISO_RIOT_OFICIAL}
-              </p>
-              <p style={{ margin: 0, color: "#6f6656" }}>
-                {t.comum.rodapeAvisoPt}{" "}
+              <p style={{ margin: 0 }}>
+                {t.comum.rodapeAviso}{" "}
                 <Link href="/legal" style={{ color: "#c98a4b", textDecoration: "none" }}>
                   {t.comum.rodapeLinkLegal}
                 </Link>
