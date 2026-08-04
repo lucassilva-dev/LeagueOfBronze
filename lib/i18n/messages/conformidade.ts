@@ -30,6 +30,11 @@ export const conformidade = definir({
     consentimentoJogadores:
       "Foto e Riot ID são publicados com autorização do participante, conforme o regulamento. Para correção ou remoção, escreva para",
     consentimentoLink: "Saiba mais no aviso legal",
+
+    proximaEdicaoSelo: "Em organização",
+    proximaEdicaoTitulo: "4ª Edição dos Bronzes",
+    proximaEdicaoTexto:
+      "A próxima edição já está sendo montada, com início previsto para o começo de novembro de 2026. A data exata ainda será confirmada — acompanhe por aqui e pelo Discord do grupo.",
   },
   en: {
     cartasTituloAviso: "How this rule works",
@@ -44,5 +49,10 @@ export const conformidade = definir({
     consentimentoJogadores:
       "Photos and Riot IDs are published with the participant's consent, as stated in the rules. For correction or removal, write to",
     consentimentoLink: "Read more in the legal notice",
+
+    proximaEdicaoSelo: "Being organised",
+    proximaEdicaoTitulo: "Os Bronzes — 4th Edition",
+    proximaEdicaoTexto:
+      "The next edition is already being put together, expected to start in early November 2026. The exact date is still to be confirmed — follow it here and on the group's Discord.",
   },
 });

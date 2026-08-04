@@ -12,7 +12,7 @@ import { getChampionshipResult } from "@/lib/tournament";
 export const dynamic = "force-dynamic";
 
 export default async function InicioPage() {
-  const { paginasHome: t } = await getMessages();
+  const { paginasHome: t, conformidade: conf } = await getMessages();
   const { dataset, indexes } = await getServerDataset();
 
   const explore = [
@@ -227,6 +227,49 @@ export default async function InicioPage() {
               <div style={{ marginTop: 8, fontSize: 11, letterSpacing: ".12em", color: "#8f8472" }}>{n.l}</div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/*
+        PRÓXIMA EDIÇÃO.
+        Com a Grande Final já jogada, o site passava a impressão de projeto encerrado — o que
+        pesa contra num pedido de chave de produção. Este bloco mostra que a operação continua.
+        A data é deliberadamente aproximada porque ainda não está fechada: melhor dizer
+        "início de novembro, a confirmar" do que anunciar um dia que pode mudar.
+      */}
+      <section className="lob-fade" style={{ marginBottom: 44 }}>
+        <div
+          style={{
+            padding: "22px 24px",
+            background:
+              "linear-gradient(120deg,rgba(201,138,75,.10),rgba(201,138,75,.03) 60%,transparent)",
+            border: "1px solid rgba(232,184,120,.28)",
+            borderRadius: 5,
+          }}
+        >
+          <span
+            style={{
+              display: "inline-block",
+              padding: "4px 10px",
+              borderRadius: 2,
+              background: "linear-gradient(180deg,#f0c88a,#b97e40)",
+              color: "#160f06",
+              fontWeight: 700,
+              fontSize: 10,
+              letterSpacing: ".12em",
+            }}
+          >
+            {conf.proximaEdicaoSelo}
+          </span>
+          <div
+            className="lob-display"
+            style={{ marginTop: 12, fontSize: "clamp(24px,4vw,36px)", lineHeight: 1.05, color: "#f3ece0" }}
+          >
+            {conf.proximaEdicaoTitulo}
+          </div>
+          <p style={{ margin: "10px 0 0", maxWidth: 620, fontSize: 14, lineHeight: 1.6, color: "#a99e8b" }}>
+            {conf.proximaEdicaoTexto}
+          </p>
         </div>
       </section>
 
