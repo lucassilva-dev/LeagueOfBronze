@@ -49,7 +49,9 @@ function StatCard({ title, children }: Readonly<{ title: string; children: React
 
 export default async function EstatisticasPage() {
   const { dataset } = await getServerDataset();
-  const t = (await getMessages()).paginasStats;
+  const mensagens = await getMessages();
+  const t = mensagens.paginasStats;
+  const conf = mensagens.conformidade;
   const players = buildDesignPlayers(dataset);
   const teams = buildDesignTeams(dataset);
 
@@ -98,6 +100,14 @@ export default async function EstatisticasPage() {
           <Pill dot={false}>{media} {t.statsPillMedia}</Pill>
           <Pill dot={false}>{monoCount} {t.statsPillMono}</Pill>
         </div>
+        {/*
+          Mesma ressalva que já existe em /regras, repetida aqui porque é NESTA página que os
+          pontos por elo aparecem somados por jogador e por time — é onde alguém poderia ler
+          isso como um ranqueamento alternativo, o que as políticas da Riot proíbem.
+        */}
+        <p style={{ margin: "14px 0 0", maxWidth: 700, fontSize: 11.5, lineHeight: 1.6, color: "#7d7263" }}>
+          {conf.eloAviso}
+        </p>
       </section>
 
       <section className="lob-fade" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 16 }}>

@@ -120,6 +120,7 @@ export default async function LegalPage() {
           </ul>
         </div>
         <p style={P}>{t.legal.guardaVisitante}</p>
+        <p style={P}>{t.legal.guardaLinksExternos}</p>
         <p style={P}>{t.legal.guardaConsentimento}</p>
       </Secao>
 

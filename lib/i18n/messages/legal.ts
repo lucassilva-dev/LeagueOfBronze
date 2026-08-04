@@ -49,6 +49,8 @@ export const legal = definir({
     guardaItem3: "Foto de perfil, quando o participante envia uma.",
     guardaVisitante:
       "Não coletamos nada de quem apenas visita o site. Não há cadastro de visitante, não usamos cookies de rastreamento, não há anúncios e não há rastreadores de terceiros. Os únicos cookies existentes são o de sessão do painel administrativo, usado para manter a organização autenticada, e o que memoriza o idioma escolhido.",
+    guardaLinksExternos:
+      "As fichas de jogador trazem links para o OP.GG, um site de estatísticas independente. São apenas links: nada é carregado do OP.GG dentro das nossas páginas e nenhum dado seu é enviado para lá enquanto você navega aqui. Ao clicar, você passa a estar no site deles, sob a política de privacidade deles. As imagens de campeões e emblemas vêm de servidores da Riot Games (Data Dragon).",
     guardaConsentimento:
       "Todos os participantes são membros do grupo privado que organiza o campeonato e autorizam expressamente, ao se inscrever, a exibição pública do seu Riot ID, foto e estatísticas das partidas do torneio, conforme consta no regulamento. Não publicamos dados de nenhum jogador que não seja participante inscrito, e não cruzamos informações para identificar jogadores fora do torneio.",
 
@@ -101,6 +103,8 @@ export const legal = definir({
     guardaItem3: "Profile photo, when the participant sends one.",
     guardaVisitante:
       "We collect nothing from people who merely visit the site. There is no visitor sign-up, no tracking cookies, no advertising and no third-party trackers. The only cookies are the admin panel session cookie, used to keep the organisation authenticated, and the one that remembers your chosen language.",
+    guardaLinksExternos:
+      "Player pages link out to OP.GG, an independent statistics site. These are links only: nothing from OP.GG is loaded inside our pages and none of your data is sent there while you browse here. Once you click, you are on their site, under their privacy policy. Champion images and rank emblems are served from Riot Games servers (Data Dragon).",
     guardaConsentimento:
       "All participants are members of the private group that runs the tournament and expressly consent, on sign-up, to the public display of their Riot ID, photo and tournament match statistics, as stated in the rules. We publish no data about players who are not registered participants, and we do not cross-reference information to identify players outside the tournament.",
 
