@@ -10,7 +10,9 @@ export const dynamic = "force-dynamic";
 
 export default async function CartasPage() {
   const { dataset } = await getServerDataset();
-  const t = (await getMessages()).paginasStats;
+  const mensagens = await getMessages();
+  const t = mensagens.paginasStats;
+  const conf = mensagens.conformidade;
   const used = calculateCardStats(dataset).filter((stat) => stat.count > 0);
 
   // Os ids das cartas (e o dataset) continuam iguais: só o texto exibido muda de idioma.
@@ -29,6 +31,33 @@ export default async function CartasPage() {
         <GoldTitle style={{ fontSize: "clamp(48px,11vw,128px)", lineHeight: 0.88, margin: "10px 0 16px" }}>{t.cartasTitulo}</GoldTitle>
         <p style={{ maxWidth: 660, fontSize: 16, lineHeight: 1.55, color: "#a99e8b", margin: 0 }}>
           {t.cartasIntro}
+        </p>
+      </section>
+
+      {/*
+        Bloco de integridade de jogo. As cartinhas restringem escolhas do adversário, e as
+        políticas da Riot avaliam justamente isso — então a explicação fica em destaque no
+        topo da página, não diluída num parágrafo mais abaixo.
+      */}
+      <section
+        className="lob-fade"
+        style={{
+          marginBottom: 30,
+          padding: "18px 20px",
+          background: "rgba(201,138,75,.06)",
+          border: "1px solid rgba(201,138,75,.18)",
+          borderRadius: 4,
+          maxWidth: 900,
+        }}
+      >
+        <div style={{ marginBottom: 10 }}>
+          <SectionTitle size={17}>{conf.cartasTituloAviso}</SectionTitle>
+        </div>
+        <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.65, color: "#b3a690" }}>
+          {conf.cartasAviso}
+        </p>
+        <p style={{ margin: "10px 0 0", fontSize: 13.5, lineHeight: 1.65, color: "#b3a690" }}>
+          {conf.cartasAvisoTecnico}
         </p>
       </section>
 

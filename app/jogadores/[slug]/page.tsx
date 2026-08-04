@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { AvisoConsentimento } from "@/components/aviso-consentimento";
 import { EloCrest, RoleIcon } from "@/components/lob/ui";
 import { formatKda } from "@/lib/format";
 import { eloLabel, rotaLabel } from "@/lib/i18n/messages/paginas-home";
@@ -112,6 +113,7 @@ export default async function PlayerFichaPage({ params }: PlayerPageParams) {
           </div>
         </div>
       </div>
+      <AvisoConsentimento />
     </div>
   );
 }

@@ -20,7 +20,7 @@ function Card({ children }: Readonly<{ children: React.ReactNode }>) {
 }
 
 export default async function RegrasPage() {
-  const { paginasRegras: t, paginasStats: ts } = await getMessages();
+  const { paginasRegras: t, paginasStats: ts, conformidade: conf } = await getMessages();
   // ELO_ORDER vem do design system com `key` tipada como string; o mapa traduzido tem chaves
   // fechadas, então a leitura é feita por um Record aberto (com fallback para o rótulo do lib).
   const eloRotulos: Record<string, string> = ts.elos;
@@ -126,6 +126,10 @@ export default async function RegrasPage() {
               <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid rgba(201,138,75,.14)", fontSize: 12.5, lineHeight: 1.5, color: "#8f8472" }}>
                 {t.eloOrcamentoPre} <b style={{ color: "#e6c592" }}>{t.eloOrcamentoValor}</b> {t.eloOrcamentoMeio}{" "}
                 <b style={{ color: "#e6c592" }}>{t.eloPoolValor}</b>.
+              </div>
+              {/* Deixa explícito que isto é moeda de draft, não ranqueamento alternativo. */}
+              <div style={{ marginTop: 10, fontSize: 12, lineHeight: 1.55, color: "#7d7263" }}>
+                {conf.eloAviso}
               </div>
             </div>
           </Card>

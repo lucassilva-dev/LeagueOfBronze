@@ -1,6 +1,7 @@
 import type { Locale } from "@/lib/i18n/config";
 import { comum } from "@/lib/i18n/messages/comum";
 import { compartilhados } from "@/lib/i18n/messages/compartilhados";
+import { conformidade } from "@/lib/i18n/messages/conformidade";
 import { legal } from "@/lib/i18n/messages/legal";
 import { paginasStats } from "@/lib/i18n/messages/paginas-stats";
 import { paginasCompeticao } from "@/lib/i18n/messages/paginas-competicao";
@@ -18,6 +19,7 @@ export const MESSAGES = {
   pt: {
     comum: comum.pt,
     compartilhados: compartilhados.pt,
+    conformidade: conformidade.pt,
     legal: legal.pt,
     paginasCompeticao: paginasCompeticao.pt,
     paginasHome: paginasHome.pt,
@@ -27,6 +29,7 @@ export const MESSAGES = {
   en: {
     comum: comum.en,
     compartilhados: compartilhados.en,
+    conformidade: conformidade.en,
     legal: legal.en,
     paginasCompeticao: paginasCompeticao.en,
     paginasHome: paginasHome.en,

@@ -204,13 +204,24 @@ a:hover {
 /* ============================================================
    Design "esports Bronze Hextech" — utilitárias novas
    ============================================================ */
+/*
+  Entrada das seções — anima SOMENTE o deslocamento, nunca a opacidade.
+
+  Terceira vez que a opacidade animada causa problema: com fill-mode `both` as páginas
+  ficavam permanentemente em branco; sem ele, qualquer contexto onde a animação começa mas
+  o relógio não avança (aba em segundo plano, navegador headless, ferramenta de auditoria
+  que captura no primeiro quadro) mostra a página quase vazia. Um auditor externo abriu o
+  site e relatou exatamente isso.
+
+  Regra que fica: nenhuma animação pode decidir se o conteúdo é visível. O texto nasce
+  opaco e apenas desliza para o lugar; se a animação não rodar, não se perde nada além do
+  efeito.
+*/
 @keyframes fadeUp {
   from {
-    opacity: 0;
     transform: translateY(22px);
   }
   to {
-    opacity: 1;
     transform: none;
   }
 }

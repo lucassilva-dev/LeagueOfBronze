@@ -96,6 +96,7 @@ export default async function LegalPage() {
       <Secao titulo={t.legal.secaoPropriedade}>
         <p style={P}>{t.legal.marcas}</p>
         <p style={P}>{t.legal.assets}</p>
+        <p style={P}>{t.legal.assetsProprios}</p>
       </Secao>
 
       <Secao titulo={t.legal.secaoGuarda}>

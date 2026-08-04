@@ -47,6 +47,12 @@ const nextConfig: NextConfig = {
    */
   async redirects() {
     return [
+      // Caminhos que um revisor ou uma ferramenta de auditoria procura por convenção.
+      // Tudo (aviso legal + privacidade) vive numa página só, a /legal.
+      { source: "/privacy", destination: "/legal", permanent: true },
+      { source: "/privacidade", destination: "/legal", permanent: true },
+      { source: "/terms", destination: "/legal", permanent: true },
+      { source: "/termos", destination: "/legal", permanent: true },
       { source: "/estatisticas", destination: "/stats", permanent: true },
       { source: "/estatísticas", destination: "/stats", permanent: true },
       { source: "/classificacao", destination: "/tabela", permanent: true },

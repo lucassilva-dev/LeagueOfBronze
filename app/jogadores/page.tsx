@@ -1,3 +1,4 @@
+import { AvisoConsentimento } from "@/components/aviso-consentimento";
 import { JogadoresClient, type PlayerPerf } from "@/components/lob/jogadores-client";
 import { Eyebrow, GoldTitle, Pill } from "@/components/lob/ui";
 import { getMessages } from "@/lib/i18n/server";
@@ -40,6 +41,7 @@ export default async function JogadoresPage() {
         </div>
       </section>
       <JogadoresClient players={players} perfByPlayer={perfByPlayer} textos={t} elos={ts.elos} />
+      <AvisoConsentimento />
     </div>
   );
 }

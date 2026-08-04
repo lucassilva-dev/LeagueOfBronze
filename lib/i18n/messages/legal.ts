@@ -36,7 +36,9 @@ export const legal = definir({
     marcas:
       "League of Legends e Riot Games são marcas comerciais ou marcas registradas da Riot Games, Inc. League of Legends © Riot Games, Inc.",
     assets:
-      "As imagens de campeões exibidas neste site vêm do Data Dragon, a fonte de assets pública e aprovada pela Riot Games. Nenhum asset é obtido de fonte não aprovada. Logotipos, escudos de elo, arte das cartinhas e fotos de jogadores são criações próprias da organização ou material enviado pelos próprios participantes.",
+      "Todo asset da Riot exibido aqui vem de uma fonte oficial e aprovada: as imagens de campeões vêm do Data Dragon; os emblemas de elo (Ferro a Desafiante) vêm do pacote oficial ranked-emblems-latest.zip; e os ícones de posição vêm do pacote oficial ranked-positions.zip — ambos publicados pela Riot Games na documentação para desenvolvedores de League of Legends. Nenhum asset é obtido de fonte não aprovada nem redesenhado.",
+    assetsProprios:
+      "São criação própria da organização, ou material enviado pelos próprios participantes: o logotipo do campeonato, os escudos dos times, a arte das cartinhas e as fotos dos jogadores.",
 
     secaoGuarda: "O QUE ESTE SITE GUARDA",
     guardaIntro:
@@ -87,7 +89,9 @@ export const legal = definir({
     marcas:
       "League of Legends and Riot Games are trademarks or registered trademarks of Riot Games, Inc. League of Legends © Riot Games, Inc.",
     assets:
-      "Champion images shown on this site come from Data Dragon, the public asset source approved by Riot Games. No asset is taken from an unapproved source. Logos, rank crests, card artwork and player photos are created by the organisation or submitted by the participants themselves.",
+      "Every Riot asset shown here comes from an official, approved source: champion images come from Data Dragon; rank emblems (Iron through Challenger) come from the official ranked-emblems-latest.zip package; and position icons come from the official ranked-positions.zip package — both published by Riot Games in the League of Legends developer documentation. No asset is taken from an unapproved source, and none has been redrawn.",
+    assetsProprios:
+      "Created by the organisation itself, or submitted by the participants: the tournament logo, the team crests, the wildcard artwork and the player photos.",
 
     secaoGuarda: "WHAT THIS SITE STORES",
     guardaIntro:
