@@ -61,6 +61,18 @@ const CARTA_INTRO =
 const CARTA_INTRO2 =
   "Se só um capitão usa, o sorteio vale entre as 6 cartinhas individuais (A–F) e afeta apenas o time adversário. Quando os DOIS capitães usam na mesma partida, entram no sorteio também as 2 cartinhas duplas — cujo efeito atinge os dois times — passando a valer entre as 8 cartas, sorteada uma única vez. Toda escolha exigida por uma carta é feita na hora e informada à organização, que tem a palavra final.";
 
+/**
+ * Renderização por requisição — OBRIGATÓRIO, não é preferência.
+ *
+ * A CSP do site usa nonce (ver proxy.ts), e o nonce é gerado a cada requisição. Uma
+ * página estática é pré-renderizada no build, quando o nonce ainda não existe: os
+ * <script> saem sem nonce, a CSP bloqueia TODO o JavaScript e o React nunca troca o
+ * bloco de Suspense pelo conteúdo — a página fica em branco. Foi exatamente o que
+ * aconteceu aqui em produção. Toda página deste app precisa ser dinâmica enquanto a
+ * CSP for baseada em nonce.
+ */
+export const dynamic = "force-dynamic";
+
 function Card({ children }: Readonly<{ children: React.ReactNode }>) {
   return <div className="lob-card-2">{children}</div>;
 }

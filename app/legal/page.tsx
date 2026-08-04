@@ -17,6 +17,13 @@ export const metadata: Metadata = {
  * descreve honestamente o que o site guarda — que é pouco: nada de dado de conta da Riot.
  */
 
+/**
+ * Renderização por requisição — OBRIGATÓRIO enquanto a CSP usar nonce (ver proxy.ts).
+ * Página estática é pré-renderizada no build, sai sem nonce nos <script>, a CSP bloqueia
+ * o JavaScript e o conteúdo preso no bloco de Suspense nunca aparece: página em branco.
+ */
+export const dynamic = "force-dynamic";
+
 const BLOCO = {
   background: "rgba(201,138,75,.06)",
   border: "1px solid rgba(201,138,75,.16)",
@@ -76,7 +83,8 @@ export default function LegalPage() {
           <p style={{ ...P, color: "#e2d6c0" }}>
             Os Bronzes isn&rsquo;t endorsed by Riot Games and doesn&rsquo;t reflect the views or
             opinions of Riot Games or anyone officially involved in producing or managing Riot Games
-            properties.
+            properties. Riot Games, and all associated properties are trademarks or registered
+            trademarks of Riot Games, Inc.
           </p>
         </div>
         <p style={P}>
@@ -135,9 +143,15 @@ export default function LegalPage() {
         </p>
         <p style={P}>
           Também <strong style={{ color: "#cfa877" }}>não armazenamos identificadores de conta da
-          Riot</strong> (como PUUID) nem qualquer credencial de jogador. Ao participar do campeonato,
-          o jogador concorda com a exibição pública do seu nick e das suas estatísticas nas partidas
-          do torneio, conforme o regulamento.
+          Riot</strong> (como PUUID) nem qualquer credencial de jogador.
+        </p>
+        <p style={P}>
+          Todos os participantes são membros do grupo privado que organiza o campeonato e{" "}
+          <strong style={{ color: "#cfa877" }}>autorizam expressamente</strong>, ao se inscrever, a
+          exibição pública do seu nick, apelido, foto e estatísticas das partidas do torneio,
+          conforme consta no regulamento. Não publicamos dados de nenhum jogador que não seja
+          participante inscrito, e não cruzamos informações para identificar jogadores fora do
+          torneio.
         </p>
       </Secao>
 

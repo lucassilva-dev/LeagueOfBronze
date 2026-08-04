@@ -52,7 +52,7 @@ function PlayerModal({
   return (
     <div
       onClick={onClose}
-      style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, background: "rgba(6,4,2,.82)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", animation: "fadeUp .22s both" }}
+      style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, background: "rgba(6,4,2,.82)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", animation: "fadeUp .22s" }}
     >
       <div
         onClick={(e) => e.stopPropagation()}

@@ -223,8 +223,20 @@ a:hover {
     opacity: 0.9;
   }
 }
+/*
+  Entrada suave das seções.
+
+  NÃO devolver o `both` (animation-fill-mode) aqui. Com `both`, o elemento fica preso no
+  quadro inicial do fadeUp — opacity: 0 — ENQUANTO a animação não roda. Se ela não dispara
+  (aba em segundo plano no carregamento, pintura suspensa pelo navegador, motor de
+  animação ocioso), o conteúdo nunca aparece: /regras e /legal ficavam totalmente em
+  branco, porque nelas todas as seções estão dentro de .lob-fade.
+
+  Sem fill-mode o estado de repouso é o normal (visível), e a animação é só enfeite:
+  na pior das hipóteses o conteúdo aparece sem o efeito — nunca some.
+*/
 .lob-fade {
-  animation: fadeUp 0.6s both;
+  animation: fadeUp 0.6s;
 }
 
 .gold-text {

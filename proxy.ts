@@ -22,6 +22,13 @@ import type { NextRequest } from "next/server";
  *   quebraria o visual inteiro. Risco associado (injeção de CSS) é muito menor que o de
  *   script, e não há sink de HTML no código.
  *
+ * ⚠ TODA PÁGINA PRECISA SER DINÂMICA. O nonce nasce por requisição; uma página estática
+ * é pré-renderizada no build, quando ele ainda não existe. Os <script> dela saem sem
+ * nonce, a CSP bloqueia todo o JavaScript e o React nunca troca o bloco de Suspense pelo
+ * conteúdo — a página fica EM BRANCO. Já aconteceu com /regras e /legal em produção.
+ * Ao criar uma página nova, marque `export const dynamic = "force-dynamic"` e confira no
+ * `npm run build` que ela aparece como ƒ (Dynamic), nunca ○ (Static).
+ *
  * Em desenvolvimento a CSP é relaxada: o HMR/React Refresh injeta scripts sem nonce e
  * precisa de 'unsafe-eval'. A CSP endurecida por nonce vale só em produção (e no
  * `next start` de um build de produção, onde ela é testada antes de subir).
