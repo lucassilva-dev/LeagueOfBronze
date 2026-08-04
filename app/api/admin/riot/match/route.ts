@@ -100,6 +100,31 @@ function getRiotApiErrorMessage(raw: unknown) {
   return undefined;
 }
 
+/**
+ * Traduz a recusa da Riot para uma mensagem que o organizador entende, sem repassar
+ * texto cru da API. O caso que mais importa é o 429: as políticas da Riot exigem que o
+ * app respeite o limite de requisições, então aqui a gente PARA e diz quantos segundos
+ * esperar (cabeçalho Retry-After) em vez de deixar o usuário martelar o botão e afundar
+ * mais ainda a cota.
+ */
+function mensagemDeRecusaDaRiot(status: number, retryAfter: string | null, riotError?: string) {
+  if (status === 429) {
+    const segundos = Number(retryAfter);
+    const espera = Number.isFinite(segundos) && segundos > 0 ? `${segundos} segundo(s)` : "alguns instantes";
+    return `Limite de requisições da Riot atingido. Aguarde ${espera} antes de importar de novo.`;
+  }
+  if (status === 401 || status === 403) {
+    return "A Riot recusou a chave de API (expirada ou sem permissão). Renove a RIOT_API_KEY.";
+  }
+  if (status === 404) {
+    return "Partida não encontrada na Riot. Confira o ID do jogo e a região.";
+  }
+  if (status === 503 || status === 500) {
+    return "A API da Riot está instável agora. Tente novamente em alguns minutos.";
+  }
+  return `Falha ao consultar Riot (${status}). ` + (riotError || "Confira o ID do jogo e a RIOT_API_KEY.");
+}
+
 function getWinningSide(blueWins: number, redWins: number) {
   if (blueWins === redWins) return null;
   return blueWins > redWins ? ("BLUE" as const) : ("RED" as const);
@@ -151,14 +176,15 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       const riotError = getRiotApiErrorMessage(raw);
+      const retryAfter = response.headers.get("retry-after");
+      const status = response.status >= 400 && response.status < 600 ? response.status : 502;
+
+      // Repassa o Retry-After para o painel poder respeitar a espera pedida pela Riot.
+      const headers = retryAfter && status === 429 ? { "Retry-After": retryAfter } : undefined;
 
       return NextResponse.json(
-        {
-          error:
-            `Falha ao consultar Riot (${response.status}). ` +
-            (riotError || "Confira o ID do jogo e a RIOT_API_KEY."),
-        },
-        { status: response.status >= 400 && response.status < 600 ? response.status : 502 },
+        { error: mensagemDeRecusaDaRiot(response.status, retryAfter, riotError) },
+        { status, headers },
       );
     }
 

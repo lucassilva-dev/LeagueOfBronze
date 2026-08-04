@@ -4,6 +4,8 @@ import { ELO_ORDER } from "@/lib/design";
 
 const FICHA = [
   { k: "INSCRIÇÃO", v: "R$ 20,00 por pessoa" },
+  { k: "PREMIAÇÃO 1º", v: "R$ 420,00 · R$ 84,00 por jogador" },
+  { k: "PREMIAÇÃO 2º", v: "R$ 180,00 · R$ 36,00 por jogador" },
   { k: "MODALIDADE", v: "5v5 · Summoner’s Rift" },
   { k: "FORMAÇÃO", v: "Draft — capitães são os mids" },
   { k: "FASE DE PONTOS", v: "Melhor de 3 (MD3)" },
@@ -51,6 +53,7 @@ const PONTUACAO = [
   "Vitória na série (MD3) = 3 pontos · Derrota = 0.",
   "Critério de desempate: 1º confronto direto, 2º saldo de mapas, 3º sorteio.",
   "Os 2 primeiros da fase de pontos avançam para a Grande Final em MD5.",
+  "100% das inscrições vira premiação: R$ 600,00 arrecadados (30 × R$ 20,00) e R$ 600,00 distribuídos — R$ 420,00 ao campeão e R$ 180,00 ao vice, divididos igualmente entre os 5 jogadores de cada time. A organização não retém nenhum valor.",
 ];
 
 const CARTA_INTRO =

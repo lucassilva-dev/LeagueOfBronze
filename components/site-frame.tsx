@@ -108,17 +108,60 @@ export function SiteFrame({ children }: SiteFrameProps) {
               margin: "0 auto",
               padding: "22px clamp(16px,4vw,24px)",
               display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 16,
-              flexWrap: "wrap",
-              fontSize: 11,
-              letterSpacing: ".10em",
-              color: "#6f6656",
+              flexDirection: "column",
+              gap: 14,
             }}
           >
-            <span>OS BRONZES · 3ª EDIÇÃO · 2026</span>
-            <span>MECÂNICA DUVIDOSA · ENTRETENIMENTO IMACULADO</span>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 16,
+                flexWrap: "wrap",
+                fontSize: 11,
+                letterSpacing: ".10em",
+                color: "#6f6656",
+              }}
+            >
+              <span>OS BRONZES · 3ª EDIÇÃO · 2026</span>
+              <span>MECÂNICA DUVIDOSA · ENTRETENIMENTO IMACULADO</span>
+            </div>
+
+            {/*
+              Aviso exigido pelas políticas da Riot Games para produtos de terceiros.
+              O texto em inglês é o EXIGIDO literalmente pela política e não deve ser
+              editado nem traduzido; a versão em português abaixo é cortesia para o
+              público do site. Precisa ficar em local prontamente visível — por isso
+              está no rodapé de TODAS as páginas, e não escondido só na /legal.
+            */}
+            <div
+              style={{
+                borderTop: "1px solid rgba(201,138,75,.10)",
+                paddingTop: 13,
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+                fontSize: 11,
+                lineHeight: 1.6,
+                color: "#7d7263",
+              }}
+            >
+              <p style={{ margin: 0 }}>
+                Os Bronzes isn&rsquo;t endorsed by Riot Games and doesn&rsquo;t reflect the views or
+                opinions of Riot Games or anyone officially involved in producing or managing Riot
+                Games properties. Riot Games and all associated properties are trademarks or
+                registered trademarks of Riot Games, Inc.
+              </p>
+              <p style={{ margin: 0, color: "#6f6656" }}>
+                Os Bronzes não é endossado pela Riot Games e não reflete as visões ou opiniões da
+                Riot Games ou de qualquer pessoa oficialmente envolvida na produção ou gestão das
+                propriedades da Riot Games.{" "}
+                <Link href="/legal" style={{ color: "#c98a4b", textDecoration: "none" }}>
+                  Aviso legal e privacidade
+                </Link>
+              </p>
+            </div>
           </div>
         </footer>
       </div>
