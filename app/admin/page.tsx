@@ -1,18 +1,22 @@
-import { PageHero } from "@/components/page-hero";
-import { PageShell } from "@/components/page-shell";
 import { AdminDashboardClient } from "@/components/admin/admin-dashboard-client";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * O painel monta o próprio contorno: barra de comando fixa no topo, trilho lateral e área de
+ * trabalho. Por isso esta página não usa PageShell nem PageHero.
+ *
+ * Dois motivos concretos:
+ *  - o PageHero trazia "Painel de atualização" no visual ANTIGO, logo acima do painel novo —
+ *    dois cabeçalhos, duas linguagens visuais na mesma tela;
+ *  - o PageShell limita a 1160px e anima a partir de opacity 0. A barra de comando precisa
+ *    atravessar a largura toda para ficar fixa, e conteúdo que depende de animação para
+ *    aparecer já deixou páginas em branco neste projeto mais de uma vez.
+ */
 export default function AdminPage() {
   return (
-    <PageShell className="space-y-6">
-      <PageHero
-        badge="Admin"
-        title="Painel de atualização"
-        description="Gerencie times, jogadores e séries da fase regular, semifinal e final em MD3 ou MD5."
-      />
+    <main style={{ minHeight: "100vh" }}>
       <AdminDashboardClient />
-    </PageShell>
+    </main>
   );
 }

@@ -1,7 +1,7 @@
-﻿"use client";
+"use client";
 
-import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from "react";
+import { AlertTriangle, Pencil, Plus, Trash2 } from "lucide-react";
 
 import type {
   CardId,
@@ -13,6 +13,7 @@ import type {
   TournamentDataset,
 } from "@/lib/schema";
 import {
+  getKda,
   getSeriesFormat,
   getSeriesFormatLabel,
   getSeriesMaxGames,
@@ -24,11 +25,7 @@ import {
   isWalkoverSeries,
 } from "@/lib/tournament";
 import { formatDateLabel } from "@/lib/format";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label, LabelText } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { resolveRole } from "@/lib/design";
 import {
   createBlankGame,
   createBlankSeries,
@@ -38,6 +35,83 @@ import {
 } from "@/components/admin/shared";
 import { CARD_OPTIONS } from "@/lib/cards";
 import { CHAMPIONS } from "@/lib/champions";
+import {
+  Banner,
+  BlockTitle,
+  Button,
+  C,
+  Card,
+  Chip,
+  Empty,
+  Field,
+  Input,
+  ScrollX,
+  SectionHead,
+  Select,
+  display,
+  tabular,
+} from "@/components/admin/ui";
+
+/**
+ * Painel de séries — a tela mais usada do admin: alguém pega o print do fim de partida e
+ * lança o resultado.
+ *
+ * Desenho: LISTA à esquerda + EDITOR à direita. Antes as 16 séries vinham empilhadas, o que
+ * obrigava a rolar a página inteira para achar o jogo do dia.
+ *
+ * O trabalho real acontece na grade de K/D/A, então ela ganhou cabeçalho de coluna visível,
+ * números tabulares e o KDA calculado ao lado — dá para conferir o print sem sair do teclado.
+ */
+
+// ---------------------------------------------------------------- layout
+
+/**
+ * Regras que dependem de media query (não dá com estilo inline) e o realce de foco.
+ * São classes próprias deste painel, não utilitárias do Tailwind.
+ */
+const CSS_PAINEL = `
+.lob-series *:focus-visible{outline:2px solid ${C.bronzeHi};outline-offset:2px;border-radius:2px}
+.lob-series-grid{display:grid;gap:16px;grid-template-columns:268px minmax(0,1fr);align-items:start}
+.lob-series-lista{max-height:calc(100vh - 250px);min-height:180px;overflow-y:auto;overflow-x:hidden}
+.lob-2col{display:grid;gap:12px;grid-template-columns:repeat(2,minmax(0,1fr))}
+.lob-3col{display:grid;gap:12px;grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:1050px){
+  .lob-series-grid{grid-template-columns:minmax(0,1fr)}
+  .lob-series-lista{max-height:340px}
+}
+@media (max-width:640px){
+  .lob-2col,.lob-3col{grid-template-columns:minmax(0,1fr)}
+}
+`;
+
+/** Colunas da grade de estatísticas — usadas pelo cabeçalho E pelas linhas, para alinhar. */
+const GRADE_STATS = "minmax(140px,1.6fr) minmax(120px,1.2fr) 54px 54px 54px 62px 42px";
+const LARGURA_MIN_STATS = 620;
+const GRADE_BANS = "minmax(120px,1fr) minmax(140px,1.3fr) 42px";
+
+const soLeitores: CSSProperties = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: "hidden",
+  clipPath: "inset(50%)",
+  whiteSpace: "nowrap",
+  border: 0,
+};
+
+const caixaLeitura: CSSProperties = {
+  padding: "9px 11px",
+  fontSize: 13,
+  color: C.ink2,
+  background: "rgba(0,0,0,.20)",
+  border: `1px dashed ${C.line}`,
+  borderRadius: 3,
+  wordBreak: "break-all",
+};
+
+// ---------------------------------------------------------------- helpers de leitura
 
 function getTeamName(dataset: TournamentDataset, teamId: string) {
   return dataset.teams.find((team) => team.id === teamId)?.name ?? teamId ?? "—";
@@ -63,26 +137,34 @@ function getSeriesStateLabel(isWalkover: boolean, hasWinner: boolean) {
   return "Em andamento";
 }
 
-function getDefaultSeriesSettings(format: SeriesFormat) {
-  if (format === "BO5") {
-    return {
-      maxGames: 5,
-      targetWins: 3,
-      formatLabel: "MD5",
-    };
-  }
-
-  return {
-    maxGames: 3,
-    targetWins: 2,
-    formatLabel: "MD3",
-  };
+/** Só dígitos: o campo é texto com teclado numérico, então limpamos o que vier colado. */
+function soDigitos(value: string) {
+  const limpo = value.replace(/[^0-9]/g, "");
+  if (!limpo) return 0;
+  const numero = Number(limpo);
+  return Number.isFinite(numero) ? numero : 0;
 }
 
-function getSelectedSeriesSettings(
-  selectedSeries: SeriesMatch | null,
-  draft: TournamentDataset,
-) {
+/** Ordena o elenco por rota (TOP, SEL, MID, ADC, SUP) — a ordem em que o print mostra. */
+function ordenarPorRota(players: Player[]) {
+  return players
+    .slice()
+    .sort((a, b) => resolveRole(a.role1).order - resolveRole(b.role1).order || a.nick.localeCompare(b.nick, "pt-BR"));
+}
+
+function rotuloJogador(dataset: TournamentDataset, player: Player) {
+  return `${resolveRole(player.role1).short} · ${player.nick} — ${getTeamName(dataset, player.teamId)}`;
+}
+
+function getDefaultSeriesSettings(format: SeriesFormat) {
+  if (format === "BO5") {
+    return { maxGames: 5, targetWins: 3, formatLabel: "MD5" };
+  }
+
+  return { maxGames: 3, targetWins: 2, formatLabel: "MD3" };
+}
+
+function getSelectedSeriesSettings(selectedSeries: SeriesMatch | null, draft: TournamentDataset) {
   const defaults = getDefaultSeriesSettings(draft.tournament.format);
 
   if (!selectedSeries) {
@@ -127,6 +209,124 @@ function getGamesSectionDescription(
 
   return `${formatLabel} com até ${maxGames} jogos. A série fecha quando um time alcançar ${targetWins} vitórias.`;
 }
+
+// ---------------------------------------------------------------- auditoria do rascunho
+
+/**
+ * #3 da auditoria: uma linha em branco derrubava o salvamento do painel inteiro com um erro
+ * técnico por índice de array. Aqui o problema é detectado ANTES, com nome de série e número
+ * de jogo, e a linha totalmente vazia (que nunca é intencional) pode ser descartada de uma vez.
+ */
+type EstadoLinha = "ok" | "vazia" | "incompleta" | "repetida" | "forasteira";
+
+/** Linha sem jogador, sem campeão e sem número digitado: sobra de clique no "+ Linha". */
+function isLinhaDescartavel(row: PlayerGameStats) {
+  return (
+    !row.playerId.trim() &&
+    !(row.champion ?? "").trim() &&
+    !row.kills &&
+    !row.deaths &&
+    !row.assists
+  );
+}
+
+function getEstadosDasLinhas(rows: PlayerGameStats[], idsDoConfronto: Set<string>): EstadoLinha[] {
+  const vistos = new Set<string>();
+
+  return rows.map((row) => {
+    if (isLinhaDescartavel(row)) return "vazia";
+
+    const playerId = row.playerId.trim();
+    const champion = (row.champion ?? "").trim();
+    if (!playerId || !champion) return "incompleta";
+    if (vistos.has(playerId)) return "repetida";
+
+    vistos.add(playerId);
+    if (idsDoConfronto.size > 0 && !idsDoConfronto.has(playerId)) return "forasteira";
+    return "ok";
+  });
+}
+
+type AuditoriaSerie = {
+  bloqueios: string[];
+  estadosPorJogo: EstadoLinha[][];
+  jogosComProblema: number[];
+  descartaveis: number;
+};
+
+function auditarSerie(series: SeriesMatch, draft: TournamentDataset): AuditoriaSerie {
+  const bloqueios: string[] = [];
+  const estadosPorJogo: EstadoLinha[][] = [];
+  const jogosComProblema: number[] = [];
+  let descartaveis = 0;
+
+  if (!series.teamAId || !series.teamBId) {
+    bloqueios.push("Falta escolher o Time A e/ou o Time B.");
+  } else if (series.teamAId === series.teamBId) {
+    bloqueios.push("Time A e Time B são o mesmo time.");
+  }
+
+  if (isWalkoverSeries(series)) {
+    return { bloqueios, estadosPorJogo, jogosComProblema, descartaveis };
+  }
+
+  const maxGames = getSeriesMaxGames(series, draft);
+  if (series.games.length > maxGames) {
+    bloqueios.push(
+      `${getSeriesFormatLabel(series, draft)} aceita no máximo ${maxGames} jogos (esta série tem ${series.games.length}).`,
+    );
+  }
+
+  const nomeA = getTeamName(draft, series.teamAId);
+  const nomeB = getTeamName(draft, series.teamBId);
+  const idsDoConfronto = new Set(
+    draft.players
+      .filter((player) => player.teamId === series.teamAId || player.teamId === series.teamBId)
+      .map((player) => player.id),
+  );
+
+  series.games.forEach((game, gameIndex) => {
+    const estados = getEstadosDasLinhas(game.statsByPlayer, idsDoConfronto);
+    estadosPorJogo.push(estados);
+    descartaveis += estados.filter((estado) => estado === "vazia").length;
+
+    let temProblema = false;
+    const jogo = `Jogo ${gameIndex + 1}`;
+
+    if (
+      !game.winnerTeamId ||
+      (game.winnerTeamId !== series.teamAId && game.winnerTeamId !== series.teamBId)
+    ) {
+      bloqueios.push(`${jogo}: falta marcar o time vencedor.`);
+      temProblema = true;
+    }
+
+    estados.forEach((estado, rowIndex) => {
+      const linha = `${jogo}, linha ${rowIndex + 1}`;
+      if (estado === "incompleta") {
+        bloqueios.push(`${linha}: falta o jogador ou o campeão.`);
+        temProblema = true;
+      } else if (estado === "repetida") {
+        bloqueios.push(`${linha}: o mesmo jogador aparece duas vezes.`);
+        temProblema = true;
+      } else if (estado === "forasteira") {
+        bloqueios.push(`${linha}: jogador não pertence a ${nomeA} nem a ${nomeB}.`);
+        temProblema = true;
+      }
+    });
+
+    if (!estados.includes("ok")) {
+      bloqueios.push(`${jogo}: nenhuma linha de K/D/A válida — sem isso o MVP não é calculado.`);
+      temProblema = true;
+    }
+
+    if (temProblema) jogosComProblema.push(gameIndex);
+  });
+
+  return { bloqueios, estadosPorJogo, jogosComProblema, descartaveis };
+}
+
+// ---------------------------------------------------------------- importação da Riot
 
 type RiotImportedParticipant = {
   participantId: number;
@@ -338,23 +538,14 @@ function getAutoMvpDisplay(game: SeriesMatch["games"][number], roster: Player[])
   const autoMvpPlayer = roster.find((player) => player.id === autoMvpPlayerId) ?? null;
 
   if (autoMvpPlayer) {
-    return {
-      text: autoMvpPlayer.nick,
-      muted: false,
-    };
+    return { text: autoMvpPlayer.nick, muted: false };
   }
 
   if (autoMvpPlayerId) {
-    return {
-      text: autoMvpPlayerId,
-      muted: false,
-    };
+    return { text: autoMvpPlayerId, muted: false };
   }
 
-  return {
-    text: "Preencha K/D/A para calcular",
-    muted: true,
-  };
+  return { text: "Preencha K/D/A para calcular", muted: true };
 }
 
 function getNameVariants(value: string | null | undefined) {
@@ -478,6 +669,102 @@ function applyRiotMatchToSeriesGame({
   };
 }
 
+// ---------------------------------------------------------------- peças visuais locais
+
+/**
+ * #33: o painel é desmontado ao trocar de aba, então a seleção não pode morar só no estado
+ * do componente. Guardar em módulo devolve a mesma série ao voltar, sem tocar no shell.
+ */
+let serieLembrada: string | null = null;
+
+/** Cabeçalho de coluna da grade (sigla curta + nome por extenso no title). */
+function ColunaTitulo({
+  children,
+  title,
+  center,
+}: Readonly<{ children: ReactNode; title?: string; center?: boolean }>) {
+  return (
+    <span
+      title={title}
+      style={{
+        fontSize: 9.5,
+        letterSpacing: ".16em",
+        textTransform: "uppercase",
+        color: C.bronze,
+        textAlign: center ? "center" : "left",
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+/** Botão só de ícone: o nome acessível vem do texto escondido, não de um aria-label solto. */
+function BotaoIcone({
+  onClick,
+  label,
+  disabled,
+  tone = "ghost",
+}: Readonly<{ onClick: () => void; label: string; disabled?: boolean; tone?: "ghost" | "danger" }>) {
+  return (
+    <Button tone={tone} small onClick={onClick} disabled={disabled} title={label} style={{ padding: "7px 8px" }}>
+      <Trash2 size={14} aria-hidden />
+      <span style={soLeitores}>{label}</span>
+    </Button>
+  );
+}
+
+/**
+ * Campo de campeão com sugestões do datalist. Fica local (e não em ui.tsx) porque o `Input`
+ * do kit não carrega `list` — e só esta tela precisa disso. O visual é o mesmo do kit.
+ */
+function InputCampeao({
+  value,
+  onChange,
+  ariaLabel,
+  placeholder,
+}: Readonly<{ value: string; onChange: (v: string) => void; ariaLabel: string; placeholder: string }>) {
+  return (
+    <input
+      aria-label={ariaLabel}
+      placeholder={placeholder}
+      list="champions-datalist"
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      style={{
+        width: "100%",
+        minWidth: 0,
+        padding: "9px 11px",
+        fontFamily: "inherit",
+        fontSize: 13,
+        color: C.ink,
+        background: "rgba(0,0,0,.34)",
+        border: `1px solid ${C.line}`,
+        borderRadius: 3,
+      }}
+    />
+  );
+}
+
+function LinhaVazia({ children }: Readonly<{ children: ReactNode }>) {
+  return (
+    <p
+      style={{
+        margin: 0,
+        padding: "12px 14px",
+        border: `1px dashed ${C.line}`,
+        borderRadius: 3,
+        fontSize: 12.5,
+        color: C.ink4,
+      }}
+    >
+      {children}
+    </p>
+  );
+}
+
+// ---------------------------------------------------------------- painel
+
 export function AdminSeriesPanel({
   draft,
   mutateDraft,
@@ -493,10 +780,16 @@ export function AdminSeriesPanel({
     [draft.seriesMatches],
   );
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(serieLembrada);
   const [riotMatchIdsByGame, setRiotMatchIdsByGame] = useState<Record<string, string>>({});
   const [riotImportStatusByGame, setRiotImportStatusByGame] = useState<Record<string, RiotImportStatus>>({});
   const [riotImportingGameKey, setRiotImportingGameKey] = useState<string | null>(null);
+  const [renomeandoId, setRenomeandoId] = useState(false);
+  const [idRascunho, setIdRascunho] = useState("");
+  const [erroId, setErroId] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<{ id: number; escopo: string; texto: string; tom: "ok" | "warn" } | null>(
+    null,
+  );
 
   useEffect(() => {
     if (!selectedId) return;
@@ -504,20 +797,65 @@ export function AdminSeriesPanel({
     setSelectedId(null);
   }, [draft.seriesMatches, selectedId]);
 
+  // Espelha a seleção fora do componente para sobreviver à troca de aba (#33).
+  useEffect(() => {
+    serieLembrada = selectedId;
+  }, [selectedId]);
+
+  // Trocar de série cancela uma renomeação pela metade.
+  useEffect(() => {
+    setRenomeandoId(false);
+    setErroId(null);
+  }, [selectedId]);
+
+  // #32: o retorno some sozinho para não virar ruído permanente.
+  useEffect(() => {
+    if (!aviso) return;
+    const timer = globalThis.setTimeout(() => setAviso(null), 5000);
+    return () => globalThis.clearTimeout(timer);
+  }, [aviso]);
+
+  const avisar = (escopo: string, texto: string, tom: "ok" | "warn" = "ok") => {
+    setAviso({ id: Date.now(), escopo, texto, tom });
+  };
+
+  const Aviso = ({ escopo }: Readonly<{ escopo: string }>) => {
+    if (!aviso || aviso.escopo !== escopo) return null;
+    return (
+      <span role="status" style={{ display: "inline-flex" }}>
+        <Chip tone={aviso.tom === "ok" ? "ok" : "warn"}>{aviso.texto}</Chip>
+      </span>
+    );
+  };
+
   const selectedSeries = draft.seriesMatches.find((series) => series.id === selectedId) ?? null;
 
   const currentRosters = useMemo(() => {
-    if (!selectedSeries) return { teamAPlayers: [], teamBPlayers: [], combined: [] as typeof draft.players };
-    const teamAPlayers = draft.players.filter((player) => player.teamId === selectedSeries.teamAId);
-    const teamBPlayers = draft.players.filter((player) => player.teamId === selectedSeries.teamBId);
+    if (!selectedSeries) return { teamAPlayers: [], teamBPlayers: [], combined: [] as Player[] };
+    const teamAPlayers = ordenarPorRota(draft.players.filter((player) => player.teamId === selectedSeries.teamAId));
+    const teamBPlayers = ordenarPorRota(draft.players.filter((player) => player.teamId === selectedSeries.teamBId));
     return { teamAPlayers, teamBPlayers, combined: [...teamAPlayers, ...teamBPlayers] };
   }, [draft, selectedSeries]);
+
   const selectedSeriesSettings = getSelectedSeriesSettings(selectedSeries, draft);
   const selectedSeriesIsWalkover = selectedSeriesSettings.isWalkover;
   const selectedSeriesFormat = selectedSeriesSettings.format;
   const selectedSeriesFormatLabel = selectedSeriesSettings.formatLabel;
   const selectedSeriesMaxGames = selectedSeriesSettings.maxGames;
   const selectedSeriesTargetWins = selectedSeriesSettings.targetWins;
+
+  // Auditoria de TODAS as séries: alimenta o aviso do topo, o selo na lista e o vermelho no editor.
+  const auditorias = useMemo(() => {
+    const mapa = new Map<string, AuditoriaSerie>();
+    for (const series of draft.seriesMatches) mapa.set(series.id, auditarSerie(series, draft));
+    return mapa;
+  }, [draft]);
+
+  const auditoriaSelecionada = selectedSeries ? auditorias.get(selectedSeries.id) ?? null : null;
+  const seriesComProblema = sortedSeries.filter(
+    (series) => (auditorias.get(series.id)?.bloqueios.length ?? 0) > 0,
+  );
+  const totalDescartaveis = [...auditorias.values()].reduce((total, item) => total + item.descartaveis, 0);
 
   const setRiotMatchIdForGame = (seriesId: string, gameIndex: number, value: string) => {
     const key = getGameImportKey(seriesId, gameIndex);
@@ -548,12 +886,55 @@ export function AdminSeriesPanel({
     setRiotImportingGameKey((prev) => (prev?.startsWith(prefix) ? null : prev));
   };
 
+  /** Remove as linhas totalmente em branco de uma série (#3). Devolve quantas saíram. */
+  const limparLinhasVazias = (seriesId: string) => {
+    const alvo = draft.seriesMatches.find((series) => series.id === seriesId);
+    if (!alvo) return 0;
+    const total = alvo.games.reduce(
+      (soma, game) => soma + game.statsByPlayer.filter((row) => isLinhaDescartavel(row)).length,
+      0,
+    );
+    if (total === 0) return 0;
+
+    mutateDraft((next) => {
+      const series = next.seriesMatches.find((row) => row.id === seriesId);
+      if (!series) return;
+      for (const game of series.games) {
+        game.statsByPlayer = game.statsByPlayer.filter((row) => !isLinhaDescartavel(row));
+      }
+    });
+    return total;
+  };
+
+  const limparTodasAsLinhasVazias = () => {
+    if (totalDescartaveis === 0) return;
+    mutateDraft((next) => {
+      for (const series of next.seriesMatches) {
+        for (const game of series.games) {
+          game.statsByPlayer = game.statsByPlayer.filter((row) => !isLinhaDescartavel(row));
+        }
+      }
+    });
+    avisar("topo", `${totalDescartaveis} linha(s) em branco descartada(s).`, "warn");
+  };
+
+  /**
+   * Trocar de série descarta as linhas em branco da anterior — elas só existem por clique
+   * acidental no "+ Linha" e derrubariam o salvamento do painel inteiro.
+   */
+  const selecionarSerie = (seriesId: string) => {
+    if (selectedId && selectedId !== seriesId) limparLinhasVazias(selectedId);
+    setSelectedId(seriesId);
+  };
+
   const createSeries = () => {
     const series = createBlankSeries(draft.tournament.format);
     mutateDraft((next) => {
       next.seriesMatches.push(series);
     });
+    if (selectedId) limparLinhasVazias(selectedId);
     setSelectedId(series.id);
+    avisar("topo", "Série criada. Escolha os dois times para começar.");
   };
 
   const deleteSeries = (seriesId: string) => {
@@ -563,14 +944,144 @@ export function AdminSeriesPanel({
     if (selectedId === seriesId) setSelectedId(null);
   };
 
+  /** #35: identificar pelos nomes dos times, não pelo id com timestamp. */
   const confirmDeleteSelectedSeries = () => {
     if (!selectedSeries) return;
     const score = getSeriesScore(selectedSeries, draft);
+    const nomeA = getTeamName(draft, selectedSeries.teamAId);
+    const nomeB = getTeamName(draft, selectedSeries.teamBId);
+    const quandoLabel = selectedSeries.date ? ` de ${formatDateLabel(selectedSeries.date)}` : "";
+    const jogos = selectedSeries.games.length;
     const shouldDelete = confirmBrowserAction(
-      `Excluir a série ${selectedSeries.id} (${score.teamAWins}-${score.teamBWins})? Essa ação remove os jogos lançados desta série no rascunho.`,
+      `Excluir a série ${nomeA} x ${nomeB}${quandoLabel} (${score.teamAWins}-${score.teamBWins})?\n\n` +
+        `Isso remove ${jogos} jogo(s) lançado(s) desta série no rascunho. Não dá para desfazer.`,
     );
     if (!shouldDelete) return;
     deleteSeries(selectedSeries.id);
+  };
+
+  const updateSelectedSeries = (recipe: (series: SeriesMatch) => void) => {
+    if (!selectedSeries) return;
+    mutateDraft((next) => {
+      const series = next.seriesMatches.find((row) => row.id === selectedSeries.id);
+      if (!series) return;
+      recipe(series);
+    });
+  };
+
+  /**
+   * #5: o ID da série vira a URL pública /partidas/[id] e também é a chave da seleção — editar
+   * direto fechava o editor na primeira tecla e deixava um ID pela metade. Agora é somente
+   * leitura e a renomeação é um ato explícito, com aviso do que muda.
+   */
+  const aplicarRenomeacao = () => {
+    if (!selectedSeries) return;
+    const novoId = slugifyValue(idRascunho);
+
+    if (!novoId) {
+      setErroId("Use letras, números e hífen — por exemplo: final-bronze-2026.");
+      return;
+    }
+    if (novoId === selectedSeries.id) {
+      setRenomeandoId(false);
+      setErroId(null);
+      return;
+    }
+    if (draft.seriesMatches.some((series) => series.id === novoId)) {
+      setErroId("Já existe outra série com esse ID.");
+      return;
+    }
+
+    const confirmou = confirmBrowserAction(
+      `Renomear a série para "${novoId}"?\n\n` +
+        `O link público muda de /partidas/${selectedSeries.id} para /partidas/${novoId}. ` +
+        `Quem tiver o link antigo salvo vai cair em página inexistente.`,
+    );
+    if (!confirmou) return;
+
+    const idAnterior = selectedSeries.id;
+    mutateDraft((next) => {
+      const series = next.seriesMatches.find((row) => row.id === idAnterior);
+      if (series) series.id = novoId;
+    });
+    clearRiotStateForSeries(idAnterior);
+    setSelectedId(novoId);
+    setRenomeandoId(false);
+    setErroId(null);
+    avisar("identidade", "ID alterado — o link público só muda de verdade depois de salvar.", "warn");
+  };
+
+  /**
+   * #6: trocar um time numa série já lançada deixava vencedor, stats e bans do time ANTIGO
+   * pendurados no rascunho. Confirmamos e limpamos o que ficou órfão.
+   */
+  const trocarTimeDaSerie = (lado: "A" | "B", novoTimeId: string) => {
+    if (!selectedSeries) return;
+    const anterior = lado === "A" ? selectedSeries.teamAId : selectedSeries.teamBId;
+    if (anterior === novoTimeId) return;
+
+    const timesFinais = lado === "A" ? [novoTimeId, selectedSeries.teamBId] : [selectedSeries.teamAId, novoTimeId];
+    const idsValidos = new Set(
+      draft.players.filter((player) => timesFinais.includes(player.teamId)).map((player) => player.id),
+    );
+
+    let linhasOrfas = 0;
+    let bansOrfaos = 0;
+    let vencedoresOrfaos = 0;
+    for (const game of selectedSeries.games) {
+      linhasOrfas += game.statsByPlayer.filter(
+        (row) => row.playerId.trim() && !idsValidos.has(row.playerId),
+      ).length;
+      bansOrfaos += (game.bans ?? []).filter((ban) => ban.teamId && !timesFinais.includes(ban.teamId)).length;
+      if (game.winnerTeamId && !timesFinais.includes(game.winnerTeamId)) vencedoresOrfaos += 1;
+    }
+
+    if (selectedSeries.games.length > 0) {
+      const confirmou = confirmBrowserAction(
+        `Trocar o Time ${lado} de "${getTeamName(draft, anterior)}" para "${getTeamName(draft, novoTimeId)}"?\n\n` +
+          `Esta série já tem ${selectedSeries.games.length} jogo(s) lançado(s). Serão apagados: ` +
+          `${linhasOrfas} linha(s) de K/D/A, ${bansOrfaos} ban(s) e o vencedor de ${vencedoresOrfaos} jogo(s) ` +
+          `que ainda apontam para o time removido.`,
+      );
+      if (!confirmou) return;
+    }
+
+    updateSelectedSeries((series) => {
+      if (lado === "A") series.teamAId = novoTimeId;
+      else series.teamBId = novoTimeId;
+
+      const times = [series.teamAId, series.teamBId];
+
+      if (
+        series.walkoverWinnerTeamId &&
+        series.walkoverWinnerTeamId !== series.teamAId &&
+        series.walkoverWinnerTeamId !== series.teamBId
+      ) {
+        delete series.walkoverWinnerTeamId;
+        delete series.walkoverReason;
+      }
+
+      for (const game of series.games) {
+        if (game.winnerTeamId && !times.includes(game.winnerTeamId)) game.winnerTeamId = "";
+        game.statsByPlayer = game.statsByPlayer.filter(
+          (row) => !row.playerId.trim() || idsValidos.has(row.playerId),
+        );
+        if (game.mvpPlayerId && !idsValidos.has(game.mvpPlayerId)) game.mvpPlayerId = "";
+        if (game.bans) game.bans = game.bans.filter((ban) => !ban.teamId || times.includes(ban.teamId));
+      }
+
+      if (series.cardsUsed) {
+        series.cardsUsed = series.cardsUsed.filter((card) => !card.teamId || times.includes(card.teamId));
+      }
+    });
+
+    if (selectedSeries.games.length > 0) {
+      avisar(
+        "times",
+        `Time ${lado} trocado. ${linhasOrfas} linha(s) e ${bansOrfaos} ban(s) órfãos removidos.`,
+        "warn",
+      );
+    }
   };
 
   const updateWalkoverWinner = (winnerTeamId: string) => {
@@ -598,15 +1109,6 @@ export function AdminSeriesPanel({
     clearRiotStateForSeries(selectedSeries.id);
   };
 
-  const updateSelectedSeries = (recipe: (series: NonNullable<typeof selectedSeries>) => void) => {
-    if (!selectedSeries) return;
-    mutateDraft((next) => {
-      const series = next.seriesMatches.find((row) => row.id === selectedSeries.id);
-      if (!series) return;
-      recipe(series);
-    });
-  };
-
   const updateSeriesFormat = (nextFormat: SeriesFormat) => {
     if (!selectedSeries) return;
     const nextMaxGames = nextFormat === "BO5" ? 5 : 3;
@@ -626,21 +1128,26 @@ export function AdminSeriesPanel({
     });
   };
 
+  /** #2/#26: as linhas saem na ordem das rotas (TOP, SEL, MID, ADC, SUP), time A e depois B. */
   const fillRosterRowsForGame = (gameIndex: number) => {
     if (!selectedSeries) return;
+    const game = selectedSeries.games[gameIndex];
+    if (!game) return;
+
+    const jaListados = new Set(game.statsByPlayer.map((row) => row.playerId));
+    const faltando = currentRosters.combined.filter((player) => !jaListados.has(player.id));
+
+    if (faltando.length === 0) {
+      avisar(`jogo:${gameIndex}`, "O elenco dos dois times já está na lista.", "warn");
+      return;
+    }
+
     updateSelectedSeries((series) => {
-      const game = series.games[gameIndex];
-      if (!game) return;
-      const playerIds = new Set(game.statsByPlayer.map((row) => row.playerId));
-      const desired = draft.players.filter(
-        (player) => player.teamId === series.teamAId || player.teamId === series.teamBId,
-      );
-      for (const player of desired) {
-        if (!playerIds.has(player.id)) {
-          game.statsByPlayer.push(createBlankStatsRow(player.id));
-        }
-      }
+      const alvo = series.games[gameIndex];
+      if (!alvo) return;
+      for (const player of faltando) alvo.statsByPlayer.push(createBlankStatsRow(player.id));
     });
+    avisar(`jogo:${gameIndex}`, `${faltando.length} linha(s) adicionada(s) na ordem das rotas.`);
   };
 
   const updateGameWinner = (gameIndex: number, winnerTeamId: string) => {
@@ -652,19 +1159,22 @@ export function AdminSeriesPanel({
   };
 
   const updateGameDuration = (gameIndex: number, value: string) => {
+    const digitos = value.replace(/[^0-9]/g, "");
     updateSelectedSeries((series) => {
       const current = series.games[gameIndex];
       if (!current) return;
-      current.durationMin = value ? Number(value) : undefined;
+      current.durationMin = digitos ? Number(digitos) : undefined;
     });
   };
 
   const addStatsRowToGame = (gameIndex: number) => {
+    const total = (selectedSeries?.games[gameIndex]?.statsByPlayer.length ?? 0) + 1;
     updateSelectedSeries((series) => {
       const current = series.games[gameIndex];
       if (!current) return;
       current.statsByPlayer.push(createBlankStatsRow());
     });
+    avisar(`jogo:${gameIndex}`, `Linha ${total} adicionada — escolha o jogador.`);
   };
 
   const updateStatsRowField = <K extends keyof PlayerGameStats>(
@@ -693,6 +1203,7 @@ export function AdminSeriesPanel({
       if (!game.bans) game.bans = [];
       game.bans.push({ teamId: series.teamAId || "", championName: "" });
     });
+    avisar(`bans:${gameIndex}`, "Ban adicionado.");
   };
 
   const updateBanField = (
@@ -715,11 +1226,47 @@ export function AdminSeriesPanel({
     });
   };
 
+  /** #8: remover jogo apaga muita digitação — confirma citando o jogo e o que se perde. */
+  const removerJogo = (gameIndex: number) => {
+    if (!selectedSeries) return;
+    const game = selectedSeries.games[gameIndex];
+    if (!game) return;
+
+    const linhas = game.statsByPlayer.length;
+    const bans = game.bans?.length ?? 0;
+    const nomeA = getTeamName(draft, selectedSeries.teamAId);
+    const nomeB = getTeamName(draft, selectedSeries.teamBId);
+
+    const confirmou = confirmBrowserAction(
+      `Remover o Jogo ${gameIndex + 1} de ${nomeA} x ${nomeB}?\n\n` +
+        `Isso apaga o vencedor, a duração, ${linhas} linha(s) de K/D/A e ${bans} ban(s). Não dá para desfazer.`,
+    );
+    if (!confirmou) return;
+
+    updateSelectedSeries((series) => {
+      series.games.splice(gameIndex, 1);
+    });
+    // As chaves de importação são por índice; com os jogos deslocados elas deixam de valer.
+    clearRiotStateForSeries(selectedSeries.id);
+    avisar("jogos", `Jogo ${gameIndex + 1} removido.`, "warn");
+  };
+
+  const adicionarJogo = () => {
+    if (!selectedSeries) return;
+    const total = selectedSeries.games.length + 1;
+    updateSelectedSeries((series) => {
+      if (series.games.length >= selectedSeriesMaxGames) return;
+      series.games.push(createBlankGame());
+    });
+    avisar("jogos", `Jogo ${total} adicionado.`);
+  };
+
   const addCardToSeries = () => {
     updateSelectedSeries((series) => {
       if (!series.cardsUsed) series.cardsUsed = [];
       series.cardsUsed.push({ teamId: series.teamAId || "", cardId: CARD_OPTIONS[0].id });
     });
+    avisar("cartinhas", "Cartinha adicionada.");
   };
 
   const updateCardField = (cardIndex: number, field: "teamId" | "cardId", value: string) => {
@@ -805,11 +1352,20 @@ export function AdminSeriesPanel({
     }
   };
 
-  const seriesListContent =
+  /**
+   * #41: a roda do mouse sobre um campo focado alterava o número sem a pessoa perceber.
+   * Tirar o foco no wheel resolve para qualquer campo da grade de uma vez só.
+   */
+  const bloquearRoda = () => {
+    const ativo = globalThis.document?.activeElement;
+    if (ativo instanceof HTMLInputElement) ativo.blur();
+  };
+
+  // -------------------------------------------------------------- lista da esquerda
+
+  const listaDeSeries =
     sortedSeries.length === 0 ? (
-      <p className="rounded-xl border border-white/8 bg-white/[0.02] p-3 text-sm text-muted">
-        Nenhuma série cadastrada.
-      </p>
+      <LinhaVazia>Nenhuma série cadastrada. Comece por &quot;Nova série&quot;.</LinhaVazia>
     ) : (
       sortedSeries.map((series) => {
         const score = getSeriesScore(series, draft);
@@ -818,323 +1374,444 @@ export function AdminSeriesPanel({
         const teamA = getTeamName(draft, series.teamAId);
         const teamB = getTeamName(draft, series.teamBId);
         const isSelected = selectedSeries?.id === series.id;
-        const seriesStatusLabel = getSeriesStateLabel(isWalkover, Boolean(winner));
-        const buttonClassName = isSelected
-          ? "border-accent/30 bg-accent/10"
-          : "border-white/8 bg-white/[0.02] hover:bg-white/[0.04]";
+        const estadoLabel = getSeriesStateLabel(isWalkover, Boolean(winner));
+        const temProblema = (auditorias.get(series.id)?.bloqueios.length ?? 0) > 0;
 
         return (
           <button
             key={series.id}
             type="button"
-            className={`rounded-xl border px-3 py-3 text-left transition ${buttonClassName}`}
-            onClick={() => setSelectedId(series.id)}
+            onClick={() => selecionarSerie(series.id)}
+            style={{
+              display: "block",
+              width: "100%",
+              textAlign: "left",
+              padding: "10px 12px 10px 11px",
+              borderRadius: 3,
+              border: `1px solid ${isSelected ? C.line2 : C.line}`,
+              borderLeft: `3px solid ${isSelected ? C.bronzeHi : "transparent"}`,
+              background: isSelected ? "rgba(201,138,75,.12)" : "rgba(0,0,0,.20)",
+              color: C.ink,
+              cursor: "pointer",
+              fontFamily: "inherit",
+            }}
           >
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="truncate font-semibold">
-                  {teamA} vs {teamB}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 10,
+                letterSpacing: ".10em",
+                textTransform: "uppercase",
+                color: C.ink4,
+                ...tabular,
+              }}
+            >
+              <span>{formatDateLabel(series.date)}</span>
+              <span aria-hidden>•</span>
+              <span>{getSeriesStageLabel(series)}</span>
+              <span aria-hidden>•</span>
+              <span>{getSeriesFormatLabel(series, draft)}</span>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: 12.5,
+                    color: isSelected ? C.ink : C.ink2,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {teamA}
                 </p>
-                <p className="text-xs text-muted">
-                  {getSeriesStageLabel(series)} • {getSeriesFormatLabel(series, draft)} •{" "}
-                  {formatDateLabel(series.date)}
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: 12.5,
+                    color: isSelected ? C.ink : C.ink2,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {teamB}
                 </p>
               </div>
-              <div className="shrink-0 text-right">
-                <p className="font-display text-base font-bold text-accent">
-                  {score.teamAWins}-{score.teamBWins}
-                </p>
-                <p className="text-[10px] uppercase tracking-[0.16em] text-muted">
-                  {seriesStatusLabel}
-                </p>
+              <div
+                style={{
+                  fontFamily: display,
+                  fontSize: 20,
+                  lineHeight: 1,
+                  color: isSelected ? C.bronzeHi : C.bronze,
+                  ...tabular,
+                }}
+              >
+                {score.teamAWins}-{score.teamBWins}
               </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+              <Chip tone={isWalkover ? "warn" : winner ? "ok" : "neutro"}>{estadoLabel}</Chip>
+              {temProblema ? (
+                <Chip tone="danger" title="Esta série tem pendências que travam o salvamento">
+                  Pendências
+                </Chip>
+              ) : null}
             </div>
           </button>
         );
       })
     );
 
-  let selectedSeriesGamesContent: ReactNode = null;
-  if (selectedSeries) {
-    if (selectedSeriesIsWalkover) {
-      selectedSeriesGamesContent = (
-        <div className="rounded-xl border border-dashed border-white/10 p-4 text-sm text-muted">
-          {getWalkoverSummaryText(
-            draft,
-            selectedSeries.walkoverWinnerTeamId,
-            selectedSeriesTargetWins,
-            selectedSeries.walkoverReason,
-          )}
-        </div>
-      );
-    } else if (selectedSeries.games.length === 0) {
-      selectedSeriesGamesContent = (
-        <div className="rounded-xl border border-dashed border-white/10 p-4 text-sm text-muted">
-          Nenhum jogo nesta série.
-        </div>
-      );
-    } else {
-      selectedSeriesGamesContent = selectedSeries.games.map((game, gameIndex) => {
-        const riotImportKey = getGameImportKey(selectedSeries.id, gameIndex);
-        const riotImportStatus = riotImportStatusByGame[riotImportKey];
-        const riotMatchId = riotMatchIdsByGame[riotImportKey] ?? "";
-        const isImportingRiot = riotImportingGameKey === riotImportKey;
-        const autoMvpDisplay = getAutoMvpDisplay(game, currentRosters.combined);
-        const winnerSelectId = `${selectedSeries.id}-game-${gameIndex}-winner`;
-        const durationInputId = `${selectedSeries.id}-game-${gameIndex}-duration`;
+  // -------------------------------------------------------------- jogos da série
 
-        return (
-          <Card
-            key={`${selectedSeries.id}-game-${gameIndex}`}
-            className="min-w-0 overflow-hidden border-white/10 p-4"
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h4 className="font-display text-base font-bold tracking-wide">
-                Jogo {gameIndex + 1}
-              </h4>
-              <div className="flex w-full flex-wrap gap-2 sm:w-auto">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="max-w-full"
-                  onClick={() => fillRosterRowsForGame(gameIndex)}
-                >
-                  Preencher elenco
-                </Button>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  className="max-w-full"
-                  onClick={() =>
-                    updateSelectedSeries((series) => {
-                      series.games.splice(gameIndex, 1);
-                    })
-                  }
-                >
-                  <Trash2 className="h-4 w-4" /> Remover jogo
-                </Button>
-              </div>
-            </div>
+  const renderStatsRow = (
+    gameIndex: number,
+    row: PlayerGameStats,
+    rowIndex: number,
+    estado: EstadoLinha,
+  ) => {
+    const problema = estado === "incompleta" || estado === "repetida" || estado === "forasteira";
+    const corBorda = problema ? "rgba(212,87,74,.55)" : estado === "vazia" ? "rgba(224,163,58,.40)" : C.line;
+    const kda = getKda(row.kills, row.deaths, row.assists);
 
-            <div className="mt-3 rounded-xl border border-white/8 bg-white/[0.02] p-3">
-              <Label htmlFor={`${selectedSeries.id}-riot-match-${gameIndex}`}>
-                ID da partida LoL (Riot)
-              </Label>
-              <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-                <Input
-                  id={`${selectedSeries.id}-riot-match-${gameIndex}`}
-                  placeholder="Ex.: 3210692404 ou BR1_3210692404"
-                  value={riotMatchId}
-                  onChange={(e) =>
-                    setRiotMatchIdForGame(selectedSeries.id, gameIndex, e.target.value)
-                  }
-                />
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="w-full sm:w-auto"
-                  disabled={
-                    isImportingRiot ||
-                    !riotMatchId.trim() ||
-                    !selectedSeries.teamAId ||
-                    !selectedSeries.teamBId
-                  }
-                  onClick={() => void importGameFromRiot(gameIndex)}
-                >
-                  {isImportingRiot ? "Importando..." : "Importar da Riot"}
-                </Button>
-              </div>
-              <p className="mt-2 text-xs text-muted">
-                Preenche automaticamente vencedor, duração, campeões e K/D/A. MVP do jogo é calculado automaticamente por KDA.
-              </p>
-              {riotImportStatus ? (
-                <p
-                  className={`mt-2 rounded-lg border px-2.5 py-2 text-xs ${
-                    riotImportStatus.kind === "error"
-                      ? "border-red-400/20 bg-red-500/10 text-red-200"
-                      : "border-emerald-400/20 bg-emerald-500/10 text-emerald-200"
-                  }`}
-                >
-                  {riotImportStatus.text}
-                </p>
+    const motivo =
+      estado === "incompleta"
+        ? "Falta o jogador ou o campeão"
+        : estado === "repetida"
+          ? "Este jogador já está em outra linha deste jogo"
+          : estado === "forasteira"
+            ? "Jogador não pertence a nenhum dos dois times da série"
+            : estado === "vazia"
+              ? "Linha em branco — será descartada"
+              : undefined;
+
+    return (
+      <div
+        key={`g${gameIndex}-r${rowIndex}`}
+        title={motivo}
+        style={{
+          display: "grid",
+          gridTemplateColumns: GRADE_STATS,
+          gap: 8,
+          alignItems: "center",
+          minWidth: LARGURA_MIN_STATS,
+          padding: "7px 8px",
+          border: `1px solid ${corBorda}`,
+          borderRadius: 3,
+          background: problema ? "rgba(212,87,74,.06)" : "rgba(0,0,0,.18)",
+        }}
+      >
+        <Select
+          ariaLabel={`Jogador da linha ${rowIndex + 1}`}
+          value={row.playerId}
+          onChange={(value) => updateStatsRowField(gameIndex, rowIndex, "playerId", value)}
+        >
+          <option value="">Jogador…</option>
+          {currentRosters.combined.map((player) => (
+            <option key={player.id} value={player.id}>
+              {rotuloJogador(draft, player)}
+            </option>
+          ))}
+          {/* Jogador de fora do confronto continua listado para não sumir silenciosamente. */}
+          {row.playerId && !currentRosters.combined.some((player) => player.id === row.playerId) ? (
+            <option value={row.playerId}>{row.playerId} (fora da série)</option>
+          ) : null}
+        </Select>
+
+        <InputCampeao
+          ariaLabel={`Campeão da linha ${rowIndex + 1}`}
+          placeholder="Campeão"
+          value={row.champion ?? ""}
+          onChange={(valor) => updateStatsRowField(gameIndex, rowIndex, "champion", valor)}
+        />
+
+        <Input
+          numeric
+          ariaLabel={`Abates da linha ${rowIndex + 1}`}
+          value={row.kills}
+          onChange={(value) => updateStatsRowField(gameIndex, rowIndex, "kills", soDigitos(value))}
+        />
+        <Input
+          numeric
+          ariaLabel={`Mortes da linha ${rowIndex + 1}`}
+          value={row.deaths}
+          onChange={(value) => updateStatsRowField(gameIndex, rowIndex, "deaths", soDigitos(value))}
+        />
+        <Input
+          numeric
+          ariaLabel={`Assistências da linha ${rowIndex + 1}`}
+          value={row.assists}
+          onChange={(value) => updateStatsRowField(gameIndex, rowIndex, "assists", soDigitos(value))}
+        />
+
+        {/* KDA calculado ao vivo: confere o print sem tirar a mão do teclado. */}
+        <span
+          style={{
+            fontSize: 12.5,
+            textAlign: "center",
+            color: estado === "vazia" ? C.ink4 : C.okSoft,
+            ...tabular,
+          }}
+        >
+          {kda.toFixed(2)}
+        </span>
+
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <BotaoIcone
+            label={`Remover a linha ${rowIndex + 1}`}
+            onClick={() => removeStatsRowFromGame(gameIndex, rowIndex)}
+          />
+        </div>
+      </div>
+    );
+  };
+
+  const renderGame = (game: SeriesMatch["games"][number], gameIndex: number) => {
+    if (!selectedSeries) return null;
+
+    const riotImportKey = getGameImportKey(selectedSeries.id, gameIndex);
+    const riotImportStatus = riotImportStatusByGame[riotImportKey];
+    const riotMatchId = riotMatchIdsByGame[riotImportKey] ?? "";
+    const isImportingRiot = riotImportingGameKey === riotImportKey;
+    const autoMvpDisplay = getAutoMvpDisplay(game, currentRosters.combined);
+    const estados =
+      auditoriaSelecionada?.estadosPorJogo[gameIndex] ??
+      game.statsByPlayer.map((): EstadoLinha => "ok");
+    const jogoComProblema = auditoriaSelecionada?.jogosComProblema.includes(gameIndex) ?? false;
+    const vencedorLabel = game.winnerTeamId ? getTeamName(draft, game.winnerTeamId) : null;
+
+    return (
+      <Card
+        key={`${selectedSeries.id}-game-${gameIndex}`}
+        padding={14}
+        style={{
+          minWidth: 0,
+          marginTop: 12,
+          borderColor: jogoComProblema ? "rgba(212,87,74,.45)" : C.line,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <h4 style={{ fontFamily: display, fontSize: 17, color: C.ink, margin: 0 }}>
+            Jogo {gameIndex + 1}
+          </h4>
+          {vencedorLabel ? <Chip tone="ok">Vitória: {vencedorLabel}</Chip> : <Chip tone="warn">Sem vencedor</Chip>}
+          {jogoComProblema ? <Chip tone="danger">Pendências neste jogo</Chip> : null}
+
+          <div style={{ display: "flex", gap: 8, marginLeft: "auto", alignItems: "center", flexWrap: "wrap" }}>
+            <Aviso escopo={`jogo:${gameIndex}`} />
+            <Button tone="ghost" small onClick={() => fillRosterRowsForGame(gameIndex)}>
+              Preencher elenco
+            </Button>
+            {/* O destrutivo fica afastado do botão usado o tempo todo (#8). */}
+            <span style={{ width: 1, height: 22, background: C.line, margin: "0 4px" }} aria-hidden />
+            <Button tone="danger" small onClick={() => removerJogo(gameIndex)}>
+              <Trash2 size={14} aria-hidden /> Remover jogo
+            </Button>
+          </div>
+        </div>
+
+        <div
+          style={{
+            marginTop: 12,
+            padding: 12,
+            border: `1px solid ${C.line}`,
+            borderRadius: 3,
+            background: "rgba(0,0,0,.18)",
+          }}
+        >
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
+            <Field
+              label="ID da partida no LoL (Riot)"
+              style={{ flex: "1 1 240px" }}
+              hint="Preenche vencedor, duração, campeões e K/D/A. O MVP sai do maior KDA."
+            >
+              <Input
+                placeholder="Ex.: 3210692404 ou BR1_3210692404"
+                value={riotMatchId}
+                onChange={(value) => setRiotMatchIdForGame(selectedSeries.id, gameIndex, value)}
+              />
+            </Field>
+            <Button
+              tone="ghost"
+              disabled={
+                isImportingRiot ||
+                !riotMatchId.trim() ||
+                !selectedSeries.teamAId ||
+                !selectedSeries.teamBId
+              }
+              onClick={() => void importGameFromRiot(gameIndex)}
+              style={{ marginBottom: 22 }}
+            >
+              {isImportingRiot ? "Importando…" : "Importar da Riot"}
+            </Button>
+          </div>
+
+          {riotImportStatus ? (
+            <p
+              role={riotImportStatus.kind === "error" ? "alert" : "status"}
+              style={{
+                margin: "10px 0 0",
+                padding: "8px 10px",
+                borderRadius: 3,
+                fontSize: 12,
+                lineHeight: 1.5,
+                border: `1px solid ${riotImportStatus.kind === "error" ? "rgba(212,87,74,.45)" : "rgba(70,214,200,.40)"}`,
+                background: riotImportStatus.kind === "error" ? "rgba(212,87,74,.10)" : "rgba(70,214,200,.09)",
+                color: riotImportStatus.kind === "error" ? C.dangerSoft : C.okSoft,
+              }}
+            >
+              {riotImportStatus.text}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="lob-3col" style={{ marginTop: 12 }}>
+          <Field label="Time vencedor">
+            <Select
+              value={game.winnerTeamId}
+              onChange={(value) => updateGameWinner(gameIndex, value)}
+              style={
+                game.winnerTeamId ? undefined : { borderColor: "rgba(224,163,58,.45)" }
+              }
+            >
+              <option value="">Selecione</option>
+              {selectedSeries.teamAId ? (
+                <option value={selectedSeries.teamAId}>{getTeamName(draft, selectedSeries.teamAId)}</option>
               ) : null}
+              {selectedSeries.teamBId ? (
+                <option value={selectedSeries.teamBId}>{getTeamName(draft, selectedSeries.teamBId)}</option>
+              ) : null}
+            </Select>
+          </Field>
+
+          <Field label="Duração (min)">
+            <Input
+              numeric
+              value={game.durationMin ?? ""}
+              onChange={(value) => updateGameDuration(gameIndex, value)}
+            />
+          </Field>
+
+          <div>
+            <span
+              style={{
+                display: "block",
+                fontSize: 10,
+                letterSpacing: ".16em",
+                textTransform: "uppercase",
+                color: C.bronze,
+                marginBottom: 6,
+              }}
+            >
+              MVP do jogo (automático)
+            </span>
+            <div style={caixaLeitura}>
+              <span style={{ color: autoMvpDisplay.muted ? C.ink4 : C.ink }}>{autoMvpDisplay.text}</span>
             </div>
+            <span style={{ display: "block", marginTop: 5, fontSize: 11, color: C.ink4 }}>
+              Maior KDA; desempate por abates, assistências e menos mortes.
+            </span>
+          </div>
+        </div>
 
-            <div className="mt-3 grid gap-3 sm:grid-cols-3">
-              <div>
-                <Label htmlFor={winnerSelectId}>Time vencedor</Label>
-                <Select
-                  id={winnerSelectId}
-                  value={game.winnerTeamId}
-                  onChange={(e) => updateGameWinner(gameIndex, e.target.value)}
-                >
-                  <option value="">Selecione</option>
-                  {selectedSeries.teamAId ? (
-                    <option value={selectedSeries.teamAId}>
-                      {getTeamName(draft, selectedSeries.teamAId)}
-                    </option>
-                  ) : null}
-                  {selectedSeries.teamBId ? (
-                    <option value={selectedSeries.teamBId}>
-                      {getTeamName(draft, selectedSeries.teamBId)}
-                    </option>
-                  ) : null}
-                </Select>
-              </div>
-              <div>
-                <LabelText>MVP do jogo (automático)</LabelText>
-                <div className="mt-2 rounded-xl border border-white/8 bg-white/[0.02] px-3 py-2.5 text-sm">
-                  <span className={autoMvpDisplay.muted ? "text-muted" : "font-semibold text-text"}>
-                    {autoMvpDisplay.text}
-                  </span>
-                </div>
-                <p className="mt-1 text-xs text-muted">
-                  Critério: maior KDA. Desempate por abates, assistências e menos mortes.
-                </p>
-              </div>
-              <div>
-                <Label htmlFor={durationInputId}>Duração (min)</Label>
-                <Input
-                  id={durationInputId}
-                  type="number"
-                  min={1}
-                  value={game.durationMin ?? ""}
-                  onChange={(e) => updateGameDuration(gameIndex, e.target.value)}
-                />
-              </div>
+        <BlockTitle
+          right={
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <Button tone="ghost" small onClick={() => addStatsRowToGame(gameIndex)}>
+                <Plus size={14} aria-hidden /> Linha
+              </Button>
             </div>
+          }
+        >
+          Estatísticas por jogador
+        </BlockTitle>
 
-            <div className="mt-4 space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
-                  Estatísticas por jogador (K/D/A)
-                </p>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => addStatsRowToGame(gameIndex)}
-                >
-                  <Plus className="h-4 w-4" /> Linha
-                </Button>
+        <div onWheelCapture={bloquearRoda}>
+          <ScrollX>
+            <div style={{ minWidth: LARGURA_MIN_STATS }}>
+              {/* #4: as três caixas de número agora têm cabeçalho visível. */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: GRADE_STATS,
+                  gap: 8,
+                  padding: "0 8px 6px",
+                }}
+              >
+                <ColunaTitulo>Jogador</ColunaTitulo>
+                <ColunaTitulo>Campeão</ColunaTitulo>
+                <ColunaTitulo center title="Abates">
+                  A
+                </ColunaTitulo>
+                <ColunaTitulo center title="Mortes">
+                  M
+                </ColunaTitulo>
+                <ColunaTitulo center title="Assistências">
+                  As
+                </ColunaTitulo>
+                <ColunaTitulo center title="KDA calculado: (abates + assistências) ÷ mortes">
+                  KDA
+                </ColunaTitulo>
+                <span />
               </div>
 
-              <div className="grid gap-2">
+              <div style={{ display: "grid", gap: 6 }}>
                 {game.statsByPlayer.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-white/10 p-3 text-sm text-muted">
-                    Nenhuma linha de stats.
-                  </div>
+                  <LinhaVazia>
+                    Nenhuma linha ainda. Use &quot;Preencher elenco&quot; para trazer os 10 jogadores na
+                    ordem das rotas.
+                  </LinhaVazia>
                 ) : (
-                  game.statsByPlayer.map((row, rowIndex) => (
-                    <div
-                      key={`${selectedSeries.id}-g${gameIndex}-r${rowIndex}`}
-                      className="min-w-0 grid gap-2 rounded-xl border border-white/8 bg-white/[0.02] p-3 md:grid-cols-[1.4fr_1.1fr_0.55fr_0.55fr_0.55fr_auto]"
-                    >
-                      <div>
-                        <LabelText className="sr-only">Jogador</LabelText>
-                        <Select
-                          aria-label={`Jogador linha ${rowIndex + 1}`}
-                          value={row.playerId}
-                          onChange={(e) =>
-                            updateStatsRowField(gameIndex, rowIndex, "playerId", e.target.value)
-                          }
-                        >
-                          <option value="">Jogador</option>
-                          {currentRosters.combined.map((player) => (
-                            <option key={player.id} value={player.id}>
-                              {player.nick} ({getTeamName(draft, player.teamId)})
-                            </option>
-                          ))}
-                        </Select>
-                      </div>
-                      <div>
-                        <LabelText className="sr-only">Campeão</LabelText>
-                        <Input
-                          aria-label={`Campeão linha ${rowIndex + 1}`}
-                          placeholder="Campeão"
-                          list="champions-datalist"
-                          value={row.champion ?? ""}
-                          onChange={(e) =>
-                            updateStatsRowField(gameIndex, rowIndex, "champion", e.target.value)
-                          }
-                        />
-                      </div>
-                      <div>
-                        <LabelText className="sr-only">Abates</LabelText>
-                        <Input
-                          aria-label={`Abates linha ${rowIndex + 1}`}
-                          type="number"
-                          min={0}
-                          value={row.kills}
-                          onChange={(e) =>
-                            updateStatsRowField(gameIndex, rowIndex, "kills", Number(e.target.value || 0))
-                          }
-                        />
-                      </div>
-                      <div>
-                        <LabelText className="sr-only">Mortes</LabelText>
-                        <Input
-                          aria-label={`Mortes linha ${rowIndex + 1}`}
-                          type="number"
-                          min={0}
-                          value={row.deaths}
-                          onChange={(e) =>
-                            updateStatsRowField(gameIndex, rowIndex, "deaths", Number(e.target.value || 0))
-                          }
-                        />
-                      </div>
-                      <div>
-                        <LabelText className="sr-only">Assistências</LabelText>
-                        <Input
-                          aria-label={`Assistências linha ${rowIndex + 1}`}
-                          type="number"
-                          min={0}
-                          value={row.assists}
-                          onChange={(e) =>
-                            updateStatsRowField(gameIndex, rowIndex, "assists", Number(e.target.value || 0))
-                          }
-                        />
-                      </div>
-                      <div className="flex items-center justify-end">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeStatsRowFromGame(gameIndex, rowIndex)}
-                          aria-label={`Remover linha ${rowIndex + 1}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))
+                  game.statsByPlayer.map((row, rowIndex) =>
+                    renderStatsRow(gameIndex, row, rowIndex, estados[rowIndex] ?? "ok"),
+                  )
                 )}
               </div>
             </div>
+          </ScrollX>
+        </div>
 
-            {selectedSeries.teamAId || selectedSeries.teamBId ? (
-              <div className="mt-4 space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
-                    Campeões banidos
-                  </p>
-                  <Button variant="secondary" size="sm" onClick={() => addBanToGame(gameIndex)}>
-                    <Plus className="h-4 w-4" /> Ban
+        {selectedSeries.teamAId || selectedSeries.teamBId ? (
+          <>
+            <BlockTitle
+              right={
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <Aviso escopo={`bans:${gameIndex}`} />
+                  <Button tone="ghost" small onClick={() => addBanToGame(gameIndex)}>
+                    <Plus size={14} aria-hidden /> Ban
                   </Button>
                 </div>
-                {(game.bans ?? []).length === 0 ? (
-                  <p className="text-xs text-muted">Nenhum ban registrado.</p>
-                ) : (
-                  <div className="grid gap-2">
+              }
+            >
+              Campeões banidos
+            </BlockTitle>
+
+            {(game.bans ?? []).length === 0 ? (
+              <LinhaVazia>Nenhum ban registrado neste jogo.</LinhaVazia>
+            ) : (
+              <ScrollX>
+                <div style={{ minWidth: 360 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: GRADE_BANS, gap: 8, padding: "0 0 6px" }}>
+                    <ColunaTitulo>Time</ColunaTitulo>
+                    <ColunaTitulo>Campeão banido</ColunaTitulo>
+                    <span />
+                  </div>
+                  <div style={{ display: "grid", gap: 6 }}>
                     {(game.bans ?? []).map((ban, banIndex) => (
                       <div
-                        key={`${selectedSeries.id}-g${gameIndex}-ban${banIndex}`}
-                        className="grid gap-2 rounded-xl border border-white/8 bg-white/[0.02] p-2 sm:grid-cols-[1fr_1.2fr_auto]"
+                        key={`g${gameIndex}-ban${banIndex}`}
+                        style={{ display: "grid", gridTemplateColumns: GRADE_BANS, gap: 8, alignItems: "center" }}
                       >
                         <Select
-                          aria-label={`Time do ban ${banIndex + 1}`}
+                          ariaLabel={`Time do ban ${banIndex + 1}`}
                           value={ban.teamId}
-                          onChange={(e) =>
-                            updateBanField(gameIndex, banIndex, "teamId", e.target.value)
-                          }
+                          onChange={(value) => updateBanField(gameIndex, banIndex, "teamId", value)}
                         >
                           <option value="">Time</option>
                           {selectedSeries.teamAId ? (
@@ -1148,335 +1825,488 @@ export function AdminSeriesPanel({
                             </option>
                           ) : null}
                         </Select>
-                        <Input
-                          aria-label={`Campeão banido ${banIndex + 1}`}
+                        <InputCampeao
+                          ariaLabel={`Campeão banido ${banIndex + 1}`}
                           placeholder="Campeão banido"
-                          list="champions-datalist"
                           value={ban.championName}
-                          onChange={(e) =>
-                            updateBanField(gameIndex, banIndex, "championName", e.target.value)
-                          }
+                          onChange={(valor) => updateBanField(gameIndex, banIndex, "championName", valor)}
                         />
-                        <div className="flex items-center justify-end">
-                          <Button
-                            variant="ghost"
-                            size="sm"
+                        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                          <BotaoIcone
+                            label={`Remover o ban ${banIndex + 1}`}
                             onClick={() => removeBanFromGame(gameIndex, banIndex)}
-                            aria-label={`Remover ban ${banIndex + 1}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          />
                         </div>
                       </div>
                     ))}
                   </div>
-                )}
-              </div>
-            ) : null}
-          </Card>
-        );
-      });
+                </div>
+              </ScrollX>
+            )}
+          </>
+        ) : null}
+      </Card>
+    );
+  };
+
+  let conteudoDosJogos: ReactNode = null;
+  if (selectedSeries) {
+    if (selectedSeriesIsWalkover) {
+      conteudoDosJogos = (
+        <LinhaVazia>
+          {getWalkoverSummaryText(
+            draft,
+            selectedSeries.walkoverWinnerTeamId,
+            selectedSeriesTargetWins,
+            selectedSeries.walkoverReason,
+          )}
+        </LinhaVazia>
+      );
+    } else if (selectedSeries.games.length === 0) {
+      conteudoDosJogos = <LinhaVazia>Nenhum jogo nesta série. Use &quot;Adicionar jogo&quot;.</LinhaVazia>;
+    } else {
+      conteudoDosJogos = selectedSeries.games.map((game, gameIndex) => renderGame(game, gameIndex));
     }
   }
 
+  // -------------------------------------------------------------- editor da direita
+
+  const placarSelecionado = selectedSeries ? getSeriesScore(selectedSeries, draft) : null;
+
+  const editor = selectedSeries === null ? (
+    <Empty
+      title="Escolha uma série na lista"
+      action={
+        <Button tone="gold" onClick={createSeries}>
+          <Plus size={15} aria-hidden /> Nova série
+        </Button>
+      }
+    >
+      À esquerda estão todas as séries do campeonato, da mais recente para a mais antiga. Clique em uma
+      para lançar os jogos.
+    </Empty>
+  ) : (
+    <Card padding={16} style={{ minWidth: 0 }}>
+      {/* #40: o placar da série fica visível o tempo todo dentro do editor. */}
+      <div style={{ display: "flex", gap: 14, alignItems: "flex-end", flexWrap: "wrap" }}>
+        <div style={{ minWidth: 0, flex: "1 1 260px" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 6,
+              fontSize: 10,
+              letterSpacing: ".16em",
+              textTransform: "uppercase",
+              color: C.bronze,
+            }}
+          >
+            <span>{getSeriesStageLabel(selectedSeries)}</span>
+            <span aria-hidden>•</span>
+            <span>{selectedSeriesFormatLabel}</span>
+            <span aria-hidden>•</span>
+            <span style={tabular}>{formatDateLabel(selectedSeries.date)}</span>
+          </div>
+          <p
+            style={{
+              margin: "8px 0 0",
+              fontFamily: display,
+              fontSize: "clamp(20px,2.6vw,28px)",
+              lineHeight: 1.1,
+              color: C.ink,
+            }}
+          >
+            {getTeamName(draft, selectedSeries.teamAId)}{" "}
+            <span style={{ color: C.bronzeHi, ...tabular }}>
+              {placarSelecionado?.teamAWins}–{placarSelecionado?.teamBWins}
+            </span>{" "}
+            {getTeamName(draft, selectedSeries.teamBId)}
+          </p>
+          <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+            <Chip
+              tone={
+                selectedSeriesIsWalkover ? "warn" : getSeriesWinnerTeamId(selectedSeries, draft) ? "ok" : "neutro"
+              }
+            >
+              {getSeriesStateLabel(
+                selectedSeriesIsWalkover,
+                Boolean(getSeriesWinnerTeamId(selectedSeries, draft)),
+              )}
+            </Chip>
+            <Chip tone="neutro">
+              {selectedSeries.games.length}/{selectedSeriesMaxGames} jogos
+            </Chip>
+          </div>
+        </div>
+        <Button tone="danger" small onClick={confirmDeleteSelectedSeries}>
+          <Trash2 size={14} aria-hidden /> Excluir série
+        </Button>
+      </div>
+
+      {auditoriaSelecionada && auditoriaSelecionada.bloqueios.length > 0 ? (
+        <div style={{ marginTop: 16 }}>
+          <Banner tone="danger" title="Esta série ainda não pode ser salva">
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {auditoriaSelecionada.bloqueios.slice(0, 6).map((texto) => (
+                <li key={texto}>{texto}</li>
+              ))}
+              {auditoriaSelecionada.bloqueios.length > 6 ? (
+                <li>+ {auditoriaSelecionada.bloqueios.length - 6} pendência(s)</li>
+              ) : null}
+            </ul>
+          </Banner>
+        </div>
+      ) : null}
+
+      <BlockTitle right={<Aviso escopo="identidade" />}>Identificação</BlockTitle>
+
+      <div className="lob-2col">
+        {renomeandoId ? (
+          <div>
+            <Field
+              label="Novo ID da série"
+              hint={`Link público: /partidas/${slugifyValue(idRascunho) || "…"}`}
+            >
+              <Input value={idRascunho} onChange={setIdRascunho} />
+            </Field>
+            {erroId ? (
+              <p role="alert" style={{ margin: "6px 0 0", fontSize: 11.5, color: C.dangerSoft }}>
+                {erroId}
+              </p>
+            ) : null}
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <Button tone="gold" small onClick={aplicarRenomeacao}>
+                Aplicar novo ID
+              </Button>
+              <Button
+                tone="ghost"
+                small
+                onClick={() => {
+                  setRenomeandoId(false);
+                  setErroId(null);
+                }}
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div>
+            {/* #5: o ID é a URL pública, então não se edita por acidente. */}
+            <Field label="ID da série (vira o link público)" hint={`/partidas/${selectedSeries.id}`}>
+              <div style={caixaLeitura}>{selectedSeries.id}</div>
+            </Field>
+            <div style={{ marginTop: 8 }}>
+              <Button
+                tone="ghost"
+                small
+                onClick={() => {
+                  setIdRascunho(selectedSeries.id);
+                  setErroId(null);
+                  setRenomeandoId(true);
+                }}
+              >
+                <Pencil size={14} aria-hidden /> Renomear ID…
+              </Button>
+            </div>
+          </div>
+        )}
+
+        <Field label="Data">
+          <Input
+            type="date"
+            value={selectedSeries.date?.slice(0, 10) ?? ""}
+            onChange={(value) =>
+              updateSelectedSeries((series) => {
+                series.date = value;
+              })
+            }
+          />
+        </Field>
+      </div>
+
+      <BlockTitle right={<Aviso escopo="times" />}>Confronto</BlockTitle>
+
+      <div className="lob-2col">
+        <Field label="Time A">
+          <Select value={selectedSeries.teamAId} onChange={(value) => trocarTimeDaSerie("A", value)}>
+            <option value="">Selecione</option>
+            {draft.teams.map((team) => (
+              <option key={team.id} value={team.id}>
+                {team.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Time B">
+          <Select value={selectedSeries.teamBId} onChange={(value) => trocarTimeDaSerie("B", value)}>
+            <option value="">Selecione</option>
+            {draft.teams.map((team) => (
+              <option key={team.id} value={team.id}>
+                {team.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Etapa">
+          <Select
+            value={selectedSeries.stage ?? "REGULAR_SEASON"}
+            onChange={(value) =>
+              updateSelectedSeries((series) => {
+                series.stage = value as SeriesStage;
+              })
+            }
+          >
+            <option value="REGULAR_SEASON">{getStageOptionLabel("REGULAR_SEASON")}</option>
+            <option value="SEMIFINAL">{getStageOptionLabel("SEMIFINAL")}</option>
+            <option value="FINAL">{getStageOptionLabel("FINAL")}</option>
+          </Select>
+        </Field>
+        <Field label="Formato da série">
+          <Select
+            value={selectedSeriesFormat}
+            onChange={(value) => updateSeriesFormat(value as SeriesFormat)}
+          >
+            <option value="BO3">{getFormatOptionLabel("BO3")}</option>
+            <option value="BO5">{getFormatOptionLabel("BO5")}</option>
+          </Select>
+        </Field>
+      </div>
+
+      <BlockTitle>Resultado por W.O.</BlockTitle>
+      <p style={{ margin: "0 0 12px", fontSize: 12, color: C.ink4 }}>
+        Use quando a série não foi jogada: o placar vira {selectedSeriesTargetWins}-0 automático, sem stats
+        de jogadores.
+      </p>
+      <div className="lob-2col">
+        <Field label="Situação da série">
+          <Select
+            value={selectedSeries.walkoverWinnerTeamId ?? ""}
+            onChange={(value) => updateWalkoverWinner(value)}
+          >
+            <option value="">Série jogada normalmente</option>
+            {selectedSeries.teamAId ? (
+              <option value={selectedSeries.teamAId}>
+                W.O. para {getTeamName(draft, selectedSeries.teamAId)}
+              </option>
+            ) : null}
+            {selectedSeries.teamBId ? (
+              <option value={selectedSeries.teamBId}>
+                W.O. para {getTeamName(draft, selectedSeries.teamBId)}
+              </option>
+            ) : null}
+          </Select>
+        </Field>
+        <Field label="Observação do W.O. (opcional)">
+          <Input
+            disabled={!selectedSeriesIsWalkover}
+            placeholder="Ex.: time não compareceu no horário"
+            value={selectedSeries.walkoverReason ?? ""}
+            onChange={(value) =>
+              updateSelectedSeries((series) => {
+                series.walkoverReason = value;
+              })
+            }
+          />
+        </Field>
+      </div>
+
+      <BlockTitle
+        right={
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <Aviso escopo="cartinhas" />
+            <Button tone="ghost" small onClick={addCardToSeries}>
+              <Plus size={14} aria-hidden /> Cartinha
+            </Button>
+          </div>
+        }
+      >
+        Cartinhas da série
+      </BlockTitle>
+
+      {(selectedSeries.cardsUsed ?? []).length === 0 ? (
+        <LinhaVazia>Nenhuma cartinha registrada nesta série.</LinhaVazia>
+      ) : (
+        <ScrollX>
+          <div style={{ minWidth: 360, display: "grid", gap: 6 }}>
+            <div style={{ display: "grid", gridTemplateColumns: GRADE_BANS, gap: 8 }}>
+              <ColunaTitulo>Time</ColunaTitulo>
+              <ColunaTitulo>Cartinha usada</ColunaTitulo>
+              <span />
+            </div>
+            {(selectedSeries.cardsUsed ?? []).map((card, cardIndex) => (
+              <div
+                key={`card-${cardIndex}`}
+                style={{ display: "grid", gridTemplateColumns: GRADE_BANS, gap: 8, alignItems: "center" }}
+              >
+                <Select
+                  ariaLabel={`Time da cartinha ${cardIndex + 1}`}
+                  value={card.teamId}
+                  onChange={(value) => updateCardField(cardIndex, "teamId", value)}
+                >
+                  <option value="">Time</option>
+                  {selectedSeries.teamAId ? (
+                    <option value={selectedSeries.teamAId}>
+                      {getTeamName(draft, selectedSeries.teamAId)}
+                    </option>
+                  ) : null}
+                  {selectedSeries.teamBId ? (
+                    <option value={selectedSeries.teamBId}>
+                      {getTeamName(draft, selectedSeries.teamBId)}
+                    </option>
+                  ) : null}
+                </Select>
+                <Select
+                  ariaLabel={`Cartinha ${cardIndex + 1}`}
+                  value={card.cardId}
+                  onChange={(value) => updateCardField(cardIndex, "cardId", value)}
+                >
+                  {CARD_OPTIONS.map((cardDef) => (
+                    <option key={cardDef.id} value={cardDef.id}>
+                      {cardDef.title}
+                    </option>
+                  ))}
+                </Select>
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <BotaoIcone
+                    label={`Remover a cartinha ${cardIndex + 1}`}
+                    onClick={() => removeCardFromSeries(cardIndex)}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </ScrollX>
+      )}
+
+      <BlockTitle
+        right={
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <Aviso escopo="jogos" />
+            <Button
+              tone="gold"
+              small
+              disabled={selectedSeriesIsWalkover || selectedSeries.games.length >= selectedSeriesMaxGames}
+              onClick={adicionarJogo}
+            >
+              <Plus size={14} aria-hidden /> Adicionar jogo
+            </Button>
+          </div>
+        }
+      >
+        Jogos da série
+      </BlockTitle>
+
+      <p style={{ margin: "0 0 4px", fontSize: 12, color: C.ink4 }}>
+        {getGamesSectionDescription(
+          selectedSeriesIsWalkover,
+          selectedSeriesFormatLabel,
+          selectedSeriesMaxGames,
+          selectedSeriesTargetWins,
+        )}
+      </p>
+
+      <div>{conteudoDosJogos}</div>
+    </Card>
+  );
+
+  // -------------------------------------------------------------- render
+
   return (
-    <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+    <div className="lob-series">
+      <style>{CSS_PAINEL}</style>
       <datalist id="champions-datalist">
         {CHAMPIONS.map((champion) => (
           <option key={champion.id} value={champion.name} />
         ))}
       </datalist>
-      <Card className="min-w-0 overflow-hidden p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="font-display text-lg font-bold tracking-wide">Séries</h3>
-          <Button variant="secondary" size="sm" onClick={createSeries}>
-            <Plus className="h-4 w-4" /> Nova série
-          </Button>
-        </div>
 
-        <div className="mt-4 grid max-h-[680px] gap-2 overflow-y-auto pr-1 scrollbar-thin">
-          {seriesListContent}
-        </div>
-      </Card>
+      <SectionHead
+        eyebrow="Resultados"
+        title="Séries"
+        description="Escolha a série na lista e lance jogo a jogo. O placar e o MVP são calculados sozinhos."
+        actions={
+          <>
+            <Aviso escopo="topo" />
+            <Button tone="gold" onClick={createSeries}>
+              <Plus size={15} aria-hidden /> Nova série
+            </Button>
+          </>
+        }
+      />
 
-      <Card className="min-w-0 overflow-hidden p-4">
-        {selectedSeries === null ? (
-          <div className="rounded-xl border border-dashed border-white/10 p-6 text-sm text-muted">
-            Selecione uma série para editar ou clique em &quot;Nova série&quot;.
-          </div>
-        ) : (
-          <div className="space-y-5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="font-display text-lg font-bold tracking-wide">Editar série</h3>
-              <div className="flex w-full flex-wrap gap-2 sm:w-auto">
-                <Button
-                  variant="danger"
-                  size="sm"
-                  className="max-w-full sm:w-auto"
-                  onClick={confirmDeleteSelectedSeries}
-                >
-                  <Trash2 className="h-4 w-4" /> Excluir série
-                </Button>
-              </div>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="min-w-0">
-                <Label htmlFor="series-id">ID da série</Label>
-                <Input
-                  id="series-id"
-                  value={selectedSeries.id}
-                  onChange={(e) =>
-                    updateSelectedSeries((series) => {
-                      series.id = e.target.value;
-                    })
-                  }
-                />
-              </div>
-              <div>
-                <Label htmlFor="series-date">Data</Label>
-                <Input
-                  id="series-date"
-                  type="date"
-                  value={selectedSeries.date?.slice(0, 10) ?? ""}
-                  onChange={(e) =>
-                    updateSelectedSeries((series) => {
-                      series.date = e.target.value;
-                    })
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-white/8 bg-white/[0.02] p-3">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
-                  Cartinhas da série (registro manual)
-                </p>
-                <Button variant="secondary" size="sm" onClick={addCardToSeries}>
-                  <Plus className="h-4 w-4" /> Cartinha
-                </Button>
-              </div>
-              {(selectedSeries.cardsUsed ?? []).length === 0 ? (
-                <p className="mt-2 text-xs text-muted">
-                  Nenhuma cartinha registrada nesta série.
-                </p>
-              ) : (
-                <div className="mt-2 grid gap-2">
-                  {(selectedSeries.cardsUsed ?? []).map((card, cardIndex) => (
-                    <div
-                      key={`${selectedSeries.id}-card${cardIndex}`}
-                      className="grid gap-2 sm:grid-cols-[1fr_1.2fr_auto]"
-                    >
-                      <Select
-                        aria-label={`Time da cartinha ${cardIndex + 1}`}
-                        value={card.teamId}
-                        onChange={(e) => updateCardField(cardIndex, "teamId", e.target.value)}
-                      >
-                        <option value="">Time</option>
-                        {selectedSeries.teamAId ? (
-                          <option value={selectedSeries.teamAId}>
-                            {getTeamName(draft, selectedSeries.teamAId)}
-                          </option>
-                        ) : null}
-                        {selectedSeries.teamBId ? (
-                          <option value={selectedSeries.teamBId}>
-                            {getTeamName(draft, selectedSeries.teamBId)}
-                          </option>
-                        ) : null}
-                      </Select>
-                      <Select
-                        aria-label={`Cartinha ${cardIndex + 1}`}
-                        value={card.cardId}
-                        onChange={(e) => updateCardField(cardIndex, "cardId", e.target.value)}
-                      >
-                        {CARD_OPTIONS.map((cardDef) => (
-                          <option key={cardDef.id} value={cardDef.id}>
-                            {cardDef.title}
-                          </option>
-                        ))}
-                      </Select>
-                      <div className="flex items-center justify-end">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeCardFromSeries(cardIndex)}
-                          aria-label={`Remover cartinha ${cardIndex + 1}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <Label htmlFor="series-stage">Etapa</Label>
-                <Select
-                  id="series-stage"
-                  value={selectedSeries.stage ?? "REGULAR_SEASON"}
-                  onChange={(e) =>
-                    updateSelectedSeries((series) => {
-                      series.stage = e.target.value as SeriesStage;
-                    })
-                  }
-                >
-                  <option value="REGULAR_SEASON">{getStageOptionLabel("REGULAR_SEASON")}</option>
-                  <option value="SEMIFINAL">{getStageOptionLabel("SEMIFINAL")}</option>
-                  <option value="FINAL">{getStageOptionLabel("FINAL")}</option>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="series-format">Formato da série</Label>
-                <Select
-                  id="series-format"
-                  value={selectedSeriesFormat}
-                  onChange={(e) => updateSeriesFormat(e.target.value as SeriesFormat)}
-                >
-                  <option value="BO3">{getFormatOptionLabel("BO3")}</option>
-                  <option value="BO5">{getFormatOptionLabel("BO5")}</option>
-                </Select>
-              </div>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <Label htmlFor="series-team-a">Time A</Label>
-                <Select
-                  id="series-team-a"
-                  value={selectedSeries.teamAId}
-                  onChange={(e) =>
-                    updateSelectedSeries((series) => {
-                      series.teamAId = e.target.value;
-                      if (
-                        series.walkoverWinnerTeamId &&
-                        series.walkoverWinnerTeamId !== series.teamAId &&
-                        series.walkoverWinnerTeamId !== series.teamBId
-                      ) {
-                        delete series.walkoverWinnerTeamId;
-                        delete series.walkoverReason;
-                      }
-                    })
-                  }
-                >
-                  <option value="">Selecione</option>
-                  {draft.teams.map((team) => (
-                    <option key={team.id} value={team.id}>
-                      {team.name}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="series-team-b">Time B</Label>
-                <Select
-                  id="series-team-b"
-                  value={selectedSeries.teamBId}
-                  onChange={(e) =>
-                    updateSelectedSeries((series) => {
-                      series.teamBId = e.target.value;
-                      if (
-                        series.walkoverWinnerTeamId &&
-                        series.walkoverWinnerTeamId !== series.teamAId &&
-                        series.walkoverWinnerTeamId !== series.teamBId
-                      ) {
-                        delete series.walkoverWinnerTeamId;
-                        delete series.walkoverReason;
-                      }
-                    })
-                  }
-                >
-                  <option value="">Selecione</option>
-                  {draft.teams.map((team) => (
-                    <option key={team.id} value={team.id}>
-                      {team.name}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-white/8 bg-white/[0.02] p-4">
-              <p className="font-display text-base font-bold tracking-wide">Resultado por W.O.</p>
-              <p className="mt-1 text-xs text-muted">
-                Use quando a série não foi jogada. O sistema conta automaticamente como vitória por {selectedSeriesTargetWins}-0, sem gerar stats de jogadores.
-              </p>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <div>
-                  <Label htmlFor="series-walkover">Situação da série</Label>
-                  <Select
-                    id="series-walkover"
-                    value={selectedSeries.walkoverWinnerTeamId ?? ""}
-                    onChange={(e) => updateWalkoverWinner(e.target.value)}
-                  >
-                    <option value="">Série jogada normalmente</option>
-                    {selectedSeries.teamAId ? (
-                      <option value={selectedSeries.teamAId}>
-                        W.O. para {getTeamName(draft, selectedSeries.teamAId)}
-                      </option>
-                    ) : null}
-                    {selectedSeries.teamBId ? (
-                      <option value={selectedSeries.teamBId}>
-                        W.O. para {getTeamName(draft, selectedSeries.teamBId)}
-                      </option>
-                    ) : null}
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="series-walkover-reason">Observação do W.O. (opcional)</Label>
-                  <Input
-                    id="series-walkover-reason"
-                    disabled={!selectedSeriesIsWalkover}
-                    placeholder="Ex.: time não compareceu no horário"
-                    value={selectedSeries.walkoverReason ?? ""}
-                    onChange={(e) =>
-                      updateSelectedSeries((series) => {
-                        series.walkoverReason = e.target.value;
-                      })
-                    }
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="font-display text-base font-bold tracking-wide">Jogos da série</p>
-                <p className="text-xs text-muted">
-                  {getGamesSectionDescription(
-                    selectedSeriesIsWalkover,
-                    selectedSeriesFormatLabel,
-                    selectedSeriesMaxGames,
-                    selectedSeriesTargetWins,
-                  )}
-                </p>
-              </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="max-w-full"
-                disabled={selectedSeriesIsWalkover || selectedSeries.games.length >= selectedSeriesMaxGames}
-                onClick={() =>
-                  updateSelectedSeries((series) => {
-                    if (series.games.length >= selectedSeriesMaxGames) return;
-                    series.games.push(createBlankGame());
-                  })
-                }
-              >
-                <Plus className="h-4 w-4" /> Adicionar jogo
+      {/* #3: pendência aparece aqui ANTES de tentar salvar, com série e jogo por nome. */}
+      {seriesComProblema.length > 0 ? (
+        <Banner
+          tone="danger"
+          title={`${seriesComProblema.length} série(s) travariam o salvamento do painel`}
+          actions={
+            totalDescartaveis > 0 ? (
+              <Button tone="ghost" small onClick={limparTodasAsLinhasVazias}>
+                Descartar {totalDescartaveis} linha(s) em branco
               </Button>
-            </div>
-
-            <div className="space-y-4">
-              {selectedSeriesGamesContent}
-            </div>
+            ) : undefined
+          }
+        >
+          <div style={{ display: "grid", gap: 6 }}>
+            {seriesComProblema.slice(0, 4).map((series) => {
+              const auditoria = auditorias.get(series.id);
+              return (
+                <button
+                  key={series.id}
+                  type="button"
+                  onClick={() => selecionarSerie(series.id)}
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    textAlign: "left",
+                    padding: "6px 8px",
+                    border: `1px solid ${C.line}`,
+                    borderRadius: 3,
+                    background: "rgba(0,0,0,.20)",
+                    color: C.ink2,
+                    fontFamily: "inherit",
+                    fontSize: 12,
+                    cursor: "pointer",
+                  }}
+                >
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: C.ink }}>
+                    <AlertTriangle size={13} aria-hidden />
+                    {getTeamName(draft, series.teamAId)} x {getTeamName(draft, series.teamBId)}
+                    <span style={{ color: C.ink4, ...tabular }}>({formatDateLabel(series.date)})</span>
+                  </span>
+                  <span style={{ display: "block", marginTop: 3, color: C.ink3 }}>
+                    {auditoria?.bloqueios[0]}
+                    {auditoria && auditoria.bloqueios.length > 1
+                      ? ` (+${auditoria.bloqueios.length - 1})`
+                      : ""}
+                  </span>
+                </button>
+              );
+            })}
+            {seriesComProblema.length > 4 ? (
+              <span style={{ fontSize: 12 }}>+ {seriesComProblema.length - 4} outra(s) série(s).</span>
+            ) : null}
           </div>
-        )}
-      </Card>
+        </Banner>
+      ) : null}
+
+      <div className="lob-series-grid">
+        <Card padding={12} style={{ minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <h3 style={{ fontFamily: display, fontSize: 15, color: C.bronze, margin: 0 }}>
+              Todas as séries
+            </h3>
+            <span style={{ fontSize: 11, color: C.ink4, marginLeft: "auto", ...tabular }}>
+              {sortedSeries.length}
+            </span>
+          </div>
+          <div className="lob-series-lista" style={{ display: "grid", gap: 6, paddingRight: 4 }}>
+            {listaDeSeries}
+          </div>
+        </Card>
+
+        <div style={{ minWidth: 0 }}>{editor}</div>
+      </div>
     </div>
   );
 }
-
