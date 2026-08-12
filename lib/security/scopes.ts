@@ -20,6 +20,15 @@ export const SCOPES = [
   { key: "players:write", label: "Criar e editar jogadores", group: "Cadastro", masterOnly: false },
   { key: "riot:import", label: "Importar partida pela Riot", group: "Séries", masterOnly: false },
   { key: "dataset:export", label: "Exportar backup", group: "Backup", masterOnly: false },
+  // --- 4ª Edição: inscrição, conferência, dinheiro e draft ---
+  // O financeiro é separado da conferência de propósito: quem confere requisito
+  // não precisa ver movimentação de dinheiro, e vice-versa.
+  { key: "inscricoes:conferir", label: "Conferir inscrições e requisitos", group: "4ª Edição", masterOnly: false },
+  { key: "inscricoes:financeiro", label: "Conferir pagamentos e estornos", group: "4ª Edição", masterOnly: false },
+  { key: "draft:conduzir", label: "Conduzir o sorteio e o draft ao vivo", group: "4ª Edição", masterOnly: false },
+  // Mexer nas datas-âncora recalcula a elegibilidade de todo mundo — é master.
+  { key: "edicao:configurar", label: "Configurar datas e parâmetros da edição", group: "Perigoso", masterOnly: true },
+
   { key: "tournament:lifecycle", label: "Iniciar e encerrar temporada", group: "Perigoso", masterOnly: true },
   { key: "dataset:import", label: "Importar/semear dataset", group: "Perigoso", masterOnly: true },
   { key: "users:manage", label: "Gerenciar usuários e permissões", group: "Perigoso", masterOnly: true },

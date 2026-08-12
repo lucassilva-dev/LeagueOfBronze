@@ -66,3 +66,10 @@ alter default privileges in schema public revoke all on functions from anon, aut
 -- insert into public.tournament_state (id, payload)
 -- values ('leagueofbronze', '{}'::jsonb)
 -- on conflict (id) do nothing;
+
+-- =====================================================================
+-- 4a EDICAO (inscricao, conferencia, dinheiro e draft)
+-- =====================================================================
+-- As tabelas da 4a Edicao ficam em supabase/schema-4a-edicao.sql, para este
+-- arquivo continuar sendo o retrato minimo do que o site precisa para existir.
+-- Rode aquele arquivo DEPOIS deste.
