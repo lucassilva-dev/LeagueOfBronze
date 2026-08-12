@@ -12,6 +12,11 @@
 -- REGRA DURA: e-mail, WhatsApp e Discord NUNCA cruzam para o dataset público.
 -- Quando o draft fecha, migram apenas nick, rotas, elo e time.
 --
+-- REGRA DESTE ARQUIVO: ele tem de poder ser rodado de novo, do começo ao fim, sem
+-- erro. Tudo aqui é `if not exists` / `on conflict do nothing` / `create or replace` /
+-- `drop ... if exists` antes de criar. Um único comando não idempotente derruba o
+-- script inteiro (é uma transação só) e desfaz também o que já tinha passado.
+--
 -- Segurança: todas seguem o padrão da tournament_state — RLS ligado E forçado,
 -- zero policies, revoke explícito. O "alter default privileges" do schema.sql já
 -- fecha por padrão, mas repetimos por tabela para não depender da ordem em que
@@ -343,10 +348,27 @@ revoke all on public.jogador_login_attempts from anon, authenticated;
 -- sem conta. A igualdade so equivale a busca sem diferenciar maiusculas se o dado
 -- gravado ja estiver em minusculas. O schema Zod garante na entrada; isto garante
 -- no banco, inclusive para linha inserida a mao pelo SQL Editor.
+-- O `drop ... if exists` antes de cada `add` NAO e enfeite: o PostgreSQL nao tem
+-- `add constraint if not exists`, e sem ele rodar este arquivo uma segunda vez aborta
+-- em "constraint already exists". Como o SQL Editor executa o script como UMA
+-- transacao, o abort desfaz tudo o que veio antes — inclusive o gatilho criado mais
+-- acima. O operador veria um erro de constraint duplicada, que parece inofensivo, e o
+-- gatilho continuaria sem existir.
+alter table public.jogador_contas
+  drop constraint if exists jogador_contas_email_minusculo;
 alter table public.jogador_contas
   add constraint jogador_contas_email_minusculo check (email = lower(email)) not valid;
 alter table public.jogador_contas validate constraint jogador_contas_email_minusculo;
 
 alter table public.inscricoes
+  drop constraint if exists inscricoes_email_minusculo;
+alter table public.inscricoes
   add constraint inscricoes_email_minusculo check (email = lower(email)) not valid;
 alter table public.inscricoes validate constraint inscricoes_email_minusculo;
+
+-- Mesma razao, para o login da organizacao (ver `normalizarUsuario`).
+alter table public.admin_users
+  drop constraint if exists admin_users_username_minusculo;
+alter table public.admin_users
+  add constraint admin_users_username_minusculo check (username = lower(username)) not valid;
+alter table public.admin_users validate constraint admin_users_username_minusculo;

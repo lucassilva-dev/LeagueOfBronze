@@ -116,10 +116,21 @@ export function atributosDoCookie(maxAge: number) {
  * escolha no draft.
  */
 export async function getJogadorIdentity(request: NextRequest): Promise<JogadorIdentity | null> {
+  return identidadePorToken(request.cookies.get(JOGADOR_COOKIE)?.value);
+}
+
+/**
+ * A mesma verificação, a partir do token cru.
+ *
+ * Existe porque Server Component não tem `NextRequest`: ele lê o cookie com
+ * `cookies()` de next/headers. Sem isto, a página precisaria fabricar um objeto
+ * parecido com uma requisição só para satisfazer o tipo — o tipo de gambiarra que
+ * cala a checagem sem tornar nada mais correto.
+ */
+export async function identidadePorToken(token: string | undefined): Promise<JogadorIdentity | null> {
   if (!contaDeJogadorDisponivel()) return null;
 
   // Verificação barata primeiro: visitante sem cookie válido não toca no banco.
-  const token = request.cookies.get(JOGADOR_COOKIE)?.value;
   const payload = verifySessionToken(token, segredoDeSessao());
   if (!payload) return null;
 

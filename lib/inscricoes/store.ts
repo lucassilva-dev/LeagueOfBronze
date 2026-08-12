@@ -107,6 +107,24 @@ export async function lerConfig(): Promise<EdicaoConfig> {
   return data;
 }
 
+/**
+ * Igual a `lerConfig`, mas devolve null em vez de estourar.
+ *
+ * Serve às PÁGINAS. Uma página pública não pode virar erro 500 porque o banco piscou
+ * ou porque o ambiente ainda não tem as chaves (é o caso do desenvolvimento local):
+ * ela mostra "inscrição indisponível no momento" e segue de pé, com o resto do site
+ * funcionando. Nas ROTAS de escrita continuamos usando `lerConfig`, que falha alto —
+ * lá, seguir sem configuração seria gravar com parâmetro errado.
+ */
+export async function lerConfigOuNulo(): Promise<EdicaoConfig | null> {
+  try {
+    return await lerConfig();
+  } catch (error) {
+    console.error("[inscricoes] configuração da edição indisponível", error);
+    return null;
+  }
+}
+
 export async function salvarConfig(patch: Partial<EdicaoConfig>): Promise<EdicaoConfig> {
   const { data, error } = await createSupabaseAdminClient()
     .from("edicao_config")
@@ -131,7 +149,7 @@ export async function salvarConfig(patch: Partial<EdicaoConfig>): Promise<Edicao
  */
 export async function criarInscricao(
   dados: InscricaoPublica,
-  origem?: { ipHash: string; jogadorId?: string | null },
+  dono: { ipHash: string; jogadorId: string; email: string },
 ): Promise<Inscricao> {
   const config = await lerConfig();
   if (!config.inscricoes_abertas) {
@@ -143,12 +161,12 @@ export async function criarInscricao(
   // Freio de envio em massa. O formulário é público, e sem isto uma única pessoa
   // (ou um script) enche a tabela. O teto é folgado de propósito: numa casa com
   // internet compartilhada, dois irmãos se inscrevendo em seguida é normal.
-  if (origem) {
+  {
     const desde = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const { count, error: erroConta } = await cliente
       .from("inscricoes")
       .select("id", { count: "exact", head: true })
-      .eq("ip_hash", origem.ipHash)
+      .eq("ip_hash", dono.ipHash)
       .gte("criado_em", desde);
 
     if (erroConta) throw new Error(`Falha ao conferir a origem: ${erroConta.message}`);
@@ -160,9 +178,9 @@ export async function criarInscricao(
   }
 
   const linha = {
-    ...linhaDeInscricao(dados),
-    ip_hash: origem?.ipHash ?? null,
-    jogador_id: origem?.jogadorId ?? null,
+    ...linhaDeInscricao(dados, dono.email),
+    ip_hash: dono.ipHash,
+    jogador_id: dono.jogadorId,
   };
 
   const { data, error } = await cliente
@@ -229,6 +247,125 @@ export async function listarPagamentos(): Promise<Pagamento[]> {
 
   if (error) throw new Error(`Falha ao listar pagamentos: ${error.message}`);
   return data ?? [];
+}
+
+// ---------------------------------------------------------------- a minha inscrição
+
+/** O que o próprio jogador pode ver da sua inscrição. Sem id interno, sem ip_hash. */
+export type MinhaInscricao = {
+  riotId: string;
+  elo: string;
+  pontos: number;
+  rotaPrimaria: string;
+  rotaSecundaria: string;
+  querCapitao: boolean;
+  situacao: Inscricao["situacao"];
+  observacao: string | null;
+  criadoEm: string;
+  pagamento: { estado: EstadoPagamento; valorCentavos: number; venceEm: string | null } | null;
+  conferencias: { item: ItemConferencia; estado: string; observacao: string | null }[];
+};
+
+/**
+ * A inscrição de quem está logado — e só a dela.
+ *
+ * A consulta filtra por `jogador_id` vindo da SESSÃO, nunca por um id recebido do
+ * cliente: essa é a diferença entre "ver a minha ficha" e "ver a ficha de qualquer um
+ * trocando um número na URL".
+ */
+export async function minhaInscricao(jogadorId: string): Promise<MinhaInscricao | null> {
+  const cliente = createSupabaseAdminClient();
+
+  const { data: inscricao, error } = await cliente
+    .from("inscricoes")
+    .select(
+      "id,criado_em,riot_id,elo_declarado,elo_congelado,pontos,rota_primaria,rota_secundaria,quer_capitao,situacao,observacao",
+    )
+    .eq("jogador_id", jogadorId)
+    .maybeSingle<{
+      id: string;
+      criado_em: string;
+      riot_id: string;
+      elo_declarado: string;
+      elo_congelado: string | null;
+      pontos: number;
+      rota_primaria: string;
+      rota_secundaria: string;
+      quer_capitao: boolean;
+      situacao: Inscricao["situacao"];
+      observacao: string | null;
+    }>();
+
+  if (error) throw new Error(`Falha ao ler a inscrição: ${error.message}`);
+  if (!inscricao) return null;
+
+  const [pag, conf] = await Promise.all([
+    cliente
+      .from("inscricao_pagamentos")
+      .select("estado,valor_centavos,vence_em")
+      .eq("inscricao_id", inscricao.id)
+      .maybeSingle<{ estado: EstadoPagamento; valor_centavos: number; vence_em: string | null }>(),
+    cliente
+      .from("inscricao_conferencias")
+      .select("item,estado,observacao")
+      .eq("inscricao_id", inscricao.id)
+      .returns<{ item: ItemConferencia; estado: string; observacao: string | null }[]>(),
+  ]);
+
+  return {
+    riotId: inscricao.riot_id,
+    // O congelado é o que vale no draft; enquanto não existir, mostramos o declarado.
+    elo: inscricao.elo_congelado ?? inscricao.elo_declarado,
+    pontos: inscricao.pontos,
+    rotaPrimaria: inscricao.rota_primaria,
+    rotaSecundaria: inscricao.rota_secundaria,
+    querCapitao: inscricao.quer_capitao,
+    situacao: inscricao.situacao,
+    observacao: inscricao.observacao,
+    criadoEm: inscricao.criado_em,
+    pagamento: pag.data
+      ? { estado: pag.data.estado, valorCentavos: pag.data.valor_centavos, venceEm: pag.data.vence_em }
+      : null,
+    conferencias: conf.data ?? [],
+  };
+}
+
+/**
+ * "Já paguei", dito pelo jogador.
+ *
+ * Só sai de `aguardando`. Não pode reabrir um pagamento já conferido, isento,
+ * estornado ou cancelado — senão o jogador conseguiria mexer no caixa fechado, e a
+ * palavra dele viraria a mesma coisa que a conferência da organização.
+ */
+export async function declararPagamento(jogadorId: string): Promise<"ok" | "sem_inscricao" | "nao_permitido"> {
+  const cliente = createSupabaseAdminClient();
+
+  const { data: inscricao, error } = await cliente
+    .from("inscricoes")
+    .select("id,riot_id")
+    .eq("jogador_id", jogadorId)
+    .maybeSingle<{ id: string; riot_id: string }>();
+
+  if (error) throw new Error(`Falha ao ler a inscrição: ${error.message}`);
+  if (!inscricao) return "sem_inscricao";
+
+  const { data, error: erroUpdate } = await cliente
+    .from("inscricao_pagamentos")
+    .update({ estado: "declarado", declarado_em: new Date().toISOString(), atualizado_em: new Date().toISOString() })
+    .eq("inscricao_id", inscricao.id)
+    .eq("estado", "aguardando")
+    .select("inscricao_id");
+
+  if (erroUpdate) throw new Error(`Falha ao registrar o aviso de pagamento: ${erroUpdate.message}`);
+  if (!data || data.length === 0) return "nao_permitido";
+
+  await registrarAuditoria({
+    inscricaoId: inscricao.id,
+    autor: inscricao.riot_id,
+    acao: "pagamento_declarado_pelo_jogador",
+  });
+
+  return "ok";
 }
 
 // ---------------------------------------------------------------- conferência

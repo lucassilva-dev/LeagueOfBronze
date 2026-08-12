@@ -9,10 +9,12 @@ import {
   viabilidadeDeOrcamento,
 } from "@/lib/inscricoes/schema";
 
+/** O e-mail NÃO está aqui: ele vem da sessão, no servidor. Ver lib/inscricoes/schema.ts. */
+const EMAIL_DA_SESSAO = "nak4y@exemplo.com";
+
 const valida = {
   nick: "Nak4y",
   tag: "JPN",
-  email: "Nak4y@Exemplo.com",
   discord: "nak4y",
   elo: "Diamante",
   rotaPrimaria: "MEIO",
@@ -46,13 +48,13 @@ describe("pontos vêm do elo, nunca do cliente", () => {
     const comPontosForjados = { ...valida, elo: "Ferro", pontos: 15 };
     const parsed = inscricaoPublicaSchema.parse(comPontosForjados);
     expect("pontos" in parsed).toBe(false);
-    expect(linhaDeInscricao(parsed).pontos).toBe(1);
+    expect(linhaDeInscricao(parsed, EMAIL_DA_SESSAO).pontos).toBe(1);
   });
 });
 
 describe("Riot ID", () => {
   it("normaliza a tag para maiúsculas e tira o # digitado por engano", () => {
-    const linha = linhaDeInscricao(inscricaoPublicaSchema.parse({ ...valida, tag: "#br1" }));
+    const linha = linhaDeInscricao(inscricaoPublicaSchema.parse({ ...valida, tag: "#br1" }), EMAIL_DA_SESSAO);
     expect(linha.tag).toBe("BR1");
   });
 
@@ -68,15 +70,36 @@ describe("Riot ID", () => {
 describe("rotas", () => {
   it("converte os rótulos do formulário para as chaves do site", () => {
     expect(rotaCanonica("TOPO")).toBe("TOP");
-    expect(rotaCanonica("SELVA")).toBe("SEL");
+    expect(rotaCanonica("SELVA")).toBe("JUNG");
     expect(rotaCanonica("MEIO")).toBe("MID");
     expect(rotaCanonica("ATIRADOR")).toBe("ADC");
     expect(rotaCanonica("SUPORTE")).toBe("SUP");
   });
 
+  it("o valor gravado volta pelo mesmo resolvedor — a selva era a exceção", () => {
+    // rotaCanonica devolvia `short`, e o short da selva é "SEL", que não é alias de
+    // nada: o jungler saía do banco como rota que o site não sabia ler. Idempotência
+    // é a asserção que pega isso.
+    for (const rota of ["TOPO", "SELVA", "MEIO", "ATIRADOR", "SUPORTE"]) {
+      const canonica = rotaCanonica(rota)!;
+      expect(canonica).not.toBeNull();
+      expect(rotaCanonica(canonica)).toBe(canonica);
+    }
+  });
+
   it("recusa rota primária igual à secundária", () => {
     const r = inscricaoPublicaSchema.safeParse({ ...valida, rotaSecundaria: "MEIO" });
     expect(r.success).toBe(false);
+  });
+});
+
+describe("tag", () => {
+  it("uma letra depois do # não vira tag válida", () => {
+    // O `#` era contado no mínimo de 2 caracteres, então "#A" passava e o Riot ID
+    // gravado ficava "Nick#A". A medida tem de ser feita DEPOIS de tirar o #.
+    expect(inscricaoPublicaSchema.safeParse({ ...valida, tag: "#A" }).success).toBe(false);
+    expect(inscricaoPublicaSchema.safeParse({ ...valida, tag: "A" }).success).toBe(false);
+    expect(inscricaoPublicaSchema.safeParse({ ...valida, tag: "#BR1" }).success).toBe(true);
   });
 });
 

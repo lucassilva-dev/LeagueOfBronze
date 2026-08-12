@@ -24,14 +24,22 @@ export const dynamic = "force-dynamic";
  * O que ela deliberadamente NÃO faz: gravar direto do navegador no banco. As tabelas
  * têm RLS forçado e zero policies — nem a chave pública as alcança.
  *
- * A conta de jogador é OPCIONAL aqui. Quem já está logado tem a inscrição amarrada à
- * conta na hora; quem se inscreve sem conta é amarrado depois, pelo e-mail, quando
- * criar a conta (`vincularInscricaoPorEmail`). Exigir conta antes de inscrever só
- * colocaria uma porta a mais entre a pessoa e o campeonato.
+ * EXIGE sessão de jogador, e isso não é burocracia: sem dono, a inscrição precisaria
+ * ser reivindicada depois pelo e-mail, e como não há confirmação de e-mail bastaria
+ * saber o endereço de um inscrito para assumir a inscrição dele. Não é porta a mais
+ * na prática — o formulário cria a conta no primeiro passo, numa tela só.
  */
 export async function POST(request: NextRequest) {
   const lido = await lerCorpoPublico(request);
   if (!lido.ok) return lido.response;
+
+  const identidade = await getJogadorIdentity(request);
+  if (!identidade) {
+    return NextResponse.json(
+      { error: "Crie sua conta ou entre antes de enviar a inscrição.", precisaEntrar: true },
+      { status: 401 },
+    );
+  }
 
   const parsed = inscricaoPublicaSchema.safeParse(lido.corpo);
   if (!parsed.success) {
@@ -45,10 +53,10 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const identidade = await getJogadorIdentity(request);
     const inscricao = await criarInscricao(parsed.data, {
       ipHash: hashIp(getClientIp(request.headers)),
-      jogadorId: identidade?.id ?? null,
+      jogadorId: identidade.id,
+      email: identidade.email,
     });
 
     // Devolve só o que a pessoa precisa ver de volta. Nada de e-mail, WhatsApp,

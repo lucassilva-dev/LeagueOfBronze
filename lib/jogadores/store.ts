@@ -41,7 +41,7 @@ export async function acharJogadorPorEmail(email: string): Promise<JogadorRow | 
     .select(CAMPOS)
     // `.eq` e NÃO `.ilike`: em LIKE, `%` e `_` são curingas. Como o e-mail chega
     // aqui já em minúsculas pelo schema (e é gravado assim), a igualdade simples é
-    // equivalente — e não vira padrão. Ver o comentário em vincularInscricaoPorEmail.
+    // equivalente — e não vira padrão. Um `%` no e-mail viraria curinga.
     .eq("email", email)
     .maybeSingle<JogadorRow>();
 
@@ -92,28 +92,19 @@ export async function trocarSenhaJogador(id: string, passwordHash: string): Prom
   if (error) throw new Error(`Falha ao trocar a senha: ${error.message}`);
 }
 
-/**
- * Amarra a inscrição já enviada à conta recém-criada, pelo e-mail.
+/*
+ * NÃO EXISTE vínculo automático de inscrição por e-mail — e a ausência é deliberada.
  *
- * O formulário de inscrição é público e não exige conta — alguém pode se inscrever
- * hoje e criar a conta na véspera do draft. Sem isto, essa pessoa nunca veria a
- * própria inscrição em /minha-inscricao, e não poderia ser capitã.
+ * A versão anterior amarrava, no cadastro, qualquer inscrição com o mesmo e-mail que
+ * ainda não tivesse conta. Como não há confirmação de e-mail (decisão consciente: a
+ * verificação de verdade é a organização conferir a pessoa à mão), bastava saber o
+ * e-mail de um inscrito para criar uma conta com ele e assumir a inscrição alheia —
+ * vendo nome, WhatsApp e Discord da pessoa, e podendo ser capitão no lugar dela.
+ *
+ * A inscrição agora EXIGE sessão e nasce com `jogador_id` preenchido, então o caso
+ * "inscrito sem conta" simplesmente não acontece. Se alguma linha antiga precisar ser
+ * ligada a uma conta, quem faz isso é a organização pelo painel, à mão.
  */
-export async function vincularInscricaoPorEmail(jogadorId: string, email: string): Promise<void> {
-  const { error } = await createSupabaseAdminClient()
-    .from("inscricoes")
-    .update({ jogador_id: jogadorId })
-    // ⚠ NUNCA `.ilike` aqui. Em LIKE, `%` casa com qualquer coisa: quem se
-    // cadastrasse com o e-mail "%@gmail.com" reivindicaria de uma vez TODAS as
-    // inscrições do Gmail ainda sem conta — e passaria a ver os dados delas em
-    // /minha-inscricao. O e-mail ja vem em minusculas do schema, entao `.eq` basta.
-    .eq("email", email)
-    .is("jogador_id", null);
-
-  // Vínculo é conveniência: se falhar, a conta continua válida e a organização
-  // consegue ligar as duas à mão. Não pode derrubar o cadastro.
-  if (error) console.error("[jogadores] falha ao vincular inscrição", error.message);
-}
 
 // ---------------------------------------------------------------- sessões
 

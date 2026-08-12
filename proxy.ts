@@ -75,22 +75,34 @@ export function proxy(request: NextRequest) {
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("Content-Security-Policy", csp);
-  // Sem isto, um cache intermediário serviria a versão em inglês para quem pede português.
-  response.headers.set("Vary", "Accept-Language, Cookie");
+  // NÃO tente pôr `Vary: Accept-Language, Cookie` aqui.
+  //
+  // O conteúdo de fato varia com o idioma, então o cabeçalho seria correto — mas o
+  // Next é dono do Vary em resposta de documento e escreve o dele (rsc,
+  // next-router-*) DEPOIS do proxy. Testado: nem `set`, nem `append`, nem uma entrada
+  // em `next.config.ts` sobrevivem (outros cabeçalhos do mesmo bloco do next.config,
+  // como o X-Content-Type-Options, passam; o Vary não).
+  //
+  // Na prática não faz falta: toda página é dinâmica e sai com
+  // `Cache-Control: no-cache, must-revalidate`, então nenhum cache compartilhado
+  // guarda uma versão para servir a outra pessoa. Se um dia esse cache for afrouxado,
+  // o problema volta — e a solução terá de vir de outro lugar, não daqui.
   return response;
 }
 
 export const config = {
   matcher: [
     // Roda nas páginas (documentos HTML), onde o nonce importa. Pula estáticos, imagens
-    // otimizadas, favicon e as rotas de API (JSON não executa script). Pula também
-    // requisições de prefetch, para não gerar CSP sob prefetch do roteador.
-    {
-      source: "/((?!api|_next/static|_next/image|favicon.ico).*)",
-      missing: [
-        { type: "header", key: "next-router-prefetch" },
-        { type: "header", key: "purpose", value: "prefetch" },
-      ],
-    },
+    // otimizadas, favicon e as rotas de API (JSON não executa script).
+    //
+    // ⚠ NÃO reintroduzir um bloco `missing` para pular prefetch. Havia um aqui, com a
+    // justificativa de "não gerar CSP sob prefetch do roteador", e ele custava caro:
+    // uma requisição com `Purpose: prefetch` não passava por este arquivo, então o
+    // documento saía SEM Content-Security-Policy nenhuma e SEM o cabeçalho de idioma
+    // — ou seja, sempre em português, mesmo para quem pediu inglês. Verificado com
+    // `curl -H "purpose: prefetch" -H "Accept-Language: en"`: vinha `lang="pt-BR"` e
+    // resposta sem CSP. Um cabeçalho de CSP numa resposta de prefetch é inofensivo; a
+    // ausência dele no documento que o navegador acaba usando não é.
+    "/((?!api|_next/static|_next/image|favicon.ico).*)",
   ],
 };

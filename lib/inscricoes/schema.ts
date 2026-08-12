@@ -36,10 +36,17 @@ export function pontosDoElo(elo: string): number | null {
   return resolveElo(elo)?.pts ?? null;
 }
 
-/** Chave canônica da rota (TOP/JUNG/MID/ADC/SUP) a partir de qualquer alias. */
+/**
+ * Chave canônica da rota (TOP/JUNG/MID/ADC/SUP) a partir de qualquer alias.
+ *
+ * Devolve `meta.key`, NÃO `meta.short`. A diferença só aparece na selva, onde a chave
+ * é "JUNG" e o rótulo curto é "SEL" — e gravar "SEL" produzia um valor que nem o
+ * `resolveRole` do próprio site reconhece (jungler saía com a pílula genérica "Rota",
+ * sem ícone e no fim da ordenação) nem este schema aceita de volta numa reedição.
+ */
 export function rotaCanonica(rota: string): string | null {
   const meta = resolveRole(rota);
-  return meta.short === "—" ? null : meta.short;
+  return meta.key === "" ? null : meta.key;
 }
 
 /**
@@ -75,13 +82,19 @@ const nickField = z
   .max(LIMITES_INSCRICAO.nick)
   .refine((v) => !v.includes("#"), "Não inclua o # aqui — a tag vai no campo ao lado.");
 
+// O `#` sai ANTES de medir. Na ordem inversa ele contava para o mínimo, e "#A"
+// passava como se tivesse dois caracteres — gravando o Riot ID "Nick#A".
 const tagField = z
   .string()
   .trim()
-  .min(2, "A tag precisa de ao menos 2 caracteres.")
-  .max(LIMITES_INSCRICAO.tag)
   .transform((v) => v.replace(/^#/, ""))
-  .refine((v) => /^[A-Za-z0-9]+$/.test(v), "A tag usa só letras e números.");
+  .pipe(
+    z
+      .string()
+      .min(2, "A tag precisa de ao menos 2 caracteres.")
+      .max(LIMITES_INSCRICAO.tag)
+      .regex(/^[A-Za-z0-9]+$/, "A tag usa só letras e números."),
+  );
 
 // ---------------------------------------------------------------- inscrição
 
@@ -91,7 +104,9 @@ export const inscricaoPublicaSchema = z
     nick: nickField,
     tag: tagField,
     nomeReal: z.string().trim().max(LIMITES_INSCRICAO.nome).optional(),
-    email: z.string().trim().toLowerCase().email("E-mail inválido.").max(LIMITES_INSCRICAO.email),
+    // `email` NÃO está aqui: vem da sessão do jogador, no servidor. Mesmo princípio
+    // dos pontos — se o cliente pudesse escolher, daria para inscrever no e-mail de
+    // outra pessoa e depois disputar a titularidade da inscrição.
     discord: texto(LIMITES_INSCRICAO.discord),
     whatsapp: z.string().trim().max(LIMITES_INSCRICAO.whatsapp).optional(),
 
@@ -113,9 +128,11 @@ export type InscricaoPublica = z.infer<typeof inscricaoPublicaSchema>;
 
 /**
  * Converte o que veio do formulário na linha que vai ao banco.
- * É AQUI que os pontos nascem — a partir do elo, no servidor.
+ *
+ * Os dois valores que o cliente NÃO fornece entram aqui: os pontos, derivados do elo,
+ * e o e-mail, que vem da sessão de quem está enviando.
  */
-export function linhaDeInscricao(dados: InscricaoPublica) {
+export function linhaDeInscricao(dados: InscricaoPublica, email: string) {
   const pontos = pontosDoElo(dados.elo);
   if (pontos === null) {
     // O schema já barrou, então chegar aqui significa que a tabela de elos mudou
@@ -127,7 +144,7 @@ export function linhaDeInscricao(dados: InscricaoPublica) {
     nick: dados.nick,
     tag: dados.tag.toUpperCase(),
     nome_real: dados.nomeReal || null,
-    email: dados.email,
+    email: email.trim().toLowerCase(),
     discord: dados.discord,
     whatsapp: dados.whatsapp || null,
     elo_declarado: dados.elo,
@@ -228,6 +245,35 @@ export const pagamentoPatchSchema = z.object({
   estado: z.enum(ESTADOS_PAGAMENTO),
   observacao: z.string().trim().max(LIMITES_INSCRICAO.texto).optional(),
 });
+
+// ---------------------------------------------------------------- janela
+
+export type EstadoJanela = "aberta" | "ainda_nao_abriu" | "encerrada" | "indisponivel";
+
+/**
+ * Em que ponto da janela de inscrição estamos.
+ *
+ * Função pura, com o "agora" recebido, por dois motivos: dá para testar as bordas sem
+ * mexer no relógio, e a página não precisa chamar `Date.now()` durante a renderização
+ * — o que, num componente, é leitura de valor instável.
+ *
+ * "ainda não abriu" e "encerrada" são estados diferentes porque a resposta que a
+ * pessoa precisa é diferente: um pede paciência, o outro pede falar com a organização.
+ * O que manda é a chave `inscricoes_abertas`; a data só distingue os dois avisos.
+ */
+export function estadoDaJanela(
+  config: { inscricoes_abertas: boolean; fechamento_inscricoes: string | null } | null,
+  agoraMs: number = Date.now(),
+): EstadoJanela {
+  if (!config) return "indisponivel";
+  if (config.inscricoes_abertas) return "aberta";
+
+  if (config.fechamento_inscricoes) {
+    const fim = new Date(config.fechamento_inscricoes).getTime();
+    if (Number.isFinite(fim) && fim < agoraMs) return "encerrada";
+  }
+  return "ainda_nao_abriu";
+}
 
 // ---------------------------------------------------------------- times
 

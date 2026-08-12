@@ -16,7 +16,10 @@ const criarSchema = z.object({
     .trim()
     .min(3, "Usuário precisa ter ao menos 3 caracteres.")
     .max(60)
-    .regex(/^[a-zA-Z0-9._-]+$/, "Use apenas letras, números, ponto, hífen ou sublinhado."),
+    .regex(/^[a-zA-Z0-9._-]+$/, "Use apenas letras, números, ponto, hífen ou sublinhado.")
+    // Guardado em minúsculas para que a busca no login possa ser igualdade simples em
+    // vez de padrão LIKE. Ver `normalizarUsuario` em lib/security/admin-store.ts.
+    .transform((v) => v.toLowerCase()),
   displayName: z.string().trim().min(1).max(120),
   password: z.string().min(1).max(200),
   scopes: z.array(z.string()).max(40).optional(),

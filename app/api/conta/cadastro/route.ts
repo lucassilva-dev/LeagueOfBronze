@@ -12,7 +12,6 @@ import {
   contarTentativasJogador,
   criarJogador,
   registrarTentativaJogador,
-  vincularInscricaoPorEmail,
 } from "@/lib/jogadores/store";
 import { getClientIp, hashIp } from "@/lib/security/admin-store";
 import { hashPassword, validatePasswordStrength } from "@/lib/security/password";
@@ -100,9 +99,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Quem se inscreveu antes de ter conta passa a enxergar a própria inscrição.
-    await vincularInscricaoPorEmail(conta.id, email);
-    await registrarTentativaJogador({ email, ipHash, success: true, reason: "cadastro" });
+    // ⚠ success:false, e não true, mesmo tendo dado certo.
+    //
+    // O campo alimenta `ipHadRecentSuccess` em evaluateLoginRateLimit, que existe para
+    // não trancar uma pessoa conhecida para fora da própria conta — e que DESLIGA o
+    // teto de falhas por usuário. Como criar conta é auto-serviço e grátis, marcar
+    // sucesso aqui deixava qualquer um fabricar o selo de "IP confiável" com um e-mail
+    // descartável e, a partir daí, martelar senhas de outra conta sem limite por 30
+    // dias. Registrar como falha também faz a criação em série contar no teto por IP,
+    // que é o freio que este trecho já prometia ter.
+    await registrarTentativaJogador({ email, ipHash, success: false, reason: "cadastro" });
 
     const cookie = await emitirCookieDeJogador(conta, request);
     const resposta = NextResponse.json({

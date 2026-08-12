@@ -128,9 +128,11 @@ export function createSupabaseAdminClient() {
   const url = getSupabaseUrl();
   const key = getSupabaseServiceRoleKey();
   if (!url || !key) {
-    throw new ErroDeRegra(
-      "Supabase não configurado. Defina SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY.",
-    );
+    // Erro comum, NÃO de regra: a mensagem de ErroDeRegra vai inteira para a resposta
+    // HTTP, e rotas públicas (a inscrição, por exemplo) chegam aqui. O nome das
+    // variáveis de ambiente é recado para quem opera o site, não para um visitante
+    // anônimo — vai para o log, com o código de referência de `respostaDeErro`.
+    throw new Error("Supabase não configurado: defina SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY.");
   }
 
   return createClient(url, key, {

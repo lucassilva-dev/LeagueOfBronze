@@ -12,14 +12,20 @@ function normalizeKey(value: string) {
 }
 
 // ---------- ROTAS ----------
-export type RoleMeta = { label: string; short: string; color: string; order: number; icon?: string };
+/**
+ * `key` é o vocabulário CANÔNICO (o mesmo do dataset: role1/role2). `short` é só o
+ * rótulo curto de exibição — e os dois divergem na selva, onde a chave é JUNG e o
+ * rótulo é SEL. Gravar `short` no banco faz o valor deixar de ser reconhecido pelo
+ * próprio `resolveRole`; quem precisa persistir deve usar `key`.
+ */
+export type RoleMeta = { key: string; label: string; short: string; color: string; order: number; icon?: string };
 
 const ROLE_TABLE: Record<string, RoleMeta> = {
-  TOP: { label: "Topo", short: "TOP", color: "#e0894a", order: 1, icon: "top" },
-  JUNG: { label: "Selva", short: "SEL", color: "#5fbf6a", order: 2, icon: "jg" },
-  MID: { label: "Meio", short: "MID", color: "#5aa2ff", order: 3, icon: "mid" },
-  ADC: { label: "Atirador", short: "ADC", color: "#e85c6a", order: 4, icon: "adc" },
-  SUP: { label: "Suporte", short: "SUP", color: "#c79be0", order: 5, icon: "suporte" },
+  TOP: { key: "TOP", label: "Topo", short: "TOP", color: "#e0894a", order: 1, icon: "top" },
+  JUNG: { key: "JUNG", label: "Selva", short: "SEL", color: "#5fbf6a", order: 2, icon: "jg" },
+  MID: { key: "MID", label: "Meio", short: "MID", color: "#5aa2ff", order: 3, icon: "mid" },
+  ADC: { key: "ADC", label: "Atirador", short: "ADC", color: "#e85c6a", order: 4, icon: "adc" },
+  SUP: { key: "SUP", label: "Suporte", short: "SUP", color: "#c79be0", order: 5, icon: "suporte" },
 };
 
 const ROLE_ALIASES: Record<string, keyof typeof ROLE_TABLE> = {
@@ -28,6 +34,9 @@ const ROLE_ALIASES: Record<string, keyof typeof ROLE_TABLE> = {
   TOPLANE: "TOP",
   JUNG: "JUNG",
   JG: "JUNG",
+  // Rede de segurança: "SEL" é o rótulo de exibição da selva e chegou a ser gravado
+  // como se fosse a chave. Aceitá-lo aqui conserta qualquer linha escrita assim.
+  SEL: "JUNG",
   SELVA: "JUNG",
   JUNGLER: "JUNG",
   JUNGLE: "JUNG",
@@ -44,7 +53,7 @@ const ROLE_ALIASES: Record<string, keyof typeof ROLE_TABLE> = {
   SUPPORT: "SUP",
 };
 
-const ROLE_FALLBACK: RoleMeta = { label: "Rota", short: "—", color: "#c98a4b", order: 9 };
+const ROLE_FALLBACK: RoleMeta = { key: "", label: "Rota", short: "—", color: "#c98a4b", order: 9 };
 
 export function resolveRole(role?: string | null): RoleMeta {
   if (!role) return ROLE_FALLBACK;
