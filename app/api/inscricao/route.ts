@@ -1,67 +1,39 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+import { getJogadorIdentity } from "@/lib/jogadores/auth";
 import { criarInscricao } from "@/lib/inscricoes/store";
 import { inscricaoPublicaSchema } from "@/lib/inscricoes/schema";
 import { getClientIp, hashIp } from "@/lib/security/admin-store";
 import { respostaDeErro } from "@/lib/security/resposta-erro";
+import { lerCorpoPublico } from "@/lib/security/rota-publica";
 
 export const dynamic = "force-dynamic";
 
 /**
  * Inscrição pública da 4ª Edição.
  *
- * É a PRIMEIRA rota do site que aceita escrita de quem não é da organização, então
- * ela carrega sozinha as proteções que `requireAdmin` dá de graça para o resto:
+ * É a primeira rota do site que aceita escrita de quem não é da organização. As
+ * proteções que `requireAdmin` dá de graça (origem, teto de corpo) vêm de
+ * `lerCorpoPublico`; as específicas ficam aqui e no store:
  *
- *  - teto de tamanho lido do cabeçalho, antes de tocar no corpo;
- *  - checagem de mesma origem, para um formulário hospedado em outro site não
- *    conseguir postar aqui;
  *  - validação por schema, com os pontos derivados do elo NO SERVIDOR;
- *  - freio por origem, dentro do store.
+ *  - freio por origem, dentro do store;
+ *  - janela de inscrição conferida no servidor — esconder o botão não é fechar.
  *
  * O que ela deliberadamente NÃO faz: gravar direto do navegador no banco. As tabelas
  * têm RLS forçado e zero policies — nem a chave pública as alcança.
+ *
+ * A conta de jogador é OPCIONAL aqui. Quem já está logado tem a inscrição amarrada à
+ * conta na hora; quem se inscreve sem conta é amarrado depois, pelo e-mail, quando
+ * criar a conta (`vincularInscricaoPorEmail`). Exigir conta antes de inscrever só
+ * colocaria uma porta a mais entre a pessoa e o campeonato.
  */
-
-const TETO_BYTES = 16 * 1024;
-
-/** Mesma lógica de `lib/security/route-guard.ts`, aplicada a uma rota pública. */
-function mesmaOrigem(request: NextRequest): boolean {
-  const secFetchSite = request.headers.get("sec-fetch-site");
-  if (secFetchSite === "same-origin" || secFetchSite === "none") return true;
-
-  const host = request.headers.get("host");
-  for (const cabecalho of ["origin", "referer"] as const) {
-    const valor = request.headers.get(cabecalho);
-    if (!valor) continue;
-    try {
-      return new URL(valor).host === host;
-    } catch {
-      return false;
-    }
-  }
-  return false;
-}
-
 export async function POST(request: NextRequest) {
-  if (!mesmaOrigem(request)) {
-    return NextResponse.json({ error: "Requisição bloqueada: origem não confere." }, { status: 403 });
-  }
+  const lido = await lerCorpoPublico(request);
+  if (!lido.ok) return lido.response;
 
-  const tamanho = Number(request.headers.get("content-length") ?? 0);
-  if (tamanho > TETO_BYTES) {
-    return NextResponse.json({ error: "Payload grande demais." }, { status: 413 });
-  }
-
-  let corpo: unknown;
-  try {
-    corpo = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Payload inválido." }, { status: 400 });
-  }
-
-  const parsed = inscricaoPublicaSchema.safeParse(corpo);
+  const parsed = inscricaoPublicaSchema.safeParse(lido.corpo);
   if (!parsed.success) {
     // Diferente das rotas de admin: aqui quem lê é o jogador preenchendo o
     // formulário, então a mensagem precisa dizer qual campo corrigir.
@@ -73,8 +45,10 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const identidade = await getJogadorIdentity(request);
     const inscricao = await criarInscricao(parsed.data, {
       ipHash: hashIp(getClientIp(request.headers)),
+      jogadorId: identidade?.id ?? null,
     });
 
     // Devolve só o que a pessoa precisa ver de volta. Nada de e-mail, WhatsApp,

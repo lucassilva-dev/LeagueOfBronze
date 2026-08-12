@@ -131,7 +131,7 @@ export async function salvarConfig(patch: Partial<EdicaoConfig>): Promise<Edicao
  */
 export async function criarInscricao(
   dados: InscricaoPublica,
-  origem?: { ipHash: string },
+  origem?: { ipHash: string; jogadorId?: string | null },
 ): Promise<Inscricao> {
   const config = await lerConfig();
   if (!config.inscricoes_abertas) {
@@ -159,7 +159,11 @@ export async function criarInscricao(
     }
   }
 
-  const linha = { ...linhaDeInscricao(dados), ip_hash: origem?.ipHash ?? null };
+  const linha = {
+    ...linhaDeInscricao(dados),
+    ip_hash: origem?.ipHash ?? null,
+    jogador_id: origem?.jogadorId ?? null,
+  };
 
   const { data, error } = await cliente
     .from("inscricoes")

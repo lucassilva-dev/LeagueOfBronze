@@ -39,12 +39,28 @@ export function getClientIp(headers: Headers): string {
   return headers.get("x-real-ip")?.trim() || "desconhecido";
 }
 
+/**
+ * Neutraliza os curingas de LIKE antes de um `ilike`.
+ *
+ * `ilike` e usado aqui de proposito, para o nome de usuario nao diferenciar
+ * maiusculas. O detalhe que passa batido: em LIKE, `%` casa com qualquer coisa e `_`
+ * casa com um caractere qualquer. Sem escapar, quem tem o nome "ana_b" tambem casa
+ * com "anaXb", e um nome contendo `%` viraria um padrao que casa com varias contas.
+ *
+ * O `*` fica de fora: o PostgREST o converte em `%` no servidor, DEPOIS deste escape,
+ * entao um nome com `*` simplesmente nao encontra ninguem — falha fechada, que e o
+ * lado certo de errar numa busca de credencial.
+ */
+export function escaparLike(valor: string): string {
+  return valor.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
 export async function findUserByUsername(username: string): Promise<AdminUserRow | null> {
   const client = createSupabaseAdminClient();
   const { data, error } = await client
     .from("admin_users")
     .select("id,username,display_name,password_hash,must_change_password,is_master,scopes,disabled_at,session_epoch")
-    .ilike("username", username)
+    .ilike("username", escaparLike(username))
     .maybeSingle<AdminUserRow>();
 
   if (error) throw new Error(`Falha ao consultar usuários: ${error.message}`);
@@ -156,7 +172,7 @@ export async function getRecentAttemptCounts(
     client
       .from("admin_login_attempts")
       .select("id", { count: "exact", head: true })
-      .ilike("username", username)
+      .ilike("username", escaparLike(username))
       .eq("success", false)
       .gte("occurred_at", janela),
     client

@@ -303,3 +303,50 @@ drop trigger if exists inscricoes_abrir_pendencias on public.inscricoes;
 create trigger inscricoes_abrir_pendencias
   after insert on public.inscricoes
   for each row execute function public.abrir_pendencias_da_inscricao();
+
+-- =====================================================================
+-- LOGIN DO JOGADOR: tentativas e troca de senha
+-- =====================================================================
+-- Tabela SEPARADA de admin_login_attempts de proposito. Se as duas dividissem
+-- o contador, cinco erros de senha de um jogador travariam o login de admin do
+-- mesmo IP, e o registro de seguranca da organizacao ficaria misturado com o
+-- de 50 jogadores.
+create table if not exists public.jogador_login_attempts (
+  id          bigserial primary key,
+  occurred_at timestamptz not null default now(),
+  email       text,
+  ip_hash     text not null,
+  success     boolean not null,
+  reason      text not null
+);
+
+create index if not exists jogador_login_attempts_ip_idx
+  on public.jogador_login_attempts (ip_hash, occurred_at desc);
+create index if not exists jogador_login_attempts_email_idx
+  on public.jogador_login_attempts (lower(email), occurred_at desc);
+
+-- Senha redefinida pela organizacao nasce temporaria: o jogador troca no
+-- primeiro acesso. Sem isto, quem redefine continua sabendo a senha do outro.
+alter table public.jogador_contas
+  add column if not exists must_change_password boolean not null default false;
+
+alter table public.jogador_login_attempts enable row level security;
+alter table public.jogador_login_attempts force  row level security;
+revoke all on public.jogador_login_attempts from anon, authenticated;
+
+-- =====================================================================
+-- E-MAIL SEMPRE EM MINUSCULAS
+-- =====================================================================
+-- O codigo procura conta e vincula inscricao com igualdade simples (`.eq`) em vez
+-- de `ilike`, porque em LIKE o `%` e o `_` sao curingas: quem se cadastrasse com o
+-- e-mail "%@gmail.com" reivindicaria de uma vez todas as inscricoes do Gmail ainda
+-- sem conta. A igualdade so equivale a busca sem diferenciar maiusculas se o dado
+-- gravado ja estiver em minusculas. O schema Zod garante na entrada; isto garante
+-- no banco, inclusive para linha inserida a mao pelo SQL Editor.
+alter table public.jogador_contas
+  add constraint jogador_contas_email_minusculo check (email = lower(email)) not valid;
+alter table public.jogador_contas validate constraint jogador_contas_email_minusculo;
+
+alter table public.inscricoes
+  add constraint inscricoes_email_minusculo check (email = lower(email)) not valid;
+alter table public.inscricoes validate constraint inscricoes_email_minusculo;
