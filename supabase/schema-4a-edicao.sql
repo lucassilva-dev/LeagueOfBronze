@@ -257,3 +257,49 @@ revoke all on public.inscricao_conferencias from anon, authenticated;
 revoke all on public.inscricao_pagamentos   from anon, authenticated;
 revoke all on public.inscricao_auditoria    from anon, authenticated;
 revoke all on public.draft_estado           from anon, authenticated;
+
+-- =====================================================================
+-- ATOMICIDADE: as pendencias nascem junto com a inscricao
+-- =====================================================================
+-- Sem isto, criar uma inscricao eram TRES chamadas separadas do servidor
+-- (inscricao, 6 conferencias, pagamento). Se a segunda falhasse, sobrava uma
+-- inscricao meio-criada: sem linha de pagamento, ela nao aparece na fila do
+-- caixa, e ninguem descobre ate a pessoa cobrar. Aqui roda tudo dentro da MESMA
+-- transacao do insert. De quebra, vale tambem para linha inserida a mao no SQL
+-- Editor.
+--
+-- SECURITY INVOKER (o padrao) de proposito: a funcao roda como service_role, que
+-- ja tem BYPASSRLS. Marcar como DEFINER daria privilegio sem necessidade.
+create or replace function public.abrir_pendencias_da_inscricao()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+declare
+  cfg public.edicao_config%rowtype;
+begin
+  select * into cfg from public.edicao_config where id = 1;
+
+  -- Mesma lista de ITENS_CONFERENCIA em lib/inscricoes/schema.ts e do check
+  -- da coluna. Criar as 6 agora (em vez de na primeira conferencia) e o que
+  -- deixa a matriz do painel mostrar o que falta desde o dia 1.
+  insert into public.inscricao_conferencias (inscricao_id, item)
+  select new.id, item from unnest(array['a','b','d','e','f','m']) as item
+  on conflict (inscricao_id, item) do nothing;
+
+  insert into public.inscricao_pagamentos (inscricao_id, valor_centavos, vence_em)
+  values (
+    new.id,
+    coalesce(cfg.taxa_centavos, 2000),
+    now() + (coalesce(cfg.prazo_pagamento_dias, 14) || ' days')::interval
+  )
+  on conflict (inscricao_id) do nothing;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists inscricoes_abrir_pendencias on public.inscricoes;
+create trigger inscricoes_abrir_pendencias
+  after insert on public.inscricoes
+  for each row execute function public.abrir_pendencias_da_inscricao();

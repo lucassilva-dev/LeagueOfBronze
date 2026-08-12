@@ -6,7 +6,6 @@ import "server-only";
 import { createSupabaseAdminClient } from "@/lib/data-store";
 import { ErroDeRegra } from "@/lib/security/erros";
 import {
-  ITENS_CONFERENCIA,
   distribuirTimes,
   linhaDeInscricao,
   type EstadoPagamento,
@@ -101,7 +100,10 @@ export async function lerConfig(): Promise<EdicaoConfig> {
     .maybeSingle<EdicaoConfig>();
 
   if (error) throw new Error(`Falha ao ler a configuração da edição: ${error.message}`);
-  if (!data) throw new ErroDeRegra("A edição ainda não foi configurada. Rode schema-4a-edicao.sql.");
+  // Erro comum, NÃO de regra: a mensagem de ErroDeRegra vai inteira para a resposta
+  // HTTP, e quem chama isto primeiro é o formulário público. "Rode schema-4a-edicao.sql"
+  // é recado para nós, não para o jogador — vai para o log com código de referência.
+  if (!data) throw new Error("edicao_config vazia: rode supabase/schema-4a-edicao.sql.");
   return data;
 }
 
@@ -179,22 +181,11 @@ export async function criarInscricao(
     throw new Error(`Falha ao gravar a inscrição: ${error.message}`);
   }
 
-  // Um item de conferência por regra, todos pendentes. Criar agora (em vez de na
-  // primeira conferência) é o que permite a matriz mostrar o que falta desde o dia 1.
-  const conferencias = ITENS_CONFERENCIA.map((item) => ({ inscricao_id: data.id, item }));
-  const { error: erroConf } = await cliente.from("inscricao_conferencias").insert(conferencias);
-  if (erroConf) throw new Error(`Falha ao abrir as conferências: ${erroConf.message}`);
-
-  // Pagamento nasce aguardando, com o vencimento já calculado pelo prazo configurado.
-  const vence = new Date();
-  vence.setDate(vence.getDate() + config.prazo_pagamento_dias);
-  const { error: erroPag } = await cliente.from("inscricao_pagamentos").insert({
-    inscricao_id: data.id,
-    valor_centavos: config.taxa_centavos,
-    vence_em: vence.toISOString(),
-  });
-  if (erroPag) throw new Error(`Falha ao abrir o pagamento: ${erroPag.message}`);
-
+  // As 6 conferências e o pagamento NÃO são abertos aqui: quem faz isso é o gatilho
+  // `inscricoes_abrir_pendencias`, na mesma transação do insert. Fazer em três
+  // chamadas separadas deixava a porta aberta para uma inscrição meio-criada — sem
+  // linha de pagamento, invisível na fila do caixa — se a segunda falhasse. E o
+  // gatilho também cobre a linha inserida à mão pelo SQL Editor.
   await registrarAuditoria({
     inscricaoId: data.id,
     autor: data.riot_id,
@@ -254,7 +245,10 @@ export async function atualizarConferencia(args: {
     .update({
       estado: args.estado,
       observacao: args.observacao ?? null,
-      retrato: args.retrato ?? null,
+      // O retrato é PROVA do que foi visto na hora. Sobrescrever com nulo só porque
+      // esta conferência não trouxe um apagaria a justificativa da anterior — e a
+      // auditoria guarda estado e observação, não o retrato. Ausente = preserva.
+      retrato: args.retrato ?? undefined,
       conferido_por: args.autor,
       conferido_em: agora,
       atualizado_em: agora,
@@ -318,19 +312,28 @@ export async function atualizarPagamento(args: {
  * Isentos entram numa linha própria porque o dinheiro deles nunca existiu.
  */
 export function fecharCaixa(pagamentos: readonly Pagamento[]) {
-  const soma = (filtro: (p: Pagamento) => boolean) =>
-    pagamentos.filter(filtro).reduce((t, p) => t + p.valor_centavos, 0);
+  const soma = (...estados: readonly EstadoPagamento[]) =>
+    pagamentos.filter((p) => estados.includes(p.estado)).reduce((t, p) => t + p.valor_centavos, 0);
 
-  const recebido = soma((p) => p.estado === "pago");
-  const estornado = soma((p) => p.estado === "estornado");
+  // Estado é EXCLUSIVO: quem foi estornado deixou de ser "pago". Então "pago" já não
+  // contém o dinheiro devolvido, e subtrair o estorno de novo descontaria duas vezes
+  // o mesmo valor. `recebido` reconstrói o bruto somando tudo que um dia entrou.
+  const daOrganizacao = soma("pago");
+  const aDevolver = soma("estorno_devido");
+  const estornado = soma("estornado");
+  const recebido = daOrganizacao + aDevolver + estornado;
 
   return {
     recebido,
     estornado,
-    arrecadado: recebido - estornado,
-    aReceber: soma((p) => p.estado === "aguardando" || p.estado === "declarado"),
-    isento: soma((p) => p.estado === "isento"),
-    estornoDevido: soma((p) => p.estado === "estorno_devido"),
+    // Já entrou e ainda está na conta, mas está comprometido a sair.
+    aDevolver,
+    // O que existe na conta agora, incluindo o que ainda será devolvido.
+    emCaixa: recebido - estornado,
+    // O dinheiro que é de fato da organização — é ESTE que vira premiação.
+    arrecadado: daOrganizacao,
+    aReceber: soma("aguardando", "declarado"),
+    isento: soma("isento"),
   };
 }
 
@@ -389,12 +392,15 @@ export function panorama(
   pagamentos: readonly Pagamento[],
   config: Pick<EdicaoConfig, "jogadores_por_time">,
 ) {
-  const aptos = inscricoes.filter((i) => i.situacao === "apto");
-  const { times, vagas, sobra } = distribuirTimes(aptos.length, config.jogadores_por_time);
+  // "sobra" também é APROVADO — é quem passou na conferência e ficou de fora quando
+  // os times fecharam. Contar só os "apto" faria a conta se mover sozinha: ao marcar
+  // dois como sobra, o total de aprovados cairia e a divisão mudaria de resposta.
+  const aprovados = inscricoes.filter((i) => i.situacao === "apto" || i.situacao === "sobra");
+  const { times, vagas, sobra } = distribuirTimes(aprovados.length, config.jogadores_por_time);
 
   return {
     inscritos: inscricoes.length,
-    aptos: aptos.length,
+    aprovados: aprovados.length,
     pendentes: inscricoes.filter((i) => i.situacao === "pendente").length,
     recusados: inscricoes.filter((i) => i.situacao === "recusado").length,
     // Sem "X de 30": não existe teto nesta edição, o número de times é derivado.
