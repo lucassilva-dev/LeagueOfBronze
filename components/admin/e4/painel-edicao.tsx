@@ -81,6 +81,8 @@ export type Pagamento = {
   conferido_por: string | null;
   conferido_em: string | null;
   vence_em: string | null;
+  /** Espelha `Pagamento` em lib/inscricoes/store.ts — os dois têm de andar juntos. */
+  observacao: string | null;
 };
 
 export type Caixa = {

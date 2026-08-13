@@ -12,7 +12,9 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["tests/**/*.test.ts"],
+    // `.tsx` também: as telas do painel são testadas com renderToStaticMarkup, que é
+    // o jeito de exercitar o render inteiro sem navegador nem login.
+    include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
     coverage: {
       provider: "v8",
       reporter: ["text", "html", "lcov"],
