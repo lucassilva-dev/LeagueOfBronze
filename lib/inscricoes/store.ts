@@ -333,6 +333,24 @@ export async function minhaInscricao(jogadorId: string): Promise<MinhaInscricao 
 }
 
 /**
+ * A inscrição de quem está logado, só o id.
+ *
+ * É a ponte entre a sessão e o draft: o motor identifica as pessoas pelo id da
+ * INSCRIÇÃO, e a sessão sabe o id da CONTA. Sem esta tradução, a rota da escolha
+ * precisaria receber o id do jogador no corpo — que é exatamente o que não pode.
+ */
+export async function inscricaoIdDoJogador(jogadorId: string): Promise<string | null> {
+  const { data, error } = await createSupabaseAdminClient()
+    .from("inscricoes")
+    .select("id")
+    .eq("jogador_id", jogadorId)
+    .maybeSingle<{ id: string }>();
+
+  if (error) throw new Error(`Falha ao localizar a inscrição: ${error.message}`);
+  return data?.id ?? null;
+}
+
+/**
  * "Já paguei", dito pelo jogador.
  *
  * Só sai de `aguardando`. Não pode reabrir um pagamento já conferido, isento,
