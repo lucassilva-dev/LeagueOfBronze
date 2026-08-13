@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+import { readDataset, saveDataset } from "@/lib/data-store";
 import { iniciarDraft, pausarDraft, retomarDraft } from "@/lib/draft/motor";
+import { datasetDoDraft, problemasDaVirada } from "@/lib/draft/virada";
 import {
   lerDraftCompleto,
   montarDraftDosAprovados,
@@ -98,6 +100,51 @@ export async function POST(request: NextRequest) {
 
         await registrarAuditoria({ autor, acao: `draft_${corpo.acao}` });
         return NextResponse.json({ ok: true, draft: paraPublico(novo) });
+      }
+
+      case "prever":
+      case "virar": {
+        if (!estado) return NextResponse.json({ error: "Monte o draft primeiro." }, { status: 409 });
+
+        const problemas = problemasDaVirada(estado);
+        const resultado = datasetDoDraft(estado);
+
+        if (corpo.acao === "prever") {
+          // Só olha. A organização confere os elencos antes de qualquer escrita no
+          // dataset público — que é de onde o site inteiro lê.
+          return NextResponse.json({ ok: true, problemas, ...resultado });
+        }
+
+        if (problemas.length > 0) {
+          return NextResponse.json({ error: "O draft ainda não está pronto para virar.", problemas }, { status: 409 });
+        }
+
+        const dataset = await readDataset();
+
+        // ⚠ Trava que não estava no plano, e que precisa existir: trocar os jogadores
+        // de uma temporada que JÁ TEM partidas registradas deixa as estatísticas
+        // apontando para gente que não está mais no dataset — placar de série
+        // referenciando jogador inexistente. A virada é para uma temporada recém
+        // aberta, não para uma em andamento.
+        if (dataset.seriesMatches.length > 0) {
+          return NextResponse.json(
+            {
+              error:
+                "Esta temporada já tem séries registradas. Arquive-a e comece a 4ª Edição antes de aplicar o draft.",
+            },
+            { status: 409 },
+          );
+        }
+
+        await saveDataset({ ...dataset, teams: resultado.teams, players: resultado.players });
+
+        await registrarAuditoria({
+          autor,
+          acao: "draft_virado_para_o_dataset",
+          detalhe: { times: resultado.teams.length, jogadores: resultado.players.length },
+        });
+
+        return NextResponse.json({ ok: true, ...resultado });
       }
 
       default:

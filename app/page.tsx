@@ -270,6 +270,20 @@ export default async function InicioPage() {
           <p style={{ margin: "10px 0 0", maxWidth: 620, fontSize: 14, lineHeight: 1.6, color: "#a99e8b" }}>
             {conf.proximaEdicaoTexto}
           </p>
+          {/*
+            Até aqui a 4ª Edição era um parágrafo sem saída: as páginas existiam mas
+            ninguém as alcançava pelo site. Ficam fora do menu principal de propósito —
+            ele é da temporada que está no ar, a 3ª — e entram aqui, onde a conversa
+            já é sobre a próxima.
+          */}
+          <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
+            <Link className="lob-btn-gold" href="/inscricao">
+              {conf.proximaEdicaoInscricao}
+            </Link>
+            <Link className="lob-btn-ghost" href="/draft">
+              {conf.proximaEdicaoDraft}
+            </Link>
+          </div>
         </div>
       </section>
 

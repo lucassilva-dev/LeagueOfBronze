@@ -35,6 +35,11 @@ export const conformidade = definir({
     proximaEdicaoTitulo: "League of Bronze — 4ª Edição",
     proximaEdicaoTexto:
       "A próxima edição já está sendo montada, com início previsto para o começo de novembro de 2026. A data exata ainda será confirmada — acompanhe por aqui e pelo Discord do grupo.",
+    // Rótulos neutros de propósito: as duas páginas dizem sozinhas em que pé estão
+    // ("as inscrições ainda não abriram", "o draft ainda não foi montado"). Um botão
+    // "FAZER MINHA INSCRIÇÃO" com a janela fechada prometeria o que não entrega.
+    proximaEdicaoInscricao: "INSCRIÇÃO →",
+    proximaEdicaoDraft: "DRAFT AO VIVO →",
 
     formatoVariaTitulo: "CADA EDIÇÃO TEM O SEU FORMATO",
     formatoVariaTexto:
@@ -62,6 +67,8 @@ export const conformidade = definir({
     proximaEdicaoTitulo: "League of Bronze — 4th Edition",
     proximaEdicaoTexto:
       "The next edition is already being put together, expected to start in early November 2026. The exact date is still to be confirmed — follow it here and on the group's Discord.",
+    proximaEdicaoInscricao: "SIGN-UP →",
+    proximaEdicaoDraft: "LIVE DRAFT →",
 
     formatoVariaTitulo: "EACH EDITION HAS ITS OWN FORMAT",
     formatoVariaTexto:
