@@ -37,7 +37,7 @@ describe("a visão pública do draft", () => {
   it("NÃO carrega nada que identifique alguém fora do jogo", () => {
     // A transmissão é aberta. Se um e-mail ou WhatsApp entrasse aqui, bastaria abrir
     // o painel de rede do navegador para colher o contato de 50 pessoas.
-    const publico = paraPublico(iniciarDraft(draftDe2Times(), T0));
+    const publico = paraPublico(iniciarDraft(draftDe2Times(), T0), 1);
     const bruto = JSON.stringify(publico).toLowerCase();
 
     for (const proibido of ["email", "e-mail", "@exemplo", "whatsapp", "discord", "telefone", "ip_hash"]) {
@@ -49,7 +49,7 @@ describe("a visão pública do draft", () => {
     let draft = iniciarDraft(draftDe2Times(), T0);
     draft = aplicarEscolha(draft, "t1", "j0", T0);
 
-    const publico = paraPublico(draft);
+    const publico = paraPublico(draft, 1);
     const chama = publico.times.find((t) => t.id === "t1")!;
 
     expect(chama.gasto).toBe(7); // capitão 5 + escolhido 2
@@ -58,16 +58,16 @@ describe("a visão pública do draft", () => {
   });
 
   it("o capitão vem marcado dentro do elenco", () => {
-    const publico = paraPublico(iniciarDraft(draftDe2Times(), T0));
+    const publico = paraPublico(iniciarDraft(draftDe2Times(), T0), 1);
     expect(publico.elencos.t1?.filter((j) => j.capitao)).toHaveLength(1);
   });
 
   it("quem já foi escolhido sai da lista de disponíveis", () => {
     let draft = iniciarDraft(draftDe2Times(), T0);
-    const antes = paraPublico(draft).disponiveis.length;
+    const antes = paraPublico(draft, 1).disponiveis.length;
     draft = aplicarEscolha(draft, "t1", "j0", T0);
 
-    const depois = paraPublico(draft).disponiveis;
+    const depois = paraPublico(draft, 1).disponiveis;
     expect(depois).toHaveLength(antes - 1);
     expect(depois.some((j) => j.id === "j0")).toBe(false);
   });
@@ -76,11 +76,11 @@ describe("a visão pública do draft", () => {
     let draft = iniciarDraft(draftDe2Times(), T0);
     draft = aplicarEscolha(draft, "t1", "j0", T0);
 
-    expect(paraPublico(draft).historico[0]).toMatchObject({ timeId: "t1", riotId: "Jog0#BR1" });
+    expect(paraPublico(draft, 1).historico[0]).toMatchObject({ timeId: "t1", riotId: "Jog0#BR1" });
   });
 
   it("o total de escolhas é 4 por time, não um número fixo", () => {
-    expect(paraPublico(draftDe2Times()).totalEscolhas).toBe(8);
+    expect(paraPublico(draftDe2Times(), 1).totalEscolhas).toBe(8);
   });
 });
 

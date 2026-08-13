@@ -37,11 +37,16 @@ export async function GET(request: NextRequest) {
     const agora = Date.now();
     const alcancado = alcancarORelogio(estado, agora);
 
+    // Se o relógio andou e a gravação pegou, a revisão avançou uma; se não pegou,
+    // outra sondagem gravou e a nossa leitura ficou velha — nos dois casos o número
+    // que descreve o estado devolvido é `revisao + 1`.
+    let revisaoAtual = revisao;
     if (alcancado !== estado) {
       // Perder a corrida aqui é normal: significa que outra sondagem já virou a
       // escolha. O estado que devolvemos abaixo continua correto porque foi calculado
       // do mesmo histórico — quem escolhe é o motor, não o acaso de quem chegou antes.
       await salvarDraftSeIntacto(alcancado, revisao);
+      revisaoAtual = revisao + 1;
     }
 
     // Quem está logado e é capitão recebe o id do time dele — é o que faz o painel
@@ -55,7 +60,7 @@ export async function GET(request: NextRequest) {
       if (inscricaoId) souCapitaoDe = timeDoCapitao(alcancado, inscricaoId);
     }
 
-    const resposta = NextResponse.json({ draft: paraPublico(alcancado), souCapitaoDe });
+    const resposta = NextResponse.json({ draft: paraPublico(alcancado, revisaoAtual), souCapitaoDe });
     resposta.headers.set("Cache-Control", "no-store");
     return resposta;
   } catch (error) {

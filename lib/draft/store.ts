@@ -3,7 +3,13 @@ import "server-only";
 import { createSupabaseAdminClient } from "@/lib/data-store";
 import { ErroDeRegra } from "@/lib/security/erros";
 import { identidadeDoTime } from "@/lib/draft/times";
-import { montarDraft, type EstadoDraft, type JogadorDoDraft, type TimeDoDraft } from "@/lib/draft/motor";
+import {
+  impedimentosDoSorteio,
+  montarDraft,
+  type EstadoDraft,
+  type JogadorDoDraft,
+  type TimeDoDraft,
+} from "@/lib/draft/motor";
 import { lerConfig, listarInscricoes } from "@/lib/inscricoes/store";
 import { distribuirTimes } from "@/lib/inscricoes/schema";
 
@@ -69,18 +75,16 @@ export async function montarDraftDosAprovados(params: {
   const config = await lerConfig();
   const inscritos = await listarInscricoes();
 
+  // "sobra" também é aprovado — conta para decidir QUANTOS times cabem. Quem joga,
+  // porém, são só os "apto": a sobra é justamente quem a organização decidiu deixar
+  // de fora.
   const aprovados = inscritos.filter((i) => i.situacao === "apto" || i.situacao === "sobra");
+  const vaoJogar = inscritos.filter((i) => i.situacao === "apto");
   const { times: quantosTimes, vagas } = distribuirTimes(aprovados.length, config.jogadores_por_time);
-
-  if (quantosTimes === 0) {
-    throw new ErroDeRegra(
-      `Não há aprovados suficientes para fechar um time: ${aprovados.length} de ${config.jogadores_por_time}.`,
-    );
-  }
 
   // O elo que vale é o congelado; sem ele, o verificado; sem ele, o declarado. Os
   // pontos já vêm derivados no banco, então não são recalculados aqui.
-  const pool: JogadorDoDraft[] = aprovados.map((i) => ({
+  const pool: JogadorDoDraft[] = vaoJogar.map((i) => ({
     id: i.id,
     riotId: i.riot_id,
     pontos: i.pontos,
@@ -90,10 +94,24 @@ export async function montarDraftDosAprovados(params: {
     timeId: null,
   }));
 
+  // As duas regras que já falharam ficam numa função pura, testável sem banco:
+  // quem joga tem de ser exatamente as vagas (senão a decisão da organização sobre
+  // quem sobra era apagada por um corte na ordem de inscrição), e a soma dos pontos
+  // tem de caber no teto (senão o draft entra ao vivo já condenado a travar).
+  const impedimentos = impedimentosDoSorteio({
+    pontosDosQueJogam: pool.map((j) => j.pontos),
+    vagas,
+    times: quantosTimes,
+    orcamentoPorTime: config.orcamento_por_time,
+    totalDeAprovados: aprovados.length,
+  });
+
+  if (impedimentos.length > 0) throw new ErroDeRegra(impedimentos.join(" "));
+
   const capitaes = escolherCapitaes({
     aprovados: pool,
-    rotaPorInscrito: new Map(aprovados.map((i) => [i.id, i.rota_primaria])),
-    querCapitao: new Set(aprovados.filter((i) => i.quer_capitao).map((i) => i.id)),
+    rotaPorInscrito: new Map(vaoJogar.map((i) => [i.id, i.rota_primaria])),
+    querCapitao: new Set(vaoJogar.filter((i) => i.quer_capitao).map((i) => i.id)),
     quantos: quantosTimes,
     metodo: params.metodo,
     manuais: params.capitaesManuais ?? [],
@@ -105,19 +123,9 @@ export async function montarDraftDosAprovados(params: {
     capitaoId,
   }));
 
-  // Quem sobrou da divisão não entra no sorteio: são `aprovados − vagas` pessoas, e a
-  // organização já decidiu isso na tela de viabilidade.
-  const noSorteio = pool.slice(0, vagas);
-  const dentro = new Set(noSorteio.map((j) => j.id));
-  for (const capitaoId of capitaes) {
-    if (!dentro.has(capitaoId)) {
-      throw new ErroDeRegra("Um dos capitães ficou fora das vagas. Ajuste a lista de aprovados.");
-    }
-  }
-
   return montarDraft({
     times,
-    jogadores: noSorteio,
+    jogadores: pool,
     jogadoresPorTime: config.jogadores_por_time,
     orcamentoPorTime: config.orcamento_por_time,
     segundosPorEscolha: config.segundos_por_escolha,
@@ -146,6 +154,15 @@ function escolherCapitaes(params: {
     if (manuais.length !== quantos) {
       throw new ErroDeRegra(`Escolha exatamente ${quantos} capitães (você marcou ${manuais.length}).`);
     }
+    // Repetido cria um time SEM capitão alcançável: `montarDraft` liga o jogador ao
+    // primeiro time que o reivindica, e o segundo nasce com o elenco vazio. Ninguém
+    // consegue escolher por ele, todas as escolhas caem no auto-pick, e a virada fica
+    // travada para sempre com "time X tem 4 de 5 jogadores" — descoberto no fim do
+    // evento ao vivo, quando o conserto é refazer o sorteio inteiro.
+    if (new Set(manuais).size !== manuais.length) {
+      throw new ErroDeRegra("Um mesmo jogador foi marcado como capitão de mais de um time.");
+    }
+
     const validos = new Set(aprovados.map((j) => j.id));
     for (const id of manuais) {
       if (!validos.has(id)) throw new ErroDeRegra("Um dos capitães escolhidos não está entre os aprovados.");
@@ -186,6 +203,16 @@ function escolherCapitaes(params: {
  * jogo, e mais nada que identifique alguém fora do jogo.
  */
 export type DraftPublico = {
+  /**
+   * Numeração da gravação, vinda da coluna `revisao`.
+   *
+   * Serve às telas para descartar resposta atrasada: numa rede ruim, a resposta de um
+   * POST pode chegar DEPOIS de uma sondagem mais nova e fazer o quadro andar para
+   * trás — mostrando de novo, como disponível, alguém que já foi escolhido. Não dá
+   * para usar `escolhaAtual` no lugar: ele volta a zero quando o draft é remontado, e
+   * a tela passaria a descartar tudo o que é novo. A revisão só cresce.
+   */
+  revisao: number;
   fase: EstadoDraft["fase"];
   times: { id: string; nome: string; cor: string; capitaoRiotId: string; gasto: number; vagas: number }[];
   elencos: Record<string, { riotId: string; pontos: number; rota1: string; rota2: string; elo: string; capitao: boolean }[]>;
@@ -199,7 +226,7 @@ export type DraftPublico = {
   historico: { escolha: number; timeId: string; riotId: string; automatica: boolean }[];
 };
 
-export function paraPublico(estado: EstadoDraft): DraftPublico {
+export function paraPublico(estado: EstadoDraft, revisao: number): DraftPublico {
   const nomePor = new Map(estado.jogadores.map((j) => [j.id, j]));
 
   const elencos: DraftPublico["elencos"] = {};
@@ -217,6 +244,7 @@ export function paraPublico(estado: EstadoDraft): DraftPublico {
   }
 
   return {
+    revisao,
     fase: estado.fase,
     times: estado.times.map((t) => {
       const elenco = elencos[t.id] ?? [];

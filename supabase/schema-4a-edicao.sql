@@ -215,11 +215,19 @@ create index if not exists inscricao_auditoria_feed_idx
   on public.inscricao_auditoria (ocorrido_em desc);
 
 -- ---------------------------------------------------------------- draft
+-- `revisao` sustenta TODA a concorrencia do draft: a gravacao e condicionada a ela
+-- (update ... where revisao = <a que eu li>), porque dez capitaes e o cronometro
+-- escrevem na mesma linha ao mesmo tempo. Sem a coluna, duas escolhas simultaneas se
+-- sobrescrevem e uma some sem erro nenhum.
 create table if not exists public.draft_estado (
   id            smallint primary key default 1 check (id = 1),
   estado        jsonb,
+  revisao       integer not null default 0,
   atualizado_em timestamptz not null default now()
 );
+
+-- Para bancos criados antes de a coluna existir.
+alter table public.draft_estado add column if not exists revisao integer not null default 0;
 
 insert into public.draft_estado (id) values (1) on conflict (id) do nothing;
 

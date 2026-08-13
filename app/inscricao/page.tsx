@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 
 import FormularioInscricao from "@/components/inscricao/formulario";
-import { Eyebrow, GoldTitle } from "@/components/lob/ui";
+import { Eyebrow, GoldTitle, LobShell } from "@/components/lob/ui";
 import { ELO_ORDER } from "@/lib/design";
 import { getMessages } from "@/lib/i18n/server";
 import { estadoDaJanela } from "@/lib/inscricoes/schema";
@@ -61,7 +61,7 @@ export default async function InscricaoPage() {
   }));
 
   return (
-    <>
+    <LobShell>
       <header style={{ marginBottom: 26 }}>
         <Eyebrow>{t.eyebrow}</Eyebrow>
         <GoldTitle>{t.titulo}</GoldTitle>
@@ -88,6 +88,6 @@ export default async function InscricaoPage() {
           jogadorInicial={jogador ? { displayName: jogador.displayName, email: jogador.email } : null}
         />
       )}
-    </>
+    </LobShell>
   );
 }

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import MinhaInscricaoCliente from "@/components/inscricao/minha";
-import { Eyebrow, GoldTitle } from "@/components/lob/ui";
+import { Eyebrow, GoldTitle, LobShell } from "@/components/lob/ui";
 import { getMessages } from "@/lib/i18n/server";
 
 /**
@@ -21,7 +21,7 @@ export default async function MinhaInscricaoPage() {
   const { inscricao: t } = await getMessages();
 
   return (
-    <>
+    <LobShell>
       <header style={{ marginBottom: 26 }}>
         <Eyebrow>{t.eyebrow}</Eyebrow>
         <GoldTitle>{t.minhaTitulo}</GoldTitle>
@@ -29,6 +29,6 @@ export default async function MinhaInscricaoPage() {
       </header>
 
       <MinhaInscricaoCliente t={t} />
-    </>
+    </LobShell>
   );
 }

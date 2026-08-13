@@ -56,6 +56,12 @@ type JogadorDisponivel = Readonly<{
 }>;
 
 type DraftPublico = Readonly<{
+  /**
+   * Numeração da gravação, vinda do banco. Só cresce, inclusive quando o draft é
+   * remontado — por isso serve para descartar resposta que chegou fora de ordem.
+   * Precisa acompanhar `DraftPublico` em lib/draft/store.ts.
+   */
+  revisao: number;
   fase: "preparando" | "rodando" | "pausado" | "encerrado";
   times: readonly TimeDoDraft[];
   elencos: Readonly<Record<string, readonly JogadorDoElenco[]>>;
@@ -132,6 +138,28 @@ export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
 
   const emVoo = useRef(false);
   const vivo = useRef(false);
+  /**
+   * Revisão do estado que está pintado na tela.
+   *
+   * Numa rede ruim a resposta do POST pode chegar DEPOIS de uma sondagem mais nova, e
+   * aí o quadro anda para trás: alguém já escolhido reaparece disponível, com o botão
+   * habilitado, e a tela volta a dizer que é a vez de quem já passou. Numa virada da
+   * serpentina — quando o mesmo time escolhe duas vezes seguidas — isso faz o capitão
+   * gastar a segunda escolha achando que está refazendo a primeira.
+   *
+   * A revisão vem do banco e só cresce, inclusive quando o draft é remontado; por isso
+   * ela serve de ordenação e `escolhaAtual` não serviria.
+   */
+  const revisaoPintada = useRef(-1);
+
+  /** Aceita só o que for mais novo do que já está pintado. */
+  const aceitar = useCallback((revisao: number | undefined) => {
+    // Sem revisão (draft ainda não montado) não há o que ordenar: passa.
+    if (revisao === undefined) return true;
+    if (revisao < revisaoPintada.current) return false;
+    revisaoPintada.current = revisao;
+    return true;
+  }, []);
 
   const sondar = useCallback(async () => {
     // Sinalizador de "em voo": numa rede lenta, uma resposta atrasada chegando depois
@@ -141,12 +169,20 @@ export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
     emVoo.current = true;
     try {
       const resposta = await fetch("/api/draft/estado", {
+        // Prazo na sondagem. Sem ele, uma requisição PENDURADA (socket morto sem
+        // RST — o sistema só desiste depois de minutos) trava o sinalizador de "em
+        // voo": o intervalo de 2s dispara dezenas de vezes e nenhuma requisição sai.
+        // A TV da sala fica parada numa escolha que já passou, com o cronômetro em
+        // 0:00 e sem nenhum aviso. Abortar rejeita, libera o sinalizador e acende o
+        // aviso que já existe.
+        signal: AbortSignal.timeout(5000),
         cache: "no-store",
         credentials: "same-origin",
       });
       if (!resposta.ok) throw new Error(String(resposta.status));
       const corpo = (await resposta.json()) as RespostaEstado;
       if (!vivo.current) return;
+      if (!aceitar(corpo.draft?.revisao)) return;
       setEstado(corpo);
       setSemResposta(false);
     } catch {
@@ -155,7 +191,7 @@ export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
       emVoo.current = false;
       if (vivo.current) setCarregando(false);
     }
-  }, []);
+  }, [aceitar]);
 
   useEffect(() => {
     vivo.current = true;
@@ -258,19 +294,22 @@ export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
         const corpo = (await resposta.json().catch(() => ({}))) as RespostaEscolha;
         // O 409 vem com o estado fresco justamente para a tela se corrigir na hora, em
         // vez de passar até 2 segundos mostrando um pool que já mudou.
-        if (corpo.draft) {
+        if (corpo.draft && aceitar(corpo.draft.revisao)) {
           const novo = corpo.draft;
           setEstado((anterior) => ({ draft: novo, souCapitaoDe: anterior?.souCapitaoDe ?? null }));
           setSemResposta(false);
         }
-        if (!resposta.ok) setAviso(corpo.error ?? t.erroGenerico);
+        // Aviso velho é pior que nenhum: sem limpar no sucesso, a tarja de "outra
+        // escolha entrou primeiro" ficava na tela rodadas depois, e o capitão a lia
+        // como se fosse da tentativa nova.
+        setAviso(resposta.ok ? null : (corpo.error ?? t.erroGenerico));
       } catch {
         setAviso(t.erroGenerico);
       } finally {
         setEscolhendoId(null);
       }
     },
-    [escolhendoId, t.erroGenerico],
+    [aceitar, escolhendoId, t.erroGenerico],
   );
 
   // ---------------------------------------------------------------- estados de borda

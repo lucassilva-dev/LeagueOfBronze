@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     const veredito = podeEscolher(atual, meuTime, jogadorId);
     if (!veredito.ok) {
       return NextResponse.json(
-        { error: veredito.motivo, draft: paraPublico(atual) },
+        { error: veredito.motivo, draft: paraPublico(atual, revisao) },
         { status: 409 },
       );
     }
@@ -76,13 +76,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error: "Outra escolha entrou primeiro. Confira o quadro e tente de novo.",
-          draft: fresco.estado ? paraPublico(fresco.estado) : null,
+          draft: fresco.estado ? paraPublico(fresco.estado, fresco.revisao) : null,
         },
         { status: 409 },
       );
     }
 
-    return NextResponse.json({ ok: true, draft: paraPublico(novo) });
+    return NextResponse.json({ ok: true, draft: paraPublico(novo, revisao + 1) });
   } catch (error) {
     return respostaDeErro("api/draft/escolha", error, "Não foi possível registrar a escolha.");
   }

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import Transmissao from "@/components/draft/transmissao";
-import { Eyebrow, GoldTitle } from "@/components/lob/ui";
+import { Eyebrow, GoldTitle, LobShell } from "@/components/lob/ui";
 import { getMessages } from "@/lib/i18n/server";
 
 /**
@@ -20,7 +20,7 @@ export default async function DraftPage() {
   const { draft: t } = await getMessages();
 
   return (
-    <>
+    <LobShell>
       <header style={{ marginBottom: 22 }}>
         <Eyebrow>{t.eyebrow}</Eyebrow>
         <GoldTitle>{t.titulo}</GoldTitle>
@@ -28,6 +28,6 @@ export default async function DraftPage() {
       </header>
 
       <Transmissao t={t} />
-    </>
+    </LobShell>
   );
 }

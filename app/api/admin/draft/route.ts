@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
           acao: "draft_montado",
           detalhe: { metodo, times: novo.times.length, escolhas: novo.ordem.length },
         });
-        return NextResponse.json({ ok: true, draft: paraPublico(novo) });
+        return NextResponse.json({ ok: true, draft: paraPublico(novo, revisao + 1) });
       }
 
       case "iniciar":
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
         if (!gravou) return conflito();
 
         await registrarAuditoria({ autor, acao: `draft_${corpo.acao}` });
-        return NextResponse.json({ ok: true, draft: paraPublico(novo) });
+        return NextResponse.json({ ok: true, draft: paraPublico(novo, revisao + 1) });
       }
 
       case "prever":

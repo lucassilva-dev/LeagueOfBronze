@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import PainelCapitao from "@/components/draft/painel-capitao";
-import { Eyebrow, GoldTitle } from "@/components/lob/ui";
+import { Eyebrow, GoldTitle, LobShell } from "@/components/lob/ui";
 import { getMessages } from "@/lib/i18n/server";
 
 /** Dinâmica pela CSP por nonce e porque é uma tela pessoal — nada aqui pode ser cacheado. */
@@ -17,7 +17,7 @@ export default async function CapitaoPage() {
   const { draft: t } = await getMessages();
 
   return (
-    <>
+    <LobShell>
       <header style={{ marginBottom: 22 }}>
         <Eyebrow>{t.eyebrow}</Eyebrow>
         <GoldTitle>{t.capitaoTitulo}</GoldTitle>
@@ -27,6 +27,6 @@ export default async function CapitaoPage() {
       </header>
 
       <PainelCapitao t={t} />
-    </>
+    </LobShell>
   );
 }

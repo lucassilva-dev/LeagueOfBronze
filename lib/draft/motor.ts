@@ -307,6 +307,59 @@ export function alcancarORelogio(estado: EstadoDraft, agoraMs: number, maxPassos
   return atual;
 }
 
+// ---------------------------------------------------------------- antes de sortear
+
+/**
+ * O sorteio pode acontecer com esta lista?
+ *
+ * Função pura, separada de `montarDraftDosAprovados` (que lê o banco) para que estas
+ * duas regras — as que já falharam — sejam verificáveis num teste:
+ *
+ *  1. quem joga são os "apto", e eles têm de ser EXATAMENTE as vagas. Antes o pool era
+ *     cortado por ordem de inscrição, então quem a organização marcou como sobra
+ *     entrava se tivesse se inscrito cedo — a decisão dela era apagada em silêncio;
+ *  2. a soma dos pontos tem de caber no teto total. Sem isto, um draft podia entrar ao
+ *     vivo já condenado a travar numa escolha em que ninguém cabe.
+ *
+ * Devolve a lista de impedimentos, vazia quando está tudo certo.
+ */
+export function impedimentosDoSorteio(params: {
+  pontosDosQueJogam: readonly number[];
+  vagas: number;
+  times: number;
+  orcamentoPorTime: number;
+  totalDeAprovados: number;
+}): string[] {
+  const { pontosDosQueJogam, vagas, times, orcamentoPorTime, totalDeAprovados } = params;
+  const problemas: string[] = [];
+  const quantos = pontosDosQueJogam.length;
+
+  if (times === 0) {
+    problemas.push(`Não há aprovados suficientes para fechar um time: ${totalDeAprovados}.`);
+    return problemas;
+  }
+
+  if (quantos > vagas) {
+    problemas.push(
+      `Há ${quantos} aprovados para ${vagas} vagas. Marque ${quantos - vagas} como "sobra" antes de sortear — quem fica de fora é decisão da organização, não da ordem de inscrição.`,
+    );
+  } else if (quantos < vagas) {
+    problemas.push(
+      `Há ${quantos} aprovados para ${vagas} vagas. Faltam ${vagas - quantos}: aprove mais alguém ou tire da sobra.`,
+    );
+  }
+
+  const total = pontosDosQueJogam.reduce((soma, p) => soma + p, 0);
+  const teto = times * orcamentoPorTime;
+  if (total > teto) {
+    problemas.push(
+      `Os ${quantos} sorteados somam ${total} pontos para um teto de ${teto} (${times} times × ${orcamentoPorTime}). Não há como fechar os elencos: troque quem entra, suba o orçamento por time, ou deixe alguém de elo alto na sobra.`,
+    );
+  }
+
+  return problemas;
+}
+
 // ---------------------------------------------------------------- montagem
 
 export function montarDraft(params: {
@@ -326,6 +379,12 @@ export function montarDraft(params: {
     const time = times.find((t) => t.capitaoId === j.id);
     return time ? { ...j, timeId: time.id } : { ...j, timeId: null };
   });
+
+  // Unicidade ANTES de presença: dois times com o mesmo capitão passariam na checagem
+  // de presença e só quebrariam mais tarde, com um time de elenco vazio.
+  if (new Set(times.map((t) => t.capitaoId)).size !== times.length) {
+    throw new Error("O mesmo jogador foi indicado como capitão de mais de um time.");
+  }
 
   for (const time of times) {
     if (!comCapitaes.some((j) => j.id === time.capitaoId)) {

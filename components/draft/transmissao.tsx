@@ -59,6 +59,8 @@ type EntradaHistorico = { escolha: number; timeId: string; riotId: string; autom
 type FaseDraft = "preparando" | "rodando" | "pausado" | "encerrado";
 
 type DraftPublico = {
+  /** Numeração da gravação. Precisa acompanhar `DraftPublico` em lib/draft/store.ts. */
+  revisao: number;
   fase: FaseDraft;
   times: TimePublico[];
   elencos: Record<string, JogadorDoElenco[]>;
@@ -914,7 +916,16 @@ export default function Transmissao({ t }: Readonly<{ t: Rotulos }>) {
       if (emVoo) return;
       emVoo = true;
       try {
-        const resposta = await fetch("/api/draft/estado", { cache: "no-store" });
+        const resposta = await fetch("/api/draft/estado", {
+          // Prazo na sondagem. Sem ele, uma requisição PENDURADA (socket morto sem
+          // RST — o sistema só desiste depois de minutos) trava o sinalizador de "em
+          // voo": o intervalo de 2s dispara dezenas de vezes e nenhuma requisição sai.
+          // A TV da sala fica parada numa escolha que já passou, com o cronômetro em
+          // 0:00 e sem nenhum aviso. Abortar rejeita, libera o sinalizador e acende o
+          // aviso que já existe.
+          signal: AbortSignal.timeout(5000),
+          cache: "no-store",
+        });
         if (!resposta.ok) throw new Error(String(resposta.status));
         const corpo = (await resposta.json()) as RespostaEstado;
         if (!vivo) return;
