@@ -8,6 +8,7 @@ import { ErroDeRegra } from "@/lib/security/erros";
 import {
   distribuirTimes,
   linhaDeInscricao,
+  pontosDoElo,
   type EstadoPagamento,
   type InscricaoPublica,
   type ItemConferencia,
@@ -88,6 +89,7 @@ export type Pagamento = {
   conferido_por: string | null;
   conferido_em: string | null;
   vence_em: string | null;
+  observacao: string | null;
 };
 
 // ---------------------------------------------------------------- configuração
@@ -242,7 +244,7 @@ export async function listarConferencias(): Promise<Conferencia[]> {
 export async function listarPagamentos(): Promise<Pagamento[]> {
   const { data, error } = await createSupabaseAdminClient()
     .from("inscricao_pagamentos")
-    .select("inscricao_id,estado,valor_centavos,declarado_em,conferido_por,conferido_em,vence_em")
+    .select("inscricao_id,estado,valor_centavos,declarado_em,conferido_por,conferido_em,vence_em,observacao")
     .returns<Pagamento[]>();
 
   if (error) throw new Error(`Falha ao listar pagamentos: ${error.message}`);
@@ -368,6 +370,114 @@ export async function declararPagamento(jogadorId: string): Promise<"ok" | "sem_
   return "ok";
 }
 
+// ---------------------------------------------------------------- ficha (organização)
+
+/**
+ * Campos da inscrição que a organização edita à mão.
+ *
+ * Repare no que NÃO está aqui: `pontos`. Ele continua derivado do elo, agora do
+ * `elo_verificado` quando existe — deixar a organização digitar o preço do jogador
+ * abriria pela porta dos fundos exatamente o que o formulário público fecha.
+ */
+export type PatchInscricao = {
+  situacao?: Inscricao["situacao"];
+  observacao?: string | null;
+  organizador?: boolean;
+  eloVerificado?: string | null;
+  entrouNoGrupo?: string | null;
+};
+
+export async function atualizarInscricao(
+  inscricaoId: string,
+  patch: PatchInscricao,
+  autor: string,
+): Promise<void> {
+  const linha: Record<string, unknown> = { atualizado_em: new Date().toISOString() };
+
+  if (patch.situacao !== undefined) linha.situacao = patch.situacao;
+  if (patch.observacao !== undefined) linha.observacao = patch.observacao;
+  if (patch.organizador !== undefined) linha.organizador = patch.organizador;
+  if (patch.entrouNoGrupo !== undefined) linha.entrou_no_grupo = patch.entrouNoGrupo;
+
+  if (patch.eloVerificado !== undefined) {
+    linha.elo_verificado = patch.eloVerificado;
+    // O preço acompanha o elo que a organização confirmou. Derivado aqui, no
+    // servidor, pela mesma tabela do site — nunca digitado.
+    if (patch.eloVerificado) {
+      const pontos = pontosDoElo(patch.eloVerificado);
+      if (pontos === null) throw new ErroDeRegra(`Elo não reconhecido: ${patch.eloVerificado}`);
+      linha.pontos = pontos;
+    }
+  }
+
+  const { error } = await createSupabaseAdminClient()
+    .from("inscricoes")
+    .update(linha)
+    .eq("id", inscricaoId);
+
+  if (error) throw new Error(`Falha ao salvar a ficha: ${error.message}`);
+
+  await registrarAuditoria({ inscricaoId, autor, acao: "ficha", detalhe: patch });
+}
+
+/**
+ * Congela o elo de todos os aprovados — o valor que vale no draft.
+ *
+ * Depois disto o preço de cada um para de acompanhar o elo verificado. Existe porque
+ * elo muda todo dia, e um draft em que o preço muda no meio não é um draft.
+ */
+export async function congelarElos(autor: string): Promise<number> {
+  const cliente = createSupabaseAdminClient();
+  const agora = new Date().toISOString();
+
+  const { data, error } = await cliente
+    .from("inscricoes")
+    .select("id,elo_declarado,elo_verificado")
+    .in("situacao", ["apto", "sobra"])
+    .is("elo_congelado", null)
+    .returns<{ id: string; elo_declarado: string; elo_verificado: string | null }[]>();
+
+  if (error) throw new Error(`Falha ao ler os aprovados: ${error.message}`);
+  if (!data || data.length === 0) return 0;
+
+  for (const linha of data) {
+    const elo = linha.elo_verificado ?? linha.elo_declarado;
+    const pontos = pontosDoElo(elo);
+    if (pontos === null) throw new ErroDeRegra(`Elo não reconhecido em ${linha.id}: ${elo}`);
+
+    const { error: erroUpdate } = await cliente
+      .from("inscricoes")
+      .update({ elo_congelado: elo, congelado_em: agora, pontos, atualizado_em: agora })
+      .eq("id", linha.id);
+
+    if (erroUpdate) throw new Error(`Falha ao congelar ${linha.id}: ${erroUpdate.message}`);
+  }
+
+  await registrarAuditoria({ autor, acao: "elos_congelados", detalhe: { quantidade: data.length } });
+  return data.length;
+}
+
+export async function listarAuditoria(limite = 60) {
+  const { data, error } = await createSupabaseAdminClient()
+    .from("inscricao_auditoria")
+    .select("id,ocorrido_em,inscricao_id,autor,acao,detalhe")
+    .order("ocorrido_em", { ascending: false })
+    .limit(limite)
+    .returns<
+      {
+        id: number;
+        ocorrido_em: string;
+        inscricao_id: string | null;
+        autor: string;
+        acao: string;
+        detalhe: unknown;
+      }[]
+    >();
+
+  if (error) throw new Error(`Falha ao ler a auditoria: ${error.message}`);
+  return data ?? [];
+}
+
 // ---------------------------------------------------------------- conferência
 
 export async function atualizarConferencia(args: {
@@ -385,7 +495,11 @@ export async function atualizarConferencia(args: {
     .from("inscricao_conferencias")
     .update({
       estado: args.estado,
-      observacao: args.observacao ?? null,
+      // Ausente PRESERVA o texto que já estava lá; string vazia é que limpa.
+      // Antes isto era `?? null`, então trocar o estado sem redigitar apagava a
+      // justificativa de quem tinha escrito antes — mesmo defeito que o `retrato`
+      // tinha, e num campo em que a organização registra por que decidiu algo.
+      observacao: args.observacao === undefined ? undefined : args.observacao || null,
       // O retrato é PROVA do que foi visto na hora. Sobrescrever com nulo só porque
       // esta conferência não trouxe um apagaria a justificativa da anterior — e a
       // auditoria guarda estado e observação, não o retrato. Ausente = preserva.
@@ -426,7 +540,11 @@ export async function atualizarPagamento(args: {
     .from("inscricao_pagamentos")
     .update({
       estado: args.estado,
-      observacao: args.observacao ?? null,
+      // Ausente PRESERVA o texto que já estava lá; string vazia é que limpa.
+      // Antes isto era `?? null`, então trocar o estado sem redigitar apagava a
+      // justificativa de quem tinha escrito antes — mesmo defeito que o `retrato`
+      // tinha, e num campo em que a organização registra por que decidiu algo.
+      observacao: args.observacao === undefined ? undefined : args.observacao || null,
       declarado_em: args.estado === "declarado" ? agora : undefined,
       estornado_em: args.estado === "estornado" ? agora : undefined,
       conferido_por: daOrganizacao ? args.autor : undefined,

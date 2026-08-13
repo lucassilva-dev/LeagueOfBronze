@@ -16,6 +16,11 @@ import { AdminSeriesPanel } from "@/components/admin/admin-series-panel";
 import { AdminBackupPanel } from "@/components/admin/admin-backup-panel";
 import { AdminTournamentPanel } from "@/components/admin/admin-tournament-panel";
 import { AdminUsersPanel } from "@/components/admin/admin-users-panel";
+import { PainelEdicao, type SecaoEdicao } from "@/components/admin/e4/painel-edicao";
+import { SecaoConfiguracao } from "@/components/admin/e4/secao-configuracao";
+import { SecaoInscritos } from "@/components/admin/e4/secao-inscritos";
+import { SecaoPagamentos } from "@/components/admin/e4/secao-pagamentos";
+import { SecaoTimes } from "@/components/admin/e4/secao-times";
 import {
   Banner,
   Button,
@@ -86,6 +91,10 @@ type AdminTabContentProps = Readonly<{
   onEndTournament: () => void;
   onStartTournament: (payload: StartTournamentPayload) => void;
   onAlert: (kind: "ok" | "erro", text: string) => void;
+  /** Escopos da 4ª Edição, para a seção mostrar em leitura em vez de oferecer um 403. */
+  podeConferir: boolean;
+  podeFinanceiro: boolean;
+  podeConfigurar: boolean;
 }>;
 
 // ================================================================ erros de API
@@ -487,8 +496,36 @@ function AdminTabContent({
   onEndTournament,
   onStartTournament,
   onAlert,
+  podeConferir,
+  podeFinanceiro,
+  podeConfigurar,
 }: AdminTabContentProps) {
   if (activeTab === "users") return <AdminUsersPanel onAlert={onAlert} />;
+
+  // As quatro seções da 4ª Edição compartilham o mesmo contêiner: ele busca uma vez e
+  // entrega os dados prontos. Ficam fora do `switch` abaixo porque nenhuma delas usa
+  // `draft` — os dados estão em tabelas próprias, não no rascunho do campeonato.
+  const secoesDaEdicao: Partial<Record<AdminTab, { secao: SecaoEdicao; render: typeof SecaoTimes }>> = {
+    "e4-config": { secao: "config", render: SecaoConfiguracao },
+    "e4-inscritos": { secao: "inscritos", render: SecaoInscritos },
+    "e4-pagamentos": { secao: "pagamentos", render: SecaoPagamentos },
+    "e4-times": { secao: "times", render: SecaoTimes },
+  };
+
+  const daEdicao = secoesDaEdicao[activeTab];
+  if (daEdicao) {
+    const Secao = daEdicao.render;
+    return (
+      <PainelEdicao
+        secao={daEdicao.secao}
+        onAlert={onAlert}
+        podeConferir={podeConferir}
+        podeFinanceiro={podeFinanceiro}
+        podeConfigurar={podeConfigurar}
+        render={(props) => <Secao {...props} />}
+      />
+    );
+  }
 
   switch (activeTab) {
     case "tournament":
@@ -1002,6 +1039,33 @@ export function AdminDashboardClient() {
         grupo: "Administração",
         escopos: ["dataset:export", "dataset:import"],
       },
+      // 4ª Edição. Ficam num grupo próprio porque não são o campeonato que está no ar
+      // — são a inscrição do próximo, que roda em paralelo com a temporada corrente.
+      {
+        value: "e4-inscritos",
+        label: "Inscritos",
+        grupo: "4ª Edição",
+        escopos: ["inscricoes:conferir"],
+      },
+      {
+        value: "e4-pagamentos",
+        label: "Pagamentos",
+        grupo: "4ª Edição",
+        escopos: ["inscricoes:financeiro"],
+      },
+      {
+        value: "e4-times",
+        label: "Times e viabilidade",
+        grupo: "4ª Edição",
+        escopos: ["inscricoes:conferir"],
+      },
+      {
+        value: "e4-config",
+        label: "Configuração da edição",
+        grupo: "4ª Edição",
+        nota: "abre inscrições",
+        escopos: ["edicao:configurar"],
+      },
     ];
     // Aba de usuários só para o master (a decisão real é sempre do servidor).
     if (session?.user?.isMaster) {
@@ -1332,6 +1396,9 @@ export function AdminDashboardClient() {
 
       <section role="region" aria-label={secaoAtiva?.label ?? "Conteúdo do painel"}>
         <AdminTabContent
+          podeConferir={alcanca(["inscricoes:conferir"])}
+          podeFinanceiro={alcanca(["inscricoes:financeiro"])}
+          podeConfigurar={alcanca(["edicao:configurar"])}
           activeTab={activeTab}
           draft={draft}
           mutateDraft={mutateDraft}

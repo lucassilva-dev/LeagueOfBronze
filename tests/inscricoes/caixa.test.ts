@@ -14,6 +14,7 @@ function pagamento(estado: EstadoPagamento, valor = TAXA): Pagamento {
     conferido_por: null,
     conferido_em: null,
     vence_em: null,
+    observacao: null,
   };
 }
 

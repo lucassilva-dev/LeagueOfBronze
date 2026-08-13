@@ -15,7 +15,14 @@ export type AdminTab =
   | "players"
   | "series"
   | "backup"
-  | "users";
+  | "users"
+  // 4ª Edição. Estas quatro NÃO tocam no rascunho do campeonato: os dados vivem em
+  // tabelas próprias, com escrita concorrente, e são buscados pela própria seção —
+  // mesmo padrão da aba de usuários.
+  | "e4-config"
+  | "e4-inscritos"
+  | "e4-pagamentos"
+  | "e4-times";
 export type MutateDraft = (recipe: (draft: TournamentDataset) => void) => void;
 
 function isCombiningMark(char: string) {

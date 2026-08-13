@@ -246,6 +246,60 @@ export const pagamentoPatchSchema = z.object({
   observacao: z.string().trim().max(LIMITES_INSCRICAO.texto).optional(),
 });
 
+// ---------------------------------------------------------------- ficha e configuração
+
+/**
+ * O que a organização pode mudar numa inscrição.
+ *
+ * `pontos` NÃO está aqui, de propósito — nem vindo de um admin. O preço do jogador
+ * continua derivado do elo no servidor (ver `atualizarInscricao`); aceitá-lo aqui
+ * abriria pela porta dos fundos exatamente o que o formulário público fecha.
+ */
+export const fichaPatchSchema = z.object({
+  inscricaoId: z.string().uuid(),
+  situacao: z.enum(["pendente", "apto", "recusado", "desistiu", "sobra"]).optional(),
+  observacao: z.string().trim().max(LIMITES_INSCRICAO.texto).nullable().optional(),
+  organizador: z.boolean().optional(),
+  eloVerificado: z
+    .string()
+    .trim()
+    .max(24)
+    .refine((v) => v === "" || resolveElo(v) !== null, "Elo não reconhecido.")
+    .transform((v) => (v === "" ? null : v))
+    .nullable()
+    .optional(),
+  // `YYYY-MM-DD`, como a coluna `date` do Postgres espera.
+  entrouNoGrupo: z
+    .string()
+    .trim()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Use o formato AAAA-MM-DD.")
+    .nullable()
+    .optional(),
+});
+
+/** Data-âncora: string ISO ou nulo. Nulo é estado legítimo — "ainda não decidimos". */
+const dataOpcional = z.string().trim().datetime({ offset: true }).nullable().optional();
+
+export const configPatchSchema = z.object({
+  inscricoes_abertas: z.boolean().optional(),
+  abertura_inscricoes: dataOpcional,
+  fechamento_inscricoes: dataOpcional,
+  prazo_vinculo_riot: dataOpcional,
+  congelamento_elo: dataOpcional,
+  data_draft: dataOpcional,
+  inicio_campeonato: dataOpcional,
+  jogadores_por_time: z.number().int().min(1).max(10).optional(),
+  orcamento_por_time: z.number().int().min(1).max(999).optional(),
+  min_ranqueadas: z.number().int().min(0).max(999).optional(),
+  dias_no_grupo: z.number().int().min(0).max(3650).optional(),
+  prazo_pagamento_dias: z.number().int().min(1).max(365).optional(),
+  segundos_por_escolha: z.number().int().min(5).max(600).optional(),
+  taxa_centavos: z.number().int().min(0).max(1_000_000).optional(),
+  pct_campeao: z.number().int().min(0).max(100).optional(),
+  chave_pix: z.string().trim().max(140).nullable().optional(),
+  responsavel_financeiro: z.string().trim().max(120).nullable().optional(),
+});
+
 // ---------------------------------------------------------------- janela
 
 export type EstadoJanela = "aberta" | "ainda_nao_abriu" | "encerrada" | "indisponivel";
