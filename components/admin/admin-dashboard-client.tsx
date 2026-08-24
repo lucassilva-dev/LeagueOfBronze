@@ -17,6 +17,7 @@ import { AdminSeriesPanel } from "@/components/admin/admin-series-panel";
 import { AdminBackupPanel } from "@/components/admin/admin-backup-panel";
 import { AdminTournamentPanel } from "@/components/admin/admin-tournament-panel";
 import { AdminUsersPanel } from "@/components/admin/admin-users-panel";
+import { TrocarSenha } from "@/components/admin/trocar-senha";
 import { PainelEdicao, type SecaoEdicao } from "@/components/admin/e4/painel-edicao";
 import { SecaoConfiguracao } from "@/components/admin/e4/secao-configuracao";
 import { SecaoInscritos } from "@/components/admin/e4/secao-inscritos";
@@ -1381,6 +1382,18 @@ export function AdminDashboardClient() {
         <span style={{ color: C.ink3 }}>{session.dataProviderLabel ?? "Arquivo local (JSON)"}</span>.
         Alterações ficam no rascunho até você salvar.
       </p>
+
+      {/*
+        Fica aqui, no cartão da conta, porque é o único lugar do painel que fala da
+        PESSOA e não do campeonato. No modo de transição não aparece: lá a "conta" é
+        uma senha única do ambiente, e não há o que trocar por dentro do site.
+      */}
+      {session.user.legacy ? null : (
+        <TrocarSenha
+          obrigatoria={session.user.mustChangePassword}
+          onTrocada={() => void fetchSession()}
+        />
+      )}
     </Card>
   ) : null;
 
