@@ -1197,7 +1197,10 @@ export function AdminDashboardClient() {
       style={{
         position: "sticky",
         top: 0,
-        zIndex: 40,
+        // 30, abaixo do cabeçalho do site (40). Estavam empatadas em 40, e o empate
+        // se resolvia pela ordem do DOM: esta barra vinha depois e cobria o menu da
+        // conta. Ver a escala em components/site-frame.tsx.
+        zIndex: 30,
         marginBottom: 14,
         display: "flex",
         flexWrap: "wrap",
