@@ -259,12 +259,20 @@ a:hover {
 }
 .lob-h1 {
   font-family: var(--font-display), "Anton", sans-serif;
+  /*
+   * TAMANHO PADRÃO. Sem ele, um <GoldTitle> sem `style` herdava o tamanho do texto
+   * comum e o título saía minúsculo — foi o que aconteceu em /entrar, /inscricao,
+   * /minha-inscricao, /draft e /capitao, porque todas as páginas antigas passavam um
+   * clamp na mão e ninguém percebeu que era obrigatório.
+   * Quem quiser outro tamanho continua passando `style`, que vence a classe.
+   */
+  font-size: clamp(38px, 8vw, 96px);
+  margin: 10px 0 16px;
   line-height: 0.9;
   /* Espaço para acentos (til, cedilha) não serem cortados pelo clip do gradiente. */
   padding-top: 0.16em;
   padding-bottom: 0.2em;
   letter-spacing: 0.005em;
-  margin: 0;
 }
 .lob-display {
   font-family: var(--font-display), "Anton", sans-serif;

@@ -64,6 +64,9 @@ export const inscricao = definir({
       "Entre para acompanhar sua inscrição e, se for capitão, abrir seu painel no dia do draft.",
     entrarSemConta: "Ainda não tem conta?",
     entrarVoltar: "← Voltar ao início",
+    // Rótulo próprio: na tela de entrar, "CRIE UMA SENHA" (herdado do cadastro) pede
+    // à pessoa exatamente o oposto do que ela vai fazer.
+    senhaLoginLabel: "SENHA",
     entrarTitulo: "Entrar",
     entrarBotao: "ENTRAR",
     entrarAjuda: "Entre para continuar a inscrição com a conta que você já criou.",
@@ -215,6 +218,7 @@ export const inscricao = definir({
       "Sign in to follow your sign-up and, if you're a captain, open your panel on draft day.",
     entrarSemConta: "Don't have an account yet?",
     entrarVoltar: "← Back to home",
+    senhaLoginLabel: "PASSWORD",
     entrarTitulo: "Sign in",
     entrarBotao: "SIGN IN",
     entrarAjuda: "Sign in to continue with the account you already created.",

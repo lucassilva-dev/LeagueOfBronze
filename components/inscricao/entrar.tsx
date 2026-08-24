@@ -46,7 +46,7 @@ export default function Entrar({ t }: Readonly<{ t: Messages["inscricao"] }>) {
   }
 
   return (
-    <form onSubmit={entrar} className="lob-card-2 lob-fade" style={{ padding: "28px 26px", maxWidth: 460 }}>
+    <form onSubmit={entrar} className="lob-card-2 lob-fade" style={{ padding: "30px 28px" }}>
       <Campo label={t.emailLabel}>
         <input
           style={entrada}
@@ -61,7 +61,7 @@ export default function Entrar({ t }: Readonly<{ t: Messages["inscricao"] }>) {
 
       <div style={{ height: 14 }} />
 
-      <Campo label={t.senhaLabel}>
+      <Campo label={t.senhaLoginLabel}>
         <input
           style={entrada}
           type="password"

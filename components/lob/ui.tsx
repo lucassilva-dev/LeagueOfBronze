@@ -162,7 +162,12 @@ export function LobShell({ children }: Readonly<{ children: ReactNode }>) {
         position: "relative",
         maxWidth: 1280,
         margin: "0 auto",
-        padding: "0 clamp(16px,4vw,24px) 96px",
+        /*
+         * O respiro de cima NÃO é enfeite: o cabeçalho é `sticky`, e sem ele o
+         * primeiro elemento da página nasce colado nele. As páginas antigas resolvem
+         * isso com um padding na primeira seção; quem usa o LobShell ganha de graça.
+         */
+        padding: "clamp(32px,6vw,52px) clamp(16px,4vw,24px) 96px",
       }}
     >
       {children}

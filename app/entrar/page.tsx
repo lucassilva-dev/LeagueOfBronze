@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 
 import Entrar from "@/components/inscricao/entrar";
-import { Eyebrow, GoldTitle, LobShell } from "@/components/lob/ui";
+import { Eyebrow } from "@/components/lob/ui";
 import { getMessages } from "@/lib/i18n/server";
 import { JOGADOR_COOKIE, identidadePorToken } from "@/lib/jogadores/auth";
 
@@ -16,6 +16,13 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+/**
+ * Layout PRÓPRIO, sem o `LobShell`.
+ *
+ * O shell padrão espalha o conteúdo por 1280px, o que serve para tabela e elenco mas
+ * deixa um formulário de login encolhido no canto esquerdo com meia tela vazia ao
+ * lado. Uma tela com um único objetivo se centraliza e para de competir com o resto.
+ */
 export default async function EntrarPage() {
   const { inscricao: t } = await getMessages();
 
@@ -26,22 +33,43 @@ export default async function EntrarPage() {
   if (jogador) redirect("/minha-inscricao");
 
   return (
-    <LobShell>
-      <header style={{ marginBottom: 26 }}>
-        <Eyebrow>{t.eyebrow}</Eyebrow>
-        <GoldTitle>{t.entrarTitulo}</GoldTitle>
-        <p style={{ margin: "10px 0 0", color: "var(--lob-muted)", maxWidth: "58ch" }}>
-          {t.entrarPaginaSubtitulo}
+    <main
+      style={{
+        // Ocupa a altura útil entre cabeçalho e rodapé para o cartão ficar no meio da
+        // tela, e não colado no topo com um vazio embaixo.
+        minHeight: "calc(100vh - 220px)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 22,
+        padding: "clamp(40px,8vw,72px) clamp(16px,4vw,24px)",
+      }}
+    >
+      <div style={{ width: "100%", maxWidth: 430 }}>
+        <header style={{ marginBottom: 22, textAlign: "center" }}>
+          <div style={{ display: "flex", justifyContent: "center" }}>
+            <Eyebrow>{t.eyebrow}</Eyebrow>
+          </div>
+          <h1
+            className="lob-h1 gold-text"
+            style={{ fontSize: "clamp(38px,8vw,60px)", lineHeight: 1, margin: "12px 0 12px" }}
+          >
+            {t.entrarTitulo}
+          </h1>
+          <p style={{ margin: 0, color: "var(--lob-muted)", fontSize: 14, lineHeight: 1.6 }}>
+            {t.entrarPaginaSubtitulo}
+          </p>
+        </header>
+
+        <Entrar t={t} />
+
+        <p style={{ margin: "22px 0 0", textAlign: "center" }}>
+          <Link href="/" style={{ color: "var(--lob-muted)", fontSize: 13 }}>
+            {t.entrarVoltar}
+          </Link>
         </p>
-      </header>
-
-      <Entrar t={t} />
-
-      <p style={{ marginTop: 24 }}>
-        <Link href="/" style={{ color: "var(--lob-muted)", fontSize: 13 }}>
-          {t.entrarVoltar}
-        </Link>
-      </p>
-    </LobShell>
+      </div>
+    </main>
   );
 }
