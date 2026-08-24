@@ -78,6 +78,23 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    /*
+     * `sorteios` é PROPRIEDADE DO SERVIDOR e não passa por aqui.
+     *
+     * É o histórico append-only dos sorteios de lados e cartinhas, com a semente que
+     * permite conferir cada resultado. Sem esta linha, quem tivesse `series:manage`
+     * apagava o histórico inteiro pelo editor do painel — bastava salvar o rascunho
+     * sem ele. Um registro que a própria pessoa auditada pode remover não é registro.
+     *
+     * O que chega do cliente é descartado e o que está gravado é preservado; escrever
+     * ali só pela rota de sorteio.
+     */
+    for (const serie of parsed.data.seriesMatches) {
+      const guardada = atual.seriesMatches.find((s) => s.id === serie.id);
+      if (guardada?.sorteios?.length) serie.sorteios = guardada.sorteios;
+      else delete serie.sorteios;
+    }
+
     const veredito = authorizeDatasetChange(guarda.identity, atual, parsed.data);
 
     if (!veredito.ok) {

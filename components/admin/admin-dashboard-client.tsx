@@ -91,6 +91,9 @@ type AdminTabContentProps = Readonly<{
   onEndTournament: () => void;
   onStartTournament: (payload: StartTournamentPayload) => void;
   onAlert: (kind: "ok" | "erro", text: string) => void;
+  /** Recarrega o dataset do servidor. O sorteio grava direto lá, então o rascunho
+   *  local fica velho na hora — sem isto, salvar depois cairia em 409. */
+  onRecarregar: () => void;
   /** Escopos da 4ª Edição, para a seção mostrar em leitura em vez de oferecer um 403. */
   podeConferir: boolean;
   podeFinanceiro: boolean;
@@ -496,6 +499,7 @@ function AdminTabContent({
   onEndTournament,
   onStartTournament,
   onAlert,
+  onRecarregar,
   podeConferir,
   podeFinanceiro,
   podeConfigurar,
@@ -544,7 +548,7 @@ function AdminTabContent({
     case "players":
       return <AdminPlayersPanel draft={draft} mutateDraft={mutateDraft} />;
     case "series":
-      return <AdminSeriesPanel draft={draft} mutateDraft={mutateDraft} />;
+      return <AdminSeriesPanel draft={draft} mutateDraft={mutateDraft} onRecarregar={onRecarregar} />;
     case "backup":
       return (
         <AdminBackupPanel
@@ -1396,6 +1400,7 @@ export function AdminDashboardClient() {
 
       <section role="region" aria-label={secaoAtiva?.label ?? "Conteúdo do painel"}>
         <AdminTabContent
+          onRecarregar={reloadDataset}
           podeConferir={alcanca(["inscricoes:conferir"])}
           podeFinanceiro={alcanca(["inscricoes:financeiro"])}
           podeConfigurar={alcanca(["edicao:configurar"])}

@@ -7,7 +7,7 @@ import { z } from "zod";
 import { requireAdmin } from "@/lib/security/route-guard";
 import { isDuplaCard } from "@/lib/cards";
 import { readDataset, saveDataset } from "@/lib/data-store";
-import { cardIdSchema } from "@/lib/schema";
+import { cardIdSchema, type SeriesMatch } from "@/lib/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +72,30 @@ export async function POST(request: NextRequest) {
       );
       series.cardsUsed = [...others, { teamId: teamId as string, cardId }];
     }
+
+
+/**
+ * Registro de sobrescrita manual.
+ *
+ * Esta rota recebe o resultado PRONTO — ela existe para a organização corrigir um
+ * registro à mão. O problema era o silêncio: dava para sortear pela rota nova, não
+ * gostar, e gravar o outro resultado por aqui. O histórico continuava com um único
+ * sorteio que CONFERIA pela semente, enquanto o dataset dizia o contrário. Um rastro
+ * de auditoria que passa na verificação e mente é pior do que não ter rastro.
+ *
+ * Agora toda definição manual entra no histórico com `semente` vazia e o valor que ela
+ * substituiu, então a divergência fica visível em vez de invisível.
+ */
+    const registro: NonNullable<SeriesMatch["sorteios"]>[number] = {
+      tipo: "carta_manual",
+      semente: "",
+      emISO: new Date().toISOString(),
+      autor: guarda.identity.username,
+      resultado: cardId,
+      detalhe: { dupla: Boolean(dupla) },
+    };
+    if (!dupla && teamId) registro.teamId = teamId;
+    series.sorteios = [...(series.sorteios ?? []), registro].slice(-50);
 
     const saved = await saveDataset(dataset);
     const savedSeries = saved.seriesMatches.find((row) => row.id === seriesId);

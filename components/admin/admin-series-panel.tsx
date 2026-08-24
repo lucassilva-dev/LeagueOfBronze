@@ -1,6 +1,8 @@
 "use client";
 
 import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from "react";
+
+import { SorteioAoVivo } from "@/components/admin/sorteio-ao-vivo";
 import { AlertTriangle, Pencil, Plus, Trash2 } from "lucide-react";
 
 import type {
@@ -25,7 +27,7 @@ import {
   isWalkoverSeries,
 } from "@/lib/tournament";
 import { formatDateLabel } from "@/lib/format";
-import { resolveRole } from "@/lib/design";
+import { resolveRole, teamColor } from "@/lib/design";
 import {
   createBlankGame,
   createBlankSeries,
@@ -768,10 +770,16 @@ function LinhaVazia({ children }: Readonly<{ children: ReactNode }>) {
 export function AdminSeriesPanel({
   draft,
   mutateDraft,
+  onRecarregar,
 }: Readonly<{
   draft: TournamentDataset;
   mutateDraft: MutateDraft;
+  onRecarregar: () => void;
 }>) {
+  // O sorteio ao vivo grava DIRETO no servidor, fora do rascunho. Por isso ele pede
+  // recarga ao terminar: o rascunho local não sabe do resultado, e salvar por cima
+  // cairia na trava de versão (409) — que é o certo, mas frustrante no meio do evento.
+  const [sorteioAberto, setSorteioAberto] = useState(false);
   const sortedSeries = useMemo(
     () =>
       draft.seriesMatches
@@ -2114,6 +2122,14 @@ export function AdminSeriesPanel({
         right={
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <Aviso escopo="cartinhas" />
+            {/*
+              O sorteio de verdade mora aqui. Os campos abaixo continuam existindo para
+              CORRIGIR à mão — e agora toda correção manual entra no histórico, para a
+              divergência entre o que foi sorteado e o que ficou gravado ficar visível.
+            */}
+            <Button tone="gold" small onClick={() => setSorteioAberto(true)}>
+              Sortear ao vivo
+            </Button>
             <Button tone="ghost" small onClick={addCardToSeries}>
               <Plus size={14} aria-hidden /> Cartinha
             </Button>
@@ -2122,6 +2138,21 @@ export function AdminSeriesPanel({
       >
         Cartinhas da série
       </BlockTitle>
+
+      <SorteioAoVivo
+        aberto={sorteioAberto}
+        onFechar={() => setSorteioAberto(false)}
+        serieId={selectedSeries.id}
+        teamAId={selectedSeries.teamAId}
+        teamBId={selectedSeries.teamBId}
+        nomeDoTime={(id) => getTeamName(draft, id)}
+        corDoTime={(id) => teamColor(id)}
+        blueSideTeamId={selectedSeries.blueSideTeamId}
+        cardsUsed={selectedSeries.cardsUsed}
+        podeLados
+        podeCartas
+        onSorteado={onRecarregar}
+      />
 
       {(selectedSeries.cardsUsed ?? []).length === 0 ? (
         <LinhaVazia>Nenhuma cartinha registrada nesta série.</LinhaVazia>

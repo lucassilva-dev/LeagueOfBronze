@@ -409,13 +409,27 @@ export const seriesMatchSchema = z.object({
   sorteios: z
     .array(
       z.object({
-        tipo: z.enum(["lados", "carta"]),
-        semente: limitado(64),
+        // "manual" = alguém definiu o resultado à mão, sem sorteio. Fica registrado
+        // com a mesma dignidade dos outros: é justamente o que precisa aparecer.
+        tipo: z.enum(["lados", "carta", "lados_manual", "carta_manual"]),
+        semente: z.string().trim().max(64),
         emISO: limitado(LIMITES.iso),
         autor: limitado(LIMITES.nome),
         teamId: z.string().trim().max(LIMITES.id).optional(),
         resultado: limitado(LIMITES.id),
-        detalhe: z.record(z.string(), z.unknown()).optional(),
+        /**
+         * Fechado de propósito. Como `record(unknown)`, isto aceitava 200 KB por
+         * registro — e o dataset inteiro vai para o navegador em toda página.
+         */
+        detalhe: z
+          .object({
+            dupla: z.boolean().optional(),
+            letras: z.tuple([limitado(2), limitado(2)]).optional(),
+            campeoes: z.number().int().min(0).max(999).optional(),
+            /** Preenchido quando alguém sobrescreveu o sorteio à mão. */
+            sobrescreveu: limitado(LIMITES.id).optional(),
+          })
+          .optional(),
       }),
     )
     .max(50)
