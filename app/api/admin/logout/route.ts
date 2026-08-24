@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 import { ADMIN_COOKIE_NAME, ADMIN_SESSION_COOKIE, revokeRequestSession } from "@/lib/admin-auth";
+import { mesmaOrigem } from "@/lib/security/route-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,14 @@ export const dynamic = "force-dynamic";
  * (print, máquina compartilhada) continuava válido até a senha ser trocada.
  */
 export async function POST(request: NextRequest) {
+  // Sair também é escrita: `revokeRequestSession` revoga a sessão NO SERVIDOR, não só
+  // limpa o cookie. Sem a checagem de origem, uma página qualquer que a pessoa
+  // visitasse conseguia derrubá-la do painel — e no meio de um draft ao vivo isso
+  // deixa de ser chateação.
+  if (!mesmaOrigem(request)) {
+    return NextResponse.json({ error: "Requisição bloqueada: origem não confere." }, { status: 403 });
+  }
+
   try {
     await revokeRequestSession(request);
   } catch (error) {

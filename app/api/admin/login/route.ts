@@ -19,6 +19,7 @@ import {
 } from "@/lib/security/admin-store";
 import { verifyPassword } from "@/lib/security/password";
 import { evaluateLoginRateLimit } from "@/lib/security/rate-limit";
+import { mesmaOrigem } from "@/lib/security/route-guard";
 import { adminLoginSchema } from "@/lib/schema";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +38,22 @@ async function comPisoDeTempo<T>(inicio: number, valor: T): Promise<T> {
 
 export async function POST(request: NextRequest) {
   const inicio = Date.now();
+
+  /*
+   * Origem conferida ANTES de qualquer trabalho, e o motivo não é o óbvio.
+   *
+   * Roubar a sessão por aqui não dá: quem não tem a senha não entra. O dano real é
+   * outro — o login tem bloqueio por IP depois de 5 erros. Sem esta checagem, uma
+   * página maliciosa faz o navegador da pessoa martelar este endpoint com senha
+   * errada, e o limitador bloqueia o IP DELA por 15 minutos. Alguém tranca você fora
+   * do próprio painel só fazendo você abrir um link.
+   *
+   * Vem antes do `recordLoginAttempt` de propósito: tentativa vinda de fora nem
+   * chega a contar.
+   */
+  if (!mesmaOrigem(request)) {
+    return NextResponse.json({ error: "Requisição bloqueada: origem não confere." }, { status: 403 });
+  }
 
   if (!isAdminConfigured()) {
     return NextResponse.json({ error: "Autenticação não configurada no ambiente." }, { status: 500 });

@@ -396,6 +396,30 @@ export const seriesMatchSchema = z.object({
   cardsUsed: z.array(cardUsageSchema).max(20).optional(),
   // Time que começa no lado azul no jogo 1 (sorteio de lados). O outro começa no vermelho.
   blueSideTeamId: z.string().trim().max(LIMITES.id).optional(),
+  /**
+   * Histórico dos sorteios, append-only.
+   *
+   * Existe para que o resultado não dependa da palavra de quem clicou: cada entrada
+   * guarda a SEMENTE, e com ela qualquer pessoa recalcula o sorteio e confere
+   * (`conferirSorteio` em lib/series/sorteio.ts).
+   *
+   * Refazer um sorteio é permitido — às vezes é legítimo — mas fica registrado que
+   * houve dois. Antes, o segundo simplesmente apagava o primeiro sem deixar rastro.
+   */
+  sorteios: z
+    .array(
+      z.object({
+        tipo: z.enum(["lados", "carta"]),
+        semente: limitado(64),
+        emISO: limitado(LIMITES.iso),
+        autor: limitado(LIMITES.nome),
+        teamId: z.string().trim().max(LIMITES.id).optional(),
+        resultado: limitado(LIMITES.id),
+        detalhe: z.record(z.string(), z.unknown()).optional(),
+      }),
+    )
+    .max(50)
+    .optional(),
 });
 
 export const standingsSeedRowSchema = z.object({
