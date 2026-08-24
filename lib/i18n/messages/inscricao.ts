@@ -57,6 +57,13 @@ export const inscricao = definir({
 
     // conta já existente
     jaTenhoConta: "Já tenho conta",
+    // Página /entrar. Ela existe porque, com as inscrições fechadas, o formulário some
+    // — e com ele sumiam os únicos campos de login do site. Um capitão que perdesse a
+    // sessão no dia do draft ficava sem caminho de volta.
+    entrarPaginaSubtitulo:
+      "Entre para acompanhar sua inscrição e, se for capitão, abrir seu painel no dia do draft.",
+    entrarSemConta: "Ainda não tem conta?",
+    entrarVoltar: "← Voltar ao início",
     entrarTitulo: "Entrar",
     entrarBotao: "ENTRAR",
     entrarAjuda: "Entre para continuar a inscrição com a conta que você já criou.",
@@ -204,6 +211,10 @@ export const inscricao = definir({
     nomePlaceholder: "What people call you",
 
     jaTenhoConta: "I already have an account",
+    entrarPaginaSubtitulo:
+      "Sign in to follow your sign-up and, if you're a captain, open your panel on draft day.",
+    entrarSemConta: "Don't have an account yet?",
+    entrarVoltar: "← Back to home",
     entrarTitulo: "Sign in",
     entrarBotao: "SIGN IN",
     entrarAjuda: "Sign in to continue with the account you already created.",

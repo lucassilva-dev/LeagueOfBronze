@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { LanguageToggle } from "@/components/language-toggle";
 import { MainNav, type NavLabel } from "@/components/main-nav";
+import { SessaoNoCabecalho } from "@/components/sessao-no-cabecalho";
 import { AVISO_RIOT_OFICIAL, CONTATO_EMAIL } from "@/lib/i18n/messages/legal";
 import { getLocale, getMessages } from "@/lib/i18n/server";
 
@@ -125,6 +126,7 @@ export async function SiteFrame({ children }: SiteFrameProps) {
                   en: locale === "en" ? t.comum.idiomaEn : t.comum.trocarParaEn,
                 }}
               />
+              <SessaoNoCabecalho t={t.comum} />
             </div>
           </div>
           <div

@@ -4,6 +4,23 @@ import { AVISO_RIOT_OFICIAL } from "@/lib/i18n/messages/legal";
 /** Navegação, rodapé e textos que aparecem no site inteiro. */
 export const comum = definir({
   pt: {
+    // ---------------------------------------------------------------- sessão
+    // Duas sessões independentes convivem no site: a da organização e a do jogador.
+    // O cabeçalho precisa dizer em qual a pessoa está — e no dia do draft isso deixa
+    // de ser conveniência.
+    sessaoEntrar: "ENTRAR",
+    sessaoSair: "Sair",
+    sessaoSaindo: "Saindo…",
+    sessaoAbrirMenu: "Abrir menu da conta",
+    sessaoJogador: "Jogador",
+    sessaoOrganizacao: "Organização",
+    sessaoMaster: "Organização · master",
+    sessaoMinhaInscricao: "Minha inscrição",
+    sessaoFazerInscricao: "Fazer minha inscrição",
+    sessaoPainelCapitao: "Painel do capitão",
+    sessaoPainelAdmin: "Painel da organização",
+    sessaoTrocarSenha: "Troque sua senha",
+    sessaoDuasContas: "Você está nas duas ao mesmo tempo.",
     navInicio: "INÍCIO",
     navTimes: "TIMES",
     navJogadores: "JOGADORES",
@@ -33,6 +50,19 @@ export const comum = definir({
     trocarParaPt: "Mudar para português",
   },
   en: {
+    sessaoEntrar: "SIGN IN",
+    sessaoSair: "Sign out",
+    sessaoSaindo: "Signing out…",
+    sessaoAbrirMenu: "Open account menu",
+    sessaoJogador: "Player",
+    sessaoOrganizacao: "Organisers",
+    sessaoMaster: "Organisers · master",
+    sessaoMinhaInscricao: "My sign-up",
+    sessaoFazerInscricao: "Sign me up",
+    sessaoPainelCapitao: "Captain panel",
+    sessaoPainelAdmin: "Organisers' panel",
+    sessaoTrocarSenha: "Change your password",
+    sessaoDuasContas: "You're signed in to both at once.",
     navInicio: "HOME",
     navTimes: "TEAMS",
     navJogadores: "PLAYERS",
