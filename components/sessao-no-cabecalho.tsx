@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import type { Messages } from "@/lib/i18n/messages";
+import { EVENTO_SESSAO } from "@/lib/sessao-mudou";
 
 /**
  * Indicador de sessão no cabeçalho.
@@ -64,15 +65,35 @@ export function SessaoNoCabecalho({ t }: Readonly<{ t: Rotulos }>) {
     }
   }, []);
 
-  // Recarrega ao trocar de rota: entrar ou sair acontece numa página, e o indicador
-  // precisa acompanhar sem exigir F5.
+  /*
+   * Três gatilhos, porque um só não cobre os casos reais:
+   *
+   *  - trocar de ROTA (navegar para /entrar, sair para a home);
+   *  - o EVENTO de sessão, disparado por quem entra ou sai. É o que faltava: o login
+   *    do painel acontece dentro da própria página, sem trocar de rota, então o
+   *    cabeçalho continuava dizendo "ENTRAR" até alguém apertar F5;
+   *  - VOLTAR À ABA, que pega a sessão expirada ou encerrada em outro lugar.
+   */
   useEffect(() => {
     let vivo = true;
-    void buscar().then((s) => {
-      if (vivo && s) setSessao(s);
-    });
+    const atualizar = () => {
+      void buscar().then((s) => {
+        if (vivo && s) setSessao(s);
+      });
+    };
+
+    atualizar();
+
+    const aoVoltar = () => {
+      if (document.visibilityState === "visible") atualizar();
+    };
+    window.addEventListener(EVENTO_SESSAO, atualizar);
+    document.addEventListener("visibilitychange", aoVoltar);
+
     return () => {
       vivo = false;
+      window.removeEventListener(EVENTO_SESSAO, atualizar);
+      document.removeEventListener("visibilitychange", aoVoltar);
     };
   }, [buscar, caminho]);
 

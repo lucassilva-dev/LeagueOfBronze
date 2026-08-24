@@ -7,6 +7,7 @@ import Entrar from "@/components/inscricao/entrar";
 import { Eyebrow } from "@/components/lob/ui";
 import { getMessages } from "@/lib/i18n/server";
 import { JOGADOR_COOKIE, identidadePorToken } from "@/lib/jogadores/auth";
+import { getAdminIdentityDeCookies } from "@/lib/admin-auth";
 
 /** Dinâmica pela CSP por nonce e porque lê a sessão. */
 export const dynamic = "force-dynamic";
@@ -26,10 +27,19 @@ export const metadata: Metadata = {
 export default async function EntrarPage() {
   const { inscricao: t } = await getMessages();
 
-  // Quem já está logado não tem o que fazer aqui. Mostrar o formulário de novo só
-  // convidaria a pessoa a digitar a senha sem necessidade.
-  const token = (await cookies()).get(JOGADOR_COOKIE)?.value;
-  const jogador = await identidadePorToken(token).catch(() => null);
+  /*
+   * Quem já está logado não tem o que fazer aqui — mostrar o formulário de novo só
+   * convidaria a pessoa a digitar a senha sem necessidade.
+   *
+   * As DUAS contas são conferidas, e a da organização primeiro: quem administra
+   * costuma chegar aqui querendo o painel, não a própria ficha de inscrição.
+   */
+  const jar = await cookies();
+
+  const admin = await getAdminIdentityDeCookies((nome) => jar.get(nome)?.value).catch(() => null);
+  if (admin) redirect("/admin");
+
+  const jogador = await identidadePorToken(jar.get(JOGADOR_COOKIE)?.value).catch(() => null);
   if (jogador) redirect("/minha-inscricao");
 
   return (

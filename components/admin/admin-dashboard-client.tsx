@@ -9,6 +9,7 @@ import { applyAutoGameMvpsToDataset, calculateStandings } from "@/lib/tournament
 import { diffDatasetForScopes, type DatasetChange } from "@/lib/security/dataset-diff";
 import { RATE_LIMIT } from "@/lib/security/rate-limit";
 import { SCOPES, hasScope, scopeLabel, type Scope } from "@/lib/security/scopes";
+import { avisarSessaoMudou } from "@/lib/sessao-mudou";
 import { AdminOverviewPanel } from "@/components/admin/admin-overview-panel";
 import { AdminTeamsPanel } from "@/components/admin/admin-teams-panel";
 import { AdminPlayersPanel } from "@/components/admin/admin-players-panel";
@@ -473,11 +474,29 @@ function ItemTrilho({ secao, ativo, alcanca, motivoBloqueio, horizontal, onClick
           border: ativo ? "none" : `1px solid ${C.line2}`,
         }}
       />
-      <span style={{ flex: 1, minWidth: 0 }}>{secao.label}</span>
+      {/*
+        `minWidth: 0` sozinho deixa o texto ENCOLHER, mas não o impede de transbordar:
+        sem o recorte, um rótulo longo passava por cima da nota ao lado e as duas
+        palavras ficavam sobrepostas. O recorte cuida do rótulo; o `flexShrink: 0`
+        garante que quem espreme é o rótulo, nunca a contagem ou a nota.
+      */}
+      <span
+        style={{
+          flex: 1,
+          minWidth: 0,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {secao.label}
+      </span>
       {typeof secao.contagem === "number" ? (
-        <span style={{ fontSize: 11, color: C.ink4, ...tabular }}>{secao.contagem}</span>
+        <span style={{ fontSize: 11, color: C.ink4, flexShrink: 0, ...tabular }}>{secao.contagem}</span>
       ) : null}
-      {secao.nota ? <span style={{ fontSize: 10.5, color: C.ink4 }}>{secao.nota}</span> : null}
+      {secao.nota ? (
+        <span style={{ fontSize: 10.5, color: C.ink4, flexShrink: 0 }}>{secao.nota}</span>
+      ) : null}
       {alcanca ? null : (
         <span aria-hidden style={{ fontSize: 10.5, color: C.ink4 }}>
           ○
@@ -782,6 +801,10 @@ export function AdminDashboardClient() {
         setPassword("");
         await fetchSession();
         await fetchDataset();
+        // O cabeçalho do site não sabe que isto aconteceu: o login é aqui dentro, sem
+        // trocar de rota. Sem o aviso, ele continuava oferecendo "ENTRAR" para quem
+        // acabou de entrar, até alguém apertar F5.
+        avisarSessaoMudou();
         setMessage("Login realizado. Painel liberado.");
       },
       "Falha no login.",
@@ -798,6 +821,7 @@ export function AdminDashboardClient() {
           method: "POST",
           credentials: "same-origin",
         });
+        avisarSessaoMudou();
         setDraft(null);
         setBaseline(null);
         setConflict(false);
@@ -1059,13 +1083,13 @@ export function AdminDashboardClient() {
       },
       {
         value: "e4-times",
-        label: "Times e viabilidade",
+        label: "Times e vagas",
         grupo: "4ª Edição",
         escopos: ["inscricoes:conferir"],
       },
       {
         value: "e4-config",
-        label: "Configuração da edição",
+        label: "Configuração",
         grupo: "4ª Edição",
         nota: "abre inscrições",
         escopos: ["edicao:configurar"],

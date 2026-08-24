@@ -98,10 +98,10 @@ export function verifyAdminPassword(input: string) {
   return constantEquals(input, expected);
 }
 
-function isAuthorizedLegacyRequest(request: NextRequest) {
+function ehLegadoAutorizado(ler: LerCookie) {
   const expectedToken = getAdminAuthToken();
   if (!expectedToken) return false;
-  const token = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
+  const token = ler(ADMIN_COOKIE_NAME);
   if (!token) return false;
   return constantEquals(token, expectedToken);
 }
@@ -160,8 +160,16 @@ export async function revokeRequestSession(request: NextRequest): Promise<void> 
   if (payload) await revokeSession(payload.sid, "logout");
 }
 
-async function getNewAuthIdentity(request: NextRequest): Promise<AdminIdentity | null> {
-  const token = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
+/**
+ * Lê um cookie por nome. Existe para a identidade poder ser resolvida tanto a partir
+ * de um `NextRequest` (nas rotas) quanto de `cookies()` de next/headers (nas páginas),
+ * sem que ninguém precise fabricar um objeto parecido com uma requisição só para
+ * satisfazer o tipo.
+ */
+export type LerCookie = (nome: string) => string | undefined;
+
+async function getNewAuthIdentityDeCookie(ler: LerCookie): Promise<AdminIdentity | null> {
+  const token = ler(ADMIN_SESSION_COOKIE);
 
   // Verificação barata primeiro (assinatura + expiração): visitante anônimo nem toca no banco.
   const payload = verifySessionToken(token, getSessionSecret());
@@ -186,9 +194,14 @@ async function getNewAuthIdentity(request: NextRequest): Promise<AdminIdentity |
  * sessão no banco — é justamente isso que permite revogar acesso na hora.
  */
 export async function getAdminIdentity(request: NextRequest): Promise<AdminIdentity | null> {
-  if (isNewAuthEnabled()) return getNewAuthIdentity(request);
+  return getAdminIdentityDeCookies((nome) => request.cookies.get(nome)?.value);
+}
 
-  if (isAuthorizedLegacyRequest(request)) {
+/** A mesma identidade, a partir de um leitor de cookies. Para Server Components. */
+export async function getAdminIdentityDeCookies(ler: LerCookie): Promise<AdminIdentity | null> {
+  if (isNewAuthEnabled()) return getNewAuthIdentityDeCookie(ler);
+
+  if (ehLegadoAutorizado(ler)) {
     return {
       id: "legacy",
       username: "admin",

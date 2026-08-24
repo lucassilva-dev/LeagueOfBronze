@@ -67,6 +67,12 @@ export const inscricao = definir({
     // Rótulo próprio: na tela de entrar, "CRIE UMA SENHA" (herdado do cadastro) pede
     // à pessoa exatamente o oposto do que ela vai fazer.
     senhaLoginLabel: "SENHA",
+    // Uma porta só para as duas contas. O rótulo precisa dizer isso, senão quem é da
+    // organização digita o usuário num campo que pede e-mail e desiste.
+    entrarIdentificador: "E-MAIL OU USUÁRIO",
+    entrarIdentificadorAjuda:
+      "Jogador entra com o e-mail; quem é da organização, com o nome de usuário.",
+    entrarIdentificadorPlaceholder: "voce@email.com",
     entrarTitulo: "Entrar",
     entrarBotao: "ENTRAR",
     entrarAjuda: "Entre para continuar a inscrição com a conta que você já criou.",
@@ -219,6 +225,9 @@ export const inscricao = definir({
     entrarSemConta: "Don't have an account yet?",
     entrarVoltar: "← Back to home",
     senhaLoginLabel: "PASSWORD",
+    entrarIdentificador: "E-MAIL OR USERNAME",
+    entrarIdentificadorAjuda: "Players sign in with their e-mail; organisers with their username.",
+    entrarIdentificadorPlaceholder: "you@email.com",
     entrarTitulo: "Sign in",
     entrarBotao: "SIGN IN",
     entrarAjuda: "Sign in to continue with the account you already created.",
