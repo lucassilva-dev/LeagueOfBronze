@@ -62,6 +62,14 @@ export const compartilhados = definir({
     tabelaLinhaPontos: "Pontos:",
 
     // components/series-live-draw.tsx
+    // O sorteio deixou de acontecer no navegador: quem sorteia é o servidor, e a
+    // semente fica gravada para qualquer um conferir depois.
+    sorteioSemente: "semente",
+    sorteioPorFulano: "sorteado por",
+    sorteioRepetido: "Este sorteio já foi feito antes nesta série — o histórico registra as duas vezes.",
+    sorteioFalhou: "Não foi possível sortear. Nada foi gravado.",
+    sorteioLetras: "Letras sorteadas",
+    sorteioCampeoesDisponiveis: "campeões disponíveis",
     sorteioLadosTitulo: "Lados · Jogo 1",
     sorteioLadoAzul: "Lado Azul",
     sorteioLadoVermelho: "Lado Vermelho",
@@ -148,6 +156,12 @@ export const compartilhados = definir({
     tabelaLinhaSeries: "Series:",
     tabelaLinhaPontos: "Points:",
 
+    sorteioSemente: "seed",
+    sorteioPorFulano: "drawn by",
+    sorteioRepetido: "This draw was already made for this series — the history records both.",
+    sorteioFalhou: "Couldn't draw. Nothing was saved.",
+    sorteioLetras: "Letters drawn",
+    sorteioCampeoesDisponiveis: "champions available",
     sorteioLadosTitulo: "Sides · Game 1",
     sorteioLadoAzul: "Blue Side",
     sorteioLadoVermelho: "Red Side",
