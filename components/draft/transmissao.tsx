@@ -101,11 +101,19 @@ const URGENTE_S = 10;
 
 // ---------------------------------------------------------------- peças
 
+/**
+ * O rótulo pequeno do handoff: 10–11px, caps, muito espaçado.
+ *
+ * `textTransform` no estilo, e não `.toUpperCase()` no texto: as traduções vêm em caixa
+ * mista ("Escolha", "Rodada") e caber a decisão ao CSS mantém o texto legível no arquivo
+ * de i18n — além de funcionar igual em inglês.
+ */
 const kicker = (cor: string, espaco: string): CSSProperties => ({
   fontFamily: DISPLAY,
   fontSize: 10,
   fontWeight: 700,
   letterSpacing: espaco,
+  textTransform: "uppercase",
   color: cor,
 });
 
@@ -505,7 +513,7 @@ function AoVivo({
               {daVez.nome}
             </span>
             <span style={{ fontSize: 14, color: D.secundario2 }}>
-              {t.capitao.toLowerCase()}. {daVez.capitaoRiotId}
+              {t.capitaoAbrev} {daVez.capitaoRiotId}
             </span>
           </div>
         </div>
@@ -569,7 +577,7 @@ function AoVivo({
         }}
       >
         <span aria-hidden style={{ width: 6, height: 6, borderRadius: "50%", background: D.ouro }} />
-        <span style={{ ...kicker(D.kickerOuro, ".2em") }}>{t.espectador.toUpperCase()}</span>
+        <span style={{ ...kicker(D.kickerOuro, ".2em") }}>{t.espectador}</span>
         <span style={{ fontSize: 12.5, color: D.secundario2 }}>{t.espectadorTexto}</span>
       </div>
 
@@ -1023,7 +1031,7 @@ function Revelacao({
               {jogador?.pontos ?? "—"}
             </div>
             <div style={{ ...kicker(D.kicker, ".2em"), fontSize: 11 }}>
-              {t.pontos.toUpperCase()}
+              {t.pontos}
             </div>
           </div>
         </div>

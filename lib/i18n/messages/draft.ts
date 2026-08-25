@@ -67,6 +67,7 @@ export const draft = definir({
     vazioTitulo: "O DRAFT AINDA NÃO ABRIU",
     vazioTexto:
       "Data e horário serão anunciados no Discord. Quando abrir, esta tela vira a transmissão oficial: sorteio dos times, cronômetro, orçamento drenando e cada escolha aparecendo ao vivo.",
+    capitaoAbrev: "cap.",
     sorteioKicker: "SORTEIO DOS TIMES E DA ORDEM DE ESCOLHA",
     sorteioTitulo: "QUEM CAPITANEIA O QUÊ",
     sorteando: "sorteando…",
@@ -139,6 +140,7 @@ export const draft = definir({
     vazioTitulo: "THE DRAFT HASN'T OPENED YET",
     vazioTexto:
       "Date and time will be announced on Discord. Once it opens, this screen becomes the official broadcast: the team draw, the clock, budgets draining and every pick landing live.",
+    capitaoAbrev: "cap.",
     sorteioKicker: "DRAWING THE TEAMS AND THE PICK ORDER",
     sorteioTitulo: "WHO CAPTAINS WHAT",
     sorteando: "drawing…",
