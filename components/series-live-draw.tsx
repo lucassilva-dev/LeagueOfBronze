@@ -1,22 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Shuffle, Swords, Users } from "lucide-react";
 
 import type { CardId } from "@/lib/schema";
-import { ALL_CARDS, CARDS, CARDS_BY_ID } from "@/lib/cards";
+import { CARDS_BY_ID } from "@/lib/cards";
 import { compartilhados } from "@/lib/i18n/messages/compartilhados";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  CerimoniaDeSorteio,
+  type PedidoDeSorteio,
+} from "@/components/series/cerimonia-de-sorteio";
 
 /** Textos do bloco. Opcional: sem eles o sorteio fica em português (padrão do site). */
 type TextosSorteio = (typeof compartilhados)["pt"];
 
 type TeamRef = { id: string; name: string };
 type Drawn = { teamId: string; cardId: string; dupla?: boolean };
-
-const DUPLA_TARGET = "__DUPLA__";
 
 type Sorteio = {
   tipo: string;
@@ -26,10 +28,9 @@ type Sorteio = {
   detalhe?: { letras?: [string, string]; campeoes?: number };
 };
 type RespostaSorteio = {
-  error?: string;
   sorteio?: Sorteio;
   blueSideTeamId?: string | null;
-  cardsUsed?: Drawn[];
+  cardsUsed?: ReadonlyArray<{ teamId: string; cardId: string; dupla?: boolean }>;
   vezes?: number;
 };
 type SessaoAdmin = {
@@ -43,14 +44,10 @@ function SideChip({
   label,
   color,
   team,
-  spinning,
-  t,
 }: Readonly<{
   label: string;
   color: string;
   team: TeamRef | null;
-  spinning: boolean;
-  t: TextosSorteio;
 }>) {
   return (
     <div
@@ -60,21 +57,17 @@ function SideChip({
       <span className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color }}>
         {label}
       </span>
-      <span className="text-sm font-semibold text-center">
-        {spinning ? t.sorteioSorteando : (team?.name ?? "—")}
-      </span>
+      <span className="text-sm font-semibold text-center">{team?.name ?? "—"}</span>
     </div>
   );
 }
 
 function CardFace({
   cardId,
-  spinning,
   t,
   nomesCartas,
 }: Readonly<{
   cardId?: string | null;
-  spinning?: boolean;
   t: TextosSorteio;
   nomesCartas?: Record<string, string>;
 }>) {
@@ -84,9 +77,7 @@ function CardFace({
   return (
     <div className="flex flex-col items-center gap-2 text-center">
       <div
-        className={`relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl text-5xl shadow-glow transition ${
-          spinning ? "scale-105 animate-pulse" : ""
-        }`}
+        className="relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl text-5xl shadow-glow"
         style={{
           background: def
             ? `linear-gradient(135deg, ${def.from}, ${def.to})`
@@ -106,9 +97,7 @@ function CardFace({
           <span aria-hidden>{def?.emoji ?? "🎴"}</span>
         )}
       </div>
-      <p className="text-sm font-semibold">
-        {nome ?? (spinning ? t.sorteioSorteando : t.sorteioSemCarta)}
-      </p>
+      <p className="text-sm font-semibold">{nome ?? t.sorteioSemCarta}</p>
       {def?.dupla ? (
         <span className="text-[10px] uppercase tracking-[0.12em] text-accent2">
           {t.sorteioCartaDupla}
@@ -118,6 +107,19 @@ function CardFace({
   );
 }
 
+/**
+ * O bloco de sorteio na página pública da partida.
+ *
+ * Ele MOSTRA o estado atual (quem está no lado azul, que cartinha cada time tirou) e, para
+ * quem tem escopo, abre a cerimônia em tela cheia — a roleta. O sorteio em si não acontece
+ * aqui nem na cerimônia: acontece em `POST /api/admin/series/sorteio`, no servidor, com uma
+ * semente gravada na série.
+ *
+ * Antes deste arquivo existir assim, o botão sorteava no próprio navegador com
+ * `Math.random()` e mandava o resultado pronto — dava para recarregar e sortear de novo até
+ * gostar. E a gravação era `fetch(...).catch(() => {})`, então falha de rede deixava a tela
+ * mostrando um resultado que nunca foi salvo.
+ */
 export function SeriesLiveDraw({
   seriesId,
   teamA,
@@ -141,17 +143,27 @@ export function SeriesLiveDraw({
   const [blueSideTeamId, setBlueSideTeamId] = useState<string | null>(
     initialBlueSideTeamId ?? null,
   );
-  const [sideSpinning, setSideSpinning] = useState(false);
   const [cardByTeam, setCardByTeam] = useState<Record<string, string | null>>(() => {
     const map: Record<string, string | null> = {};
     for (const card of initialCards) map[card.teamId] = card.cardId;
     return map;
   });
   const [isDupla, setIsDupla] = useState(() => initialCards.some((card) => card.dupla));
-  const [spinTarget, setSpinTarget] = useState<string | null>(null);
-  const [spinFace, setSpinFace] = useState<string | null>(null);
-  const [erro, setErro] = useState<string | null>(null);
   const [ultimo, setUltimo] = useState<Sorteio | null>(null);
+  const [pedido, setPedido] = useState<PedidoDeSorteio | null>(null);
+  /*
+   * Conta os cliques só para servir de `key` à cerimônia.
+   *
+   * Remontar a cada clique é o que garante que a roda comece do zero e que o sorteio saia
+   * UMA vez. Sem isso o mesmo componente era reaproveitado e o efeito reexecutava a cada
+   * `router.refresh()` — o que gravou 24 sorteios a partir de um clique só.
+   */
+  const [rodada, setRodada] = useState(0);
+
+  const abrir = useCallback((p: PedidoDeSorteio) => {
+    setRodada((n) => n + 1);
+    setPedido(p);
+  }, []);
   const router = useRouter();
 
   useEffect(() => {
@@ -170,103 +182,54 @@ export function SeriesLiveDraw({
   }, []);
 
   /**
-   * Pede o sorteio AO SERVIDOR e anima até o resultado que voltou.
+   * O resultado já está gravado quando isto roda — a cerimônia avisa assim que o servidor
+   * responde, ainda com a roda desacelerando.
    *
-   * Antes, o resultado saía de um `Math.random()` aqui no navegador e era mandado
-   * pronto para a rota — bastava recarregar a página e sortear de novo até gostar, e
-   * nada ficava registrado. Pior: a gravação era `fetch(...).catch(() => {})`, então
-   * uma falha de rede deixava a tela mostrando um resultado que nunca foi salvo.
-   *
-   * Agora o servidor decide, grava a semente junto e devolve. A roleta continua
-   * girando enquanto a resposta não chega — o suspense é teatro, o resultado não é.
+   * A tela é sincronizada aqui A PARTIR DA RESPOSTA, e não só por `router.refresh()`: os
+   * estados locais nascem de `useState` com valor inicial, e um refresh do servidor não
+   * reexecuta inicializador de estado. Sem isto, fechar a cerimônia mostraria o valor antigo.
    */
-  const pedirSorteio = async (
-    alvo: string,
-    corpo: { tipo: "lados" | "carta"; teamId?: string; dupla?: boolean },
-    pool: typeof CARDS | null,
-  ) => {
-    if (spinTarget || sideSpinning) return;
-    setErro(null);
-    if (corpo.tipo === "lados") setSideSpinning(true);
-    else setSpinTarget(alvo);
+  const aplicarResposta = useCallback(
+    (resposta: RespostaSorteio) => {
+      if (resposta.sorteio) setUltimo(resposta.sorteio);
 
-    // Giro livre enquanto a rede responde. Só o freio conhece o resultado.
-    const girar = setInterval(() => {
-      if (corpo.tipo === "lados") {
-        setBlueSideTeamId((atual) => (atual === teamA?.id ? (teamB?.id ?? null) : (teamA?.id ?? null)));
-      } else if (pool) {
-        setSpinFace(pool[Math.floor(Math.random() * pool.length)]!.id);
-      }
-    }, 85);
-
-    const inicio = Date.now();
-    try {
-      const resposta = await fetch("/api/admin/series/sorteio", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ seriesId, ...corpo }),
-      });
-      const dados = (await resposta.json().catch(() => ({}))) as RespostaSorteio;
-
-      // Piso de suspense: numa rede rápida a roleta mal apareceria.
-      const faltando = Math.max(0, 1200 - (Date.now() - inicio));
-      await new Promise((r) => setTimeout(r, faltando));
-      clearInterval(girar);
-
-      if (!resposta.ok || !dados.sorteio) {
-        // A falha PRECISA aparecer. O `.catch(() => {})` de antes escondia justamente
-        // o caso em que a tela e o banco discordam.
-        setErro(dados.error ?? t.sorteioFalhou);
-        setBlueSideTeamId(initialBlueSideTeamId ?? null);
-        setSpinFace(null);
-        return;
-      }
-
-      setUltimo(dados.sorteio);
-      if (corpo.tipo === "lados") {
-        setBlueSideTeamId(dados.blueSideTeamId ?? null);
+      if (resposta.sorteio?.tipo === "lados") {
+        setBlueSideTeamId(resposta.blueSideTeamId ?? null);
       } else {
-        const cartas = dados.cardsUsed ?? [];
+        const cartas = resposta.cardsUsed ?? [];
         const mapa: Record<string, string | null> = {};
         for (const c of cartas) mapa[c.teamId] = c.cardId;
         setCardByTeam(mapa);
         setIsDupla(cartas.some((c) => c.dupla));
-        setSpinFace(null);
       }
 
-      // O resto da página (o bloco de cartinhas mais abaixo) vem do servidor.
+      // O resto da página (histórico de sorteios, jogos) vem do servidor.
       router.refresh();
-    } catch {
-      clearInterval(girar);
-      setErro(t.sorteioFalhou);
-      setBlueSideTeamId(initialBlueSideTeamId ?? null);
-      setSpinFace(null);
-    } finally {
-      setSideSpinning(false);
-      setSpinTarget(null);
-    }
-  };
+    },
+    [router],
+  );
 
-  const drawSides = () => void pedirSorteio("__LADOS__", { tipo: "lados" }, null);
-  const drawSingle = (team: TeamRef) =>
-    void pedirSorteio(team.id, { tipo: "carta", teamId: team.id }, CARDS);
-  const drawDupla = () => void pedirSorteio(DUPLA_TARGET, { tipo: "carta", dupla: true }, ALL_CARDS);
+  const blueTeam =
+    teamA && teamB
+      ? blueSideTeamId === teamB.id
+        ? teamB
+        : blueSideTeamId === teamA.id
+          ? teamA
+          : null
+      : null;
+  const redTeam = blueTeam ? (blueTeam.id === teamA?.id ? teamB : teamA) : null;
 
   const renderTeam = (team: TeamRef | null) => {
     if (!team) return null;
-    const spinning = spinTarget === team.id || spinTarget === DUPLA_TARGET;
-    const shown = spinning ? spinFace : cardByTeam[team.id];
     return (
       <div className="flex flex-col items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.02] p-4">
         <p className="text-xs uppercase tracking-[0.14em] text-muted">{team.name}</p>
-        <CardFace cardId={shown} spinning={spinning} t={t} nomesCartas={nomesCartas} />
+        <CardFace cardId={cardByTeam[team.id]} t={t} nomesCartas={nomesCartas} />
         {podeCartas ? (
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => drawSingle(team)}
-            disabled={Boolean(spinTarget)}
+            onClick={() => abrir({ tipo: "carta", teamId: team.id })}
           >
             <Shuffle className="h-4 w-4" /> {t.sorteioBotaoSortear}
           </Button>
@@ -275,113 +238,121 @@ export function SeriesLiveDraw({
     );
   };
 
-  const blueTeam = teamA && teamB ? (blueSideTeamId === teamB.id ? teamB : blueSideTeamId === teamA.id ? teamA : null) : null;
-  const redTeam = blueTeam ? (blueTeam.id === teamA?.id ? teamB : teamA) : null;
-
   return (
-    <Card className="p-5">
-      {teamA && teamB ? (
-        <div className="mb-5">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs uppercase tracking-[0.14em] text-muted">{t.sorteioLadosTitulo}</p>
-            {podeLados ? <span className="text-[11px] text-accent2">{t.sorteioAoVivo}</span> : null}
-          </div>
-          <div className="mt-3 flex items-stretch gap-3">
-            <SideChip
-              label={t.sorteioLadoAzul}
-              color="#4d9bff"
-              team={blueTeam}
-              spinning={sideSpinning}
-              t={t}
-            />
-            <SideChip
-              label={t.sorteioLadoVermelho}
-              color="#ff5d5d"
-              team={redTeam}
-              spinning={sideSpinning}
-              t={t}
-            />
-          </div>
-          {podeLados ? (
-            <div className="mt-3 flex justify-center">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={drawSides}
-                disabled={sideSpinning || Boolean(spinTarget)}
-              >
-                <Swords className="h-4 w-4" /> {t.sorteioBotaoLados}
-              </Button>
+    <>
+      <Card className="p-5">
+        {teamA && teamB ? (
+          <div className="mb-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs uppercase tracking-[0.14em] text-muted">
+                {t.sorteioLadosTitulo}
+              </p>
+              {podeLados ? <span className="text-[11px] text-accent2">{t.sorteioAoVivo}</span> : null}
             </div>
-          ) : null}
-        </div>
-      ) : null}
+            <div className="mt-3 flex items-stretch gap-3">
+              <SideChip label={t.sorteioLadoAzul} color="#4d9bff" team={blueTeam} />
+              <SideChip label={t.sorteioLadoVermelho} color="#ff5d5d" team={redTeam} />
+            </div>
+            {podeLados ? (
+              <div className="mt-3 flex justify-center">
+                <Button variant="secondary" size="sm" onClick={() => abrir({ tipo: "lados" })}>
+                  <Swords className="h-4 w-4" /> {t.sorteioBotaoLados}
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs uppercase tracking-[0.14em] text-muted">
-          {t.sorteioCartinhasTitulo}
-        </p>
-        {podeCartas ? <span className="text-[11px] text-accent2">{t.sorteioAoVivo}</span> : null}
-      </div>
-      {isDupla ? (
-        <p className="mt-2 rounded-lg border border-accent2/30 bg-accent2/[0.06] px-3 py-2 text-[11px] uppercase tracking-[0.12em] text-accent2">
-          {t.sorteioDuplo}
-        </p>
-      ) : null}
-      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {renderTeam(teamA)}
-        {renderTeam(teamB)}
-      </div>
-
-      {/* As letras completam a carta: sem elas o ABCDRAFT não diz o que fazer. */}
-      {ultimo?.detalhe?.letras ? (
-        <div className="mt-3 rounded-xl border border-accent2/30 bg-accent2/[0.06] p-3 text-center">
-          <p className="text-[10px] uppercase tracking-[0.16em] text-muted">{t.sorteioLetras}</p>
-          <p className="mt-1 text-3xl font-bold tracking-[0.2em] text-accent2">
-            {ultimo.detalhe.letras.join(" · ")}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs uppercase tracking-[0.14em] text-muted">
+            {t.sorteioCartinhasTitulo}
           </p>
-          {typeof ultimo.detalhe.campeoes === "number" ? (
-            <p className="text-[11px] text-muted">
-              {ultimo.detalhe.campeoes} {t.sorteioCampeoesDisponiveis}
+          {podeCartas ? <span className="text-[11px] text-accent2">{t.sorteioAoVivo}</span> : null}
+        </div>
+        {isDupla ? (
+          <p className="mt-2 rounded-lg border border-accent2/30 bg-accent2/[0.06] px-3 py-2 text-[11px] uppercase tracking-[0.12em] text-accent2">
+            {t.sorteioDuplo}
+          </p>
+        ) : null}
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {renderTeam(teamA)}
+          {renderTeam(teamB)}
+        </div>
+
+        {/* As letras completam a carta: sem elas o ABCDRAFT não diz o que fazer. */}
+        {ultimo?.detalhe?.letras ? (
+          <div className="mt-3 rounded-xl border border-accent2/30 bg-accent2/[0.06] p-3 text-center">
+            <p className="text-[10px] uppercase tracking-[0.16em] text-muted">{t.sorteioLetras}</p>
+            <p className="mt-1 text-3xl font-bold tracking-[0.2em] text-accent2">
+              {ultimo.detalhe.letras.join(" · ")}
             </p>
-          ) : null}
-        </div>
-      ) : null}
+            {typeof ultimo.detalhe.campeoes === "number" ? (
+              <p className="text-[11px] text-muted">
+                {ultimo.detalhe.campeoes} {t.sorteioCampeoesDisponiveis}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
-      {/*
-        A procedência fica à vista. O sorteio é do servidor e a semente permite
-        recalculá-lo depois — mostrar isso é o que separa "confie em nós" de
-        "confira você mesmo".
-      */}
-      {ultimo ? (
-        <p className="mt-3 text-center text-[10.5px] text-muted">
-          <span className="font-mono">{t.sorteioSemente}: {ultimo.semente}</span>
-          {" · "}
-          {t.sorteioPorFulano} {ultimo.autor}
-        </p>
-      ) : null}
+        {/*
+          A procedência fica à vista. O sorteio é do servidor e a semente permite
+          recalculá-lo depois — mostrar isso é o que separa "confie em nós" de
+          "confira você mesmo".
+        */}
+        {ultimo ? (
+          <p className="mt-3 text-center text-[10.5px] text-muted">
+            <span className="font-mono">
+              {t.sorteioSemente}: {ultimo.semente}
+            </span>
+            {" · "}
+            {t.sorteioPorFulano} {ultimo.autor}
+          </p>
+        ) : null}
 
-      {erro ? (
-        <p
-          role="alert"
-          className="mt-3 rounded-xl border border-danger/40 bg-danger/[0.08] px-3 py-2 text-center text-[12px] text-danger"
-        >
-          {erro}
-        </p>
-      ) : null}
-      {podeCartas && teamA && teamB ? (
-        <div className="mt-3 flex flex-col items-center gap-2">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={drawDupla}
-            disabled={Boolean(spinTarget)}
-          >
-            <Users className="h-4 w-4" /> {t.sorteioBotaoDupla}
-          </Button>
-          <p className="text-center text-[11px] text-muted">{t.sorteioDuplaExplicacao}</p>
-        </div>
-      ) : null}
-    </Card>
+        {podeCartas && teamA && teamB ? (
+          <div className="mt-3 flex flex-col items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => abrir({ tipo: "carta", dupla: true })}
+            >
+              <Users className="h-4 w-4" /> {t.sorteioBotaoDupla}
+            </Button>
+            <p className="text-center text-[11px] text-muted">{t.sorteioDuplaExplicacao}</p>
+          </div>
+        ) : null}
+      </Card>
+
+      <CerimoniaDeSorteio
+        key={rodada}
+        aberto={pedido !== null}
+        pedido={pedido}
+        onFechar={() => setPedido(null)}
+        onSorteado={aplicarResposta}
+        seriesId={seriesId}
+        teamA={teamA}
+        teamB={teamB}
+        nomesCartas={nomesCartas}
+        t={{
+          titulo: t.cerimoniaTitulo,
+          fechar: t.cerimoniaFechar,
+          vai: t.cerimoniaVai,
+          girando: t.cerimoniaGirando,
+          ladoAzul: t.sorteioLadoAzul,
+          ladoVermelho: t.sorteioLadoVermelho,
+          resultado: t.cerimoniaResultado,
+          semente: t.sorteioSemente,
+          porFulano: t.sorteioPorFulano,
+          falhou: t.sorteioFalhou,
+          repetido: t.sorteioRepetido,
+          letras: t.sorteioLetras,
+          campeoesDisponiveis: t.sorteioCampeoesDisponiveis,
+          cartaDupla: t.sorteioCartaDupla,
+          som: t.cerimoniaSom,
+          semSom: t.cerimoniaSemSom,
+          frases: t.cerimoniaFrases,
+        }}
+      />
+    </>
   );
 }

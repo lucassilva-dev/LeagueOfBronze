@@ -85,6 +85,27 @@ export const compartilhados = definir({
     sorteioDuplaExplicacao:
       "Quando os dois capitães usam a carta na mesma partida: sorteio único entre as 8 cartas (as 6 individuais + as 2 duplas), valendo para os dois times.",
 
+    // components/series/cerimonia-de-sorteio.tsx — a roleta em tela cheia
+    cerimoniaTitulo: "Sorteio ao vivo",
+    cerimoniaFechar: "Fechar",
+    cerimoniaVai: "VAI!",
+    cerimoniaGirando: "Girando…",
+    cerimoniaResultado: "E o resultado é",
+    cerimoniaSom: "Som",
+    cerimoniaSemSom: "Mudo",
+    cerimoniaFrases: [
+      "chacoalhando o pote…",
+      "subornando a aleatoriedade…",
+      "consultando o além…",
+      "girando na força do Ferro IV…",
+      "conferindo com o juiz…",
+      "pedindo licença pro RNG…",
+      "soprando o dado…",
+      "acordando o servidor…",
+      "olhando pro outro lado…",
+      "fingindo que não é sorte…",
+    ],
+
     // app/not-found.tsx
     naoEncontradoTitulo: "Página não encontrada",
     naoEncontradoTexto: "O recurso solicitado não existe ou foi removido.",
@@ -176,6 +197,26 @@ export const compartilhados = definir({
     sorteioBotaoDupla: "Draw double wildcard (2 captains)",
     sorteioDuplaExplicacao:
       "When both captains play their wildcard in the same match: a single draw among the 8 wildcards (the 6 single ones + the 2 double ones), applied to both teams.",
+
+    cerimoniaTitulo: "Live draw",
+    cerimoniaFechar: "Close",
+    cerimoniaVai: "GO!",
+    cerimoniaGirando: "Spinning…",
+    cerimoniaResultado: "And the result is",
+    cerimoniaSom: "Sound",
+    cerimoniaSemSom: "Muted",
+    cerimoniaFrases: [
+      "shaking the jar…",
+      "bribing the randomness…",
+      "consulting the beyond…",
+      "spinning on Iron IV power…",
+      "checking with the referee…",
+      "asking RNG nicely…",
+      "blowing on the dice…",
+      "waking the server up…",
+      "looking the other way…",
+      "pretending this isn't luck…",
+    ],
 
     naoEncontradoTitulo: "Page not found",
     naoEncontradoTexto: "The page you asked for doesn't exist or has been removed.",
