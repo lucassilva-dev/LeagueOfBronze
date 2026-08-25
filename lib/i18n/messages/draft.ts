@@ -62,6 +62,27 @@ export const draft = definir({
     meuElenco: "MEU ELENCO",
 
     erroGenerico: "Não foi possível falar com o servidor. A tela se atualiza sozinha em instantes.",
+
+    // ---- textos do handoff de design da transmissão ----
+    vazioTitulo: "O DRAFT AINDA NÃO ABRIU",
+    vazioTexto:
+      "Data e horário serão anunciados no Discord. Quando abrir, esta tela vira a transmissão oficial: sorteio dos times, cronômetro, orçamento drenando e cada escolha aparecendo ao vivo.",
+    sorteioKicker: "SORTEIO DOS TIMES E DA ORDEM DE ESCOLHA",
+    sorteioTitulo: "QUEM CAPITANEIA O QUÊ",
+    sorteando: "sorteando…",
+    ordemSerpentina: "Ordem serpentina: 1-2-3-4-5-6 · 6-5-4-3-2-1 · e repete.",
+    escolhaLivre: "ESCOLHA LIVRE",
+    poolDisponivel: "POOL DISPONÍVEL",
+    poolNota: "quem escolhe é o capitão, pelo painel dele",
+    modoTv: "MODO TV",
+    sairDaTv: "SAIR DA TV",
+    escolhido: "ESCOLHIDO",
+    tempoEsgotado: "TEMPO ESGOTADO · ESCOLHA AUTOMÁTICA",
+    fimKicker: "DRAFT ENCERRADO · 4ª EDIÇÃO",
+    timesFormados: "OS TIMES ESTÃO FORMADOS",
+    fimTexto: "Agora é com vocês. Calendário e confrontos saem no Discord.",
+    pontosUsados: "pontos usados",
+    jogadores: "jogadores",
   },
 
   en: {
@@ -114,5 +135,25 @@ export const draft = definir({
     meuElenco: "MY ROSTER",
 
     erroGenerico: "We couldn't reach the server. The screen refreshes itself in a moment.",
+
+    vazioTitulo: "THE DRAFT HASN'T OPENED YET",
+    vazioTexto:
+      "Date and time will be announced on Discord. Once it opens, this screen becomes the official broadcast: the team draw, the clock, budgets draining and every pick landing live.",
+    sorteioKicker: "DRAWING THE TEAMS AND THE PICK ORDER",
+    sorteioTitulo: "WHO CAPTAINS WHAT",
+    sorteando: "drawing…",
+    ordemSerpentina: "Snake order: 1-2-3-4-5-6 · 6-5-4-3-2-1 · and repeat.",
+    escolhaLivre: "FREE PICK",
+    poolDisponivel: "AVAILABLE POOL",
+    poolNota: "the captain picks, from their own panel",
+    modoTv: "TV MODE",
+    sairDaTv: "EXIT TV",
+    escolhido: "PICKED",
+    tempoEsgotado: "TIME'S UP · AUTOMATIC PICK",
+    fimKicker: "DRAFT CLOSED · 4TH EDITION",
+    timesFormados: "THE TEAMS ARE SET",
+    fimTexto: "It's on you now. Schedule and fixtures go out on Discord.",
+    pontosUsados: "points used",
+    jogadores: "players",
   },
 });

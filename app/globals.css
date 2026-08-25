@@ -587,3 +587,78 @@ a:hover {
 .lob-cer-faisca {
   animation: lobCerFaisca 1.4s ease-in-out infinite;
 }
+
+/* ============================================================
+   DRAFT AO VIVO — keyframes do handoff de design
+   ============================================================
+   Tempos e curvas exatamente como no `README.md` do handoff.
+
+   OS NOMES GANHARAM O PREFIXO `lobd`. O handoff pede os nomes originais, mas um
+   deles — `lobGlow` — já existe neste arquivo com outra definição (opacidade, usada
+   no brilho das seções). Duas regras com o mesmo nome: a última vence, e o site
+   quebraria em silêncio num lugar sem relação com o draft. Prefixo resolve sem mudar
+   um milissegundo do que foi especificado.
+
+   Vale a regra da casa: as opacidades animadas aqui estão todas em ELEMENTOS
+   DECORATIVOS ou em sobreposições que só existem por 2,4s. Nome, pontos e time
+   nascem opacos.
+*/
+@keyframes lobdSheen {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+@keyframes lobdPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.8); }
+}
+@keyframes lobdRise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes lobdSlam {
+  0% { opacity: 0; transform: scale(2.4) rotate(-9deg); }
+  55% { opacity: 1; transform: scale(0.93) rotate(1.5deg); }
+  75% { transform: scale(1.04) rotate(-0.5deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+@keyframes lobdFlash {
+  0% { opacity: 0; }
+  8% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes lobdConfetti {
+  0% { transform: translate3d(0, -10vh, 0) rotate(0); opacity: 1; }
+  100% {
+    transform: translate3d(var(--dx, 0px), 110vh, 0) rotate(var(--rot, 720deg));
+    opacity: 0.9;
+  }
+}
+@keyframes lobdSpinNames {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-50%); }
+}
+@keyframes lobdUrgent {
+  0%, 100% { color: #ff5b4d; text-shadow: 0 0 22px rgba(255, 91, 77, 0.7); }
+  50% { color: #ffd0c8; text-shadow: 0 0 42px rgba(255, 91, 77, 1); }
+}
+@keyframes lobdGlow {
+  0%, 100% {
+    box-shadow: 0 0 0 1px rgba(239, 166, 63, 0.5), 0 0 26px rgba(239, 166, 63, 0.16);
+  }
+  50% {
+    box-shadow: 0 0 0 1px rgba(239, 166, 63, 0.95), 0 0 52px rgba(239, 166, 63, 0.4);
+  }
+}
+
+/*
+  MODO TV do draft: a transmissão ocupa a tela inteira.
+
+  A classe vive no <html> porque o cabeçalho do site está fora da árvore da transmissão.
+  Esconde também a faixa do ambiente de teste — numa projeção, tarja amarela atravessada
+  na tela é o que a plateia vê primeiro.
+*/
+.lobd-tv header,
+.lobd-tv footer,
+.lobd-tv [role="status"][style*="ffcf3f"] {
+  display: none !important;
+}
