@@ -267,12 +267,32 @@ a:hover {
    * Quem quiser outro tamanho continua passando `style`, que vence a classe.
    */
   font-size: clamp(38px, 8vw, 96px);
-  margin: 10px 0 16px;
   line-height: 0.9;
-  /* Espaço para acentos (til, cedilha) não serem cortados pelo clip do gradiente. */
-  padding-top: 0.16em;
-  padding-bottom: 0.2em;
   letter-spacing: 0.005em;
+
+  /*
+   * FOLGA PARA O CEDILHA E O TIL — e por que ela precisa ser deste tamanho.
+   *
+   * `.gold-text` pinta um gradiente e o recorta no texto (`background-clip: text`). O
+   * gradiente só existe dentro da CAIXA DE PREENCHIMENTO do elemento: o pedaço de glifo que
+   * passa dali não fica cortado por overflow nenhum — fica simplesmente SEM TINTA. Some.
+   *
+   * Medido na Anton a 96px: o "Ç" desce 30px abaixo da linha de base (0,313em) e o
+   * line-height 0.9 ainda come 4,8px de meio-vão. Os 0,2em que havia aqui deixavam 14,4px
+   * de espaço para 30px de tinta — o rabinho do Ç sumia em "INSCRIÇÃO", "CONFIRMAÇÃO",
+   * "MINHA INSCRIÇÃO". Em cima sobravam 17,6px, então o til nunca foi problema.
+   *
+   * A conta: o padding precisa cobrir `descida + subidaDaFonte − (lineHeight + fontSize)/2`.
+   * Com a Anton isso dá 0,54em para line-height 0.9 e 0,56em para 0.88 — e /times/[slug]
+   * usa 0.86, que já estouraria. 0.62em cobre até 0.74, que é mais apertado do que qualquer
+   * título do site. Medido, não chutado: com 0.56em sobrava 1px a 128px.
+   *
+   * A margem negativa devolve o espaço à página: a folga é para a TINTA, não para o
+   * layout — sem ela o título ganharia ~40px de ar embaixo.
+   */
+  padding-top: 0.16em;
+  padding-bottom: 0.62em;
+  margin: 10px 0 calc(16px - 0.42em);
 }
 .lob-display {
   font-family: var(--font-display), "Anton", sans-serif;
@@ -329,11 +349,28 @@ a:hover {
   background: #c98a4b;
   flex-shrink: 0;
 }
+/*
+  Os dois botões do site.
+
+  ATENÇÃO ao mexer: eles NÃO tinham `padding` nem `font-size` próprios. Funcionava por
+  acidente — as telas antigas passam os dois inline, uma a uma. As telas novas (o bloco da
+  4ª Edição na home, a inscrição inteira, o painel do capitão) não passavam, e nasciam com
+  padding zero: o texto encostando na borda, 24px de altura, e a fonte do corpo (16px) em
+  vez dos ~13px dos outros botões. O "CONTINUAR →" da inscrição era um deles.
+
+  Mesma armadilha que a `.lob-h1` já tinha tido. Agora a classe se basta, e quem passa
+  valor inline continua mandando — estilo inline sempre vence classe.
+*/
 .lob-btn-gold {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  padding: 12px 20px;
+  font-size: 12.5px;
+  line-height: 1.15;
+  /* A seta "→" faz parte do rótulo: quebrar linha entre ela e a palavra fica torto. */
+  white-space: nowrap;
   background: linear-gradient(180deg, #f0c88a, #b97e40);
   color: #160f06;
   font-weight: 700;
@@ -354,6 +391,10 @@ a:hover {
   align-items: center;
   justify-content: center;
   gap: 8px;
+  padding: 12px 20px;
+  font-size: 12.5px;
+  line-height: 1.15;
+  white-space: nowrap;
   background: rgba(201, 138, 75, 0.08);
   border: 1px solid rgba(201, 138, 75, 0.4);
   color: #e6c592;

@@ -77,7 +77,7 @@ export default async function InicioPage() {
       {/* HERO */}
       <section className="lob-fade" style={{ padding: "clamp(48px,8vw,88px) 0 30px" }}>
         <Eyebrow>{t.homeSobretitulo}</Eyebrow>
-        <GoldTitle style={{ fontSize: "clamp(52px,11vw,148px)", lineHeight: 1.08, margin: "12px 0 14px" }}>
+        <GoldTitle style={{ fontSize: "clamp(52px,11vw,148px)", lineHeight: 1.08, margin: "12px 0 calc(14px - 0.42em)" }}>
           {t.homeTituloLinha1}
           <br />
           {t.homeTituloLinha2}

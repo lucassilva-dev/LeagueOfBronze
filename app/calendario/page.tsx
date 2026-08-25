@@ -41,7 +41,7 @@ export default async function CalendarioPage() {
     <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "0 clamp(16px,4vw,24px) 96px" }}>
       <section className="lob-fade" style={{ padding: "clamp(40px,7vw,56px) 0 20px" }}>
         <Eyebrow>{textos.calendarioEyebrow}</Eyebrow>
-        <GoldTitle style={{ fontSize: "clamp(44px,10vw,120px)", lineHeight: 0.88, margin: "10px 0 16px" }}>{textos.calendarioTitulo}</GoldTitle>
+        <GoldTitle style={{ fontSize: "clamp(44px,10vw,120px)", lineHeight: 0.88 }}>{textos.calendarioTitulo}</GoldTitle>
         <p style={{ maxWidth: 620, fontSize: 16, lineHeight: 1.55, color: "#a99e8b", margin: "0 0 20px" }}>
           {textos.calendarioIntro}
         </p>

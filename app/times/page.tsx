@@ -106,7 +106,7 @@ export default async function TimesPage() {
     <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "0 clamp(16px,4vw,24px) 96px" }}>
       <section className="lob-fade" style={{ padding: "clamp(40px,7vw,56px) 0 26px" }}>
         <Eyebrow>{t.edicaoSobretitulo}</Eyebrow>
-        <GoldTitle style={{ fontSize: "clamp(52px,11vw,138px)", lineHeight: 0.88, margin: "10px 0 16px" }}>{t.timesTitulo}</GoldTitle>
+        <GoldTitle style={{ fontSize: "clamp(52px,11vw,138px)", lineHeight: 0.88 }}>{t.timesTitulo}</GoldTitle>
         <p style={{ maxWidth: 560, fontSize: 16, lineHeight: 1.55, color: "#a99e8b", margin: 0 }}>
           {t.timesIntro}
         </p>

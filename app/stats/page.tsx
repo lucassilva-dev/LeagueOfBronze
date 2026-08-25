@@ -93,7 +93,7 @@ export default async function EstatisticasPage() {
     <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "0 clamp(16px,4vw,24px) 96px" }}>
       <section className="lob-fade" style={{ padding: "clamp(40px,7vw,56px) 0 24px" }}>
         <Eyebrow>{t.statsEyebrow}</Eyebrow>
-        <GoldTitle style={{ fontSize: "clamp(40px,9vw,116px)", lineHeight: 0.88, margin: "10px 0 16px" }}>{t.statsTitulo}</GoldTitle>
+        <GoldTitle style={{ fontSize: "clamp(40px,9vw,116px)", lineHeight: 0.88 }}>{t.statsTitulo}</GoldTitle>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 9, marginTop: 6 }}>
           <Pill dot={false}>{players.length} {t.statsPillJogadores}</Pill>
           <Pill dot={false}>{poolTotal} {t.statsPillPool}</Pill>

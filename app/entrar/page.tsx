@@ -63,7 +63,7 @@ export default async function EntrarPage() {
           </div>
           <h1
             className="lob-h1 gold-text"
-            style={{ fontSize: "clamp(38px,8vw,60px)", lineHeight: 1, margin: "12px 0 12px" }}
+            style={{ fontSize: "clamp(38px,8vw,60px)", lineHeight: 1, margin: "12px 0 calc(12px - 0.42em)" }}
           >
             {t.entrarTitulo}
           </h1>

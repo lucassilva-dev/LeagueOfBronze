@@ -31,7 +31,7 @@ export default async function JogadoresPage() {
     <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "0 clamp(16px,4vw,24px) 96px" }}>
       <section className="lob-fade" style={{ padding: "clamp(40px,7vw,56px) 0 26px" }}>
         <Eyebrow>{t.edicaoSobretitulo}</Eyebrow>
-        <GoldTitle style={{ fontSize: "clamp(44px,10vw,128px)", lineHeight: 0.88, margin: "10px 0 16px" }}>{t.jogadoresTitulo}</GoldTitle>
+        <GoldTitle style={{ fontSize: "clamp(44px,10vw,128px)", lineHeight: 0.88 }}>{t.jogadoresTitulo}</GoldTitle>
         <p style={{ maxWidth: 580, fontSize: 16, lineHeight: 1.55, color: "#a99e8b", margin: "0 0 24px" }}>
           {t.jogadoresIntro}
         </p>

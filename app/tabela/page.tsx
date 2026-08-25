@@ -45,7 +45,7 @@ export default async function TabelaPage() {
     <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "0 clamp(16px,4vw,24px) 96px" }}>
       <section className="lob-fade" style={{ padding: "clamp(40px,7vw,56px) 0 24px" }}>
         <Eyebrow>{textos.tabelaEyebrow}</Eyebrow>
-        <GoldTitle style={{ fontSize: "clamp(48px,11vw,128px)", lineHeight: 0.88, margin: "10px 0 16px" }}>{textos.tabelaTitulo}</GoldTitle>
+        <GoldTitle style={{ fontSize: "clamp(48px,11vw,128px)", lineHeight: 0.88 }}>{textos.tabelaTitulo}</GoldTitle>
         <p style={{ maxWidth: 600, fontSize: 16, lineHeight: 1.55, color: "#a99e8b", margin: 0 }}>
           {textos.tabelaIntro}
         </p>
