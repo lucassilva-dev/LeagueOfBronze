@@ -5,6 +5,7 @@ import { MainNav, type NavLabel } from "@/components/main-nav";
 import { SessaoNoCabecalho } from "@/components/sessao-no-cabecalho";
 import { AVISO_RIOT_OFICIAL, CONTATO_EMAIL } from "@/lib/i18n/messages/legal";
 import { getLocale, getMessages } from "@/lib/i18n/server";
+import { ehAmbienteDeTeste } from "@/lib/data-store";
 
 type SiteFrameProps = Readonly<{ children: React.ReactNode }>;
 
@@ -71,6 +72,48 @@ export async function SiteFrame({ children }: SiteFrameProps) {
       />
 
       <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+        {/*
+          Faixa do ambiente de teste.
+
+          Fica ACIMA do cabeçalho e empurra a página para baixo em vez de flutuar sobre
+          ela: uma tarja que alguém pode não ver, ou que some ao rolar, não serve para
+          nada. Todo o conteúdo daqui é falso, e uma inscrição feita no lugar errado só
+          se descobre quando o campeonato começa sem a pessoa.
+
+          Cor de aviso e texto direto, sem estilo do site: ela precisa parecer um enxerto.
+        */}
+        {ehAmbienteDeTeste() ? (
+          <div
+            role="status"
+            style={{
+              background: "repeating-linear-gradient(135deg,#ffcf3f 0 18px,#1a1206 18px 36px)",
+              padding: 3,
+            }}
+          >
+            <div
+              style={{
+                background: "#1a1206",
+                color: "#ffcf3f",
+                textAlign: "center",
+                padding: "9px 14px",
+                fontSize: 12.5,
+                fontWeight: 800,
+                letterSpacing: ".10em",
+                lineHeight: 1.5,
+              }}
+            >
+              ⚠ AMBIENTE DE TESTE — DADOS FALSOS · nada aqui vale para o campeonato de
+              verdade. O site oficial é{" "}
+              <a
+                href="https://league-of-bronze.vercel.app"
+                style={{ color: "#fff", textDecoration: "underline" }}
+              >
+                league-of-bronze.vercel.app
+              </a>
+            </div>
+          </div>
+        ) : null}
+
         <header
           style={{
             position: "sticky",

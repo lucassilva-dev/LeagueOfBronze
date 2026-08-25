@@ -93,6 +93,29 @@ function getSupabaseServiceRoleKey() {
   return process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || "";
 }
 
+/**
+ * O schema do Postgres onde este ambiente vive.
+ *
+ * Produção não define a variável e continua em `public`. O site de teste define
+ * `SUPABASE_DB_SCHEMA=lob_teste` e passa a falar com um conjunto de tabelas com os MESMOS
+ * nomes, no MESMO banco, que produção não enxerga.
+ *
+ * Isolar aqui, e não em cada consulta, foi deliberado: são 58 chamadas `.from(...)` em 7
+ * arquivos, e bastaria esquecer UMA para uma inscrição de teste cair na tabela de inscrição
+ * de verdade. O cliente é o único lugar por onde todas passam.
+ *
+ * (O plano gratuito do Supabase permite 2 projetos e os dois já estão em uso — daí schema
+ * separado em vez de banco separado. A separação de dados é a mesma.)
+ */
+export function getSupabaseSchema() {
+  return process.env.SUPABASE_DB_SCHEMA?.trim() || "public";
+}
+
+/** Verdadeiro quando este ambiente NÃO é o de produção. */
+export function ehAmbienteDeTeste() {
+  return getSupabaseSchema() !== "public";
+}
+
 export function getSupabaseDatasetRowId() {
   return process.env.SUPABASE_DATASET_ROW_ID?.trim() || SUPABASE_DEFAULT_ROW_ID;
 }
@@ -137,6 +160,8 @@ export function createSupabaseAdminClient() {
 
   return createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
+    // Uma linha, e é ela que separa o ambiente de teste do de verdade.
+    db: { schema: getSupabaseSchema() },
   });
 }
 

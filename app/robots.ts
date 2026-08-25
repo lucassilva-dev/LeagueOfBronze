@@ -1,5 +1,7 @@
 import type { MetadataRoute } from "next";
 
+import { ehAmbienteDeTeste } from "@/lib/data-store";
+
 /**
  * robots.txt.
  *
@@ -9,6 +11,16 @@ import type { MetadataRoute } from "next";
  */
 export default function robots(): MetadataRoute.Robots {
   const base = "https://league-of-bronze.vercel.app";
+
+  /*
+   * O ambiente de teste sai INTEIRO dos buscadores.
+   *
+   * Ele tem times, jogadores e datas falsos. Indexado, apareceria em busca por "League of
+   * Bronze" ao lado do site de verdade, e alguém acabaria se inscrevendo no lugar errado.
+   */
+  if (ehAmbienteDeTeste()) {
+    return { rules: [{ userAgent: "*", disallow: "/" }] };
+  }
 
   return {
     rules: [
