@@ -116,6 +116,52 @@ export function ehAmbienteDeTeste() {
   return getSupabaseSchema() !== "public";
 }
 
+/**
+ * A TRAVA CONTRA O ERRO DE CONFIGURAÇÃO QUE NÃO DÁ ERRO.
+ *
+ * O jeito de o ambiente de teste virar um desastre não é um bug: é criar o projeto de
+ * teste na Vercel e esquecer (ou errar) a variável `SUPABASE_DB_SCHEMA`. Sem ela o padrão
+ * é `public`, e o site de teste passa a ser um SEGUNDO site de produção — o pessoal
+ * fazendo inscrição de brincadeira direto na tabela que decide quem joga, sem um único
+ * erro na tela.
+ *
+ * A Vercel já injeta `VERCEL_PROJECT_PRODUCTION_URL` sozinha, sem ninguém configurar
+ * nada. Então dá para conferir a coisa contra ela mesma: um projeto chamado
+ * `teste-...` que está lendo `public` está errado, e um projeto de produção lendo
+ * qualquer outro schema também.
+ *
+ * Retorna a descrição do problema, ou `null` quando está tudo coerente. Na dúvida —
+ * ambiente que não é Vercel, variável ausente, desenvolvimento local — devolve `null`:
+ * uma trava que dispara sozinha é pior do que trava nenhuma.
+ */
+export function problemaDeAmbiente(): string | null {
+  const dominio = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim().toLowerCase();
+  if (!dominio) return null; // fora da Vercel (local, teste automatizado): não opina.
+
+  // "teste-league-of-bronze.vercel.app" → primeiro rótulo "teste".
+  const pareceTeste = dominio.split(".")[0]?.split("-")[0] === "teste";
+  const schema = getSupabaseSchema();
+
+  if (pareceTeste && schema === "public") {
+    return (
+      `Este deploy se chama "${dominio}" mas está apontando para os dados de PRODUÇÃO ` +
+      `(schema "public"). Defina SUPABASE_DB_SCHEMA=lob_teste nas variáveis deste projeto ` +
+      `na Vercel e faça um novo deploy. Nada foi lido nem escrito.`
+    );
+  }
+
+  if (!pareceTeste && schema !== "public") {
+    // O inverso também mata: produção servindo o campeonato de mentira.
+    return (
+      `Este deploy se chama "${dominio}" (produção) mas está apontando para o schema ` +
+      `"${schema}", que é de teste. Remova SUPABASE_DB_SCHEMA das variáveis deste projeto ` +
+      `na Vercel e faça um novo deploy. Nada foi lido nem escrito.`
+    );
+  }
+
+  return null;
+}
+
 export function getSupabaseDatasetRowId() {
   return process.env.SUPABASE_DATASET_ROW_ID?.trim() || SUPABASE_DEFAULT_ROW_ID;
 }
@@ -148,6 +194,10 @@ function getDatasetValidationErrorPrefix() {
  * a partir de um componente com "use client".
  */
 export function createSupabaseAdminClient() {
+  // Antes de tudo: se o deploy e o schema se contradizem, ninguém fala com o banco.
+  const problema = problemaDeAmbiente();
+  if (problema) throw new Error(problema);
+
   const url = getSupabaseUrl();
   const key = getSupabaseServiceRoleKey();
   if (!url || !key) {

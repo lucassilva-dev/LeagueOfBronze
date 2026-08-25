@@ -5,7 +5,7 @@ import { MainNav, type NavLabel } from "@/components/main-nav";
 import { SessaoNoCabecalho } from "@/components/sessao-no-cabecalho";
 import { AVISO_RIOT_OFICIAL, CONTATO_EMAIL } from "@/lib/i18n/messages/legal";
 import { getLocale, getMessages } from "@/lib/i18n/server";
-import { ehAmbienteDeTeste } from "@/lib/data-store";
+import { ehAmbienteDeTeste, problemaDeAmbiente } from "@/lib/data-store";
 
 type SiteFrameProps = Readonly<{ children: React.ReactNode }>;
 
@@ -82,6 +82,28 @@ export async function SiteFrame({ children }: SiteFrameProps) {
 
           Cor de aviso e texto direto, sem estilo do site: ela precisa parecer um enxerto.
         */}
+        {/*
+          Configuração incoerente entre o deploy e o schema. Vem ANTES da faixa de teste
+          porque é mais grave: o log já acusa, mas log ninguém lê — quem abre o site tem
+          que ver. Vermelha, e diz o que fazer.
+        */}
+        {problemaDeAmbiente() ? (
+          <div
+            role="alert"
+            style={{
+              background: "#7f1010",
+              color: "#ffe9e9",
+              textAlign: "center",
+              padding: "12px 16px",
+              fontSize: 13,
+              fontWeight: 700,
+              lineHeight: 1.6,
+            }}
+          >
+            ⛔ CONFIGURAÇÃO ERRADA — {problemaDeAmbiente()}
+          </div>
+        ) : null}
+
         {ehAmbienteDeTeste() ? (
           <div
             role="status"
