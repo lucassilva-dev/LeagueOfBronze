@@ -95,6 +95,71 @@ export async function PUT(request: NextRequest) {
       else delete serie.sorteios;
     }
 
+    /*
+     * `archivedSeasons` também é PROPRIEDADE DO SERVIDOR e não passa por aqui.
+     *
+     * Cada entrada guarda um dataset COMPLETO de uma temporada inteira, e depois de
+     * "encerrar + iniciar a próxima" (`buildNextSeasonDataset` zera `seriesMatches`) esse
+     * retrato é o ÚNICO exemplar que resta da temporada anterior.
+     *
+     * Quem escreve aqui é o ciclo de vida (`/api/admin/tournament/end`), nunca o editor: o
+     * painel só LÊ esta lista para mostrar contagem. Mas o rascunho carrega o dataset
+     * inteiro de volta no PUT, então uma aba aberta ANTES do arquivamento reenviava
+     * `archivedSeasons: []` — e com "Salvar por cima assim mesmo" (`force`), que pula a
+     * trava de versão, a temporada arquivada era apagada de vez. A restauração de backup
+     * não passa por aqui (usa `/api/admin/import`), então preservar não fecha caminho
+     * nenhum.
+     */
+    parsed.data.archivedSeasons = atual.archivedSeasons;
+
+    /*
+     * ...e preservar por igualdade de id não basta.
+     *
+     * A preservação acima só encontra o histórico quando o id da série continua o
+     * mesmo. Some o id do corpo enviado e o histórico morre em silêncio, por dois
+     * caminhos que existem hoje no painel:
+     *
+     *  - RENOMEAR a série (o editor deixa trocar o id): o corpo chega com o id novo,
+     *    o `find` não acha nada, e o registro do id antigo simplesmente não é
+     *    regravado. O aviso da tela só fala que o link público muda.
+     *  - REMOVER a série e recriá-la com o mesmo id em duas requisições: a primeira
+     *    apaga o histórico, a segunda devolve uma série limpa.
+     *
+     * Nos dois casos quem tem `series:manage` apaga o registro append-only que a
+     * preservação acima existe para proteger — inclusive a semente que permite
+     * conferir cada sorteio.
+     *
+     * A recusa vale para quem NÃO é master. A ameaça real é um admin limitado apagar
+     * o rastro de um sorteio que não gostou: um registro que a própria pessoa auditada
+     * pode remover não é registro. Já o dono do campeonato precisa poder apagar uma
+     * série criada por engano que chegou a ter sorteio — barrar TODO mundo transformava
+     * um risco raro de auditoria num impedimento comum: a série já tinha sido removida
+     * do rascunho na tela, então o painel inteiro ficava impossível de salvar, sem
+     * desfazer, às vezes no meio do evento. Excluir um time era pior ainda, porque
+     * arrasta as séries dele junto.
+     *
+     * `force` não passa por aqui de propósito: ele existe para resolver edição
+     * concorrente (409), não para autorizar a destruição do histórico.
+     */
+    if (!guarda.identity.isMaster) {
+      const idsEnviados = new Set(parsed.data.seriesMatches.map((s) => s.id));
+      const historicoPerdido = atual.seriesMatches
+        .filter((s) => s.sorteios?.length && !idsEnviados.has(s.id))
+        .map((s) => s.id);
+
+      if (historicoPerdido.length > 0) {
+        return NextResponse.json(
+          {
+            error:
+              `Estas séries têm histórico de sorteios e só o responsável pelo campeonato ` +
+              `pode removê-las ou trocar o ID delas: ${historicoPerdido.join(", ")}. O ` +
+              `histórico guarda a semente de cada sorteio e é append-only.`,
+          },
+          { status: 403 },
+        );
+      }
+    }
+
     const veredito = authorizeDatasetChange(guarda.identity, atual, parsed.data);
 
     if (!veredito.ok) {

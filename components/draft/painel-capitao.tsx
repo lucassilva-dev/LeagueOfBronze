@@ -287,6 +287,15 @@ export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
       try {
         const resposta = await fetch("/api/draft/escolha", {
           method: "POST",
+          // Mesmo motivo da sondagem, e aqui dói mais: sem prazo, uma requisição
+          // PENDURADA (troca de Wi-Fi para 4G no meio do evento — o socket morre sem
+          // RST e o sistema só desiste depois de minutos) nunca resolve, o `finally`
+          // nunca roda e `escolhendoId` fica preso. Com ele preso, `podeClicar` é
+          // falso e TODOS os botões da lista ficam desabilitados: o capitão vê o draft
+          // andar, vê "SUA VEZ", e não consegue escolher mais nada até recarregar —
+          // todas as escolhas dele caem no auto-pick. Abortar rejeita, o `catch`
+          // acende o aviso e o `finally` libera para tentar de novo.
+          signal: AbortSignal.timeout(10000),
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ jogadorId }),
@@ -328,12 +337,26 @@ export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
   }
 
   if (!draft) {
+    /*
+     * "Não foi montado" é uma AFIRMAÇÃO sobre o campeonato, e só pode ser dita quando o
+     * servidor respondeu isso.
+     *
+     * Sem a distinção abaixo, uma falha de rede na primeira sondagem (Wi-Fi ruim no local
+     * do evento, ou o timeout de 5 s da própria sondagem) deixava `estado` nulo e
+     * `carregando` falso, e o capitão lia "O draft ainda não foi montado" — sem nenhuma
+     * tarja de erro, porque a de `semResposta` só existe no return principal, lá embaixo.
+     * Ele concluía que a organização ainda não sorteou, saía da página, e as escolhas dele
+     * caíam no cronômetro. A transmissão já trata isto certo (mostra o aviso no próprio
+     * ramo sem draft).
+     */
     return (
       <div className="lob-card lob-fade" style={{ ...CAIXA, display: "grid", gap: 10 }}>
         <h2 className="lob-display" style={{ margin: 0, fontSize: 24, color: "var(--lob-text)" }}>
-          {t.semDraft}
+          {semResposta ? t.erroGenerico : t.semDraft}
         </h2>
-        <p style={{ margin: 0, color: "var(--lob-muted)", maxWidth: "60ch" }}>{t.semDraftTexto}</p>
+        {semResposta ? null : (
+          <p style={{ margin: 0, color: "var(--lob-muted)", maxWidth: "60ch" }}>{t.semDraftTexto}</p>
+        )}
       </div>
     );
   }

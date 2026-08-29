@@ -382,21 +382,40 @@ function FichaInscrito({ inscrito, config, conferencias, executar, ocupado, pode
   const rotas = rotasDoInscrito(inscrito);
   const congelado = Boolean(inscrito.elo_congelado);
 
-  const fichaMudou =
-    situacao !== inscrito.situacao ||
-    eloVerificado !== (resolveElo(inscrito.elo_verificado)?.label ?? "") ||
-    entrouNoGrupo !== (inscrito.entrou_no_grupo ?? "") ||
-    organizador !== inscrito.organizador ||
-    observacao.trim() !== (inscrito.observacao ?? "").trim();
+  // Uma comparação por campo, reaproveitada pelo botão (habilitar) e pelo envio
+  // (decidir o que vai no corpo).
+  const mudou = {
+    situacao: situacao !== inscrito.situacao,
+    eloVerificado: eloVerificado !== (resolveElo(inscrito.elo_verificado)?.label ?? ""),
+    entrouNoGrupo: entrouNoGrupo !== (inscrito.entrou_no_grupo ?? ""),
+    organizador: organizador !== inscrito.organizador,
+    observacao: observacao.trim() !== (inscrito.observacao ?? "").trim(),
+  };
 
+  const fichaMudou = Object.values(mudou).some(Boolean);
+
+  /*
+   * Envia SÓ o que esta tela mudou.
+   *
+   * Antes ia sempre o pacote inteiro dos cinco campos, montado do estado local — que é
+   * uma foto de quando a ficha foi aberta. Com dois organizadores trabalhando ao mesmo
+   * tempo (o modo normal aqui), quem salvasse por último devolvia os valores VELHOS dos
+   * campos que nem tocou: bastava alguém abrir a ficha, o outro marcar "apto", e o
+   * primeiro salvar uma observação para a situação voltar a "pendente" sem aviso nenhum.
+   *
+   * `PatchInscricao` já é todo opcional e `atualizarInscricao` só grava o que vem
+   * definido, então omitir o campo intocado é o bastante para ele sobreviver.
+   */
   const salvarFicha = async () => {
     await executar("ficha", {
       inscricaoId: inscrito.id,
-      situacao,
-      eloVerificado: eloVerificado === "" ? null : eloVerificado,
-      entrouNoGrupo: entrouNoGrupo === "" ? null : entrouNoGrupo,
-      organizador,
-      observacao: observacao.trim() === "" ? null : observacao.trim(),
+      ...(mudou.situacao && { situacao }),
+      ...(mudou.eloVerificado && { eloVerificado: eloVerificado === "" ? null : eloVerificado }),
+      ...(mudou.entrouNoGrupo && { entrouNoGrupo: entrouNoGrupo === "" ? null : entrouNoGrupo }),
+      ...(mudou.organizador && { organizador }),
+      ...(mudou.observacao && {
+        observacao: observacao.trim() === "" ? null : observacao.trim(),
+      }),
     });
   };
 

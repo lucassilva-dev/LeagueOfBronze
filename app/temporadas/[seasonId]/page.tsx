@@ -40,8 +40,25 @@ export default async function TemporadaDetailPage({ params }: TemporadaPageParam
   // de estatísticas e `compartilhados` os componentes que também servem o campeonato ativo.
   const { paginasRegras: t, paginasStats: ts, compartilhados: tc } = await getMessages();
   const { archived, dataset, indexes, overview } = result;
-  const endedLabel = formatDateLabel(archived.endedAtISO ?? archived.archivedAtISO);
-  const { playerRankings, champRankings } = buildStatsRows(dataset);
+  // A temporada arquivada usa os MESMOS rótulos traduzidos da página /stats. Sem eles,
+  // esta página caía nos padrões em português (`LABELS_PT`) e a data no fuso/idioma do
+  // servidor: a temporada arquivada era a única parte do site que continuava em
+  // português com o site inteiro em inglês.
+  const endedLabel = formatDateLabel(
+    archived.endedAtISO ?? archived.archivedAtISO,
+    undefined,
+    tc.localeTag,
+  );
+  const { playerRankings, champRankings } = buildStatsRows(dataset, {
+    vitoria: ts.siglaVitoria,
+    derrota: ts.siglaDerrota,
+    jogo: ts.siglaJogo,
+    pick: ts.siglaPick,
+    ban: ts.siglaBan,
+    dosJogos: ts.siglaDosJogos,
+    rotas: ts.rotas,
+    localeTag: tc.localeTag,
+  });
   const championTeamSlug = overview.championship
     ? indexes.teamsById.get(overview.championship.championTeamId)?.slug
     : undefined;
@@ -161,7 +178,16 @@ export default async function TemporadaDetailPage({ params }: TemporadaPageParam
                     </span>
                   )}
                   <div className="min-w-0">
-                    <p className="truncate font-semibold">{card.title}{def?.dupla ? t.duplaSufixo : ""}</p>
+                    {/*
+                      O nome sai do dicionário, como /cartas já faz. `card.title` vem de
+                      `calculateCardStats` fixo em português — era a única string de
+                      domínio que escapava do i18n, e com o site em inglês a seção
+                      mostrava "DRAFT SABOTADO — 3 draws", metade em cada idioma.
+                    */}
+                    <p className="truncate font-semibold">
+                      {ts.cartas[card.cardId as CardId]?.nome ?? card.title}
+                      {def?.dupla ? t.duplaSufixo : ""}
+                    </p>
                     <p className="text-xs text-muted">{card.count} {card.count === 1 ? t.sorteioSingular : t.sorteioPlural}</p>
                   </div>
                 </Card>
@@ -201,6 +227,7 @@ export default async function TemporadaDetailPage({ params }: TemporadaPageParam
 
       <RoleBests
         groups={buildRoleBests(dataset)}
+        localeTag={tc.localeTag}
         hrefBase={`/temporadas/${seasonId}/jogadores/`}
         t={{
           titulo: ts.rotaTitulo,

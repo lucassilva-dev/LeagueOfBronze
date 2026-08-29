@@ -32,10 +32,11 @@ import {
   createBlankGame,
   createBlankSeries,
   createBlankStatsRow,
+  proximaVersaoDoRascunho,
   slugifyValue,
   type MutateDraft,
 } from "@/components/admin/shared";
-import { CARD_OPTIONS } from "@/lib/cards";
+import { CARD_OPTIONS, CARDS_BY_ID } from "@/lib/cards";
 import { CHAMPIONS } from "@/lib/champions";
 import {
   Banner,
@@ -770,15 +771,17 @@ function LinhaVazia({ children }: Readonly<{ children: ReactNode }>) {
 export function AdminSeriesPanel({
   draft,
   mutateDraft,
-  onRecarregar,
+  aplicarDoServidor,
 }: Readonly<{
   draft: TournamentDataset;
   mutateDraft: MutateDraft;
-  onRecarregar: () => void;
+  /** Para o que o servidor já gravou: entra no rascunho E na baseline. */
+  aplicarDoServidor: MutateDraft;
 }>) {
-  // O sorteio ao vivo grava DIRETO no servidor, fora do rascunho. Por isso ele pede
-  // recarga ao terminar: o rascunho local não sabe do resultado, e salvar por cima
-  // cairia na trava de versão (409) — que é o certo, mas frustrante no meio do evento.
+  // O sorteio ao vivo grava DIRETO no servidor, fora do rascunho. Por isso ele DEVOLVE
+  // o que gravou (`onSorteado`): o rascunho local sincroniza só `blueSideTeamId` e
+  // `cardsUsed` e não fica velho, sem precisar da recarga que abria `window.confirm`
+  // no meio da cerimônia — e salvar depois não cai na trava de versão (409).
   const [sorteioAberto, setSorteioAberto] = useState(false);
   const sortedSeries = useMemo(
     () =>
@@ -960,9 +963,21 @@ export function AdminSeriesPanel({
     const nomeB = getTeamName(draft, selectedSeries.teamBId);
     const quandoLabel = selectedSeries.date ? ` de ${formatDateLabel(selectedSeries.date)}` : "";
     const jogos = selectedSeries.games.length;
+    // O histórico de sorteios é append-only e some junto com a série. Avisar AQUI, e não
+    // deixar a pessoa descobrir na hora de salvar: a exclusão já mexeu no rascunho, e o
+    // servidor recusa o PUT inteiro para quem não é o responsável — o painel ficava
+    // impossível de salvar, sem desfazer.
+    const sorteios = selectedSeries.sorteios?.length ?? 0;
+    const avisoSorteios =
+      sorteios > 0
+        ? `\n\nATENÇÃO: esta série tem ${sorteios} registro(s) de sorteio (com a semente que ` +
+          `permite conferir cada resultado). Eles serão perdidos, e só o responsável pelo ` +
+          `campeonato consegue salvar essa remoção.`
+        : "";
     const shouldDelete = confirmBrowserAction(
       `Excluir a série ${nomeA} x ${nomeB}${quandoLabel} (${score.teamAWins}-${score.teamBWins})?\n\n` +
-        `Isso remove ${jogos} jogo(s) lançado(s) desta série no rascunho. Não dá para desfazer.`,
+        `Isso remove ${jogos} jogo(s) lançado(s) desta série no rascunho. Não dá para desfazer.` +
+        avisoSorteios,
     );
     if (!shouldDelete) return;
     deleteSeries(selectedSeries.id);
@@ -1000,10 +1015,18 @@ export function AdminSeriesPanel({
       return;
     }
 
+    // O histórico de sorteios é guardado pelo servidor POR ID da série: trocar o id faz
+    // o registro do id antigo não ser reencontrado. O aviso antigo falava só do link.
+    const sorteiosDaSerie = selectedSeries.sorteios?.length ?? 0;
     const confirmou = confirmBrowserAction(
       `Renomear a série para "${novoId}"?\n\n` +
         `O link público muda de /partidas/${selectedSeries.id} para /partidas/${novoId}. ` +
-        `Quem tiver o link antigo salvo vai cair em página inexistente.`,
+        `Quem tiver o link antigo salvo vai cair em página inexistente.` +
+        (sorteiosDaSerie > 0
+          ? `\n\nATENÇÃO: o histórico de sorteios é guardado pelo ID da série. Os ` +
+            `${sorteiosDaSerie} registro(s) desta série serão perdidos na renomeação, e só ` +
+            `o responsável pelo campeonato consegue salvar essa mudança.`
+          : ""),
     );
     if (!confirmou) return;
 
@@ -1067,6 +1090,13 @@ export function AdminSeriesPanel({
       ) {
         delete series.walkoverWinnerTeamId;
         delete series.walkoverReason;
+      }
+
+      // O lado azul também aponta para um time e também fica órfão. Sem esta limpeza,
+      // a série trocava de time mas seguia com `blueSideTeamId` do time REMOVIDO, e a
+      // cerimônia de sorteio anunciava como lado azul alguém que não está no confronto.
+      if (series.blueSideTeamId && !times.includes(series.blueSideTeamId)) {
+        delete series.blueSideTeamId;
       }
 
       for (const game of series.games) {
@@ -2151,7 +2181,88 @@ export function AdminSeriesPanel({
         cardsUsed={selectedSeries.cardsUsed}
         podeLados
         podeCartas
-        onSorteado={onRecarregar}
+        onSorteado={({ tipo, blueSideTeamId, cardsUsed, versao, versaoLida, sorteios }) => {
+          // Aplica no rascunho exatamente o que o servidor gravou, sem recarregar:
+          // a recarga abre `window.confirm` quando há edição pendente e congelava a
+          // roda na tela projetada — e, se passasse direto, descartaria em silêncio
+          // o que o organizador estivesse editando.
+          aplicarDoServidor((next) => {
+            /*
+             * A VERSÃO acompanha — mas SÓ se o rascunho estiver na mesma versão que a
+             * rota leu antes de gravar.
+             *
+             * A rota do sorteio grava por conta própria e o `lastUpdatedISO` avança; sem
+             * copiar o novo aqui, o primeiro "Salvar" depois de um sorteio ao vivo cai
+             * sempre em 409. Mas adotar CEGO é pior do que o 409: se outra pessoa salvou
+             * depois que este painel carregou, a rota leu a versão dela, e carimbar esse
+             * número num rascunho velho faz a trava de concorrência do PUT parar de
+             * disparar — este rascunho passa na conferência e sobrescreve o trabalho da
+             * outra pessoa em silêncio, sem banner e sem desfazer.
+             *
+             * Quando não casa, a versão antiga fica: o próximo "Salvar" cai em 409 e o
+             * organizador escolhe entre recarregar e sobrescrever, que é exatamente o que
+             * a trava existe para oferecer.
+             */
+            next.tournament.lastUpdatedISO = proximaVersaoDoRascunho(
+              next.tournament.lastUpdatedISO,
+              versaoLida,
+              versao,
+            );
+
+            const serie = next.seriesMatches.find((row) => row.id === selectedSeries.id);
+            if (!serie) return;
+
+            /*
+             * O HISTÓRICO acompanha nos DOIS tipos — lados e carta acrescentam registro.
+             *
+             * Os avisos de excluir/renomear série (e o de excluir time, que arrasta as
+             * séries dele) leem `sorteios` DAQUI para prever a recusa do servidor. Sem
+             * sincronizar, um sorteio feito nesta mesma sessão não aparecia no rascunho e
+             * os avisos ficavam mudos justamente no dia de jogo: a pessoa excluía a série
+             * achando que não havia histórico e só descobria no 403, com a série já fora
+             * do rascunho e sem desfazer.
+             *
+             * Copia a lista inteira em vez de acrescentar, para não divergir de um
+             * rascunho atrasado. O campo continua sendo propriedade do servidor: o PUT o
+             * reancora a partir do que está gravado.
+             */
+            if (Array.isArray(sorteios)) {
+              serie.sorteios = sorteios as NonNullable<SeriesMatch["sorteios"]>;
+            }
+
+            /*
+             * Só o campo que ESTE sorteio mexeu.
+             *
+             * A rota responde sempre com os dois campos, inclusive o que ela não tocou —
+             * num sorteio de LADOS ela devolve o `cardsUsed` que estava no servidor. Como
+             * as cartinhas também são editáveis à mão neste painel e só chegam ao servidor
+             * no "Salvar", espelhar os dois apagava do rascunho, sem aviso e sem desfazer,
+             * as linhas que o organizador tinha acabado de montar. O caminho antigo
+             * (recarregar tudo) ao menos PERGUNTAVA antes de descartar.
+             */
+            if (tipo === "lados") {
+              if (blueSideTeamId) serie.blueSideTeamId = blueSideTeamId;
+              else delete serie.blueSideTeamId;
+            } else {
+              // `cardsUsed` chega da rede com `cardId` solto como string. Conferir contra
+              // as cartas conhecidas antes de gravar evita enfiar no rascunho um id que o
+              // schema recusaria depois, na hora de salvar.
+              const validas = cardsUsed.flatMap((uso) =>
+                uso.cardId in CARDS_BY_ID ? [{ ...uso, cardId: uso.cardId as CardId }] : [],
+              );
+              /*
+               * Lista vazia sobre campo AUSENTE tem de continuar ausente.
+               *
+               * `[]` e `undefined` são diferentes para o diff de autorização: gravar `[]`
+               * onde o servidor não tem o campo cria uma mudança `series:cards` fantasma, e
+               * quem tem só `series:sides` levava 403 ao salvar por um campo que nunca
+               * tocou — sem outra saída além da recarga que descarta o rascunho.
+               */
+              if (validas.length === 0 && serie.cardsUsed === undefined) delete serie.cardsUsed;
+              else serie.cardsUsed = validas;
+            }
+          });
+        }}
       />
 
       {(selectedSeries.cardsUsed ?? []).length === 0 ? (

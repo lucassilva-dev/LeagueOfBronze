@@ -50,7 +50,26 @@ type Props = Readonly<{
   cardsUsed?: readonly { teamId: string; cardId: string; dupla?: boolean }[];
   podeLados: boolean;
   podeCartas: boolean;
-  onSorteado: () => void;
+  /**
+   * Avisa o painel do que o servidor acabou de gravar.
+   *
+   * Recebe o resultado em vez de não receber nada de propósito: antes isto disparava
+   * uma RECARGA do rascunho, que abre um `window.confirm` quando há edição não salva.
+   * No meio da cerimônia — com a tela projetada — o diálogo trava a thread e a roda
+   * congela. Com os dois campos em mãos, o painel sincroniza só o que mudou.
+   */
+  onSorteado: (resultado: {
+    /** O que este sorteio realmente mexeu. O painel só aplica o campo correspondente. */
+    tipo: "lados" | "carta";
+    blueSideTeamId: string | null;
+    cardsUsed: { teamId: string; cardId: string; dupla?: boolean }[];
+    /** Versão nova do dataset. Sem ela o painel salva com a versão velha e leva 409. */
+    versao?: string;
+    /** Versão que a rota leu. O painel só adota `versao` se o rascunho estiver nela. */
+    versaoLida?: string;
+    /** Histórico atualizado: os avisos de exclusão/renomeação do painel dependem dele. */
+    sorteios?: unknown[];
+  }) => void;
 }>;
 
 // ---------------------------------------------------------------- contrato da rota
@@ -72,6 +91,12 @@ type RespostaSorteio = {
   cardsUsed: { teamId: string; cardId: string; dupla?: boolean }[];
   /** Quantas vezes ESTE sorteio já foi feito nesta série. 1 = primeira. */
   vezes: number;
+  /** `lastUpdatedISO` do dataset depois da gravação, para o painel não cair em 409. */
+  versao?: string;
+  /** `lastUpdatedISO` que a rota LEU antes de gravar — o painel só adota `versao` se casar. */
+  versaoLida?: string;
+  /** Histórico já com o registro deste sorteio, para o rascunho do painel acompanhar. */
+  sorteios?: unknown[];
 };
 
 type Pedido =
@@ -584,7 +609,26 @@ export function SorteioAoVivo({
     partida.current = null;
 
     const achado = itens.findIndex((item) => item.chave === resposta.sorteio.resultado);
-    const indice = achado >= 0 ? achado : 0;
+
+    const revelacaoDireta: Tela = { fase: "revelado", serieId, itens, resposta };
+
+    /*
+     * Resultado fora da roda NÃO pode virar "para na fatia 0 e finge".
+     *
+     * Aconteceria se o baralho desta tela e o do servidor divergissem — e esta é a tela
+     * PROJETADA: a roda encostaria numa carta com toda a encenação de vitória enquanto o
+     * texto anuncia outra. O `?? 0` fazia exatamente isso.
+     *
+     * Sem fatia correspondente, revela sem freio — mesma proteção que a cerimônia
+     * pública já documenta e aplica (components/series/cerimonia-de-sorteio.tsx).
+     */
+    if (achado < 0) {
+      setTransicao("none");
+      setTela(revelacaoDireta);
+      return;
+    }
+
+    const indice = achado;
     const passo = 360 / Math.max(1, itens.length);
     // Ângulo que traz o MEIO da fatia vencedora até o ponteiro, sempre girando para a
     // frente (nunca de ré) e com voltas inteiras de sobra para a freada ter curso.
@@ -682,19 +726,42 @@ export function SorteioAoVivo({
           );
         }
 
-        if (rodada.current !== minhaRodada) return;
-
         const completa: RespostaSorteio = {
           ok: true,
           sorteio: dados.sorteio,
           blueSideTeamId: dados.blueSideTeamId ?? null,
           cardsUsed: dados.cardsUsed ?? [],
           vezes: dados.vezes ?? 1,
+          versao: dados.versao,
+          versaoLida: dados.versaoLida,
+          sorteios: dados.sorteios,
         };
 
-        // O resultado já está gravado no servidor: o painel pode recarregar o rascunho
-        // enquanto a roda ainda desacelera.
-        onSorteado();
+        /*
+         * O AVISO AO PAINEL VEM ANTES DA GUARDA DE RODADA, e a ordem é o ponto.
+         *
+         * O servidor já gravou quando respondeu: lado azul, carta e o registro em
+         * `sorteios` estão no banco, aconteça o que acontecer nesta tela. Com a guarda
+         * antes, fechar a cerimônia entre o clique e a resposta (✕ ou ESC) fazia
+         * `fechar()` incrementar `rodada.current` e o `return` descartar o resultado
+         * SEM avisar o painel — e `onSorteado` é o único caminho pelo qual o rascunho
+         * aprende o que foi gravado. O painel seguia com `blueSideTeamId`/`cardsUsed`
+         * anteriores e com a versão velha do dataset.
+         *
+         * Descartar a ANIMAÇÃO de uma rodada abandonada é correto; descartar o dado já
+         * gravado não é.
+         */
+        onSorteado({
+          tipo: completa.sorteio.tipo,
+          blueSideTeamId: completa.blueSideTeamId,
+          cardsUsed: completa.cardsUsed,
+          versao: completa.versao,
+          versaoLida: completa.versaoLida,
+          sorteios: completa.sorteios,
+        });
+
+        // Daqui para baixo é só encenação — e ela sim pode ser abandonada.
+        if (rodada.current !== minhaRodada) return;
 
         const restante = reduzido ? 0 : Math.max(0, MINIMO_MS - (Date.now() - comecou));
         espera.current = setTimeout(() => {

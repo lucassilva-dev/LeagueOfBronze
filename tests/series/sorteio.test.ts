@@ -66,6 +66,62 @@ describe("o sorteio é reproduzível — é isso que o torna conferível", () =>
       ),
     ).toBe(false);
   });
+
+  it("conferir aprova a CARTA sorteada, individual e dupla, sem precisar de aviso", () => {
+    /*
+     * Quem confere meses depois tem em mãos o registro — e nada além dele. O pool
+     * duplo tem 8 cartas e o individual 6, então tomar o tipo de quem chama (que era
+     * `contexto.dupla ?? false`) fazia a conferência de um sorteio duplo legítimo
+     * devolver `false`: a ferramenta que existe para provar honestidade acusava de
+     * fraude um sorteio honesto.
+     *
+     * ⚠ SEMENTE FIXA, e não `novaSemente()`. Como `ALL_CARDS` começa com as 6 do pool
+     * individual, em ~25% das sementes o índice cai na mesma carta nos dois pools e a
+     * conferência bateria por acidente MESMO com o defeito de volta — o teste virava
+     * cara-ou-coroa. Esta semente separa os dois pools, e a asserção logo abaixo garante
+     * que ela continua separando se a tabela de cartas mudar.
+     */
+    const semente = "semente-fixa-0";
+
+    const individual = sortearCarta(semente, false);
+    expect(
+      conferirSorteio(
+        { tipo: "carta", semente, emISO: "x", autor: "y", resultado: individual },
+        { teamAId: "presas", teamBId: "lgtv" },
+      ),
+    ).toBe(true);
+
+    const duplo = sortearCarta(semente, true);
+    // A premissa que torna o caso discriminante: se os dois pools dessem a MESMA carta,
+    // conferir no pool errado passaria por coincidência e o teste não provaria nada.
+    expect(duplo).not.toBe(individual);
+    expect(
+      conferirSorteio(
+        {
+          tipo: "carta",
+          semente,
+          emISO: "x",
+          autor: "y",
+          resultado: duplo,
+          detalhe: { dupla: true },
+        },
+        { teamAId: "presas", teamBId: "lgtv" },
+      ),
+    ).toBe(true);
+  });
+
+  it("conferir REPROVA uma carta adulterada", () => {
+    const semente = novaSemente();
+    const real = sortearCarta(semente, false);
+    const outra = CARDS.find((c) => c.cardId !== real)!.cardId;
+
+    expect(
+      conferirSorteio(
+        { tipo: "carta", semente, emISO: "x", autor: "y", resultado: outra },
+        { teamAId: "presas", teamBId: "lgtv" },
+      ),
+    ).toBe(false);
+  });
 });
 
 describe("o sorteio é justo", () => {

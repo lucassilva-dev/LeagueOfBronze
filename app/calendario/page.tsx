@@ -73,7 +73,7 @@ export default async function CalendarioPage() {
               return (
               <Link key={game.id} href={`/partidas/${game.id}`} className="lob-card-2 lob-lift" style={{ padding: "16px 18px", textDecoration: "none", display: "block", background: game.done ? "linear-gradient(180deg,#15170f,#0c0d07)" : undefined, borderColor: game.done ? (game.walkover ? "rgba(232,184,120,.42)" : "rgba(95,191,106,.32)") : undefined }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 10.5, letterSpacing: ".08em", color: "#8f8472", marginBottom: 14 }}>
-                  <span>{textos.calendarioJogo} {game.n} · {turnoLabel(game.turno)}</span>
+                  <span>{textos.calendarioJogo} {game.n}{game.turno ? ` · ${turnoLabel(game.turno)}` : ""}</span>
                   {game.done ? (
                     game.walkover ? (
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 2, background: "rgba(232,184,120,.16)", border: "1px solid rgba(232,184,120,.5)", color: "#e6c592", fontWeight: 700 }}>⚖ {textos.calendarioStatusWo}</span>
@@ -81,7 +81,11 @@ export default async function CalendarioPage() {
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 2, background: "rgba(95,191,106,.16)", border: "1px solid rgba(95,191,106,.5)", color: "#8fe0a0", fontWeight: 700 }}>✓ {textos.calendarioStatusFinalizado}</span>
                     )
                   ) : (
-                    <span style={{ padding: "2px 8px", border: "1px solid rgba(201,138,75,.3)", borderRadius: 2, color: "#cfa877" }}>{game.hora}</span>
+                    // Sem horário definido não se desenha o selo: antes sobrava uma
+                    // borda com nada dentro na série ainda sem hora marcada.
+                    game.hora ? (
+                      <span style={{ padding: "2px 8px", border: "1px solid rgba(201,138,75,.3)", borderRadius: 2, color: "#cfa877" }}>{game.hora}</span>
+                    ) : null
                   )}
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 10 }}>
@@ -91,7 +95,7 @@ export default async function CalendarioPage() {
                   </div>
                   <div style={{ textAlign: "center" }}>
                     <div className="lob-display" style={{ fontSize: 22, color: played ? "#f0c88a" : "#6f6656", letterSpacing: ".08em" }}>{played ? `${game.scoreA} – ${game.scoreB}` : "—"}</div>
-                    <div style={{ fontSize: 9, letterSpacing: ".10em", color: "#5f5747", marginTop: 2 }}>{textos.formatoBo3}</div>
+                    <div style={{ fontSize: 9, letterSpacing: ".10em", color: "#5f5747", marginTop: 2 }}>{game.format === "BO5" ? textos.formatoBo5 : textos.formatoBo3}</div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, justifyContent: "flex-end" }}>
                     <span style={{ fontWeight: bWon ? 700 : 600, fontSize: 13.5, color: nameColor(bWon), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "right" }}>{game.teamB.name}</span>
@@ -137,7 +141,7 @@ export default async function CalendarioPage() {
               </div>
             </div>
             <div style={{ position: "relative", display: "flex", justifyContent: "center", gap: 9, marginTop: 18, flexWrap: "wrap" }}>
-              <span style={{ padding: "6px 13px", background: "linear-gradient(180deg,#f0c88a,#b97e40)", color: "#160f06", fontWeight: 700, fontSize: 11, letterSpacing: ".10em", borderRadius: 2 }}>{textos.calendarioFinalMelhorDe5}</span>
+              <span style={{ padding: "6px 13px", background: "linear-gradient(180deg,#f0c88a,#b97e40)", color: "#160f06", fontWeight: 700, fontSize: 11, letterSpacing: ".10em", borderRadius: 2 }}>{finalGame.format === "BO5" ? textos.calendarioFinalMelhorDe5 : textos.formatoBo3}</span>
               <span style={{ padding: "6px 13px", background: "rgba(10,8,4,.5)", border: "1px solid rgba(201,138,75,.35)", color: "#e6c592", fontSize: 11, letterSpacing: ".10em", borderRadius: 2 }}>{finalGame.hora ? `${finalGame.hora} · ` : ""}{textos.calendarioFinalConfronto}</span>
             </div>
           </Link>

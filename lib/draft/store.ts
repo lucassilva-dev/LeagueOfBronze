@@ -6,6 +6,7 @@ import { identidadeDoTime } from "@/lib/draft/times";
 import {
   impedimentosDoSorteio,
   montarDraft,
+  timeDaVez,
   type EstadoDraft,
   type JogadorDoDraft,
   type TimeDoDraft,
@@ -122,6 +123,39 @@ export async function montarDraftDosAprovados(params: {
     ...identidadeDoTime(i),
     capitaoId,
   }));
+
+  /*
+   * O orçamento também tem de fechar POR TIME, e não só na soma.
+   *
+   * `impedimentosDoSorteio`, acima, compara o total de pontos com
+   * `times × orcamentoPorTime` — o que garante que os elencos fecham na MÉDIA. Mas o
+   * capitão já entra no elenco e já custa pontos, e ele só é conhecido aqui embaixo
+   * (`escolherCapitaes` roda depois daquela checagem). Um capitão caro sozinho pode não
+   * deixar nem o mínimo de 1 ponto por vaga restante.
+   *
+   * O motor tem uma rede para isso — quando ninguém cabe, `avancarPorTempo` PAUSA em vez
+   * de travar calado —, e ela continua valendo. Mas pausar acontece ao vivo, na vez do
+   * time, com a transmissão no ar. Conferir aqui move a descoberta para a montagem, que é
+   * quando ainda dá para trocar o capitão ou subir o orçamento.
+   *
+   * A checagem fica NESTE fluxo, e não dentro de `montarDraft`: aquele é o construtor puro
+   * e precisa continuar podendo montar qualquer estado — inclusive o insustentável que os
+   * testes usam justamente para exercitar a pausa.
+   */
+  const jogadoresPorTime = config.jogadores_por_time;
+  const orcamento = config.orcamento_por_time;
+  if (jogadoresPorTime > 1) {
+    for (const time of times) {
+      const capitao = pool.find((j) => j.id === time.capitaoId);
+      if (!capitao) continue;
+      const sobra = orcamento - capitao.pontos;
+      if (sobra < jogadoresPorTime - 1) {
+        throw new ErroDeRegra(
+          `O capitão do ${time.nome} custa ${capitao.pontos} pontos e sobrariam ${sobra} para preencher ${jogadoresPorTime - 1} vaga(s) — é preciso ao menos 1 ponto por vaga. Escolha outro capitão para esse time ou suba o orçamento por time.`,
+        );
+      }
+    }
+  }
 
   return montarDraft({
     times,
@@ -266,7 +300,12 @@ export function paraPublico(estado: EstadoDraft, revisao: number): DraftPublico 
       .map((j) => ({ id: j.id, riotId: j.riotId, pontos: j.pontos, rota1: j.rota1, rota2: j.rota2, elo: j.elo })),
     escolhaAtual: estado.escolhaAtual,
     totalEscolhas: estado.ordem.length,
-    timeDaVezId: estado.ordem[estado.escolhaAtual] ?? null,
+    // `timeDaVez` do motor, e não a indexação crua da ordem: o motor devolve null fora de
+    // "rodando"/"pausado", enquanto indexar direto continua apontando um time em
+    // "preparando" e em "encerrado". A visão pública e a autorização precisam responder a
+    // mesma coisa — senão a transmissão anuncia "vez do time X" num draft que ainda não
+    // começou, e cada tela nova teria de lembrar de reconferir a fase por conta própria.
+    timeDaVezId: timeDaVez(estado),
     prazoISO: estado.prazoISO,
     orcamentoPorTime: estado.orcamentoPorTime,
     jogadoresPorTime: estado.jogadoresPorTime,

@@ -194,3 +194,115 @@ describe("autorização por permissão", () => {
     expect(authorizeDatasetChange(soCartas, base, mexeJogador).ok).toBe(false);
   });
 });
+
+/**
+ * Campos que não guardam o resultado, mas decidem se um resultado JÁ REGISTRADO conta.
+ *
+ * `stage` tira a série da fase regular; `format` muda quantas vitórias fecham a série (um
+ * 2-0 vira "sem vencedor" ao virar MD5); `teamAId`/`teamBId` reatribuem a campanha. Numa
+ * série que já tem resultado, mexer neles some com o resultado da tabela pública — o mesmo
+ * efeito de apagar a série, que exige `results:write`.
+ *
+ * Os testes vêm em PAR de propósito. Só o caso negativo (série com resultado) passaria
+ * verde mesmo com o defeito de volta se alguém escrevesse o positivo errado; e só o
+ * positivo (série vazia) não prova nada. É preciso provar que o escopo muda COM o conteúdo.
+ */
+describe("campos de série que decidem o resultado", () => {
+  const comResultado = () => base.seriesMatches.find((s) => s.games.length > 0)!;
+
+  /*
+   * A série vazia é CONSTRUÍDA, não procurada.
+   *
+   * `leagueofbronze.json` não tem nenhuma série sem jogos, então a versão anterior deste
+   * helper devolvia `undefined` e os dois testes do caso positivo saíam por um `return`
+   * silencioso: vitest os contava como verdes sem ter asserido nada. Metade do par que
+   * existe justamente para provar que o escopo muda COM o conteúdo não provava nada.
+   */
+  const ID_VAZIA = "serie-vazia-de-teste";
+  const comSerieVazia = () => {
+    const copia = clone(base);
+    const modelo = comResultado();
+    copia.seriesMatches.push({
+      ...clone(base).seriesMatches.find((s) => s.id === modelo.id)!,
+      id: ID_VAZIA,
+      games: [],
+      stage: "REGULAR_SEASON",
+      format: "BO3",
+    });
+    delete copia.seriesMatches.find((s) => s.id === ID_VAZIA)!.walkoverWinnerTeamId;
+    delete copia.seriesMatches.find((s) => s.id === ID_VAZIA)!.sorteios;
+    return copia;
+  };
+
+  const trocar = (id: string, campo: string, valor: unknown) => {
+    const depois = clone(base);
+    const alvo = depois.seriesMatches.find((s) => s.id === id)!;
+    (alvo as unknown as Record<string, unknown>)[campo] = valor;
+    return depois;
+  };
+
+  for (const [campo, valor] of [
+    ["stage", "FINAL"],
+    ["format", "BO5"],
+  ] as const) {
+    it(`mudar ${campo} numa série COM resultado exige results:write`, () => {
+      const serie = comResultado();
+      const depois = trocar(serie.id, campo, valor);
+
+      expect(escoposDe(base, depois)).toContain("results:write");
+      expect(authorizeDatasetChange(usuario(["series:manage"]), base, depois).ok).toBe(false);
+    });
+
+    it(`mudar ${campo} numa série VAZIA continua sendo series:manage`, () => {
+      // A série vazia entra no "antes" E no "depois": o que se mede é só a troca do campo.
+      const antes = comSerieVazia();
+      const depois = clone(antes);
+      const alvo = depois.seriesMatches.find((s) => s.id === ID_VAZIA)!;
+      (alvo as unknown as Record<string, unknown>)[campo] = valor;
+
+      expect(escoposDe(antes, depois)).toEqual(["series:manage"]);
+      expect(authorizeDatasetChange(usuario(["series:manage"]), antes, depois).ok).toBe(true);
+    });
+  }
+
+  it("trocar um dos times de uma série COM resultado exige results:write", () => {
+    const serie = comResultado();
+    const outro = base.teams.find((t) => t.id !== serie.teamAId && t.id !== serie.teamBId)!;
+    const depois = trocar(serie.id, "teamAId", outro.id);
+
+    expect(escoposDe(base, depois)).toContain("results:write");
+    expect(authorizeDatasetChange(usuario(["series:manage"]), base, depois).ok).toBe(false);
+  });
+
+  it("esvaziar os jogos E trocar o stage no MESMO envio não escapa", () => {
+    /*
+     * O predicado olha os DOIS lados: o lado anterior tinha resultado, então o `stage`
+     * continua exigindo `results:write` mesmo com o lado novo já vazio.
+     *
+     * A asserção é sobre a MUDANÇA DE `stage` especificamente, e não sobre o `ok` geral:
+     * esvaziar `games` já exige `results:write` por si só, então um
+     * `expect(...ok).toBe(false)` passaria verde mesmo com esta correção inteira
+     * desligada — mediria o campo errado.
+     */
+    const serie = comResultado();
+    const depois = clone(base);
+    const alvo = depois.seriesMatches.find((s) => s.id === serie.id)!;
+    alvo.games = [];
+    alvo.stage = "FINAL";
+
+    const doStage = diffDatasetForScopes(base, depois).find((m) => m.path.endsWith(".stage"));
+
+    expect(doStage).toBeDefined();
+    expect(doStage!.scope).toBe("results:write");
+    expect(authorizeDatasetChange(usuario(["series:manage"]), base, depois).ok).toBe(false);
+  });
+
+  it("quem tem results:write junto continua conseguindo", () => {
+    const serie = comResultado();
+    const depois = trocar(serie.id, "stage", "FINAL");
+
+    expect(
+      authorizeDatasetChange(usuario(["series:manage", "results:write"]), base, depois).ok,
+    ).toBe(true);
+  });
+});

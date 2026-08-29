@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 
+import { resolveRole } from "@/lib/design";
 import type { Messages } from "@/lib/i18n/messages";
 
 /**
@@ -15,6 +16,24 @@ import type { Messages } from "@/lib/i18n/messages";
  */
 
 type Rotulos = Messages["inscricao"];
+
+/**
+ * Traduz a rota gravada na ficha.
+ *
+ * O banco guarda a chave canônica (`TOP`, `JUNG`, `MID`, `ADC`, `SUP` — ver
+ * `rotaCanonica`), mas o dicionário desta área é indexado pelos nomes em português
+ * (`TOPO`, `SELVA`, `MEIO`, …). Indexar um pelo outro nunca casava, então TODA ficha
+ * caía no valor cru e esta tela mostrava "TOP · JUNG" — inclusive no site em inglês.
+ *
+ * Os dois lados são aliases da MESMA rota, então casamos pela forma canônica em vez
+ * de manter um segundo mapa, que sairia do ar na primeira rota nova.
+ */
+function rotuloDaRota(chaveDoBanco: string, rotas: Record<string, string>) {
+  const canonica = resolveRole(chaveDoBanco).key;
+  if (!canonica) return chaveDoBanco;
+  const equivalente = Object.keys(rotas).find((chave) => resolveRole(chave).key === canonica);
+  return equivalente ? rotas[equivalente] : chaveDoBanco;
+}
 
 type Conferencia = { item: string; estado: string; observacao: string | null };
 type MinhaInscricao = {
@@ -119,15 +138,27 @@ export default function MinhaInscricaoCliente({ t }: Readonly<{ t: Rotulos }>) {
   }, [carregar]);
 
   async function avisarPagamento() {
+    // O try/finally não é enfeite: sem ele, uma falha de rede fazia o `fetch` rejeitar,
+    // o `setAvisando(false)` nunca rodava e o botão "JÁ PAGUEI" ficava desabilitado
+    // para sempre — a pessoa avisava o pagamento uma vez e não conseguia nunca mais,
+    // sem nenhuma mensagem na tela dizendo por quê.
     setAvisando(true);
-    const r = await fetch("/api/inscricao/pagamento", { method: "POST" });
-    setAvisando(false);
-    if (r.ok) {
-      await carregar();
-      return;
+    try {
+      const r = await fetch("/api/inscricao/pagamento", {
+        method: "POST",
+        signal: AbortSignal.timeout(15000),
+      });
+      if (r.ok) {
+        await carregar();
+        return;
+      }
+      const corpo = (await r.json().catch(() => ({}))) as { error?: string };
+      setErro(corpo.error ?? t.erroGenerico);
+    } catch {
+      setErro(t.erroGenerico);
+    } finally {
+      setAvisando(false);
     }
-    const corpo = (await r.json().catch(() => ({}))) as { error?: string };
-    setErro(corpo.error ?? t.erroGenerico);
   }
 
   if (carregando) {
@@ -167,8 +198,7 @@ export default function MinhaInscricaoCliente({ t }: Readonly<{ t: Rotulos }>) {
           <div>
             <div className="lob-display" style={{ fontSize: 24, color: "var(--lob-text)" }}>{i.riotId}</div>
             <div style={{ marginTop: 4, fontSize: 13, color: "var(--lob-muted)" }}>
-              {[i.elo, t.rotas[i.rotaPrimaria as keyof typeof t.rotas] ?? i.rotaPrimaria,
-                t.rotas[i.rotaSecundaria as keyof typeof t.rotas] ?? i.rotaSecundaria]
+              {[i.elo, rotuloDaRota(i.rotaPrimaria, t.rotas), rotuloDaRota(i.rotaSecundaria, t.rotas)]
                 .filter(Boolean)
                 .join(" · ")}
             </div>

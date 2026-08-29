@@ -130,6 +130,7 @@ export const compartilhados = definir({
     turnos: {
       Matutino: "Matutino",
       Vespertino: "Vespertino",
+      Noturno: "Noturno",
     } as Record<string, string>,
     /** Tag de idioma para formatar datas e horas (lib/format.ts). */
     localeTag: "pt-BR" as LocaleTag,
@@ -237,6 +238,8 @@ export const compartilhados = definir({
     turnos: {
       Matutino: "Morning",
       Vespertino: "Afternoon",
+      // Mesmo termo já usado em `calendarioTurnoNoturno` (paginas-competicao).
+      Noturno: "Evening",
     } as Record<string, string>,
     localeTag: "en-US" as LocaleTag,
   },

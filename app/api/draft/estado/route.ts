@@ -37,16 +37,30 @@ export async function GET(request: NextRequest) {
     const agora = Date.now();
     const alcancado = alcancarORelogio(estado, agora);
 
-    // Se o relógio andou e a gravação pegou, a revisão avançou uma; se não pegou,
-    // outra sondagem gravou e a nossa leitura ficou velha — nos dois casos o número
-    // que descreve o estado devolvido é `revisao + 1`.
+    // Se o relógio andou e a gravação pegou, a revisão avançou uma.
+    //
+    // Se NÃO pegou, quem gravou no meio do caminho pode ter sido:
+    //  - outra sondagem, que aplicou o MESMO auto-pick (o motor é determinístico); ou
+    //  - um POST de capitão (`/api/draft/escolha`) ou uma ação do admin, que gravou um
+    //    estado DIFERENTE — e com o mesmo número `revisao + 1`.
+    //
+    // No segundo caso, devolver o nosso estado local rotulado como `revisao + 1` faz a
+    // transmissão anunciar uma escolha automática que nunca existiu, e a escolha real
+    // nunca é revelada (o histórico tem o mesmo tamanho, então o efeito de revelação
+    // não dispara). Por isso a releitura: nunca devolver estado que não está no banco.
     let revisaoAtual = revisao;
+    let estadoFinal = alcancado;
     if (alcancado !== estado) {
-      // Perder a corrida aqui é normal: significa que outra sondagem já virou a
-      // escolha. O estado que devolvemos abaixo continua correto porque foi calculado
-      // do mesmo histórico — quem escolhe é o motor, não o acaso de quem chegou antes.
-      await salvarDraftSeIntacto(alcancado, revisao);
-      revisaoAtual = revisao + 1;
+      const gravou = await salvarDraftSeIntacto(alcancado, revisao);
+      if (gravou) {
+        revisaoAtual = revisao + 1;
+      } else {
+        const fresco = await lerDraftCompleto();
+        if (fresco.estado) {
+          estadoFinal = fresco.estado;
+          revisaoAtual = fresco.revisao;
+        }
+      }
     }
 
     // Quem está logado e é capitão recebe o id do time dele — é o que faz o painel
@@ -57,10 +71,10 @@ export async function GET(request: NextRequest) {
 
     if (identidade) {
       const inscricaoId = await inscricaoIdDoJogador(identidade.id);
-      if (inscricaoId) souCapitaoDe = timeDoCapitao(alcancado, inscricaoId);
+      if (inscricaoId) souCapitaoDe = timeDoCapitao(estadoFinal, inscricaoId);
     }
 
-    const resposta = NextResponse.json({ draft: paraPublico(alcancado, revisaoAtual), souCapitaoDe });
+    const resposta = NextResponse.json({ draft: paraPublico(estadoFinal, revisaoAtual), souCapitaoDe });
     resposta.headers.set("Cache-Control", "no-store");
     return resposta;
   } catch (error) {

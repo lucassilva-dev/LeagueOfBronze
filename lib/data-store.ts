@@ -286,7 +286,13 @@ async function readSupabaseDataset(): Promise<TournamentDataset> {
 
   try {
     const dataset = parseAndValidateDataset(row.payload);
-    lastGoodDataset = dataset;
+    // A cópia de emergência guarda um CLONE, e não a mesma instância que sai daqui.
+    // Rotas que editam um pedaço do dataset (cartas, lados) fazem
+    // `const d = await readDataset(); serie.x = ...` — mutando o objeto devolvido.
+    // Sendo a mesma instância, isso reescrevia a última cópia boa por tabela; se a
+    // gravação seguinte falhasse, o fallback passava a servir um estado que nunca
+    // existiu no banco, e ninguém teria como perceber.
+    lastGoodDataset = structuredClone(dataset);
     return dataset;
   } catch (error) {
     const detail = error instanceof Error ? error.message.replace(/^Validação falhou:\s*/i, "") : String(error);
@@ -340,7 +346,8 @@ export async function saveDataset(input: unknown): Promise<TournamentDataset> {
     await saveLocalDataset(dataset);
   }
 
-  lastGoodDataset = dataset;
+  // Mesmo motivo da leitura: quem recebe o dataset salvo pode mexer nele em seguida.
+  lastGoodDataset = structuredClone(dataset);
   return dataset;
 }
 
@@ -386,9 +393,22 @@ export async function importDatasetFromText(raw: string) {
 export async function endCurrentTournament(): Promise<TournamentDataset> {
   const current = await readDataset();
 
-  if (current.tournament.status === "finished") {
-    throw new ErroDeRegra("A temporada atual já está encerrada.");
-  }
+  /*
+   * ENCERRAR É IDEMPOTENTE: encerrar de novo REFAZ o retrato arquivado.
+   *
+   * Encerrar não tranca a edição — o dataset continua gravável pelo painel depois. Então
+   * o caminho normal "encerrei, e só aí percebi um placar errado" deixava o arquivo
+   * eternamente desatualizado: a correção entrava no dataset vivo, mas o retrato de
+   * `archivedSeasons` continuava com o número errado, e reencerrar para atualizá-lo
+   * estourava "a temporada já está encerrada". Como depois da virada esse retrato é o
+   * ÚNICO exemplar da temporada, o erro ficava congelado para sempre na página pública
+   * da temporada arquivada.
+   *
+   * O `filter` mais abaixo já substitui a entrada de mesmo `seasonId`, então refazer é
+   * só deixar passar. `endedAtISO` é PRESERVADO: a data em que a temporada acabou não
+   * muda porque alguém corrigiu um placar depois.
+   */
+  const jaEncerrada = current.tournament.status === "finished";
 
   const now = new Date().toISOString();
   const seasonId = current.tournament.seasonId ?? `season-${now.replace(/[:.]/g, "-")}`;
@@ -405,7 +425,8 @@ export async function endCurrentTournament(): Promise<TournamentDataset> {
     tournament: {
       ...currentWithId.tournament,
       status: "finished",
-      endedAtISO: now,
+      // Reencerrar não reescreve a data do fim — só o retrato.
+      endedAtISO: jaEncerrada ? (currentWithId.tournament.endedAtISO ?? now) : now,
     },
     archivedSeasons: [
       ...current.archivedSeasons.filter((season) => season.seasonId !== seasonId),

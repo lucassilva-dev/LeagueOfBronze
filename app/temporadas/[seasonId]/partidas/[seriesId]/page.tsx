@@ -44,7 +44,7 @@ export default async function TemporadaPartidaPage({ params }: PageParams) {
   const result = await getServerArchivedSeason(seasonId);
   if (!result) notFound();
 
-  const { paginasRegras: t, compartilhados: tc } = await getMessages();
+  const { paginasRegras: t, compartilhados: tc, paginasStats: ts } = await getMessages();
   const { archived, dataset, indexes } = result;
   const series = getSeriesById(dataset, seriesId);
   if (!series) notFound();
@@ -136,7 +136,13 @@ export default async function TemporadaPartidaPage({ params }: PageParams) {
           <div className="mt-2 flex flex-wrap gap-2">
             {cards.map((card, i) => (
               <Badge key={`${card.teamId}-${card.cardId}-${i}`} variant="outline">
-                {(indexes.teamsById.get(card.teamId)?.name ?? card.teamId)}: {getCardTitle(card.cardId as CardId)}
+                {(indexes.teamsById.get(card.teamId)?.name ?? card.teamId)}:{" "}
+                {/*
+                  O nome da carta sai do dicionário, como /cartas e a página-mãe da
+                  temporada já fazem. `getCardTitle` devolve o título fixo em português,
+                  e com o site em inglês a etiqueta ficava metade em cada idioma.
+                */}
+                {ts.cartas[card.cardId as CardId]?.nome ?? getCardTitle(card.cardId as CardId)}
                 {card.dupla ? t.duplaSufixo : ""}
               </Badge>
             ))}

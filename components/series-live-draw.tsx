@@ -126,6 +126,7 @@ export function SeriesLiveDraw({
   teamB,
   initialCards,
   initialBlueSideTeamId,
+  initialUltimoCarta,
   textos: t = compartilhados.pt,
   nomesCartas,
 }: Readonly<{
@@ -134,6 +135,19 @@ export function SeriesLiveDraw({
   teamB: TeamRef | null;
   initialCards: Drawn[];
   initialBlueSideTeamId?: string | null;
+  /**
+   * O último sorteio de CARTA já gravado nesta série.
+   *
+   * As letras do ABCDRAFT e a linha de procedência (semente e autor) vinham só da
+   * resposta da cerimônia, então existiam apenas na aba de quem clicou: qualquer recarga
+   * — ou qualquer outra pessoa abrindo a página — via a carta sem as letras que a
+   * completam e sem a semente que permite conferir o sorteio. Justamente a informação que
+   * torna o resultado auditável era a que não sobrevivia.
+   *
+   * É o último sorteio de CARTA, e não o último de qualquer tipo: se o último tivesse
+   * sido de lados, a seção de cartinhas passaria a exibir a semente do sorteio de lados.
+   */
+  initialUltimoCarta?: Sorteio | null;
   textos?: TextosSorteio;
   /** Nome de cada cartinha por id, traduzido. Opcional: sem ele vale lib/cards.ts (pt). */
   nomesCartas?: Record<string, string>;
@@ -149,7 +163,7 @@ export function SeriesLiveDraw({
     return map;
   });
   const [isDupla, setIsDupla] = useState(() => initialCards.some((card) => card.dupla));
-  const [ultimo, setUltimo] = useState<Sorteio | null>(null);
+  const [ultimo, setUltimo] = useState<Sorteio | null>(initialUltimoCarta ?? null);
   const [pedido, setPedido] = useState<PedidoDeSorteio | null>(null);
   /*
    * Conta os cliques só para servir de `key` à cerimônia.
@@ -191,7 +205,12 @@ export function SeriesLiveDraw({
    */
   const aplicarResposta = useCallback(
     (resposta: RespostaSorteio) => {
-      if (resposta.sorteio) setUltimo(resposta.sorteio);
+      // Só sorteio de CARTA entra em `ultimo`: ele alimenta as letras do ABCDRAFT e a
+      // linha de semente/autor da seção de cartinhas. Carimbar um sorteio de LADOS ali
+      // fazia a seção de cartas exibir a semente e o autor do sorteio de lados — e some
+      // com as letras da carta que continua na tela. É a mesma escolha que
+      // `initialUltimoCarta` já faz ao hidratar do servidor.
+      if (resposta.sorteio && resposta.sorteio.tipo !== "lados") setUltimo(resposta.sorteio);
 
       if (resposta.sorteio?.tipo === "lados") {
         setBlueSideTeamId(resposta.blueSideTeamId ?? null);

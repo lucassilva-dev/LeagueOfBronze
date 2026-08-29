@@ -1,5 +1,6 @@
 import type { ChampStatRow, PlayerStatRow } from "@/components/lob/stats-toggles";
 import type { TournamentDataset } from "@/lib/schema";
+import { formatKda } from "@/lib/format";
 import { buildDesignPlayers } from "@/lib/roster";
 import {
   buildChampionLeaderboards,
@@ -99,6 +100,13 @@ export type StatsRowLabels = {
   dosJogos: string;
   /** Rótulo da rota pela sigla do design system (TOP, SEL, MID, ADC, SUP). */
   rotas?: Record<string, string>;
+  /**
+   * Tag de idioma para os números. Sem ela o KDA saía de `toFixed(2)`, que é sempre
+   * ponto decimal, enquanto os cards da MESMA página usam `formatKda` (vírgula em
+   * pt-BR): o mesmo jogador com o mesmo número aparecia "5,19" no card e "5.19" na
+   * tabela logo abaixo.
+   */
+  localeTag?: string;
 };
 
 const LABELS_PT: StatsRowLabels = {
@@ -144,7 +152,7 @@ export function buildStatsRows(
 
   const playerRankings: Record<string, PlayerStatRow[]> = {
     abates: pboards.kills.map((r) => toRow(r, String(r.value))),
-    kda: pboards.kda.map((r) => toRow(r, r.value.toFixed(2))),
+    kda: pboards.kda.map((r) => toRow(r, formatKda(r.value, labels.localeTag))),
     mvps: pboards.mvps.map((r) => toRow(r, String(r.value))),
     assist: pboards.assists.map((r) => toRow(r, String(r.value))),
     mortes: pboards.deathsLeast.map((r) => toRow(r, String(r.value))),
@@ -156,7 +164,7 @@ export function buildStatsRows(
     banidos: cboards.bans.map((r) => ({ rank: r.position, championId: r.champion.championId, championName: r.champion.championName, valueLabel: `${r.value}×`, sub: `${Math.round(r.champion.banRate)}% ${labels.dosJogos}` })),
     presenca: cboards.presence.map((r) => ({ rank: r.position, championId: r.champion.championId, championName: r.champion.championName, valueLabel: `${Math.round(r.value)}%`, sub: `${r.champion.picks}${labels.pick} · ${r.champion.bans}${labels.ban}` })),
     winrate: cboards.winRate.map((r) => ({ rank: r.position, championId: r.champion.championId, championName: r.champion.championName, valueLabel: `${Math.round(r.value)}%`, sub: `${r.champion.wins}${labels.vitoria}/${r.champion.games}${labels.jogo}` })),
-    kda: cboards.kda.map((r) => ({ rank: r.position, championId: r.champion.championId, championName: r.champion.championName, valueLabel: r.value.toFixed(2), sub: `${r.champion.kills}/${r.champion.deaths}/${r.champion.assists}` })),
+    kda: cboards.kda.map((r) => ({ rank: r.position, championId: r.champion.championId, championName: r.champion.championName, valueLabel: formatKda(r.value, labels.localeTag), sub: `${r.champion.kills}/${r.champion.deaths}/${r.champion.assists}` })),
   };
 
   return { playerRankings, champRankings };

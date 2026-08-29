@@ -169,7 +169,16 @@ export function JogadoresClient({
     list.push(player);
     byRole.set(player.roleMeta.short, list);
   }
-  const sections = ROLE_ORDER.map((short) => {
+  /*
+   * As rotas conhecidas vêm primeiro, na ordem do design; o que sobrar vem depois.
+   *
+   * A segunda parte não é enfeite: `resolveRole` devolve um fallback com `short: "—"`
+   * para rota vazia ou não reconhecida, e esse valor não está em ROLE_ORDER. Percorrer
+   * só ROLE_ORDER fazia esses jogadores SUMIREM da página — enquanto a pílula do topo
+   * continuava contando todos os inscritos. O número dizia 30 e a página mostrava 29,
+   * sem nenhum caminho para chegar no que faltava.
+   */
+  const montarSecao = (short: string) => {
     const list = (byRole.get(short) ?? []).slice().sort((a, b) => b.pts - a.pts);
     if (list.length === 0) return null;
     return {
@@ -178,7 +187,12 @@ export function JogadoresClient({
       color: list[0].roleMeta.color,
       players: list,
     };
-  }).filter((section): section is NonNullable<typeof section> => section !== null);
+  };
+
+  const sobras = [...byRole.keys()].filter((short) => !ROLE_ORDER.includes(short)).sort();
+  const sections = [...ROLE_ORDER, ...sobras]
+    .map(montarSecao)
+    .filter((section): section is NonNullable<typeof section> => section !== null);
 
   return (
     <>

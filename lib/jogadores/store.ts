@@ -205,18 +205,33 @@ export async function contarTentativasJogador(
   const janela = new Date(Date.now() - 15 * 60 * 1000).toISOString();
   const janelaConfianca = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
+  /*
+   * Mesma regra do login da organização (ver `getRecentAttemptCounts`): tentativa
+   * RECUSADA pelo limitador fica gravada, mas não conta como falha. Sem isso o
+   * bloqueio se auto-prorroga — cada retentativa entra na janela de 15 minutos e a
+   * empurra para a frente, e o bloqueio por IP não tem a válvula do
+   * `ipHadRecentSuccess`.
+   *
+   * Aqui o estrago é maior do que no painel: quem fica trancado é um CAPITÃO, e um
+   * capitão que não consegue entrar durante o draft perde todas as escolhas dele
+   * para o cronômetro.
+   */
+  const naoContaComoFalha = ["ip_bloqueado", "usuario_bloqueado"];
+
   const [porIp, porEmail, sucessoConhecido] = await Promise.all([
     cliente
       .from("jogador_login_attempts")
       .select("id", { count: "exact", head: true })
       .eq("ip_hash", ipHash)
       .eq("success", false)
+      .notIn("reason", naoContaComoFalha)
       .gte("occurred_at", janela),
     cliente
       .from("jogador_login_attempts")
       .select("id", { count: "exact", head: true })
       .eq("email", email)
       .eq("success", false)
+      .notIn("reason", naoContaComoFalha)
       .gte("occurred_at", janela),
     cliente
       .from("jogador_login_attempts")
@@ -225,6 +240,16 @@ export async function contarTentativasJogador(
       .eq("success", true)
       .gte("occurred_at", janelaConfianca),
   ]);
+
+  /*
+   * FALHA FECHADA, pelo mesmo motivo de `getRecentAttemptCounts`: com o erro ignorado,
+   * um `count` nulo virava `0` e o limitador liberava toda tentativa — o freio de força
+   * bruta do login dos jogadores desligado em silêncio.
+   */
+  const falha = porIp.error ?? porEmail.error ?? sucessoConhecido.error;
+  if (falha) {
+    throw new Error(`Falha ao conferir as tentativas de login: ${falha.message}`);
+  }
 
   return {
     failuresByIp: porIp.count ?? 0,

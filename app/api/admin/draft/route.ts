@@ -136,7 +136,27 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        await saveDataset({ ...dataset, teams: resultado.teams, players: resultado.players });
+        /*
+         * `standingsSeed` NÃO pode ser herdada da composição anterior.
+         *
+         * A virada substitui o conjunto inteiro de times, então cada linha da
+         * classificação inicial passava a apontar para um `teamId` que não existe mais.
+         * A trava acima só cobre `seriesMatches`; a semente ficava de fora e viajava
+         * intacta para a edição nova, alimentando a tabela com times fantasmas.
+         *
+         * Filtrar (em vez de zerar) mantém o caso legítimo de uma semente que já foi
+         * escrita com os times novos.
+         */
+        const semente = dataset.standingsSeed.filter((linha) =>
+          resultado.teams.some((time) => time.id === linha.teamId),
+        );
+
+        await saveDataset({
+          ...dataset,
+          teams: resultado.teams,
+          players: resultado.players,
+          standingsSeed: semente,
+        });
 
         await registrarAuditoria({
           autor,

@@ -32,6 +32,55 @@ const SERIES_FIELD_SCOPE: Record<string, Scope> = {
 };
 const SERIES_DEFAULT_SCOPE: Scope = "series:manage";
 
+/**
+ * Campos que NÃO guardam o resultado, mas decidem se um resultado já registrado conta.
+ *
+ * `stage` tira a série da fase regular (`getStandingsSeries` só soma
+ * `isRegularSeasonSeries`); `format` muda quantas vitórias fecham a série
+ * (`getSeriesTargetWins`), e um 2-0 vira "sem vencedor" ao virar MD5; `teamAId`/`teamBId`
+ * reatribuem a campanha inteira para outro time.
+ *
+ * Numa série que JÁ TEM resultado, mexer neles produz na tabela pública o mesmo efeito de
+ * apagar o resultado — e apagar exige `results:write`. Sem isto, quem tem apenas
+ * `series:manage` conseguia sumir com um 2-0 da classificação trocando uma letra, driblando
+ * a permissão granular. É o mesmo furo que `escoposDoItem` fechou no add/remove,
+ * sobrevivendo pelo ramo de update.
+ *
+ * Em série VAZIA continuam em `series:manage`: montar o confronto e marcar a final antes de
+ * ela acontecer é justamente o trabalho de quem administra as séries.
+ */
+const SERIES_CAMPOS_QUE_DECIDEM_RESULTADO = new Set(["stage", "format", "teamAId", "teamBId"]);
+
+/** O que o item era e o que passou a ser — o escopo pode depender do conteúdo. */
+type ContextoDoItem = { anterior?: ComChave; depois?: ComChave };
+type EscopoDoCampo = (campo: string, contexto: ContextoDoItem) => Scope;
+
+/** Série com resultado lançado: jogos registrados ou W.O. */
+function serieTemResultado(serie?: ComChave): boolean {
+  if (!serie) return false;
+  if (Array.isArray(serie.games) && serie.games.length > 0) return true;
+  return campoPreenchido(serie.walkoverWinnerTeamId);
+}
+
+/**
+ * O escopo de um campo de série. Olha os DOIS lados: um PUT que ao mesmo tempo esvazia
+ * `games` e troca `stage` continua exigindo `results:write`, porque o lado anterior tinha
+ * resultado.
+ */
+function escopoDeCampoDeSerie(campo: string, contexto: ContextoDoItem): Scope {
+  const proprio = SERIES_FIELD_SCOPE[campo];
+  if (proprio) return proprio;
+
+  if (
+    SERIES_CAMPOS_QUE_DECIDEM_RESULTADO.has(campo) &&
+    (serieTemResultado(contexto.anterior) || serieTemResultado(contexto.depois))
+  ) {
+    return "results:write";
+  }
+
+  return SERIES_DEFAULT_SCOPE;
+}
+
 /** JSON com chaves ordenadas: comparação estável independente da ordem dos campos. */
 function stable(value: unknown): string {
   return JSON.stringify(ordenar(value));
@@ -93,11 +142,12 @@ function campoPreenchido(valor: unknown): boolean {
  */
 function escoposDoItem<T extends ComChave>(
   item: T,
-  escopoDoCampo: (campo: string) => Scope,
+  escopoDoCampo: EscopoDoCampo,
+  contexto: ContextoDoItem,
 ): Scope[] {
-  const escopos = new Set<Scope>([escopoDoCampo("__base__")]);
+  const escopos = new Set<Scope>([escopoDoCampo("__base__", contexto)]);
   for (const [campo, valor] of Object.entries(item)) {
-    if (campoPreenchido(valor)) escopos.add(escopoDoCampo(campo));
+    if (campoPreenchido(valor)) escopos.add(escopoDoCampo(campo, contexto));
   }
   return [...escopos];
 }
@@ -107,7 +157,7 @@ function diffLista<T extends ComChave>(
   depois: readonly T[],
   chave: string,
   caminho: string,
-  escopoDoCampo: (campo: string) => Scope,
+  escopoDoCampo: EscopoDoCampo,
 ): DatasetChange[] {
   const mudancas: DatasetChange[] = [];
   const mapaAntes = indexar(antes, chave);
@@ -115,7 +165,7 @@ function diffLista<T extends ComChave>(
 
   for (const [id, anterior] of mapaAntes) {
     if (!mapaDepois.has(id)) {
-      for (const scope of escoposDoItem(anterior, escopoDoCampo)) {
+      for (const scope of escoposDoItem(anterior, escopoDoCampo, { anterior })) {
         mudancas.push({ scope, path: `${caminho}[${id}]`, kind: "remove" });
       }
     }
@@ -123,7 +173,7 @@ function diffLista<T extends ComChave>(
   for (const [id, item] of mapaDepois) {
     const anterior = mapaAntes.get(id);
     if (!anterior) {
-      for (const scope of escoposDoItem(item, escopoDoCampo)) {
+      for (const scope of escoposDoItem(item, escopoDoCampo, { depois: item })) {
         mudancas.push({ scope, path: `${caminho}[${id}]`, kind: "add" });
       }
       continue;
@@ -131,7 +181,11 @@ function diffLista<T extends ComChave>(
     const campos = new Set([...Object.keys(anterior), ...Object.keys(item)]);
     for (const campo of campos) {
       if (stable(anterior[campo]) !== stable(item[campo])) {
-        mudancas.push({ scope: escopoDoCampo(campo), path: `${caminho}[${id}].${campo}`, kind: "update" });
+        mudancas.push({
+          scope: escopoDoCampo(campo, { anterior, depois: item }),
+          path: `${caminho}[${id}].${campo}`,
+          kind: "update",
+        });
       }
     }
   }
@@ -171,7 +225,7 @@ export function diffDatasetForScopes(
       b.seriesMatches as ComChave[],
       "id",
       "seriesMatches",
-      (campo) => SERIES_FIELD_SCOPE[campo] ?? SERIES_DEFAULT_SCOPE,
+      escopoDeCampoDeSerie,
     ),
   );
 

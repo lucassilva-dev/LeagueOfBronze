@@ -51,6 +51,9 @@ export default async function EstatisticasPage() {
   const { dataset } = await getServerDataset();
   const mensagens = await getMessages();
   const t = mensagens.paginasStats;
+  // Tag de idioma para os números (KDA): sem ela os rankings saíam sempre com o
+  // separador decimal do português, divergindo dos cards da mesma página.
+  const tc = mensagens.compartilhados;
   const conf = mensagens.conformidade;
   const players = buildDesignPlayers(dataset);
   const teams = buildDesignTeams(dataset);
@@ -86,6 +89,7 @@ export default async function EstatisticasPage() {
     ban: t.siglaBan,
     dosJogos: t.siglaDosJogos,
     rotas: t.rotas,
+    localeTag: tc.localeTag,
   });
   const gameDurations = getGameDurations(dataset);
 
@@ -152,6 +156,7 @@ export default async function EstatisticasPage() {
 
       <RoleBests
         groups={buildRoleBests(dataset)}
+        localeTag={tc.localeTag}
         t={{
           titulo: t.rotaTitulo,
           descricao: t.rotaDescricao,

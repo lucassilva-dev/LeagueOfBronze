@@ -6,7 +6,7 @@ import { z } from "zod";
 
 import { requireAdmin } from "@/lib/security/route-guard";
 import { readDataset, saveDataset } from "@/lib/data-store";
-import type { SeriesMatch } from "@/lib/schema";
+import { MAX_SORTEIOS_POR_SERIE, type SeriesMatch } from "@/lib/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +44,19 @@ export async function POST(request: NextRequest) {
     }
 
     const anterior = series.blueSideTeamId;
+
+    // A checagem do teto vem ANTES de qualquer mutação: recusar depois de já ter
+    // mexido em `series` deixaria a alteração pendurada no objeto em memória, que é
+    // a mesma instância guardada como última cópia boa (ver `readDataset`).
+    if (anterior !== blueSideTeamId && (series.sorteios ?? []).length >= MAX_SORTEIOS_POR_SERIE) {
+      return NextResponse.json(
+        {
+          error: `Esta série já acumulou ${MAX_SORTEIOS_POR_SERIE} registros de sorteio. Fale com a organização antes de continuar.`,
+        },
+        { status: 400 },
+      );
+    }
+
     series.blueSideTeamId = blueSideTeamId;
 
 /**
@@ -67,7 +80,21 @@ export async function POST(request: NextRequest) {
         resultado: blueSideTeamId,
       };
       if (anterior) registro.detalhe = { sobrescreveu: anterior };
-      series.sorteios = [...(series.sorteios ?? []), registro].slice(-50);
+      // Sem `.slice(-50)`: no teto esta rota recusa (acima), em vez de descartar em
+      // silêncio o registro mais antigo do histórico append-only.
+      series.sorteios = [...(series.sorteios ?? []), registro];
+    }
+
+    // Mesma trava de concorrência da rota de sorteio e da de cartas: esta rota também
+    // regrava o dataset inteiro a partir do que leu, e sem ela um sorteio de lados
+    // apagava em silêncio o que outra pessoa salvou no intervalo.
+    const versaoLida = dataset.tournament.lastUpdatedISO;
+    const conferencia = await readDataset();
+    if (conferencia.tournament.lastUpdatedISO !== versaoLida) {
+      return NextResponse.json(
+        { error: "Alguém salvou o campeonato enquanto você sorteava. Recarregue e sorteie de novo." },
+        { status: 409 },
+      );
     }
 
     const saved = await saveDataset(dataset);

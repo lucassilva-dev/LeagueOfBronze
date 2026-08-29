@@ -469,7 +469,9 @@ export function CerimoniaDeSorteio({
     if (pedidoSorteado.current === pedido) return;
     pedidoSorteado.current = pedido;
 
-    const { itens, onSorteado, falhou } = ultimos.current;
+    // `onSorteado` não sai daqui: ele é lido de `ultimos.current` na hora de aplicar,
+    // para continuar valendo mesmo depois de a cerimônia ser fechada.
+    const { itens, falhou } = ultimos.current;
     if (itens.length === 0) return;
 
     rodada.current += 1;
@@ -524,6 +526,31 @@ export function CerimoniaDeSorteio({
 
     // Silencia a rejeição não tratada; o erro é consumido no `then` mais abaixo.
     promessa.catch(() => {});
+
+    /*
+     * O RESULTADO É APLICADO ASSIM QUE CHEGA, fora da encenação.
+     *
+     * O POST sai junto com a contagem regressiva, e o servidor grava antes de responder:
+     * `blueSideTeamId`, a carta e o registro em `sorteios` já estão no banco. Só que o
+     * consumidor da promessa vivia dentro de `girar()`, que só roda depois de 3·2·1
+     * (≈2,1 s). Fechar a cerimônia antes disso (✕ ou ESC) incrementava `rodada.current`
+     * e o resultado era simplesmente esquecido: a tela seguia mostrando "lados não
+     * sorteados" enquanto o banco já tinha o sorteio.
+     *
+     * A consequência prática era pior que a tela desatualizada: a organização sorteava
+     * de novo, o servidor gravava um SEGUNDO sorteio com outra semente por cima, e o
+     * histórico append-only ficava com dois registros para um sorteio que a plateia viu
+     * uma vez só — com a própria tela acusando "este sorteio já foi feito antes".
+     *
+     * A `flag` evita aplicar duas vezes quando a encenação também termina normalmente.
+     */
+    let aplicado = false;
+    const aplicarUmaVez = (resposta: RespostaSorteio) => {
+      if (aplicado) return;
+      aplicado = true;
+      ultimos.current.onSorteado(resposta);
+    };
+    void promessa.then(aplicarUmaVez, () => {});
 
     const freiar = (resposta: RespostaSorteio) => {
       if (rodada.current !== minha) return;
@@ -617,8 +644,10 @@ export function CerimoniaDeSorteio({
 
       void promessa.then(
         (resposta) => {
+          // A aplicação já foi feita acima, assim que a resposta chegou — aqui fica só
+          // a encenação, que pode mesmo ser abandonada se a cerimônia foi fechada.
+          aplicarUmaVez(resposta);
           if (rodada.current !== minha) return;
-          onSorteado(resposta);
           const falta = reduzido ? 0 : Math.max(0, MINIMO_MS - (Date.now() - comecou));
           marcar(() => freiar(resposta), falta);
         },

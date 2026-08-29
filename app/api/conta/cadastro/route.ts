@@ -65,7 +65,19 @@ export async function POST(request: NextRequest) {
 
   // O mesmo freio do login vale aqui: sem ele, um script cria contas em série. O
   // contador de "falhas" recebe também as criações, então quem repete demais para.
-  const decisao = evaluateLoginRateLimit(await contarTentativasJogador(email, ipHash));
+  //
+  // A leitura do contador FALHA FECHADA (ela estoura quando o banco não responde, para o
+  // limitador nunca ficar desligado em silêncio), e por isso precisa do try: fora dele o
+  // erro escapava da rota e virava um 500 cru, sem o código de referência que
+  // `respostaDeErro` gera para o log.
+  let decisao;
+  try {
+    decisao = evaluateLoginRateLimit(await contarTentativasJogador(email, ipHash));
+  } catch (error) {
+    // Com o MESMO piso de tempo dos outros returns desta rota: um caminho de erro
+    // que responde mais rapido que os demais vira canal de medicao.
+    return comPisoDeTempo(inicio, respostaDeErro("api/conta/cadastro", error, "Não foi possível criar a conta agora."));
+  }
   if (!decisao.allowed) {
     await registrarTentativaJogador({ email, ipHash, success: false, reason: decisao.reason });
     return comPisoDeTempo(

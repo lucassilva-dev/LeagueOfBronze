@@ -7,7 +7,7 @@ import { z } from "zod";
 import { requireAdmin } from "@/lib/security/route-guard";
 import { isDuplaCard } from "@/lib/cards";
 import { readDataset, saveDataset } from "@/lib/data-store";
-import { cardIdSchema, type SeriesMatch } from "@/lib/schema";
+import { cardIdSchema, MAX_SORTEIOS_POR_SERIE, type SeriesMatch } from "@/lib/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -95,7 +95,38 @@ export async function POST(request: NextRequest) {
       detalhe: { dupla: Boolean(dupla) },
     };
     if (!dupla && teamId) registro.teamId = teamId;
-    series.sorteios = [...(series.sorteios ?? []), registro].slice(-50);
+
+    // No teto, RECUSA — não descarta o registro mais antigo para caber. O `.slice(-50)`
+    // que estava aqui apagava em silêncio a entrada mais antiga do histórico que o
+    // comentário acima defende, e ainda deixava a série presa em exatamente 50, o que
+    // bloqueava para sempre o sorteio ao vivo (que recusa em `>= MAX_SORTEIOS_POR_SERIE`).
+    if ((series.sorteios ?? []).length >= MAX_SORTEIOS_POR_SERIE) {
+      return NextResponse.json(
+        {
+          error: `Esta série já acumulou ${MAX_SORTEIOS_POR_SERIE} registros de sorteio. Fale com a organização antes de continuar.`,
+        },
+        { status: 400 },
+      );
+    }
+    series.sorteios = [...(series.sorteios ?? []), registro];
+
+    /*
+     * Trava de concorrência, a mesma de `/api/admin/series/sorteio` e do PUT do
+     * dataset: `lastUpdatedISO` é carimbado pelo servidor a cada gravação, então
+     * serve de versão.
+     *
+     * Esta rota regrava o dataset INTEIRO a partir do que leu no começo. Sem a trava,
+     * uma carta sorteada no meio de uma edição no painel (ou junto de outro sorteio)
+     * devolvia 200 e apagava em silêncio o que a outra pessoa tinha acabado de salvar.
+     */
+    const versaoLida = dataset.tournament.lastUpdatedISO;
+    const conferencia = await readDataset();
+    if (conferencia.tournament.lastUpdatedISO !== versaoLida) {
+      return NextResponse.json(
+        { error: "Alguém salvou o campeonato enquanto você sorteava. Recarregue e sorteie de novo." },
+        { status: 409 },
+      );
+    }
 
     const saved = await saveDataset(dataset);
     const savedSeries = saved.seriesMatches.find((row) => row.id === seriesId);

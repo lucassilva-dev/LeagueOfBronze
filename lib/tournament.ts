@@ -316,69 +316,149 @@ function seriesInRange(series: SeriesMatch, range?: DateRangeFilter) {
   return true;
 }
 
+/**
+ * O que separa dois times ANTES de qualquer desempate.
+ *
+ * ⚠ O saldo de mapas NÃO entra aqui, e a ausência é o ponto.
+ *
+ * A regra publicada — no card da própria /tabela, na regra (u) e em "pontuação", nos
+ * dois idiomas — é: **1º confronto direto · 2º saldo de mapas · 3º sorteio**. Com
+ * `gameDiff` nesta comparação, o saldo era aplicado ANTES do confronto direto e os dois
+ * times nem chegavam a formar um grupo empatado: o site anunciava um critério e aplicava
+ * outro, numa tabela que decide quem vai para a final.
+ *
+ * `seriesWon` fica porque, com a regra de pontos em uso (vitória > 0, derrota = 0), ele
+ * é redundante com `points` e não muda ordem nenhuma — mas protege o caso de alguém
+ * configurar pontuação por derrota, em que "mais vitórias" continua sendo o critério
+ * óbvio antes de ir para o desempate.
+ */
 function compareStandingsBase(a: StandingsRow, b: StandingsRow) {
   if (b.points !== a.points) return b.points - a.points;
   if (b.seriesWon !== a.seriesWon) return b.seriesWon - a.seriesWon;
-  if (b.gameDiff !== a.gameDiff) return b.gameDiff - a.gameDiff;
   return 0;
 }
 
-function compareHeadToHead(teamAId: string, teamBId: string, dataset: TournamentDataset) {
-  const totals = {
-    aSeriesWins: 0,
-    bSeriesWins: 0,
-    aGamesWon: 0,
-    bGamesWon: 0,
-  };
+/**
+ * Mini-tabela do confronto direto: só as séries ENTRE os times empatados.
+ *
+ * Vale para grupo de qualquer tamanho. Antes, o confronto direto só era aplicado a
+ * empates de exatamente DOIS times; com três ou mais, a ordem saía alfabética e um time
+ * que venceu os outros dois podia ficar atrás de quem tem nome no começo do alfabeto —
+ * decidindo vaga de final por ordem de nome.
+ *
+ * Para grupo de dois, isto degenera exatamente no confronto direto de sempre.
+ */
+function chaveDoPar(a: string, b: string) {
+  return [a, b].sort().join("|");
+}
+
+function ordenarPorConfrontoDireto(grupo: StandingsRow[], dataset: TournamentDataset) {
+  const doGrupo = new Set(grupo.map((linha) => linha.teamId));
+
+  /** Mini-tabela do grupo: séries e saldo de mapas contando SÓ os jogos entre empatados. */
+  const mini = new Map(grupo.map((linha) => [linha.teamId, { series: 0, mapas: 0 }]));
+  /** O mesmo, mas por PAR — para quando a mini-tabela do grupo não puder ser usada. */
+  const porPar = new Map<string, Map<string, { series: number; mapas: number }>>();
 
   for (const series of getStandingsSeries(dataset)) {
-    const isMatchup =
-      (series.teamAId === teamAId && series.teamBId === teamBId) ||
-      (series.teamAId === teamBId && series.teamBId === teamAId);
-    if (!isMatchup) continue;
+    if (!doGrupo.has(series.teamAId) || !doGrupo.has(series.teamBId)) continue;
 
-    const winner = getSeriesWinnerTeamId(series, dataset);
-    if (!winner) continue;
+    const vencedor = getSeriesWinnerTeamId(series, dataset);
+    if (!vencedor) continue;
 
-    applyHeadToHeadSeriesTotals(totals, series, winner, dataset, teamAId, teamBId);
+    const placar = getSeriesScore(series, dataset);
+    const a = mini.get(series.teamAId);
+    const b = mini.get(series.teamBId);
+    if (!a || !b) continue;
+
+    const ganhouA = vencedor === series.teamAId ? 1 : 0;
+    const ganhouB = vencedor === series.teamBId ? 1 : 0;
+    const saldoA = placar.teamAWins - placar.teamBWins;
+
+    a.series += ganhouA;
+    b.series += ganhouB;
+    a.mapas += saldoA;
+    b.mapas -= saldoA;
+
+    const chave = chaveDoPar(series.teamAId, series.teamBId);
+    const par =
+      porPar.get(chave) ??
+      new Map([
+        [series.teamAId, { series: 0, mapas: 0 }],
+        [series.teamBId, { series: 0, mapas: 0 }],
+      ]);
+    par.get(series.teamAId)!.series += ganhouA;
+    par.get(series.teamBId)!.series += ganhouB;
+    par.get(series.teamAId)!.mapas += saldoA;
+    par.get(series.teamBId)!.mapas -= saldoA;
+    porPar.set(chave, par);
   }
 
-  if (totals.aSeriesWins !== totals.bSeriesWins) {
-    return totals.bSeriesWins - totals.aSeriesWins;
-  }
+  /*
+   * A MINI-TABELA DO GRUPO só vale quando TODOS os pares se enfrentaram.
+   *
+   * Com cobertura parcial ela compara coisas que não se comparam: quem não jogou contra
+   * ninguém do grupo pontua 0, e 0 é "melhor" que o −1 de quem perdeu um mapa para um
+   * adversário do grupo — colocando na frente justamente quem não tem confronto nenhum.
+   *
+   * Quando ela não vale, o confronto direto ainda decide os pares que EXISTIRAM (ver o
+   * comparador abaixo). Não zeramos o confronto: quem ganhou na cara do outro não pode
+   * ficar atrás dele por causa de um terceiro time que nenhum dos dois enfrentou.
+   *
+   * O par a par não pode formar ciclo aqui: um ciclo de três exige que os três pares
+   * tenham acontecido, que é exatamente o caso de cobertura completa — onde quem decide é
+   * a mini-tabela, que é transitiva por construção.
+   */
+  const grupoCompleto = porPar.size === (grupo.length * (grupo.length - 1)) / 2;
 
-  const aGameDiff = totals.aGamesWon - totals.bGamesWon;
-  const bGameDiff = totals.bGamesWon - totals.aGamesWon;
-  if (aGameDiff !== bGameDiff) return bGameDiff - aGameDiff;
+  return [...grupo].sort((x, y) => {
+    // 1º confronto direto.
+    if (grupoCompleto) {
+      const mx = mini.get(x.teamId) ?? { series: 0, mapas: 0 };
+      const my = mini.get(y.teamId) ?? { series: 0, mapas: 0 };
+      if (my.series !== mx.series) return my.series - mx.series;
+      if (my.mapas !== mx.mapas) return my.mapas - mx.mapas;
+    } else {
+      const par = porPar.get(chaveDoPar(x.teamId, y.teamId));
+      const px = par?.get(x.teamId);
+      const py = par?.get(y.teamId);
+      if (px && py) {
+        if (py.series !== px.series) return py.series - px.series;
+        if (py.mapas !== px.mapas) return py.mapas - px.mapas;
+      }
+    }
 
-  return 0;
+    // 2º saldo de mapas geral.
+    if (y.gameDiff !== x.gameDiff) return y.gameDiff - x.gameDiff;
+
+    /*
+     * 3º mapas GANHOS, e 4º mapas PERDIDOS.
+     *
+     * Dois times podem ter o mesmo saldo com campanhas bem diferentes: 8-5 e 3-0 empatam
+     * em +3. Quem venceu mais mapas fez mais dentro de quadra, e quem perdeu menos foi
+     * menos batido — os dois são fato registrado, não sorte.
+     *
+     * Existem para que a ordem alfabética NÃO decida empate de verdade. Ela é só o último
+     * recurso, e só é alcançada quando todos os números destes times são idênticos — o que
+     * na prática quer dizer campanha zerada, no começo da temporada, quando ainda não há
+     * nada a comparar.
+     */
+    if (y.gamesWon !== x.gamesWon) return y.gamesWon - x.gamesWon;
+    if (y.gamesLost !== x.gamesLost) return x.gamesLost - y.gamesLost;
+
+    // Último caso: nada distingue os times. O desempate de verdade é o SORTEIO, que a
+    // organização faz à mão; aqui só se garante uma ordem ESTÁVEL, para a tabela não
+    // dançar entre dois carregamentos com os mesmos dados.
+    return x.teamName.localeCompare(y.teamName, "pt-BR");
+  });
 }
 
-function applyHeadToHeadSeriesTotals(
-  totals: {
-    aSeriesWins: number;
-    bSeriesWins: number;
-    aGamesWon: number;
-    bGamesWon: number;
-  },
-  series: SeriesMatch,
-  winner: string,
-  dataset: TournamentDataset,
-  teamAId: string,
-  teamBId: string,
-) {
-  if (winner === teamAId) totals.aSeriesWins += 1;
-  if (winner === teamBId) totals.bSeriesWins += 1;
-
-  const score = getSeriesScore(series, dataset);
-  const teamAPlayedOnSideA = series.teamAId === teamAId;
-  const aWinsInSeries = teamAPlayedOnSideA ? score.teamAWins : score.teamBWins;
-  const bWinsInSeries = teamAPlayedOnSideA ? score.teamBWins : score.teamAWins;
-
-  totals.aGamesWon += aWinsInSeries;
-  totals.bGamesWon += bWinsInSeries;
-}
-
+/**
+ * Ordena a classificação: primeiro o que separa objetivamente, depois o desempate.
+ *
+ * Times empatados em pontos e séries vencidas formam um GRUPO, e o grupo inteiro passa
+ * por `ordenarPorConfrontoDireto` — um caminho só, para grupo de qualquer tamanho.
+ */
 function sortStandingsRows(rows: StandingsRow[], dataset: TournamentDataset) {
   const prelim = [...rows].sort((a, b) => {
     const base = compareStandingsBase(a, b);
@@ -397,17 +477,7 @@ function sortStandingsRows(rows: StandingsRow[], dataset: TournamentDataset) {
       i += 1;
     }
 
-    if (group.length === 2) {
-      group.sort((a, b) => {
-        const h2h = compareHeadToHead(a.teamId, b.teamId, dataset);
-        if (h2h !== 0) return h2h;
-        return a.teamName.localeCompare(b.teamName, "pt-BR");
-      });
-    } else if (group.length > 2) {
-      group.sort((a, b) => a.teamName.localeCompare(b.teamName, "pt-BR"));
-    }
-
-    resolved.push(...group);
+    resolved.push(...(group.length > 1 ? ordenarPorConfrontoDireto(group, dataset) : group));
   }
 
   return resolved.map((row, index) => ({ ...row, position: index + 1 }));

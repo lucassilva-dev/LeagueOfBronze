@@ -412,6 +412,16 @@ export function montarDraft(params: {
 
 export function iniciarDraft(estado: EstadoDraft, agoraMs: number): EstadoDraft {
   if (estado.fase === "encerrado") throw new Error("O draft já terminou.");
+
+  // Ordem esgotada = draft terminado (a mesma regra que o resto do arquivo já segue:
+  // `escolhaAtual` igual a `ordem.length` significa acabou). Sem isto, uma ordem vazia
+  // — que acontece com `jogadores_por_time = 1`, em que os capitães já preenchem os
+  // times — entrava em "rodando" sem nenhuma escolha a fazer e nunca mais saía: o
+  // cronômetro não tinha o que virar e a transmissão ficava presa para sempre.
+  if (estado.escolhaAtual >= estado.ordem.length) {
+    return { ...estado, fase: "encerrado", prazoISO: null };
+  }
+
   const novo: EstadoDraft = { ...estado, fase: "rodando", prazoISO: null };
   novo.prazoISO = proximoPrazo(novo, agoraMs);
   return novo;

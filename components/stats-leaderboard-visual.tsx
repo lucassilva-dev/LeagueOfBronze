@@ -39,8 +39,11 @@ function Podium({ rows, metric }: StatsLeaderboardVisualProps) {
         return (
           <motion.div
             key={`${metric}-${entry.player.playerId}`}
-            initial={{ opacity: 0, y: 30, scaleY: 0.85 }}
-            whileInView={{ opacity: 1, y: 0, scaleY: 1 }}
+            // Só transform: `opacity: 0` aqui é renderizado no SERVIDOR e, se a
+            // animação não roda, o pódio inteiro fica invisível. É a armadilha que já
+            // apagou páginas deste site quatro vezes (ver components/ui/reveal.tsx).
+            initial={{ y: 30, scaleY: 0.85 }}
+            whileInView={{ y: 0, scaleY: 1 }}
             viewport={{ once: true }}
             transition={{ duration: 0.55, ease: EASE, delay: PODIUM_DELAYS[col] }}
             style={{ transformOrigin: "bottom" }}

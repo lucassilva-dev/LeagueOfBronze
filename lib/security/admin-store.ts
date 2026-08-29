@@ -168,18 +168,36 @@ export async function getRecentAttemptCounts(
   const janela = new Date(Date.now() - 15 * 60 * 1000).toISOString();
   const janelaConfianca = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
+  /*
+   * As tentativas RECUSADAS pelo próprio limitador não contam como falha.
+   *
+   * Elas continuam gravadas — o registro de segurança precisa mostrar que houve
+   * marteladas — mas ficam de fora da contagem, senão o bloqueio se auto-prorroga:
+   * cada retentativa durante o bloqueio grava uma falha nova com `occurred_at = now()`,
+   * que entra na janela de 15 minutos e empurra a janela para a frente. Quem errou a
+   * senha cinco vezes e continuou tentando ficava trancado para SEMPRE, sem nada no
+   * banco explicando por quê — e o bloqueio por IP não tem a válvula de escape do
+   * `ipHadRecentSuccess`, que só vale para o bloqueio por usuário.
+   *
+   * Essas tentativas também nunca chegaram a testar uma senha, então não são
+   * evidência de um palpite novo.
+   */
+  const naoContaComoFalha = ["ip_bloqueado", "usuario_bloqueado"];
+
   const [porIp, porUsuario, sucessoConhecido] = await Promise.all([
     client
       .from("admin_login_attempts")
       .select("id", { count: "exact", head: true })
       .eq("ip_hash", ipHash)
       .eq("success", false)
+      .notIn("reason", naoContaComoFalha)
       .gte("occurred_at", janela),
     client
       .from("admin_login_attempts")
       .select("id", { count: "exact", head: true })
       .eq("username", normalizarUsuario(username))
       .eq("success", false)
+      .notIn("reason", naoContaComoFalha)
       .gte("occurred_at", janela),
     client
       .from("admin_login_attempts")
@@ -188,6 +206,21 @@ export async function getRecentAttemptCounts(
       .eq("success", true)
       .gte("occurred_at", janelaConfianca),
   ]);
+
+  /*
+   * FALHA FECHADA. Antes, o erro das consultas era ignorado e só `count` era lido: como
+   * um `count` nulo virava `0` pelo `??`, qualquer falha de leitura (banco oscilando,
+   * grant alterado, filtro malformado) zerava as duas contagens e o limitador passava a
+   * liberar TODA tentativa — proteção contra força bruta desligada sem nada em lugar
+   * nenhum dizendo que estava desligada.
+   *
+   * Estourar aqui deixa o login indisponível, que é o lado certo de falhar: sem banco
+   * não há como conferir a senha de qualquer forma.
+   */
+  const falha = porIp.error ?? porUsuario.error ?? sucessoConhecido.error;
+  if (falha) {
+    throw new Error(`Falha ao conferir as tentativas de login: ${falha.message}`);
+  }
 
   return {
     failuresByIp: porIp.count ?? 0,

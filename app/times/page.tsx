@@ -95,11 +95,17 @@ export default async function TimesPage() {
   const teams = buildDesignTeams(dataset);
 
   const standings = calculateStandings(dataset);
+  // Só entra no mapa quem já jogou. A classificação lista TODOS os times, inclusive os
+  // que ainda não têm série, então sem este filtro o `?? null` abaixo nunca acontecia:
+  // um time recém-criado aparecia com "1º · 0V 0D · 0 pts" — igual a quem jogou e
+  // perdeu tudo — em vez do rótulo "sem séries" que o card já sabe mostrar.
   const campaignByTeam = new Map<string, NonNullable<Campaign>>(
-    standings.rows.map((row) => [
-      row.teamId,
-      { position: row.position, wins: row.seriesWon, losses: row.seriesLost, points: row.points },
-    ]),
+    standings.rows
+      .filter((row) => row.seriesPlayed > 0)
+      .map((row) => [
+        row.teamId,
+        { position: row.position, wins: row.seriesWon, losses: row.seriesLost, points: row.points },
+      ]),
   );
 
   return (

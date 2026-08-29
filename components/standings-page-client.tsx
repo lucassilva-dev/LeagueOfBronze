@@ -72,7 +72,9 @@ function MobileRowDetails({ row, t }: Readonly<{ row: StandingsRow; t: TextosTab
       <p>
         {t.tabelaLinhaSaldo} <GameDiffValue value={row.gameDiff} />
       </p>
-      <p>{t.tabelaLinhaVitorias} {formatPercent(row.seriesWinRate)}</p>
+      {/* O card do celular usa o MESMO idioma da tabela do desktop — sem a tag, esta
+          metade continuava com vírgula decimal no site em inglês. */}
+      <p>{t.tabelaLinhaVitorias} {formatPercent(row.seriesWinRate, 1, t.localeTag)}</p>
     </div>
   );
 }
@@ -117,7 +119,9 @@ function buildColumns(teamHrefBase: string, t: TextosTabela): ColumnDef<Standing
   {
     accessorKey: "seriesWinRate",
     header: t.tabelaColVitorias,
-    cell: ({ getValue }) => formatPercent(getValue<number>()),
+    // `t` aqui é o bloco `compartilhados`, que carrega a tag de idioma: sem ela a
+    // coluna saía com vírgula decimal mesmo com o site em inglês.
+    cell: ({ getValue }) => formatPercent(getValue<number>(), 1, t.localeTag),
   },
   {
     accessorKey: "points",

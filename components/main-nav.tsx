@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 export type NavLabel = { href: string; label: string };
 
@@ -20,16 +20,8 @@ function isActive(pathname: string, href: string) {
 
 export function MainNav({ labels, ariaLabel, abrirMenu }: MainNavProps) {
   const pathname = usePathname();
-  const [collapse, setCollapse] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [rotaAnterior, setRotaAnterior] = useState(pathname);
-
-  useEffect(() => {
-    const onResize = () => setCollapse(window.innerWidth < 1060);
-    onResize();
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
 
   // Fecha o menu ao mudar de rota. Ajustar o estado durante a renderização (em vez de num
   // useEffect) é o padrão recomendado pelo React para reagir a uma prop/valor que mudou:
@@ -40,9 +32,25 @@ export function MainNav({ labels, ariaLabel, abrirMenu }: MainNavProps) {
     setMenuOpen(false);
   }
 
-  if (!collapse) {
-    return (
-      <nav aria-label={ariaLabel} style={{ display: "flex", alignItems: "center", gap: 2 }}>
+  /*
+   * QUAL NAVEGAÇÃO APARECE É DECIDIDO POR CSS, não por JavaScript.
+   *
+   * Antes isto era `useState(false)` + um efeito medindo `window.innerWidth`: o HTML do
+   * SERVIDOR saía sempre com a navegação de desktop, e no celular o menu só aparecia
+   * depois que o efeito rodava — quem estava sem JavaScript (ou antes da hidratação)
+   * recebia uma barra larga demais para a tela, sem nenhum caminho para as outras páginas.
+   *
+   * É a mesma regra que vale para as animações deste projeto: o estado de repouso, o que
+   * sai do servidor, tem de ser o CERTO. Com media query, o navegador acerta na primeira
+   * pintura e sem script nenhum.
+   */
+  return (
+    <>
+      <nav
+        aria-label={ariaLabel}
+        className="hidden min-[1060px]:flex"
+        style={{ alignItems: "center", gap: 2 }}
+      >
         {labels.map((item) => {
           const active = isActive(pathname, item.href);
           return (
@@ -79,11 +87,8 @@ export function MainNav({ labels, ariaLabel, abrirMenu }: MainNavProps) {
           );
         })}
       </nav>
-    );
-  }
 
-  return (
-    <>
+      <div className="min-[1060px]:hidden">
       <button
         type="button"
         aria-label={abrirMenu}
@@ -150,6 +155,7 @@ export function MainNav({ labels, ariaLabel, abrirMenu }: MainNavProps) {
           })}
         </div>
       ) : null}
+      </div>
     </>
   );
 }

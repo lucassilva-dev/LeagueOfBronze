@@ -131,6 +131,8 @@ type Impacto = Readonly<{
   linhas: number;
   jogadores: number;
   classificacao: number;
+  /** Registros de sorteio (com semente) que somem junto com as séries do time. */
+  sorteios: number;
 }>;
 
 /** Conta o que a exclusão em cascata leva junto. Números, não adjetivos. */
@@ -138,11 +140,13 @@ function medirImpacto(draft: TournamentDataset, teamId: string): Impacto {
   let series = 0;
   let jogos = 0;
   let linhas = 0;
+  let sorteios = 0;
 
   for (const serie of draft.seriesMatches) {
     if (serie.teamAId !== teamId && serie.teamBId !== teamId) continue;
     series += 1;
     jogos += serie.games.length;
+    sorteios += serie.sorteios?.length ?? 0;
     for (const jogo of serie.games) linhas += jogo.statsByPlayer.length;
   }
 
@@ -152,6 +156,7 @@ function medirImpacto(draft: TournamentDataset, teamId: string): Impacto {
     linhas,
     jogadores: draft.players.filter((p) => p.teamId === teamId).length,
     classificacao: draft.standingsSeed.filter((linha) => linha.teamId === teamId).length,
+    sorteios,
   };
 }
 
@@ -632,6 +637,23 @@ export function AdminTeamsPanel({
                   <br />
                   Some tudo de uma vez e <strong style={{ color: C.dangerSoft }}>não há como
                   desfazer</strong> — só restaurando um backup.
+                  {/*
+                    O histórico de sorteios é append-only e o servidor recusa removê-lo de
+                    quem não é o responsável pelo campeonato. Sem este aviso, a exclusão
+                    era aceita na tela e só falhava lá na frente, na hora de salvar — com o
+                    time já apagado do rascunho e sem desfazer.
+                  */}
+                  {impacto.sorteios > 0 ? (
+                    <>
+                      <br />
+                      <strong style={{ color: C.dangerSoft }}>
+                        Inclui {impacto.sorteios} registro{impacto.sorteios === 1 ? "" : "s"} de
+                        sorteio
+                      </strong>{" "}
+                      (com a semente que permite conferir cada resultado). Só o responsável pelo
+                      campeonato consegue salvar uma remoção dessas.
+                    </>
+                  ) : null}
                 </Banner>
               ) : null}
 

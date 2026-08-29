@@ -182,8 +182,24 @@ export function conferirSorteio(
   if (registro.tipo === "lados") {
     return sortearLado(registro.semente, contexto.teamAId, contexto.teamBId) === registro.resultado;
   }
+  /*
+   * O tipo de pool sai do PRÓPRIO REGISTRO, não de quem está conferindo.
+   *
+   * O sorteio duplo usa as 8 cartas; o individual, só as 6. Com `contexto.dupla ?? false`,
+   * quem conferisse um registro duplo sem saber que precisava avisar recebia `false` — a
+   * ferramenta que existe para provar honestidade acusava de fraude um sorteio honesto.
+   * E quem confere meses depois tem em mãos exatamente o registro, que já carrega
+   * `detalhe.dupla`.
+   *
+   * `contexto.dupla` continua valendo como sobreposição explícita, para quem quiser
+   * conferir contra um pool escolhido à mão.
+   */
+  const dupla =
+    contexto.dupla ??
+    (registro.detalhe?.dupla === true || isDuplaCard(registro.resultado as CardId));
+
   try {
-    return sortearCarta(registro.semente, contexto.dupla ?? false) === registro.resultado;
+    return sortearCarta(registro.semente, dupla) === registro.resultado;
   } catch {
     return false;
   }

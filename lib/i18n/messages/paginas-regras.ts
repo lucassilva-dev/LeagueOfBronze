@@ -61,7 +61,8 @@ const pt = {
   regraR: "O capitão vencedor envia o print do resultado no Discord em até 15 minutos.",
   regraS: "Ao participar, você autoriza o uso da sua imagem/nick em transmissões.",
   regraT: "A organização pode ajustar o regulamento antes do início, com aviso no Discord.",
-  regraU: "Empate na tabela: confronto direto → saldo de mapas → sorteio.",
+  regraU:
+    "Empate na tabela: confronto direto → saldo de mapas → mapas ganhos → sorteio.",
   regraV: "Uso do canal de voz oficial obrigatório durante as partidas.",
 
   // ---------- app/regras: draft por pontos ----------
@@ -84,7 +85,8 @@ const pt = {
   // ---------- app/regras: pontuação ----------
   pontuacaoTitulo: "PONTUAÇÃO & DESEMPATE",
   pontuacao1: "Vitória na série (MD3) = 3 pontos · Derrota = 0.",
-  pontuacao2: "Critério de desempate: 1º confronto direto, 2º saldo de mapas, 3º sorteio.",
+  pontuacao2:
+    "Critério de desempate: 1º confronto direto, 2º saldo de mapas, 3º mapas ganhos, 4º sorteio.",
   pontuacao3: "Os 2 primeiros da fase de pontos avançam para a Grande Final em MD5.",
   pontuacao4:
     "100% das inscrições vira premiação: R$ 600,00 arrecadados (30 × R$ 20,00) e R$ 600,00 distribuídos — R$ 420,00 ao campeão e R$ 180,00 ao vice, divididos igualmente entre os 5 jogadores de cada time. A organização não retém nenhum valor.",
@@ -260,7 +262,8 @@ export const paginasRegras = definir<ChavesPaginasRegras>({
     regraS: "By taking part you consent to your image and Riot ID being used in broadcasts.",
     regraT:
       "The organisation may adjust the rulebook before the tournament starts, with notice on Discord.",
-    regraU: "Standings tiebreak: head-to-head → map differential → coin flip.",
+    regraU:
+      "Standings tiebreak: head-to-head → map differential → games won → coin flip.",
     regraV: "Using the official voice channel during matches is mandatory.",
 
     // ---------- app/regras: draft por pontos ----------
@@ -284,7 +287,8 @@ export const paginasRegras = definir<ChavesPaginasRegras>({
     // ---------- app/regras: pontuação ----------
     pontuacaoTitulo: "POINTS & TIEBREAKERS",
     pontuacao1: "Series win (Bo3) = 3 points · Loss = 0.",
-    pontuacao2: "Tiebreakers, in order: 1st head-to-head, 2nd map differential, 3rd coin flip.",
+    pontuacao2:
+      "Tiebreakers, in order: 1st head-to-head, 2nd map differential, 3rd games won, 4th coin flip.",
     pontuacao3: "The top 2 of the group stage advance to the Grand Final, played as a Bo5.",
     pontuacao4:
       "100% of the entry fees go to the prize pool: R$ 600,00 collected (30 × R$ 20,00) and R$ 600,00 paid out — R$ 420,00 to the champions and R$ 180,00 to the runners-up, split equally between the 5 players of each team. The organisation keeps nothing.",

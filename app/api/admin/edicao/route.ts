@@ -121,7 +121,12 @@ export async function PATCH(request: NextRequest) {
 
   const corpo = lido.corpo as { acao?: string; dados?: unknown };
   const acao = corpo?.acao;
-  if (typeof acao !== "string" || !(acao in ESCOPO_DA_ACAO)) {
+  // `Object.hasOwn`, e não `in`: o `in` enxerga o protótipo, então `{"acao":"toString"}`
+  // passava por "ação conhecida" e o escopo virava a própria função `toString`. A resposta
+  // saía 403 com a mensagem "Você não tem permissão para: function toString() { [native
+  // code] }" e `missing: [null]` (JSON.stringify serializa função em array como null) —
+  // quando o certo é 400 "Ação desconhecida.".
+  if (typeof acao !== "string" || !Object.hasOwn(ESCOPO_DA_ACAO, acao)) {
     return NextResponse.json({ error: "Ação desconhecida." }, { status: 400 });
   }
 

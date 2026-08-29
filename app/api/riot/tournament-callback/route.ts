@@ -52,15 +52,42 @@ const callbackSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const tamanho = Number(request.headers.get("content-length") ?? 0);
-  if (tamanho > TETO_BYTES) {
+  /*
+   * O teto é medido no CORPO LIDO, não no cabeçalho.
+   *
+   * `Content-Length` é opcional: quem envia `Transfer-Encoding: chunked` simplesmente
+   * não manda o cabeçalho, o `?? 0` fazia a comparação virar `0 > 65536` (falso), e
+   * `request.json()` materializava o corpo inteiro na memória da função antes de o Zod
+   * chegar a rodar. Esta rota é PÚBLICA e sem autenticação — é a Riot que chama —, então
+   * bastava um cliente qualquer mandar centenas de MB em paralelo para derrubar a
+   * instância por memória, recebendo um 400 depois do estrago.
+   *
+   * Ler como texto e medir os bytes de verdade é o mesmo que `lerCorpoPublico` já faz
+   * nas rotas internas; aqui não dá para reusá-la inteira porque ela exige mesma origem,
+   * que uma chamada da Riot nunca teria.
+   */
+  // 1º corte, de graça: quando o cabeçalho VEM, recusa sem ler byte nenhum do corpo.
+  // (Ele é opcional — `Transfer-Encoding: chunked` não o manda — por isso não basta
+  //  sozinho; mas remover esta checagem, como uma versão anterior desta correção fez,
+  //  obrigava a bufferizar até um corpo declaradamente gigante antes de responder 413.)
+  const declarado = Number(request.headers.get("content-length") ?? Number.NaN);
+  if (Number.isFinite(declarado) && declarado > TETO_BYTES) {
     return NextResponse.json({ error: "Payload grande demais." }, { status: 413 });
   }
 
   let corpo: unknown;
   try {
-    corpo = await request.json();
+    // 2º corte: quem não declarou tamanho é medido no corpo lido de verdade. Sem isto,
+    // um cliente que omite o `Content-Length` materializava centenas de MB na memória da
+    // função antes de o Zod rodar — e esta rota é PÚBLICA e sem autenticação.
+    const texto = await request.text();
+    if (Buffer.byteLength(texto, "utf8") > TETO_BYTES) {
+      return NextResponse.json({ error: "Payload grande demais." }, { status: 413 });
+    }
+    corpo = JSON.parse(texto);
   } catch {
+    // O `await request.text()` fica DENTRO do try: corpo truncado no meio do envio
+    // rejeita a promessa, e fora daqui isso virava 500 onde o certo é 400.
     return NextResponse.json({ error: "Payload inválido." }, { status: 400 });
   }
 

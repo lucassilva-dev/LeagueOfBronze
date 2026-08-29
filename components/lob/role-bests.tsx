@@ -39,7 +39,7 @@ function Photo({ row, size }: Readonly<{ row: RoleBestRow; size: number }>) {
   return <TeamMark imageUrl={row.teamImageUrl} color={row.teamColor} name={row.teamName} size={size} diamond={Math.round(size / 2.6)} />;
 }
 
-function RoleCard({ group, hrefBase, t }: Readonly<{ group: RoleBestGroup; hrefBase: string; t: TextosRoleBests }>) {
+function RoleCard({ group, hrefBase, t, localeTag }: Readonly<{ group: RoleBestGroup; hrefBase: string; t: TextosRoleBests; localeTag?: string }>) {
   const [first, ...rest] = group.rows;
 
   return (
@@ -66,7 +66,7 @@ function RoleCard({ group, hrefBase, t }: Readonly<{ group: RoleBestGroup; hrefB
           </div>
         </div>
         <div style={{ textAlign: "right", flexShrink: 0 }}>
-          <div className="lob-display" style={{ fontSize: 22, color: "#e6c592", lineHeight: 1 }}>{formatKda(first.kda)}</div>
+          <div className="lob-display" style={{ fontSize: 22, color: "#e6c592", lineHeight: 1 }}>{formatKda(first.kda, localeTag)}</div>
           <div style={{ fontSize: 8.5, letterSpacing: ".08em", color: "#8f8472", marginTop: 4 }}>KDA</div>
         </div>
       </Link>
@@ -88,7 +88,7 @@ function RoleCard({ group, hrefBase, t }: Readonly<{ group: RoleBestGroup; hrefB
               <span className="lob-display" style={{ fontSize: 12, color: "#6f6656" }}>{row.rank}</span>
               <Photo row={row} size={26} />
               <span style={{ fontSize: 12, color: "#cdbfa8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.nick}</span>
-              <span className="lob-display" style={{ fontSize: 13, color: "#a98a5f" }}>{formatKda(row.kda)}</span>
+              <span className="lob-display" style={{ fontSize: 13, color: "#a98a5f" }}>{formatKda(row.kda, localeTag)}</span>
             </Link>
           ))}
         </div>
@@ -101,7 +101,10 @@ export function RoleBests({
   groups,
   hrefBase = "/jogadores/",
   t = TEXTOS_PT,
-}: Readonly<{ groups: RoleBestGroup[]; hrefBase?: string; t?: TextosRoleBests }>) {
+  // Sem o idioma, o KDA daqui saía sempre com vírgula (padrão pt-BR) mesmo com o site
+  // em inglês — e divergia da tabela da mesma página.
+  localeTag,
+}: Readonly<{ groups: RoleBestGroup[]; hrefBase?: string; t?: TextosRoleBests; localeTag?: string }>) {
   if (groups.length === 0) return null;
 
   return (
@@ -115,7 +118,7 @@ export function RoleBests({
       </p>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(250px,1fr))", gap: 14 }}>
         {groups.map((group) => (
-          <RoleCard key={group.short} group={group} hrefBase={hrefBase} t={t} />
+          <RoleCard key={group.short} group={group} hrefBase={hrefBase} t={t} localeTag={localeTag} />
         ))}
       </div>
     </section>

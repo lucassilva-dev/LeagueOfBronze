@@ -180,13 +180,43 @@ export async function POST(request: NextRequest) {
       ...dataset,
       seriesMatches: dataset.seriesMatches.map((s) => (s.id === seriesId ? novaSerie : s)),
     };
-    await saveDataset(paraSalvar);
+    const salvo = await saveDataset(paraSalvar);
 
     return NextResponse.json({
       ok: true,
       sorteio: registro,
       blueSideTeamId: novaSerie.blueSideTeamId ?? null,
       cardsUsed: novaSerie.cardsUsed ?? [],
+      /*
+       * O histórico atualizado, para o rascunho do painel acompanhar.
+       *
+       * O painel LÊ `sorteios` do rascunho para avisar, antes de excluir ou renomear uma
+       * série (e antes de excluir um time, que arrasta as séries dele), que existe
+       * histórico e que o servidor vai recusar a remoção de quem não é o responsável.
+       * Sem devolver o campo aqui, um sorteio feito na MESMA sessão não chegava ao
+       * rascunho e esses avisos ficavam mudos: a pessoa excluía a série achando que não
+       * havia nada, e só descobria no 403 — com a série já fora do rascunho e sem desfazer.
+       */
+      sorteios: novaSerie.sorteios,
+      /*
+       * A versão nova do dataset, para o painel acompanhar sem recarregar.
+       *
+       * Esta rota grava por conta própria, então o `lastUpdatedISO` do servidor avança
+       * e o rascunho aberto no painel fica com o antigo. Sem devolver a versão aqui, o
+       * primeiro "Salvar" depois de qualquer sorteio ao vivo caía sempre em 409 — o que
+       * antes era mascarado pela recarga completa que a cerimônia disparava (e que abria
+       * `window.confirm` no meio da transmissão).
+       */
+      versao: salvo.tournament.lastUpdatedISO,
+      /*
+       * A versão que esta rota LEU antes de gravar.
+       *
+       * O painel só pode adotar `versao` se o rascunho dele estiver exatamente nesta
+       * versão. Sem isso, adotar `versao` cegamente carimba um rascunho VELHO com um
+       * número novo e a trava de concorrência do PUT para de disparar: o rascunho passa
+       * pela conferência de versão e sobrescreve, em silêncio, o que outra pessoa salvou.
+       */
+      versaoLida,
       /** Quantas vezes este mesmo sorteio já foi feito — a tela avisa na repetição. */
       vezes: novaSerie.sorteios.filter((s) => s.tipo === tipo && s.teamId === registro.teamId).length,
     });

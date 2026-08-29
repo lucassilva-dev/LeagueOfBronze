@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 
 import type { Messages } from "@/lib/i18n/messages";
+import { avisarSessaoMudou } from "@/lib/sessao-mudou";
 
 /**
  * Formulário de inscrição da 4ª Edição.
@@ -100,18 +101,40 @@ export default function FormularioInscricao({ t, config, elos, jogadorInicial }:
     setErro(null);
   }
 
+  /*
+   * NUNCA lança.
+   *
+   * As três chamadas desta tela seguem `setEnviando(true)` → `await postar(...)` →
+   * `setEnviando(false)`, sem try/catch. Se o `fetch` rejeitasse (Wi-Fi que cai,
+   * celular que troca de rede, servidor inalcançável), o `setEnviando(false)` nunca
+   * rodava: o botão ficava preso em "ENVIANDO…" para sempre, sem mensagem nenhuma, e
+   * a inscrição não tinha como ser reenviada a não ser recarregando a página — no
+   * meio de um formulário de vários passos, isso significa preencher tudo de novo.
+   *
+   * Devolver a falha como resposta (em vez de exceção) mantém os três caminhos com
+   * uma saída só, e o `status: 0` distingue "não chegou ao servidor" de um 4xx real.
+   */
   async function postar(url: string, corpo: unknown) {
-    const r = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(corpo),
-    });
-    const dados = (await r.json().catch(() => ({}))) as {
+    type Resposta = {
       error?: string;
       problemas?: Problema[];
       jogador?: { displayName: string; email: string };
     };
-    return { ok: r.ok, status: r.status, dados };
+
+    try {
+      const r = await fetch(url, {
+        method: "POST",
+        // Prazo de rede: sem ele, um socket morto sem RST deixa a promessa pendurada
+        // por minutos e o efeito prático volta a ser o botão travado.
+        signal: AbortSignal.timeout(15000),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(corpo),
+      });
+      const dados = (await r.json().catch(() => ({}))) as Resposta;
+      return { ok: r.ok, status: r.status, dados };
+    } catch {
+      return { ok: false, status: 0, dados: { error: t.erroGenerico } as Resposta };
+    }
   }
 
   // ------------------------------------------------------------------ passo 1
@@ -131,6 +154,10 @@ export default function FormularioInscricao({ t, config, elos, jogadorInicial }:
 
     if (r.ok && r.dados.jogador) {
       setJogador(r.dados.jogador);
+      // O cabeçalho do site não sabe que a sessão nasceu aqui dentro (não há troca de
+      // rota): sem o aviso, ele continuava oferecendo "ENTRAR" para quem acabou de criar
+      // a conta, até alguém apertar F5.
+      avisarSessaoMudou();
       setPasso(2);
       return;
     }
@@ -155,6 +182,7 @@ export default function FormularioInscricao({ t, config, elos, jogadorInicial }:
 
     if (r.ok && r.dados.jogador) {
       setJogador(r.dados.jogador);
+      avisarSessaoMudou();
       setModoEntrar(false);
       setPasso(2);
       return;
@@ -341,7 +369,10 @@ export default function FormularioInscricao({ t, config, elos, jogadorInicial }:
 
         <div style={{ display: "flex", gap: 10, marginTop: 22, flexWrap: "wrap" }}>
           {passo > 1 && (
-            <button type="button" className="lob-btn-ghost" onClick={() => { limparAvisos(); setPasso(passo - 1); }}>
+            // "Voltar" NÃO limpa os avisos: quando o envio volta com erro num campo do
+            // passo anterior, apagar aqui tirava da tela a única pista justamente no
+            // caminho que a pessoa percorre para corrigi-lo.
+            <button type="button" className="lob-btn-ghost" onClick={() => setPasso(passo - 1)}>
               {t.voltar}
             </button>
           )}
@@ -359,7 +390,16 @@ export default function FormularioInscricao({ t, config, elos, jogadorInicial }:
           )}
 
           {passo === 2 && (
-            <button type="button" className="lob-btn-gold" onClick={() => { limparAvisos(); setPasso(3); }}>
+            // O passo 2 é conferido ANTES de sair dele. Sem isto dava para avançar com
+            // elo ou rota em branco (ou as duas rotas iguais): o erro só aparecia ao
+            // enviar, no passo 3, apontando para campos que não estão mais na tela — e
+            // a pessoa lia "Confira os campos destacados" sem ver campo destacado nenhum.
+            <button
+              type="button"
+              className="lob-btn-gold"
+              onClick={() => { limparAvisos(); setPasso(3); }}
+              disabled={!elo || !rota1 || !rota2 || rota1 === rota2}
+            >
               {t.continuar}
             </button>
           )}
@@ -574,7 +614,14 @@ function Passo1({
         </Campo>
       </Grade>
 
-      <Campo label={t.nomeLabel} erro={problemaDe("nomeReal")}>
+      {/*
+        Este input alimenta DUAS rotas com nomes de campo diferentes: a criação de conta
+        manda `nome` (passo 1) e a inscrição manda `nomeReal` (envio final). Olhando só
+        `nomeReal`, o erro do passo 1 — "Informe como quer ser chamado", quando alguém
+        digita uma letra só — não acendia em campo nenhum, e a pessoa lia "Confira os
+        campos destacados" sem nenhum campo destacado.
+      */}
+      <Campo label={t.nomeLabel} erro={problemaDe("nomeReal") ?? problemaDe("nome")}>
         <input
           style={entradaEstilo}
           value={campos.nome}

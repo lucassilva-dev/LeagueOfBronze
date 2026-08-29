@@ -1,6 +1,6 @@
 import { teamColor } from "@/lib/design";
-import type { TournamentDataset } from "@/lib/schema";
-import { getSeriesScore, getSeriesWinnerTeamId, isWalkoverSeries } from "@/lib/tournament";
+import type { SeriesFormat, TournamentDataset } from "@/lib/schema";
+import { getSeriesFormat, getSeriesScore, getSeriesWinnerTeamId, isWalkoverSeries } from "@/lib/tournament";
 
 export type CalTeamRef = { id: string; name: string; color: string; imageUrl?: string };
 export type CalGame = {
@@ -10,6 +10,14 @@ export type CalGame = {
   dateLabel: string;
   turno: string;
   hora: string;
+  /**
+   * Formato REAL da série (`series.format`, com o padrão do torneio como reserva).
+   *
+   * O calendário rotulava MD3 fixo em toda série da fase regular e MD5 fixo na final,
+   * ignorando o que está gravado: uma série da fase regular marcada como MD5 e
+   * terminada em 3-1 aparecia aqui como "MD3", enquanto /partidas mostrava MD5.
+   */
+  format: SeriesFormat;
   teamA: CalTeamRef;
   teamB: CalTeamRef;
   stage: string;
@@ -58,6 +66,7 @@ export function buildRegularGames(dataset: TournamentDataset): CalGame[] {
         dateKey: parts.dateKey,
         dateLabel: parts.dateLabel,
         turno: parts.turno,
+        format: getSeriesFormat(series, dataset),
         hora: parts.hora,
         teamA: { id: series.teamAId, name: teamA?.name ?? series.teamAId, color: teamColor(series.teamAId), imageUrl: teamA?.imageUrl },
         teamB: { id: series.teamBId, name: teamB?.name ?? series.teamBId, color: teamColor(series.teamBId), imageUrl: teamB?.imageUrl },
@@ -89,6 +98,7 @@ export function buildFinalGame(dataset: TournamentDataset): CalGame | null {
     dateLabel: parts.dateLabel,
     turno: parts.turno,
     hora: parts.hora,
+    format: getSeriesFormat(series, dataset),
     teamA: { id: series.teamAId, name: teamA?.name ?? series.teamAId, color: teamColor(series.teamAId), imageUrl: teamA?.imageUrl },
     teamB: { id: series.teamBId, name: teamB?.name ?? series.teamBId, color: teamColor(series.teamBId), imageUrl: teamB?.imageUrl },
     stage: "FINAL",

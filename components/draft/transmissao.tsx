@@ -745,8 +745,17 @@ function AoVivo({
             .sort((a, b) => b.pontos - a.pontos)
             .map((jogador) => {
               const elo = resolveElo(jogador.elo);
-              // "Cabe" é só orçamento: o motor não tem regra de rota.
-              const cabe = jogador.pontos <= draft.orcamentoPorTime - daVez.gasto;
+              // "Cabe" é só orçamento (o motor não tem regra de rota), mas é o TETO DA
+              // ESCOLHA, não o saldo: cada vaga que ainda falta preencher reserva 1
+              // ponto, senão o time fica sem como completar o elenco. É a mesma conta de
+              // `tetoDaEscolha` (lib/draft/motor.ts) e do painel do capitão.
+              //
+              // Com o saldo cru, a transmissão marcava como disponível quem o capitão da
+              // vez seria RECUSADO ao escolher — a plateia via um nome ao alcance do time
+              // e o clique voltava erro.
+              const teto =
+                daVez.vagas > 0 ? draft.orcamentoPorTime - daVez.gasto - (daVez.vagas - 1) : 0;
+              const cabe = jogador.pontos <= teto;
               return (
                 <div
                   key={jogador.id}
@@ -1224,6 +1233,37 @@ export default function Transmissao({ t }: Readonly<{ t: Rotulos }>) {
   return (
     <div style={palco}>
       {aviso}
+      {/*
+        PAUSA na transmissão.
+
+        O painel do capitão já tratava `pausado` (mostra `t.pausado`/`t.pausadoTexto`),
+        mas a transmissão caía no `else` e desenhava a tela de draft rodando — idêntica.
+        Na tela projetada, pausar não mudava NADA: o cronômetro só parava de andar, o
+        que dá para confundir com atraso da sondagem. Ninguém na sala sabia se o draft
+        tinha sido interrompido de propósito ou se a transmissão tinha travado.
+
+        Faixa sólida, sem animar opacidade — a regra do projeto (ver .lob-fade e
+        page-shell): estado "apagado" se comunica com cor e texto, nunca com
+        transparência, que já apagou o site quatro vezes.
+      */}
+      {draft.fase === "pausado" ? (
+        <div
+          role="status"
+          style={{
+            margin: "10px 22px 0",
+            padding: "14px 20px",
+            borderRadius: 6,
+            border: `2px solid ${D.ouro}`,
+            background: "rgba(239,166,63,.14)",
+            textAlign: "center",
+          }}
+        >
+          <div style={{ ...kicker(D.ouro, ".3em"), fontSize: 20, fontWeight: 700 }}>
+            {t.pausado}
+          </div>
+          <div style={{ marginTop: 6, fontSize: 14, color: "#f3d69a" }}>{t.pausadoTexto}</div>
+        </div>
+      ) : null}
       {draft.fase === "preparando" ? (
         <Sorteio draft={draft} t={t} nomesParaRolar={nomesParaRolar} />
       ) : draft.fase === "encerrado" ? (

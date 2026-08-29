@@ -32,7 +32,8 @@ export const paginasCompeticao = definir({
     tabelaInfoPontuacaoDestaque: "3 pontos",
     tabelaInfoPontuacaoDepois: " · Derrota = 0.",
     tabelaInfoDesempateTitulo: "DESEMPATE",
-    tabelaInfoDesempateTexto: "1º confronto direto · 2º saldo de mapas (SG) · 3º sorteio.",
+    tabelaInfoDesempateTexto:
+      "1º confronto direto · 2º saldo de mapas (SG) · 3º mapas ganhos · 4º sorteio.",
     tabelaInfoClassificacaoTitulo: "CLASSIFICAÇÃO",
     tabelaInfoClassificacaoAntes: "Os ",
     tabelaInfoClassificacaoDestaque: "2 primeiros",
@@ -146,7 +147,8 @@ export const paginasCompeticao = definir({
     tabelaInfoPontuacaoDestaque: "3 points",
     tabelaInfoPontuacaoDepois: " · Loss = 0.",
     tabelaInfoDesempateTitulo: "TIEBREAKERS",
-    tabelaInfoDesempateTexto: "1st head-to-head · 2nd game differential (GD) · 3rd coin flip.",
+    tabelaInfoDesempateTexto:
+      "1st head-to-head · 2nd game differential (GD) · 3rd games won · 4th coin flip.",
     tabelaInfoClassificacaoTitulo: "QUALIFICATION",
     tabelaInfoClassificacaoAntes: "The ",
     tabelaInfoClassificacaoDestaque: "top 2",

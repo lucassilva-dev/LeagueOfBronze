@@ -121,3 +121,27 @@ export function createBlankSeries(defaultFormat: SeriesFormat = "BO3"): SeriesMa
 export function cloneDataset(dataset: TournamentDataset): TournamentDataset {
   return structuredClone(dataset);
 }
+
+/**
+ * Qual `lastUpdatedISO` o rascunho deve passar a carregar depois de um sorteio ao vivo.
+ *
+ * A rota de sorteio grava por conta própria, então a versão do servidor avança e o
+ * rascunho aberto no painel fica para trás — e todo "Salvar" seguinte cairia em 409.
+ * Adotar a versão nova resolve isso, MAS só é seguro quando a rota partiu exatamente da
+ * versão que este rascunho tem.
+ *
+ * Se outra pessoa salvou depois que este painel carregou, a rota leu a versão DELA.
+ * Carimbar esse número aqui faria a trava de concorrência do PUT parar de disparar: o
+ * rascunho velho passaria na conferência de versão e sobrescreveria o trabalho da outra
+ * pessoa em silêncio — sem banner, sem cartão de conflito e sem desfazer. Nesse caso a
+ * versão antiga PERMANECE, o próximo Salvar cai em 409, e quem está editando escolhe
+ * entre recarregar e sobrescrever.
+ */
+export function proximaVersaoDoRascunho(
+  versaoDoRascunho: string,
+  versaoLida: string | undefined,
+  versaoGravada: string | undefined,
+): string {
+  if (!versaoGravada || !versaoLida) return versaoDoRascunho;
+  return versaoLida === versaoDoRascunho ? versaoGravada : versaoDoRascunho;
+}

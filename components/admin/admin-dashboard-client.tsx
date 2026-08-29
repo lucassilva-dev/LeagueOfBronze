@@ -93,9 +93,8 @@ type AdminTabContentProps = Readonly<{
   onEndTournament: () => void;
   onStartTournament: (payload: StartTournamentPayload) => void;
   onAlert: (kind: "ok" | "erro", text: string) => void;
-  /** Recarrega o dataset do servidor. O sorteio grava direto lá, então o rascunho
-   *  local fica velho na hora — sem isto, salvar depois cairia em 409. */
-  onRecarregar: () => void;
+  /** Aplica no rascunho E na baseline o que o servidor já gravou (sorteio ao vivo). */
+  aplicarDoServidor: MutateDraft;
   /** Escopos da 4ª Edição, para a seção mostrar em leitura em vez de oferecer um 403. */
   podeConferir: boolean;
   podeFinanceiro: boolean;
@@ -519,7 +518,7 @@ function AdminTabContent({
   onEndTournament,
   onStartTournament,
   onAlert,
-  onRecarregar,
+  aplicarDoServidor,
   podeConferir,
   podeFinanceiro,
   podeConfigurar,
@@ -568,7 +567,13 @@ function AdminTabContent({
     case "players":
       return <AdminPlayersPanel draft={draft} mutateDraft={mutateDraft} />;
     case "series":
-      return <AdminSeriesPanel draft={draft} mutateDraft={mutateDraft} onRecarregar={onRecarregar} />;
+      return (
+        <AdminSeriesPanel
+          draft={draft}
+          mutateDraft={mutateDraft}
+          aplicarDoServidor={aplicarDoServidor}
+        />
+      );
     case "backup":
       return (
         <AdminBackupPanel
@@ -717,6 +722,26 @@ export function AdminDashboardClient() {
     });
   };
 
+  /**
+   * Aplica uma mudança no rascunho E na baseline.
+   *
+   * Para o que o SERVIDOR já gravou por fora do editor — hoje, o resultado do sorteio ao
+   * vivo. Mexer só no rascunho (como `mutateDraft`) fazia o painel contar aquilo como
+   * alteração pendente: depois de qualquer sorteio o chip de "alterações não salvas"
+   * ficava aceso para sempre, o aviso de sair da página passava a disparar à toa, e a
+   * pessoa não tinha como distinguir o que ela mudou do que o sorteio trouxe.
+   */
+  const aplicarDoServidor: MutateDraft = (recipe) => {
+    const aplicar = (prev: TournamentDataset | null) => {
+      if (!prev) return prev;
+      const next = cloneDataset(prev);
+      recipe(next);
+      return next;
+    };
+    setDraft(aplicar);
+    setBaseline(aplicar);
+  };
+
   // ------------------------------------------------------------ estado do rascunho
 
   const changes = useMemo<DatasetChange[]>(() => {
@@ -801,7 +826,22 @@ export function AdminDashboardClient() {
         }
         setPassword("");
         await fetchSession();
-        await fetchDataset();
+        /*
+         * A falha AQUI precisa virar `bootError`, e não o erro comum da barra.
+         *
+         * Se a busca do dataset falhasse logo depois de um login bem-sucedido (Supabase
+         * pausado, queda de rede entre as duas requisições), o erro ia para `error`,
+         * `bootError` continuava nulo e a tela de exceção — a que traz o botão "Tentar
+         * de novo" — não aparecia. Com sessão autorizada e `draft` nulo, o painel ficava
+         * preso em "Carregando dados do campeonato..." para sempre, sem mensagem e sem
+         * saída a não ser recarregar a página na mão.
+         */
+        try {
+          await fetchDataset();
+        } catch (falhaNoDataset) {
+          setBootError(getErrorMessage(falhaNoDataset, "Falha ao carregar os dados do campeonato."));
+          throw falhaNoDataset;
+        }
         // O cabeçalho do site não sabe que isto aconteceu: o login é aqui dentro, sem
         // trocar de rota. Sem o aviso, ele continuava oferecendo "ENTRAR" para quem
         // acabou de entrar, até alguém apertar F5.
@@ -826,6 +866,11 @@ export function AdminDashboardClient() {
         setDraft(null);
         setBaseline(null);
         setConflict(false);
+        // A seção volta para o começo. Sem isto, o master que saiu da aba "Usuários"
+        // deixava a próxima pessoa caindo direto nela — e quem não é master leva 403
+        // ali. No notebook da organização, num dia de jogo, isso é a troca normal de
+        // quem está no painel.
+        setActiveTab("overview");
         // #9: o authMode PRECISA sobreviver ao logout. Sem ele o formulário perde o campo
         // de usuário e a pessoa fica presa num 401 até recarregar a página na mão.
         setSession({
@@ -1440,7 +1485,7 @@ export function AdminDashboardClient() {
 
       <section role="region" aria-label={secaoAtiva?.label ?? "Conteúdo do painel"}>
         <AdminTabContent
-          onRecarregar={reloadDataset}
+          aplicarDoServidor={aplicarDoServidor}
           podeConferir={alcanca(["inscricoes:conferir"])}
           podeFinanceiro={alcanca(["inscricoes:financeiro"])}
           podeConfigurar={alcanca(["edicao:configurar"])}

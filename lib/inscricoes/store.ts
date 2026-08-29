@@ -281,7 +281,7 @@ export async function minhaInscricao(jogadorId: string): Promise<MinhaInscricao 
   const { data: inscricao, error } = await cliente
     .from("inscricoes")
     .select(
-      "id,criado_em,riot_id,elo_declarado,elo_congelado,pontos,rota_primaria,rota_secundaria,quer_capitao,situacao,observacao",
+      "id,criado_em,riot_id,elo_declarado,elo_verificado,elo_congelado,pontos,rota_primaria,rota_secundaria,quer_capitao,situacao,observacao",
     )
     .eq("jogador_id", jogadorId)
     .maybeSingle<{
@@ -289,6 +289,7 @@ export async function minhaInscricao(jogadorId: string): Promise<MinhaInscricao 
       criado_em: string;
       riot_id: string;
       elo_declarado: string;
+      elo_verificado: string | null;
       elo_congelado: string | null;
       pontos: number;
       rota_primaria: string;
@@ -316,8 +317,17 @@ export async function minhaInscricao(jogadorId: string): Promise<MinhaInscricao 
 
   return {
     riotId: inscricao.riot_id,
-    // O congelado é o que vale no draft; enquanto não existir, mostramos o declarado.
-    elo: inscricao.elo_congelado ?? inscricao.elo_declarado,
+    /*
+     * A MESMA cascata de três níveis que o resto do sistema usa: congelado (o que vale
+     * no draft) → verificado (o que a organização conferiu) → declarado (a palavra do
+     * jogador).
+     *
+     * Faltava o verificado aqui, e esta tela era a única do site que o pulava. Como
+     * `pontos` JÁ é derivado do elo verificado, o jogador via o elo que declarou ao
+     * lado do preço do elo que a organização confirmou — "Ouro · 8 pontos" — sem nada
+     * na tela explicando a diferença.
+     */
+    elo: inscricao.elo_congelado ?? inscricao.elo_verificado ?? inscricao.elo_declarado,
     pontos: inscricao.pontos,
     rotaPrimaria: inscricao.rota_primaria,
     rotaSecundaria: inscricao.rota_secundaria,
@@ -419,11 +429,34 @@ export async function atualizarInscricao(
 
   if (patch.eloVerificado !== undefined) {
     linha.elo_verificado = patch.eloVerificado;
-    // O preço acompanha o elo que a organização confirmou. Derivado aqui, no
-    // servidor, pela mesma tabela do site — nunca digitado.
-    if (patch.eloVerificado) {
-      const pontos = pontosDoElo(patch.eloVerificado);
-      if (pontos === null) throw new ErroDeRegra(`Elo não reconhecido: ${patch.eloVerificado}`);
+
+    /*
+     * O preço acompanha o elo que a organização confirmou. Derivado aqui, no
+     * servidor, pela mesma tabela do site — nunca digitado.
+     *
+     * Duas regras que a versão anterior desta função quebrava:
+     *
+     * 1. DEPOIS DO CONGELAMENTO o preço para de acompanhar o elo (é a promessa que
+     *    `congelarElos` faz logo abaixo: "um draft em que o preço muda no meio não é
+     *    um draft"). Salvar a ficha reprecificava o jogador mesmo com o elo já
+     *    congelado — inclusive durante o draft.
+     * 2. LIMPAR o elo verificado precisa devolver o preço ao elo declarado. Com a
+     *    guarda só de verdadeiro, `null` apagava o elo e deixava para trás os pontos
+     *    do elo que acabara de ser removido.
+     */
+    const { data: atual, error: erroLeitura } = await createSupabaseAdminClient()
+      .from("inscricoes")
+      .select("elo_declarado,elo_congelado")
+      .eq("id", inscricaoId)
+      .maybeSingle<{ elo_declarado: string; elo_congelado: string | null }>();
+
+    if (erroLeitura) throw new Error(`Falha ao ler a ficha: ${erroLeitura.message}`);
+    if (!atual) throw new ErroDeRegra("Inscrição não encontrada.");
+
+    if (!atual.elo_congelado) {
+      const eloValendo = patch.eloVerificado ?? atual.elo_declarado;
+      const pontos = pontosDoElo(eloValendo);
+      if (pontos === null) throw new ErroDeRegra(`Elo não reconhecido: ${eloValendo}`);
       linha.pontos = pontos;
     }
   }

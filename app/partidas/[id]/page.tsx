@@ -90,6 +90,8 @@ type GameDetailsCardProps = Readonly<{
   blocks: readonly [GameTeamBlock, GameTeamBlock];
   playersById: Map<string, Player>;
   textos: Textos;
+  /** Idioma para os números: sem ele o KDA saía com vírgula decimal no site em inglês. */
+  localeTag: string;
 }>;
 
 function isGrandFinalStage(stage: string | undefined) {
@@ -304,6 +306,7 @@ function GameDetailsCard({
   blocks,
   playersById,
   textos,
+  localeTag,
 }: GameDetailsCardProps) {
   return (
     <Card className="p-5">
@@ -386,7 +389,7 @@ function GameDetailsCard({
                           {row.kills}/{row.deaths}/{row.assists}
                         </TableCell>
                         <TableCell className="whitespace-nowrap text-right">
-                          {formatKda((row.kills + row.assists) / Math.max(1, row.deaths))}
+                          {formatKda((row.kills + row.assists) / Math.max(1, row.deaths), localeTag)}
                         </TableCell>
                       </TableRow>
                     ))
@@ -472,6 +475,11 @@ export default async function PartidaDetalhePage({ params }: PartidaDetalhePageP
         teamB={teamB}
         initialCards={series.cardsUsed ?? []}
         initialBlueSideTeamId={series.blueSideTeamId ?? null}
+        initialUltimoCarta={
+          [...(series.sorteios ?? [])]
+            .reverse()
+            .find((s) => s.tipo === "carta" || s.tipo === "carta_manual") ?? null
+        }
         textos={t.compartilhados}
         nomesCartas={Object.fromEntries(
           Object.entries(t.paginasStats.cartas).map(([id, carta]) => [id, carta.nome]),
@@ -517,6 +525,7 @@ export default async function PartidaDetalhePage({ params }: PartidaDetalhePageP
                 key={`${series.id}-g${gameIndex}`}
                 seriesId={series.id}
                 gameIndex={gameIndex}
+                localeTag={t.compartilhados.localeTag}
                 winnerName={winnerName}
                 durationMin={game.durationMin}
                 gameMvpNick={gameMvpNick}

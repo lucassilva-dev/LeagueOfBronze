@@ -383,6 +383,17 @@ export const cardUsageSchema = z.object({
   dupla: z.boolean().optional(),
 });
 
+/**
+ * Teto do histórico de sorteios de UMA série.
+ *
+ * Exportado porque as três rotas que escrevem em `sorteios` precisam do mesmo número:
+ * chegar no teto tem de RECUSAR a gravação, nunca descartar registro para caber. As
+ * rotas de carta e de lados faziam `.slice(-50)`, que jogava fora o registro mais
+ * antigo em silêncio — num histórico que existe para auditoria, e cuja documentação
+ * diz "append-only", isso é exatamente a falha que ele deveria impedir.
+ */
+export const MAX_SORTEIOS_POR_SERIE = 50;
+
 export const seriesMatchSchema = z.object({
   id: limitado(LIMITES.id),
   date: limitado(LIMITES.iso),
@@ -432,7 +443,7 @@ export const seriesMatchSchema = z.object({
           .optional(),
       }),
     )
-    .max(50)
+    .max(MAX_SORTEIOS_POR_SERIE)
     .optional(),
 });
 

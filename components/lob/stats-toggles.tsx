@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { TeamMark } from "@/components/lob/ui";
-import { championIconUrl } from "@/lib/champions";
+import { championIconUrl, resolveChampion } from "@/lib/champions";
 import { eloSvgUrl } from "@/lib/design";
 
 export type PlayerStatRow = {
@@ -26,6 +26,48 @@ export type ChampStatRow = {
   valueLabel: string;
   sub: string;
 };
+
+/**
+ * Ícone do campeão no ranking, com as iniciais quando o nome não é reconhecido.
+ *
+ * Mesmo tratamento de `components/champion-icon.tsx`, mas com a moldura própria desta
+ * tabela (32px, borda bronze) em vez das classes do outro componente.
+ */
+function IconeDoCampeao({ id, nome }: Readonly<{ id: string; nome: string }>) {
+  const moldura = {
+    width: 32,
+    height: 32,
+    borderRadius: 5,
+    border: "1px solid rgba(201,138,75,.3)",
+    flexShrink: 0,
+  } as const;
+  const resolvido = resolveChampion(id);
+
+  if (!resolvido) {
+    return (
+      <span
+        style={{
+          ...moldura,
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "rgba(201,138,75,.10)",
+          fontSize: 11,
+          fontWeight: 600,
+          color: "#8f8472",
+        }}
+        title={nome || id}
+      >
+        {(nome || id).trim().slice(0, 2).toUpperCase() || "—"}
+      </span>
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={championIconUrl(resolvido.id)} alt={resolvido.name} title={resolvido.name} style={moldura} />
+  );
+}
 
 /** Uma métrica: rótulo do botão, cabeçalho da coluna e legenda embaixo da tabela. */
 type Metrica = { label: string; head: string; desc: string };
@@ -256,8 +298,14 @@ export function StatsToggles({
                 <div key={`${c.rank}-${c.championId}`} style={{ display: "grid", gridTemplateColumns: GRID_C, alignItems: "center", gap: 8, padding: "10px 16px", borderTop: "1px solid rgba(201,138,75,.10)" }}>
                   <span className="lob-display" style={{ fontSize: 15, color: c.rank <= 3 ? "#cfa877" : "#6f6656" }}>{c.rank}</span>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={championIconUrl(c.championId)} alt={c.championName} width={32} height={32} style={{ borderRadius: 5, border: "1px solid rgba(201,138,75,.3)", flexShrink: 0 }} />
+                    {/*
+                      `championIconUrl` monta a URL do Data Dragon com o que receber. O
+                      campeão é digitado à mão no painel, então um nome com erro de
+                      digitação virava uma URL que responde 404 e a linha do ranking
+                      ficava com o ícone quebrado. Resolvendo antes, o não reconhecido
+                      cai nas iniciais — o mesmo tratamento que `ChampionIcon` já dá.
+                    */}
+                    <IconeDoCampeao id={c.championId} nome={c.championName} />
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 13, color: "#f0e9dd", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.championName}</div>
                       <div style={{ fontSize: 10, color: "#8f8472" }}>{c.sub}</div>

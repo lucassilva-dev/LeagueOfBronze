@@ -19,6 +19,7 @@ import {
 } from "@/lib/security/admin-store";
 import { verifyPassword } from "@/lib/security/password";
 import { evaluateLoginRateLimit } from "@/lib/security/rate-limit";
+import { respostaDeErro } from "@/lib/security/resposta-erro";
 import { mesmaOrigem } from "@/lib/security/route-guard";
 import { adminLoginSchema } from "@/lib/schema";
 
@@ -103,7 +104,18 @@ export async function POST(request: NextRequest) {
   }
 
   // 1. Bloqueio por tentativas (contador no Postgres — serverless não compartilha memória)
-  const tentativas = await getRecentAttemptCounts(usuario, ipHash);
+  //
+  // A leitura FALHA FECHADA (estoura quando o banco não responde, para o limitador nunca
+  // ficar desligado em silêncio). Esta rota não tem try em volta daqui, então sem o
+  // tratamento o erro escaparia como 500 cru, sem o código de referência do log.
+  let tentativas;
+  try {
+    tentativas = await getRecentAttemptCounts(usuario, ipHash);
+  } catch (error) {
+    // Com o MESMO piso de tempo dos outros returns desta rota: um caminho de erro
+    // que responde mais rapido que os demais vira canal de medicao.
+    return comPisoDeTempo(inicio, respostaDeErro("api/admin/login", error, "Não foi possível entrar agora."));
+  }
   const decisao = evaluateLoginRateLimit(tentativas);
   if (!decisao.allowed) {
     await recordLoginAttempt({ username: usuario, ipHash, success: false, reason: decisao.reason });

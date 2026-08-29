@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 import {
   Banner,
@@ -170,6 +170,24 @@ export function AdminUsersPanel({ onAlert }: Readonly<{ onAlert: (kind: "ok" | "
   // Para remover é preciso digitar o @usuário: é a única ação sem volta do painel.
   const [textoRemocao, setTextoRemocao] = useState("");
 
+  /*
+   * O aviso vai por REF, e `carregar` não depende dele.
+   *
+   * Com `onAlert` nas dependências, uma listagem que FALHA virava laço infinito: o
+   * catch chama `onAlert`, que muda o estado do pai; o pai re-renderiza e cria um
+   * `onAlert` novo; `carregar` ganha identidade nova; o efeito abaixo dispara de novo;
+   * a busca falha outra vez. O navegador passava a martelar /api/admin/users dezenas de
+   * vezes por segundo enquanto a faixa de erro piscava — e o gatilho é justamente o
+   * cenário que já aconteceu neste projeto (Supabase pausado devolvendo 500) ou um 403
+   * de quem não é master.
+   *
+   * Mesmo padrão de e4/painel-edicao.tsx.
+   */
+  const refAlerta = useRef(onAlert);
+  useEffect(() => {
+    refAlerta.current = onAlert;
+  });
+
   const carregar = useCallback(async () => {
     setCarregando(true);
     try {
@@ -178,11 +196,11 @@ export function AdminUsersPanel({ onAlert }: Readonly<{ onAlert: (kind: "ok" | "
       if (!r.ok) throw new Error(d.error ?? "Falha ao listar usuários.");
       setUsuarios(d.users ?? []);
     } catch (e) {
-      onAlert("erro", e instanceof Error ? e.message : "Falha ao listar usuários.");
+      refAlerta.current("erro", e instanceof Error ? e.message : "Falha ao listar usuários.");
     } finally {
       setCarregando(false);
     }
-  }, [onAlert]);
+  }, []);
 
   useEffect(() => {
     void carregar();
