@@ -14,10 +14,25 @@ import type { TournamentDataset } from "@/lib/schema";
  * O data-store e a guarda são simulados para exercitar a rota inteira sem banco.
  */
 
-const store = vi.hoisted(() => ({ read: vi.fn(), save: vi.fn() }));
+const store = vi.hoisted(() => ({ read: vi.fn(), save: vi.fn(), versao: { atual: 7 } }));
+
+/** Mesma classe de erro do data-store, para o teste exercitar o ramo de conflito. */
+class ConflitoDeVersaoErrorFake extends Error {
+  readonly code = "VERSAO_CONFLITO";
+  constructor(readonly versaoAtual: number) {
+    super("conflito");
+    this.name = "ConflitoDeVersaoError";
+  }
+}
 const guarda = vi.hoisted(() => ({ escopos: [] as (string | undefined)[] }));
 
-vi.mock("@/lib/data-store", () => ({ readDataset: store.read, saveDataset: store.save }));
+vi.mock("@/lib/data-store", () => ({
+  // A rota lê com versão e grava condicionada a ela — é a trava de concorrência.
+  readDatasetComVersao: async () => ({ dataset: await store.read(), versao: store.versao.atual }),
+  readDataset: store.read,
+  saveDataset: store.save,
+  ConflitoDeVersaoError: ConflitoDeVersaoErrorFake,
+}));
 vi.mock("@/lib/security/route-guard", () => ({
   mesmaOrigem: () => true,
   requireAdmin: async (_r: unknown, escopo?: string) => {
@@ -114,21 +129,40 @@ describe("o sorteio não destrói o que já estava gravado", () => {
 });
 
 describe("o sorteio não some depois de anunciado", () => {
-  it("recusa quando o campeonato mudou entre a leitura e a gravação", async () => {
-    // Sem a trava, dois sorteios simultâneos devolviam 200 e um deles desaparecia do
-    // dataset: o organizador via o resultado na tela e ele não estava salvo.
-    let leituras = 0;
-    store.read.mockImplementation(async () => {
-      leituras += 1;
-      const d = dataset();
-      // A segunda leitura (a conferência) vê uma versão diferente.
-      if (leituras > 1) d.tournament.lastUpdatedISO = "2026-08-24T09:99:00.000Z";
-      return d;
-    });
+  it("grava CONDICIONADA à versão lida — a condição viaja junto com a escrita", async () => {
+    /*
+     * O ponto da trava não é conferir: é gravar de forma que o banco recuse.
+     *
+     * A versão anterior lia, comparava e só então gravava — três passos, com uma janela
+     * entre a conferência e a escrita por onde cabia outra requisição inteira. Os dois
+     * sorteios passavam pela conferência e o segundo sobrescrevia o primeiro, com 200 na
+     * tela dos dois.
+     *
+     * Este teste falha se alguém voltar a gravar sem a condição.
+     */
+    store.versao.atual = 7;
+    store.read.mockImplementation(async () => dataset());
 
     const r = await POST(req({ seriesId: "s1", tipo: "lados" }));
+
+    expect(r.status).toBe(200);
+    expect(store.save).toHaveBeenCalledTimes(1);
+    expect(store.save.mock.calls[0]![1]).toEqual({ versaoEsperada: 7 });
+  });
+
+  it("devolve 409 quando o banco recusa a gravação por versão", async () => {
+    // Quem perde a corrida não escreve nada: o `update ... where version = <lida>` não
+    // casa nenhuma linha e o data-store lança. A rota transforma isso em 409 com a
+    // versão atual, para a tela poder se recuperar.
+    store.read.mockImplementation(async () => dataset());
+    store.save.mockRejectedValueOnce(new ConflitoDeVersaoErrorFake(9));
+
+    const r = await POST(req({ seriesId: "s1", tipo: "lados" }));
+    const corpo = (await r.json()) as { conflict?: boolean; versao?: number };
+
     expect(r.status).toBe(409);
-    expect(store.save).not.toHaveBeenCalled();
+    expect(corpo.conflict).toBe(true);
+    expect(corpo.versao).toBe(9);
   });
 
   it("não deixa estado meio-gravado quando a gravação falha", async () => {

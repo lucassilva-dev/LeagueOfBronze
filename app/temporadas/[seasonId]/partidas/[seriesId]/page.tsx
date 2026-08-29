@@ -20,6 +20,7 @@ import { formatKda, formatSeriesDateLabel } from "@/lib/format";
 import { getMessages } from "@/lib/i18n/server";
 import { getServerArchivedSeason } from "@/lib/server-data";
 import {
+  elencoDaSerie,
   getGameMvpPlayerId,
   getGameTeamKills,
   getSeriesById,
@@ -158,7 +159,8 @@ export default async function TemporadaPartidaPage({ params }: PageParams) {
         ) : (
           gameRows.map(({ game, gameIndex, teamARows, teamBRows }) => {
             const winnerName = indexes.teamsById.get(game.winnerTeamId)?.name ?? game.winnerTeamId;
-            const gameMvpNick = indexes.playersById.get(getGameMvpPlayerId(game))?.nick ?? "—";
+            const gameMvpNick =
+              indexes.playersById.get(getGameMvpPlayerId(game, elencoDaSerie(series, dataset)))?.nick ?? "—";
             const kills = getGameTeamKills(game, series, dataset);
             const blocks = [
               { teamName: teamAName, rows: teamARows },

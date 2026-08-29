@@ -5,7 +5,7 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 
 import { requireAdmin } from "@/lib/security/route-guard";
-import { readDataset, saveDataset } from "@/lib/data-store";
+import { ConflitoDeVersaoError, readDatasetComVersao, saveDataset } from "@/lib/data-store";
 import { MAX_SORTEIOS_POR_SERIE, type SeriesMatch } from "@/lib/schema";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
   const { seriesId, blueSideTeamId } = parsed.data;
 
   try {
-    const dataset = await readDataset();
+    const { dataset, versao: versaoLida } = await readDatasetComVersao();
     const series = dataset.seriesMatches.find((row) => row.id === seriesId);
     if (!series) {
       return NextResponse.json({ error: "Série não encontrada." }, { status: 404 });
@@ -85,19 +85,27 @@ export async function POST(request: NextRequest) {
       series.sorteios = [...(series.sorteios ?? []), registro];
     }
 
-    // Mesma trava de concorrência da rota de sorteio e da de cartas: esta rota também
-    // regrava o dataset inteiro a partir do que leu, e sem ela um sorteio de lados
-    // apagava em silêncio o que outra pessoa salvou no intervalo.
-    const versaoLida = dataset.tournament.lastUpdatedISO;
-    const conferencia = await readDataset();
-    if (conferencia.tournament.lastUpdatedISO !== versaoLida) {
-      return NextResponse.json(
-        { error: "Alguém salvou o campeonato enquanto você sorteava. Recarregue e sorteie de novo." },
-        { status: 409 },
-      );
+    /*
+     * Trava de concorrência ATÔMICA: a versão lida vai junto com a gravação, e o banco
+     * recusa se ela já não for a atual. Conferir antes e gravar depois deixava uma janela
+     * entre os dois passos por onde outra requisição inteira passava.
+     */
+    let saved;
+    try {
+      saved = await saveDataset(dataset, { versaoEsperada: versaoLida });
+    } catch (erro) {
+      if (erro instanceof ConflitoDeVersaoError) {
+        return NextResponse.json(
+          {
+            error: "Alguém salvou o campeonato enquanto você sorteava os lados. Recarregue e tente de novo.",
+            conflict: true,
+            versao: erro.versaoAtual,
+          },
+          { status: 409 },
+        );
+      }
+      throw erro;
     }
-
-    const saved = await saveDataset(dataset);
     const savedSeries = saved.seriesMatches.find((row) => row.id === seriesId);
     return NextResponse.json({ ok: true, blueSideTeamId: savedSeries?.blueSideTeamId ?? null });
   } catch (error) {

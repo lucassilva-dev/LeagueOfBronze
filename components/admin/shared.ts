@@ -138,10 +138,10 @@ export function cloneDataset(dataset: TournamentDataset): TournamentDataset {
  * entre recarregar e sobrescrever.
  */
 export function proximaVersaoDoRascunho(
-  versaoDoRascunho: string,
-  versaoLida: string | undefined,
-  versaoGravada: string | undefined,
-): string {
-  if (!versaoGravada || !versaoLida) return versaoDoRascunho;
+  versaoDoRascunho: number | null,
+  versaoLida: number | undefined,
+  versaoGravada: number | undefined,
+): number | null {
+  if (versaoGravada === undefined || versaoLida === undefined) return versaoDoRascunho;
   return versaoLida === versaoDoRascunho ? versaoGravada : versaoDoRascunho;
 }

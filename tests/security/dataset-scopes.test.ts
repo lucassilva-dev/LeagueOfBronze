@@ -49,6 +49,39 @@ describe("diferença do dataset → escopos exigidos", () => {
     expect(escoposDe(base, depois)).toEqual(["players:write"]);
   });
 
+  it("TRANSFERIR um jogador de time exige players:write — e só isso", () => {
+    /*
+     * O MVP automático de cada jogo é derivado e entra na canonicalização do diff. Se ele
+     * dependesse do elenco, mover um jogador mudaria o elenco das séries dele, mudaria o
+     * MVP derivado, e apareceria diferença em `seriesMatches[].games` — fazendo uma
+     * transferência exigir `results:write` e dar 403 citando séries que ninguém abriu.
+     */
+    const depois = clone(base);
+    const jogador = depois.players[0]!;
+    const outroTime = base.teams.find((t) => t.id !== jogador.teamId)!;
+    jogador.teamId = outroTime.id;
+
+    expect(escoposDe(base, depois)).toEqual(["players:write"]);
+  });
+
+  it("trocar o MVP gravado À MÃO num jogo sem estatística exige results:write", () => {
+    /*
+     * Trava contra a "correção" errada para o caso acima: zerar `mvpPlayerId` na
+     * canonicalização faria a transferência parar de exigir `results:write`, mas abriria
+     * um furo — `mvpPlayerId` também é gravado à mão quando o jogo não tem estatística, e
+     * aí alguém sem `results:write` poderia trocá-lo sem o diff ver nada.
+     */
+    const antes = clone(base);
+    const serie = antes.seriesMatches.find((s) => s.games.length > 0)!;
+    serie.games[0]!.statsByPlayer = [];
+    serie.games[0]!.mvpPlayerId = "p1";
+
+    const depois = clone(antes);
+    depois.seriesMatches.find((s) => s.id === serie.id)!.games[0]!.mvpPlayerId = "p2";
+
+    expect(escoposDe(antes, depois)).toContain("results:write");
+  });
+
   it("alterar resultado de jogo exige results:write", () => {
     const depois = clone(base);
     const serie = depois.seriesMatches.find((s) => s.games.length > 0)!;

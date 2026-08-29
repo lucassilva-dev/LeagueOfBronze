@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-import { readDataset, saveDataset } from "@/lib/data-store";
+import { ConflitoDeVersaoError, readDatasetComVersao, saveDataset } from "@/lib/data-store";
 import { iniciarDraft, pausarDraft, retomarDraft } from "@/lib/draft/motor";
 import { datasetDoDraft, problemasDaVirada } from "@/lib/draft/virada";
 import {
@@ -119,7 +119,9 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: "O draft ainda não está pronto para virar.", problemas }, { status: 409 });
         }
 
-        const dataset = await readDataset();
+        // Com versão: a virada substitui times e jogadores a partir do que leu, então uma
+        // gravação que entre no meio seria perdida em silêncio.
+        const { dataset, versao } = await readDatasetComVersao();
 
         // ⚠ Trava que não estava no plano, e que precisa existir: trocar os jogadores
         // de uma temporada que JÁ TEM partidas registradas deixa as estatísticas
@@ -151,12 +153,29 @@ export async function POST(request: NextRequest) {
           resultado.teams.some((time) => time.id === linha.teamId),
         );
 
-        await saveDataset({
-          ...dataset,
-          teams: resultado.teams,
-          players: resultado.players,
-          standingsSeed: semente,
-        });
+        try {
+          await saveDataset(
+            {
+              ...dataset,
+              teams: resultado.teams,
+              players: resultado.players,
+              standingsSeed: semente,
+            },
+            { versaoEsperada: versao },
+          );
+        } catch (erro) {
+          if (erro instanceof ConflitoDeVersaoError) {
+            return NextResponse.json(
+              {
+                error:
+                  "Alguém salvou o campeonato enquanto o draft era aplicado. Recarregue e tente de novo.",
+                conflict: true,
+              },
+              { status: 409 },
+            );
+          }
+          throw erro;
+        }
 
         await registrarAuditoria({
           autor,

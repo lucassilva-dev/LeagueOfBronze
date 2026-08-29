@@ -6,7 +6,7 @@ import { z } from "zod";
 
 import { requireAdmin } from "@/lib/security/route-guard";
 import { isDuplaCard } from "@/lib/cards";
-import { readDataset, saveDataset } from "@/lib/data-store";
+import { ConflitoDeVersaoError, readDatasetComVersao, saveDataset } from "@/lib/data-store";
 import { cardIdSchema, MAX_SORTEIOS_POR_SERIE, type SeriesMatch } from "@/lib/schema";
 
 export const dynamic = "force-dynamic";
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const dataset = await readDataset();
+    const { dataset, versao: versaoLida } = await readDatasetComVersao();
     const series = dataset.seriesMatches.find((row) => row.id === seriesId);
     if (!series) {
       return NextResponse.json({ error: "Série não encontrada." }, { status: 404 });
@@ -111,24 +111,26 @@ export async function POST(request: NextRequest) {
     series.sorteios = [...(series.sorteios ?? []), registro];
 
     /*
-     * Trava de concorrência, a mesma de `/api/admin/series/sorteio` e do PUT do
-     * dataset: `lastUpdatedISO` é carimbado pelo servidor a cada gravação, então
-     * serve de versão.
-     *
-     * Esta rota regrava o dataset INTEIRO a partir do que leu no começo. Sem a trava,
-     * uma carta sorteada no meio de uma edição no painel (ou junto de outro sorteio)
-     * devolvia 200 e apagava em silêncio o que a outra pessoa tinha acabado de salvar.
+     * Trava de concorrência ATÔMICA: a versão lida vai junto com a gravação, e o banco
+     * recusa se ela já não for a atual. Conferir antes e gravar depois deixava uma janela
+     * entre os dois passos por onde outra requisição inteira passava.
      */
-    const versaoLida = dataset.tournament.lastUpdatedISO;
-    const conferencia = await readDataset();
-    if (conferencia.tournament.lastUpdatedISO !== versaoLida) {
-      return NextResponse.json(
-        { error: "Alguém salvou o campeonato enquanto você sorteava. Recarregue e sorteie de novo." },
-        { status: 409 },
-      );
+    let saved;
+    try {
+      saved = await saveDataset(dataset, { versaoEsperada: versaoLida });
+    } catch (erro) {
+      if (erro instanceof ConflitoDeVersaoError) {
+        return NextResponse.json(
+          {
+            error: "Alguém salvou o campeonato enquanto você sorteava a carta. Recarregue e tente de novo.",
+            conflict: true,
+            versao: erro.versaoAtual,
+          },
+          { status: 409 },
+        );
+      }
+      throw erro;
     }
-
-    const saved = await saveDataset(dataset);
     const savedSeries = saved.seriesMatches.find((row) => row.id === seriesId);
     return NextResponse.json({ ok: true, cardsUsed: savedSeries?.cardsUsed ?? [] });
   } catch (error) {

@@ -40,6 +40,21 @@ export class DatasetInvalidError extends Error {
 }
 
 /**
+ * Alguém gravou entre a leitura e a gravação — a versão esperada não é mais a do banco.
+ *
+ * Não é erro de sistema: é o resultado normal de duas pessoas trabalhando ao mesmo tempo.
+ * Quem chama transforma isto em 409 e deixa a pessoa decidir entre recarregar e refazer.
+ */
+export class ConflitoDeVersaoError extends Error {
+  readonly code = "VERSAO_CONFLITO";
+
+  constructor(readonly versaoAtual: number) {
+    super("O campeonato mudou entre a leitura e a gravação.");
+    this.name = "ConflitoDeVersaoError";
+  }
+}
+
+/**
  * Última cópia válida lida nesta instância. Serve para as páginas públicas
  * continuarem no ar caso o payload do banco seja adulterado — sem isso, uma única
  * escrita maliciosa direta no banco derrubava o site inteiro.
@@ -54,6 +69,8 @@ type SupabaseRow = {
   id: string;
   payload: unknown;
   updated_at?: string;
+  /** Versão da linha. Cresce de 1 a cada gravação; é a trava de concorrência. */
+  version?: number;
 };
 
 function parseAndValidateDataset(json: unknown) {
@@ -259,7 +276,7 @@ async function readSupabaseRow(): Promise<SupabaseRow | null> {
 
   const { data, error } = await client
     .from(SUPABASE_TABLE)
-    .select("id,payload,updated_at")
+    .select("id,payload,updated_at,version")
     .eq("id", rowId)
     .maybeSingle<SupabaseRow>();
 
@@ -272,7 +289,7 @@ async function readSupabaseRow(): Promise<SupabaseRow | null> {
   return data ?? null;
 }
 
-async function readSupabaseDataset(): Promise<TournamentDataset> {
+async function readSupabaseDataset(): Promise<{ dataset: TournamentDataset; versao: number }> {
   const row = await readSupabaseRow();
   if (!row) {
     // SEGURANÇA: ler NUNCA pode gravar. Antes, um visitante anônimo em qualquer página
@@ -293,37 +310,107 @@ async function readSupabaseDataset(): Promise<TournamentDataset> {
     // gravação seguinte falhasse, o fallback passava a servir um estado que nunca
     // existiu no banco, e ninguém teria como perceber.
     lastGoodDataset = structuredClone(dataset);
-    return dataset;
+    return { dataset, versao: row.version ?? 0 };
   } catch (error) {
     const detail = error instanceof Error ? error.message.replace(/^Validação falhou:\s*/i, "") : String(error);
     throw new DatasetInvalidError(`${getDatasetValidationErrorPrefix()} no Supabase: ${detail}`);
   }
 }
 
-async function saveSupabaseDataset(dataset: TournamentDataset) {
+/**
+ * Grava o dataset. Com `versaoEsperada`, a gravação é CONDICIONADA a ela.
+ *
+ * É a diferença entre conferir e garantir. A versão anterior lia, comparava
+ * `lastUpdatedISO` e só então gravava — três passos, com uma janela entre a conferência e
+ * a escrita: duas requisições podiam passar as duas pela conferência e a segunda
+ * sobrescrevia a primeira, com 200 na tela dos dois. Aqui a condição vai DENTRO do
+ * `update`, então quem perde a corrida não escreve nada e recebe 0 linhas.
+ *
+ * A versão é um INTEIRO, e não `updated_at`: o carimbo de tempo é gravado pelo app com
+ * precisão de milissegundo, e duas gravações no mesmo milissegundo teriam o mesmo valor —
+ * a condição aprovaria as duas. Um inteiro que só cresce não empata.
+ *
+ * Sem `versaoEsperada` a gravação é incondicional, e isso é proposital: importação,
+ * semeadura e arquivamento substituem o documento inteiro de propósito.
+ */
+async function saveSupabaseDataset(
+  dataset: TournamentDataset,
+  versaoEsperada?: number,
+): Promise<number> {
   const client = createSupabaseAdminClient();
   const rowId = getSupabaseDatasetRowId();
 
-  const { error } = await client.from(SUPABASE_TABLE).upsert(
-    {
-      id: rowId,
-      payload: dataset,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "id" },
-  );
+  const gravarCondicionado = async (versao: number) => {
+    const { data, error } = await client
+      .from(SUPABASE_TABLE)
+      .update({ payload: dataset, updated_at: new Date().toISOString(), version: versao + 1 })
+      .eq("id", rowId)
+      .eq("version", versao)
+      .select("version");
 
-  if (error) {
-    throw new Error(
-      `Falha ao salvar no Supabase (${SUPABASE_TABLE}). Detalhe: ${error.message}`,
-    );
+    if (error) {
+      throw new Error(`Falha ao salvar no Supabase (${SUPABASE_TABLE}). Detalhe: ${error.message}`);
+    }
+    return data && data.length > 0 ? versao + 1 : null;
+  };
+
+  if (versaoEsperada !== undefined) {
+    const gravada = await gravarCondicionado(versaoEsperada);
+    if (gravada !== null) return gravada;
+
+    // Nenhuma linha casou: ou a versão avançou (outra pessoa gravou), ou a linha sumiu.
+    // Relemos só para dizer a versão atual a quem chamou.
+    const atual = await readSupabaseRow();
+    if (!atual) {
+      throw new DatasetMissingError(
+        `Registro "${rowId}" não existe em ${SUPABASE_TABLE}. Use a semeadura no painel admin.`,
+      );
+    }
+    throw new ConflitoDeVersaoError(atual.version ?? 0);
   }
+
+  /*
+   * GRAVAÇÃO INCONDICIONAL (importação, semeadura, arquivamento): substitui o documento de
+   * propósito, mas ainda assim CEDE a vez em vez de atropelar.
+   *
+   * Ler a versão e gravar `versao + 1` em dois passos é uma corrida: dois escritores leem 4
+   * e ambos gravam 5, e a partir daí os dois "5" descrevem conteúdos diferentes — a trava
+   * passaria a aprovar uma gravação que deveria recusar. Por isso mesmo aqui a escrita é
+   * condicionada; a diferença é que, ao perder, ela RETENTA com a versão nova em vez de
+   * devolver conflito. O resultado é o pretendido ("a última substituição vence") sem
+   * nenhuma versão repetida.
+   */
+  const TENTATIVAS = 5;
+  for (let tentativa = 0; tentativa < TENTATIVAS; tentativa++) {
+    const atual = await readSupabaseRow();
+
+    if (!atual) {
+      // A linha ainda não existe: criar é a semeadura. `insert` falha se alguém criou
+      // primeiro, e aí a próxima volta do laço entra pelo caminho normal.
+      const { error } = await client
+        .from(SUPABASE_TABLE)
+        .insert({ id: rowId, payload: dataset, updated_at: new Date().toISOString(), version: 0 });
+      if (!error) return 0;
+      continue;
+    }
+
+    const gravada = await gravarCondicionado(atual.version ?? 0);
+    if (gravada !== null) return gravada;
+  }
+
+  throw new Error(
+    `Falha ao salvar no Supabase (${SUPABASE_TABLE}): outra gravação venceu a disputa ${TENTATIVAS} vezes seguidas.`,
+  );
 }
 
 export async function readDatasetText() {
   const provider = getConfiguredDataProvider();
   if (provider === "supabase") {
-    const dataset = await readSupabaseDataset();
+    // Só o DATASET vai para o arquivo. `readSupabaseDataset` passou a devolver
+    // `{dataset, versao}`, e serializar o par gerava um backup com a forma
+    // `{"dataset":{...},"versao":7}` — que `importDatasetFromText` recusa. O download
+    // parecia perfeito e a quebra só apareceria no dia da restauração.
+    const { dataset } = await readSupabaseDataset();
     return `${JSON.stringify(dataset, null, 2)}\n`;
   }
   return readLocalDatasetText();
@@ -331,24 +418,69 @@ export async function readDatasetText() {
 
 export async function readDataset(): Promise<TournamentDataset> {
   const provider = getConfiguredDataProvider();
-  if (provider === "supabase") return readSupabaseDataset();
+  if (provider === "supabase") return (await readSupabaseDataset()).dataset;
   return readLocalDataset();
 }
 
-export async function saveDataset(input: unknown): Promise<TournamentDataset> {
+/**
+ * Leitura para quem vai GRAVAR: devolve o dataset junto da versão que ele tinha.
+ *
+ * Quem só exibe continua usando `readDataset()`. Quem edita precisa da versão para passá-la
+ * de volta em `saveDataset`, que é o que fecha a corrida entre duas gravações.
+ *
+ * No provedor local a versão é sempre 0 e a gravação condicionada nunca recusa — é um
+ * arquivo, num processo só, sem concorrência a proteger. A trava vale onde ela importa,
+ * que é no Supabase (produção e o site de teste).
+ */
+export async function readDatasetComVersao(): Promise<{
+  dataset: TournamentDataset;
+  versao: number;
+}> {
+  const provider = getConfiguredDataProvider();
+  if (provider === "supabase") return readSupabaseDataset();
+  return { dataset: await readLocalDataset(), versao: 0 };
+}
+
+export async function saveDatasetComVersao(
+  input: unknown,
+  opts?: {
+    /**
+     * Versão lida antes de editar. Com ela a gravação só acontece se ninguém tiver
+     * gravado no intervalo; sem ela, substitui o documento (importação, semeadura,
+     * arquivamento).
+     */
+    versaoEsperada?: number;
+  },
+): Promise<{ dataset: TournamentDataset; versao: number }> {
   const parsed = parseAndValidateDataset(input);
   const dataset = normalizeDatasetForSave(parsed);
   const provider = getConfiguredDataProvider();
 
+  let versao = 0;
   if (provider === "supabase") {
-    await saveSupabaseDataset(dataset);
+    versao = await saveSupabaseDataset(dataset, opts?.versaoEsperada);
   } else {
+    // Arquivo local, processo único: não há concorrência a versionar.
     await saveLocalDataset(dataset);
   }
 
   // Mesmo motivo da leitura: quem recebe o dataset salvo pode mexer nele em seguida.
   lastGoodDataset = structuredClone(dataset);
-  return dataset;
+  return { dataset, versao };
+}
+
+/**
+ * Grava e devolve só o dataset — a forma que a maioria dos chamadores usa.
+ *
+ * Quem precisa saber em QUE versão a gravação caiu usa `saveDatasetComVersao`. Reler depois
+ * de gravar não serve para isso: entre a gravação e a releitura cabe a gravação de outra
+ * pessoa, e o número lido seria o dela.
+ */
+export async function saveDataset(
+  input: unknown,
+  opts?: { versaoEsperada?: number },
+): Promise<TournamentDataset> {
+  return (await saveDatasetComVersao(input, opts)).dataset;
 }
 
 /**
@@ -390,8 +522,13 @@ export async function importDatasetFromText(raw: string) {
 // Ciclo de vida do torneio (orquestram read → helper puro → save)
 // ============================================================
 
-export async function endCurrentTournament(): Promise<TournamentDataset> {
-  const current = await readDataset();
+export async function endCurrentTournament(): Promise<{
+  dataset: TournamentDataset;
+  versao: number;
+}> {
+  // Ler COM versão e gravar condicionado: encerrar é ler-alterar-gravar (arquiva o retrato
+  // do que está no ar), então uma gravação que entre no meio seria perdida em silêncio.
+  const { dataset: current, versao } = await readDatasetComVersao();
 
   /*
    * ENCERRAR É IDEMPOTENTE: encerrar de novo REFAZ o retrato arquivado.
@@ -434,7 +571,7 @@ export async function endCurrentTournament(): Promise<TournamentDataset> {
     ],
   };
 
-  return saveDataset(updated);
+  return saveDatasetComVersao(updated, { versaoEsperada: versao });
 }
 
 export async function startNewTournament(options: {
@@ -443,8 +580,10 @@ export async function startNewTournament(options: {
   keepTeams?: boolean;
   keepPlayers?: boolean;
   archiveCurrent?: boolean;
-}): Promise<TournamentDataset> {
-  let current = await readDataset();
+}): Promise<{ dataset: TournamentDataset; versao: number }> {
+  // Mesma razão de `endCurrentTournament`: é ler-alterar-gravar, então a gravação vai
+  // condicionada à versão lida.
+  let { dataset: current, versao } = await readDatasetComVersao();
 
   const activeWithData =
     current.tournament.status !== "finished" && current.seriesMatches.length > 0;
@@ -456,7 +595,11 @@ export async function startNewTournament(options: {
   }
 
   if (options.archiveCurrent && current.tournament.status !== "finished") {
-    current = await endCurrentTournament();
+    // O arquivamento GRAVA, então a versão avança — seguir com a antiga faria a gravação
+    // seguinte recusar a si mesma.
+    const arquivado = await endCurrentTournament();
+    current = arquivado.dataset;
+    versao = arquivado.versao;
   }
 
   const now = new Date().toISOString();
@@ -470,7 +613,7 @@ export async function startNewTournament(options: {
     now,
   });
 
-  return saveDataset(next);
+  return saveDatasetComVersao(next, { versaoEsperada: versao });
 }
 
 export async function listArchivedSeasons(): Promise<ArchivedSeasonSummary[]> {

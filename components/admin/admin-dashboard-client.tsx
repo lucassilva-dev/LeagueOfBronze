@@ -38,6 +38,7 @@ import {
 } from "@/components/admin/ui";
 import {
   cloneDataset,
+  proximaVersaoDoRascunho,
   type AdminTab,
   type MutateDraft,
 } from "@/components/admin/shared";
@@ -70,6 +71,10 @@ type SessionResponse = {
 
 type DatasetResponse = {
   dataset?: TournamentDataset;
+  /** Código estável de falha (ex.: DATASET_MISSING). */
+  code?: string;
+  /** Versão da linha no banco. É o token da trava de concorrência (ver lib/data-store). */
+  versao?: number;
   message?: string;
   error?: string;
   missing?: string[];
@@ -95,6 +100,10 @@ type AdminTabContentProps = Readonly<{
   onAlert: (kind: "ok" | "erro", text: string) => void;
   /** Aplica no rascunho E na baseline o que o servidor já gravou (sorteio ao vivo). */
   aplicarDoServidor: MutateDraft;
+  /** Acompanha a versão da linha quando uma rota grava por fora do editor. */
+  onVersaoDoServidor: (versaoLida?: number, versaoGravada?: number) => void;
+  /** Formulário de Times/Jogadores preenchido e ainda não aplicado ao rascunho. */
+  onFormularioSujo: (sujo: boolean) => void;
   /** Escopos da 4ª Edição, para a seção mostrar em leitura em vez de oferecer um 403. */
   podeConferir: boolean;
   podeFinanceiro: boolean;
@@ -113,15 +122,19 @@ class ApiError extends Error {
   readonly status: number;
   readonly missing: string[];
   readonly retryAfterSeconds: number | null;
+  /** Código estável do servidor (ex.: DATASET_MISSING), quando ele manda um. */
+  readonly code: string | null;
 
   constructor(
     message: string,
     status: number,
     missing: string[] = [],
     retryAfterSeconds: number | null = null,
+    code: string | null = null,
   ) {
     super(message);
     this.name = "ApiError";
+    this.code = code;
     this.status = status;
     this.missing = missing;
     this.retryAfterSeconds = retryAfterSeconds;
@@ -140,7 +153,8 @@ function erroDaResposta(response: Response, corpo: DatasetResponse | MessageResp
   const missing = Array.isArray((corpo as DatasetResponse).missing)
     ? ((corpo as DatasetResponse).missing as string[])
     : [];
-  return new ApiError(corpo.error || fallback, response.status, missing, lerRetryAfter(response));
+  const code = typeof (corpo as DatasetResponse).code === "string" ? (corpo as DatasetResponse).code! : null;
+  return new ApiError(corpo.error || fallback, response.status, missing, lerRetryAfter(response), code);
 }
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -519,6 +533,8 @@ function AdminTabContent({
   onStartTournament,
   onAlert,
   aplicarDoServidor,
+  onVersaoDoServidor,
+  onFormularioSujo,
   podeConferir,
   podeFinanceiro,
   podeConfigurar,
@@ -563,15 +579,16 @@ function AdminTabContent({
     case "overview":
       return <AdminOverviewPanel draft={draft} />;
     case "teams":
-      return <AdminTeamsPanel draft={draft} mutateDraft={mutateDraft} />;
+      return <AdminTeamsPanel draft={draft} mutateDraft={mutateDraft} onSujoChange={onFormularioSujo} />;
     case "players":
-      return <AdminPlayersPanel draft={draft} mutateDraft={mutateDraft} />;
+      return <AdminPlayersPanel draft={draft} mutateDraft={mutateDraft} onSujoChange={onFormularioSujo} />;
     case "series":
       return (
         <AdminSeriesPanel
           draft={draft}
           mutateDraft={mutateDraft}
           aplicarDoServidor={aplicarDoServidor}
+          onVersaoDoServidor={onVersaoDoServidor}
         />
       );
     case "backup":
@@ -598,6 +615,13 @@ export function AdminDashboardClient() {
    * que aparece na barra é a mesma que vai ser checada na hora de salvar.
    */
   const [baseline, setBaseline] = useState<TournamentDataset | null>(null);
+  /**
+   * Versão do dataset no banco, como estava quando este rascunho foi carregado.
+   *
+   * Vive FORA do dataset porque é atributo da linha, não do documento. Vai de volta no PUT
+   * e é o que permite ao banco recusar a gravação quando outra pessoa gravou no intervalo.
+   */
+  const [versao, setVersao] = useState<number | null>(null);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
@@ -607,6 +631,16 @@ export function AdminDashboardClient() {
   const [esperaSegundos, setEsperaSegundos] = useState<number | null>(null);
   /** Falha na CARGA INICIAL: sem isto a tela ficava em "Carregando..." para sempre (#10). */
   const [bootError, setBootError] = useState<string | null>(null);
+  /** Código do erro de carga, quando o servidor mandou um (ver ApiError.code). */
+  const [bootCode, setBootCode] = useState<string | null>(null);
+  const [semeando, setSemeando] = useState(false);
+  /**
+   * Formulário de Times/Jogadores preenchido mas ainda NÃO aplicado ao rascunho.
+   *
+   * O `sujo` abaixo compara rascunho com baseline e não enxerga esse formulário: sem isto,
+   * sair ou fechar a aba com uma ficha inteira digitada não pedia confirmação nenhuma.
+   */
+  const [formularioSujo, setFormularioSujo] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [tarefa, setTarefa] = useState<Tarefa>(null);
   /** Alguém gravou por cima enquanto este rascunho estava aberto (resposta 409). */
@@ -654,9 +688,10 @@ export function AdminDashboardClient() {
   };
 
   /** Toda vez que o servidor devolve o dataset ele vira rascunho E referência de comparação. */
-  const adotarDatasetDoServidor = (dataset: TournamentDataset) => {
+  const adotarDatasetDoServidor = (dataset: TournamentDataset, versaoDoServidor?: number) => {
     setDraft(dataset);
     setBaseline(cloneDataset(dataset));
+    if (typeof versaoDoServidor === "number") setVersao(versaoDoServidor);
   };
 
   const fetchDataset = async () => {
@@ -669,7 +704,7 @@ export function AdminDashboardClient() {
     if (!response.ok || !data.dataset) {
       throw erroDaResposta(response, data, "Falha ao carregar os dados do campeonato.");
     }
-    adotarDatasetDoServidor(data.dataset);
+    adotarDatasetDoServidor(data.dataset, data.versao);
     return data.dataset;
   };
 
@@ -693,6 +728,7 @@ export function AdminDashboardClient() {
 
   const carregarPainel = () => {
     setBootError(null);
+    setBootCode(null);
     startTransition(async () => {
       try {
         clearAlerts();
@@ -704,6 +740,7 @@ export function AdminDashboardClient() {
         // Erro da carga inicial fica em estado próprio: a tela precisa MOSTRAR a falha e
         // oferecer "tentar de novo" em vez de ficar presa no "Carregando...".
         setBootError(getErrorMessage(bootFailure, "Falha ao iniciar o painel."));
+        setBootCode(bootFailure instanceof ApiError ? bootFailure.code : null);
       }
     });
   };
@@ -742,6 +779,17 @@ export function AdminDashboardClient() {
     setBaseline(aplicar);
   };
 
+  /**
+   * Acompanha a versão quando uma rota grava por fora do editor (o sorteio ao vivo).
+   *
+   * Só adota a versão nova se o rascunho estava exatamente na versão que a rota leu —
+   * ver `proximaVersaoDoRascunho`. Adotar cego carimbaria um rascunho velho com um número
+   * novo e faria a trava do PUT parar de disparar.
+   */
+  const sincronizarVersaoDoServidor = (versaoLida?: number, versaoGravada?: number) => {
+    setVersao((atual) => proximaVersaoDoRascunho(atual, versaoLida, versaoGravada));
+  };
+
   // ------------------------------------------------------------ estado do rascunho
 
   const changes = useMemo<DatasetChange[]>(() => {
@@ -755,23 +803,47 @@ export function AdminDashboardClient() {
   }, [draft, baseline]);
 
   const sujo = changes.length > 0;
+  /** Há trabalho a perder: rascunho alterado OU ficha preenchida e não aplicada. */
+  const temTrabalhoNaoSalvo = sujo || formularioSujo;
 
   // #1: fechar a aba ou recarregar apagava o rascunho em silêncio.
   useEffect(() => {
-    if (!sujo) return;
+    if (!temTrabalhoNaoSalvo) return;
     const aoSair = (event: BeforeUnloadEvent) => {
       event.preventDefault();
       event.returnValue = "";
     };
     window.addEventListener("beforeunload", aoSair);
     return () => window.removeEventListener("beforeunload", aoSair);
-  }, [sujo]);
+  }, [temTrabalhoNaoSalvo]);
+
+  /**
+   * Troca de seção pedindo confirmação quando há ficha preenchida e não aplicada.
+   *
+   * Este é o caminho MAIS provável de perder o trabalho — mais que fechar a aba ou sair:
+   * a pessoa preenche a ficha de um jogador, lembra de conferir outra coisa, clica noutra
+   * seção e o formulário some. `beforeunload` não cobre navegação interna, e o `sujo` do
+   * rascunho não enxerga a ficha.
+   */
+  const trocarDeSecao = (destino: AdminTab) => {
+    if (destino === activeTab) return;
+    if (formularioSujo) {
+      const seguir = window.confirm(
+        "Você preencheu uma ficha e ainda não aplicou ao rascunho. Trocar de seção vai descartá-la. Continuar?",
+      );
+      if (!seguir) return;
+    }
+    setActiveTab(destino);
+  };
 
   const confirmarDescarte = (acao: string) => {
-    if (!sujo) return true;
-    return window.confirm(
-      `Você tem ${changes.length} alteração(ões) não salva(s). ${acao} vai descartar tudo. Continuar?`,
-    );
+    if (!temTrabalhoNaoSalvo) return true;
+    // A ficha preenchida e não aplicada conta como trabalho a perder, mas não entra na
+    // contagem de `changes` — por isso o texto muda quando ela é a única coisa pendente.
+    const oQueSePerde = sujo
+      ? `${changes.length} alteração(ões) não salva(s)`
+      : "uma ficha preenchida e ainda não aplicada ao rascunho";
+    return window.confirm(`Você tem ${oQueSePerde}. ${acao} vai descartar tudo. Continuar?`);
   };
 
   // ------------------------------------------------------------ identidade e permissões
@@ -840,6 +912,7 @@ export function AdminDashboardClient() {
           await fetchDataset();
         } catch (falhaNoDataset) {
           setBootError(getErrorMessage(falhaNoDataset, "Falha ao carregar os dados do campeonato."));
+          setBootCode(falhaNoDataset instanceof ApiError ? falhaNoDataset.code : null);
           throw falhaNoDataset;
         }
         // O cabeçalho do site não sabe que isto aconteceu: o login é aqui dentro, sem
@@ -865,6 +938,7 @@ export function AdminDashboardClient() {
         avisarSessaoMudou();
         setDraft(null);
         setBaseline(null);
+        setVersao(null);
         setConflict(false);
         // A seção volta para o começo. Sem isto, o master que saiu da aba "Usuários"
         // deixava a próxima pessoa caindo direto nela — e quem não é master leva 403
@@ -913,7 +987,9 @@ export function AdminDashboardClient() {
           method: "PUT",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ dataset: datasetToSave, force }),
+          // A versão vai junto: é o que o servidor confere ANTES do diff e o que ele
+          // condiciona a gravação. Com `force` ela é ignorada de propósito.
+          body: JSON.stringify({ dataset: datasetToSave, force, versao }),
         });
         const data = (await response.json()) as DatasetResponse;
 
@@ -932,7 +1008,7 @@ export function AdminDashboardClient() {
           throw erroDaResposta(response, data, "Falha ao salvar.");
         }
         setConflict(false);
-        adotarDatasetDoServidor(data.dataset);
+        adotarDatasetDoServidor(data.dataset, data.versao);
         const standings = calculateStandings(data.dataset);
         setMessage(
           `${data.message || "Salvo com sucesso."} Líder atual: ${
@@ -983,7 +1059,7 @@ export function AdminDashboardClient() {
     if (!response.ok || !data.dataset) {
       throw erroDaResposta(response, data, "Falha ao importar arquivo.");
     }
-    adotarDatasetDoServidor(data.dataset);
+    adotarDatasetDoServidor(data.dataset, data.versao);
     setMessage(data.message || "Importação concluída.");
   };
 
@@ -1000,7 +1076,7 @@ export function AdminDashboardClient() {
     if (!response.ok || !data.dataset) {
       throw erroDaResposta(response, data, "Falha ao importar texto.");
     }
-    adotarDatasetDoServidor(data.dataset);
+    adotarDatasetDoServidor(data.dataset, data.versao);
     setMessage(data.message || "Importação concluída.");
   };
 
@@ -1017,7 +1093,7 @@ export function AdminDashboardClient() {
         if (!response.ok || !data.dataset) {
           throw erroDaResposta(response, data, "Falha ao encerrar a temporada.");
         }
-        adotarDatasetDoServidor(data.dataset);
+        adotarDatasetDoServidor(data.dataset, data.versao);
         setMessage(data.message || "Temporada encerrada.");
       },
       "Falha ao encerrar a temporada.",
@@ -1039,7 +1115,7 @@ export function AdminDashboardClient() {
         if (!response.ok || !data.dataset) {
           throw erroDaResposta(response, data, "Falha ao iniciar a temporada.");
         }
-        adotarDatasetDoServidor(data.dataset);
+        adotarDatasetDoServidor(data.dataset, data.versao);
         setActiveTab("overview");
         setMessage(data.message || "Nova temporada iniciada.");
       },
@@ -1176,14 +1252,64 @@ export function AdminDashboardClient() {
   // ------------------------------------------------------------ telas de exceção
 
   if (bootError && (!session || (session.authorized && !draft))) {
+    /*
+     * "A linha não existe" tem conserto, e o conserto precisa estar NESTA tela.
+     *
+     * A semeadura (`POST /api/admin/dataset/seed`) sempre existiu, mas não havia como
+     * chegar nela: o painel não abre sem dataset, e a importação vive numa aba do painel.
+     * A pessoa ficava num cartão de erro com um "Tentar de novo" que falharia para
+     * sempre — e a própria mensagem do servidor mandava "use a semeadura no painel".
+     */
+    const faltaODataset = bootCode === "DATASET_MISSING";
+    const podeSemear = !identity || hasScope(identity, "dataset:import");
+
+    const semear = () => {
+      setSemeando(true);
+      void (async () => {
+        try {
+          const resposta = await fetch("/api/admin/dataset/seed", {
+            method: "POST",
+            credentials: "same-origin",
+          });
+          const dados = (await resposta.json()) as DatasetResponse;
+          if (!resposta.ok || !dados.dataset) {
+            throw erroDaResposta(resposta, dados, "Falha ao semear o banco.");
+          }
+          setBootError(null);
+          setBootCode(null);
+          carregarPainel();
+        } catch (falha) {
+          setBootError(getErrorMessage(falha, "Falha ao semear o banco."));
+        } finally {
+          setSemeando(false);
+        }
+      })();
+    };
+
     return (
       <Card padding="26px 24px">
-        <Banner tone="danger" title="Não foi possível abrir o painel">
+        <Banner
+          tone={faltaODataset ? "warn" : "danger"}
+          title={faltaODataset ? "Este banco ainda não tem o campeonato" : "Não foi possível abrir o painel"}
+        >
           {bootError}
+          {faltaODataset && !podeSemear ? (
+            <>
+              <br />
+              Semear exige a permissão de importar dados — peça ao responsável pelo campeonato.
+            </>
+          ) : null}
         </Banner>
-        <Button tone="gold" onClick={carregarPainel} disabled={isPending}>
-          {isPending ? "Tentando..." : "Tentar de novo"}
-        </Button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <Button tone="gold" onClick={carregarPainel} disabled={isPending || semeando}>
+            {isPending ? "Tentando..." : "Tentar de novo"}
+          </Button>
+          {faltaODataset && podeSemear ? (
+            <Button onClick={semear} disabled={semeando || isPending}>
+              {semeando ? "Semeando..." : "Semear a partir do arquivo do repositório"}
+            </Button>
+          ) : null}
+        </div>
       </Card>
     );
   }
@@ -1386,7 +1512,7 @@ export function AdminDashboardClient() {
             alcanca={alcanca(secao.escopos)}
             motivoBloqueio={motivoBloqueio(secao)}
             horizontal={horizontal}
-            onClick={() => setActiveTab(secao.value)}
+            onClick={() => trocarDeSecao(secao.value)}
           />
         ))}
       </div>
@@ -1486,6 +1612,8 @@ export function AdminDashboardClient() {
       <section role="region" aria-label={secaoAtiva?.label ?? "Conteúdo do painel"}>
         <AdminTabContent
           aplicarDoServidor={aplicarDoServidor}
+          onVersaoDoServidor={sincronizarVersaoDoServidor}
+          onFormularioSujo={setFormularioSujo}
           podeConferir={alcanca(["inscricoes:conferir"])}
           podeFinanceiro={alcanca(["inscricoes:financeiro"])}
           podeConfigurar={alcanca(["edicao:configurar"])}

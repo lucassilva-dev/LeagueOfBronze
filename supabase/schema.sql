@@ -4,8 +4,12 @@
 create table if not exists public.tournament_state (
   id text primary key,
   payload jsonb not null,
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  version bigint not null default 0
 );
+
+-- Para bancos criados antes de a coluna existir.
+alter table public.tournament_state add column if not exists version bigint not null default 0;
 
 comment on table public.tournament_state is
 'Armazena o dataset completo do campeonato (JSON) para uso do site/admin.';
@@ -18,6 +22,9 @@ comment on column public.tournament_state.payload is
 
 comment on column public.tournament_state.updated_at is
 'Data de atualização do registro.';
+
+comment on column public.tournament_state.version is
+'Trava de concorrencia. Cresce 1 a cada gravacao; o app grava com "where version = <a que leu>" e trata zero linhas como conflito (409). NAO usar updated_at para isso: ele e gravado pelo app com precisao de milissegundo, e duas gravacoes no mesmo milissegundo teriam o mesmo valor.';
 
 create index if not exists tournament_state_updated_at_idx
   on public.tournament_state (updated_at desc);

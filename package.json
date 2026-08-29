@@ -11,7 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "sonar": "sonar"
+    "sonar": "sonar-scanner-npm"
   },
   "keywords": [],
   "author": "",
@@ -24,7 +24,7 @@
     "date-fns": "^4.1.0",
     "framer-motion": "^12.34.3",
     "lucide-react": "^0.575.0",
-    "next": "^16.1.6",
+    "next": "^16.3.3",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "server-only": "^0.0.1",
@@ -32,7 +32,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@sonar/scan": "^4.3.5",
+    "@sonar/scan": "^5.0.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^25.3.0",

@@ -23,6 +23,7 @@ import type { Messages } from "@/lib/i18n/messages";
 import { getMessages } from "@/lib/i18n/server";
 import { getServerDataset } from "@/lib/server-data";
 import {
+  elencoDaSerie,
   getGameMvpPlayerId,
   getGameTeamKills,
   getSeriesById,
@@ -516,7 +517,7 @@ export default async function PartidaDetalhePage({ params }: PartidaDetalhePageP
         ) : (
           gameRows.map(({ game, gameIndex, teamARows, teamBRows }) => {
             const winnerName = indexes.teamsById.get(game.winnerTeamId)?.name ?? game.winnerTeamId;
-            const gameMvpPlayerId = getGameMvpPlayerId(game);
+            const gameMvpPlayerId = getGameMvpPlayerId(game, elencoDaSerie(series, dataset));
             const gameMvpNick = indexes.playersById.get(gameMvpPlayerId)?.nick ?? gameMvpPlayerId;
             const kills = getGameTeamKills(game, series, dataset);
 

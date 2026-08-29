@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 
-import { readDataset, saveDataset } from "@/lib/data-store";
+import { ConflitoDeVersaoError, readDatasetComVersao, saveDataset } from "@/lib/data-store";
 import { isDuplaCard } from "@/lib/cards";
 import { novaSemente, sortearCarta, sortearLado, sortearLetras } from "@/lib/series/sorteio";
 import { requireAdmin } from "@/lib/security/route-guard";
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
   if (!comEscopo.ok) return comEscopo.response;
 
   try {
-    const dataset = await readDataset();
+    const { dataset, versao: versaoLida } = await readDatasetComVersao();
     const serie = dataset.seriesMatches.find((s) => s.id === seriesId);
     if (!serie) return NextResponse.json({ error: "Série não encontrada." }, { status: 404 });
 
@@ -155,23 +155,6 @@ export async function POST(request: NextRequest) {
     // o que alguém tentando apagar rastro iria querer.
     novaSerie.sorteios = [...(novaSerie.sorteios ?? []), registro];
 
-    /*
-     * Trava de concorrência, a mesma que o PUT do dataset usa: `lastUpdatedISO` é
-     * carimbado pelo servidor a cada gravação, então serve de versão.
-     *
-     * Sem ela, dois sorteios simultâneos (ou um sorteio no meio de uma edição no
-     * painel) devolviam 200 e um deles sumia do dataset — o organizador via o
-     * resultado na tela e ele não estava salvo.
-     */
-    const versaoLida = dataset.tournament.lastUpdatedISO;
-    const conferencia = await readDataset();
-    if (conferencia.tournament.lastUpdatedISO !== versaoLida) {
-      return NextResponse.json(
-        { error: "Alguém salvou o campeonato enquanto você sorteava. Recarregue e sorteie de novo." },
-        { status: 409 },
-      );
-    }
-
     // Monta um dataset NOVO em vez de escrever dentro do que veio da leitura: se a
     // gravação falhar, nada do que já está em memória saiu do lugar. Antes, a série
     // era substituída no objeto lido e uma falha no banco deixava o processo servindo
@@ -180,7 +163,31 @@ export async function POST(request: NextRequest) {
       ...dataset,
       seriesMatches: dataset.seriesMatches.map((s) => (s.id === seriesId ? novaSerie : s)),
     };
-    const salvo = await saveDataset(paraSalvar);
+
+    /*
+     * Trava de concorrência ATÔMICA: a versão lida vai junto com a gravação, e o banco
+     * recusa se ela já não for a atual.
+     *
+     * A versão anterior lia de novo, comparava `lastUpdatedISO` e só então gravava — e
+     * entre a comparação e a gravação cabia outra requisição inteira. Dois sorteios quase
+     * simultâneos passavam os dois pela conferência, e o segundo sobrescrevia o primeiro
+     * com 200 na tela dos dois: o organizador via um resultado que não estava salvo.
+     */
+    try {
+      await saveDataset(paraSalvar, { versaoEsperada: versaoLida });
+    } catch (erro) {
+      if (erro instanceof ConflitoDeVersaoError) {
+        return NextResponse.json(
+          {
+            error: "Alguém salvou o campeonato enquanto você sorteava. Recarregue e sorteie de novo.",
+            conflict: true,
+            versao: erro.versaoAtual,
+          },
+          { status: 409 },
+        );
+      }
+      throw erro;
+    }
 
     return NextResponse.json({
       ok: true,
@@ -207,15 +214,8 @@ export async function POST(request: NextRequest) {
        * antes era mascarado pela recarga completa que a cerimônia disparava (e que abria
        * `window.confirm` no meio da transmissão).
        */
-      versao: salvo.tournament.lastUpdatedISO,
-      /*
-       * A versão que esta rota LEU antes de gravar.
-       *
-       * O painel só pode adotar `versao` se o rascunho dele estiver exatamente nesta
-       * versão. Sem isso, adotar `versao` cegamente carimba um rascunho VELHO com um
-       * número novo e a trava de concorrência do PUT para de disparar: o rascunho passa
-       * pela conferência de versão e sobrescreve, em silêncio, o que outra pessoa salvou.
-       */
+      versao: versaoLida + 1,
+      /** A versão que esta rota LEU antes de gravar — o painel só adota `versao` se casar. */
       versaoLida,
       /** Quantas vezes este mesmo sorteio já foi feito — a tela avisa na repetição. */
       vezes: novaSerie.sorteios.filter((s) => s.tipo === tipo && s.teamId === registro.teamId).length,

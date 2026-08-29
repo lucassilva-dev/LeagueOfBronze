@@ -32,7 +32,6 @@ import {
   createBlankGame,
   createBlankSeries,
   createBlankStatsRow,
-  proximaVersaoDoRascunho,
   slugifyValue,
   type MutateDraft,
 } from "@/components/admin/shared";
@@ -772,11 +771,14 @@ export function AdminSeriesPanel({
   draft,
   mutateDraft,
   aplicarDoServidor,
+  onVersaoDoServidor,
 }: Readonly<{
   draft: TournamentDataset;
   mutateDraft: MutateDraft;
   /** Para o que o servidor já gravou: entra no rascunho E na baseline. */
   aplicarDoServidor: MutateDraft;
+  /** Avisa a versão que a rota leu e a que ela gravou, para o painel acompanhar a trava. */
+  onVersaoDoServidor: (versaoLida?: number, versaoGravada?: number) => void;
 }>) {
   // O sorteio ao vivo grava DIRETO no servidor, fora do rascunho. Por isso ele DEVOLVE
   // o que gravou (`onSorteado`): o rascunho local sincroniza só `blueSideTeamId` e
@@ -2186,29 +2188,11 @@ export function AdminSeriesPanel({
           // a recarga abre `window.confirm` quando há edição pendente e congelava a
           // roda na tela projetada — e, se passasse direto, descartaria em silêncio
           // o que o organizador estivesse editando.
-          aplicarDoServidor((next) => {
-            /*
-             * A VERSÃO acompanha — mas SÓ se o rascunho estiver na mesma versão que a
-             * rota leu antes de gravar.
-             *
-             * A rota do sorteio grava por conta própria e o `lastUpdatedISO` avança; sem
-             * copiar o novo aqui, o primeiro "Salvar" depois de um sorteio ao vivo cai
-             * sempre em 409. Mas adotar CEGO é pior do que o 409: se outra pessoa salvou
-             * depois que este painel carregou, a rota leu a versão dela, e carimbar esse
-             * número num rascunho velho faz a trava de concorrência do PUT parar de
-             * disparar — este rascunho passa na conferência e sobrescreve o trabalho da
-             * outra pessoa em silêncio, sem banner e sem desfazer.
-             *
-             * Quando não casa, a versão antiga fica: o próximo "Salvar" cai em 409 e o
-             * organizador escolhe entre recarregar e sobrescrever, que é exatamente o que
-             * a trava existe para oferecer.
-             */
-            next.tournament.lastUpdatedISO = proximaVersaoDoRascunho(
-              next.tournament.lastUpdatedISO,
-              versaoLida,
-              versao,
-            );
+          // A versão é atributo da LINHA no banco, não do documento — quem guarda é o
+          // painel principal. Aqui só se repassa o que a rota informou.
+          onVersaoDoServidor(versaoLida, versao);
 
+          aplicarDoServidor((next) => {
             const serie = next.seriesMatches.find((row) => row.id === selectedSeries.id);
             if (!serie) return;
 

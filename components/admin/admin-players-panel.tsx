@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { Player, TournamentDataset } from "@/lib/schema";
 import { createBlankPlayer, slugifyValue, type MutateDraft } from "@/components/admin/shared";
@@ -237,9 +237,12 @@ function criarJogadorEmBranco(): Player {
 export function AdminPlayersPanel({
   draft,
   mutateDraft,
+  onSujoChange,
 }: Readonly<{
   draft: TournamentDataset;
   mutateDraft: MutateDraft;
+  /** Avisa que há formulário preenchido e ainda não aplicado ao rascunho. */
+  onSujoChange?: (sujo: boolean) => void;
 }>) {
   const [selectedId, setSelectedId] = useState<string | null>(draft.players[0]?.id ?? null);
   const [teamFilter, setTeamFilter] = useState<string>("all");
@@ -258,6 +261,28 @@ export function AdminPlayersPanel({
   const base = salvo ?? branco;
   const editando = Boolean(salvo);
   const sujo = serializa(form) !== serializa(carregado);
+
+  /*
+   * Avisa o painel principal que existe formulário preenchido e ainda NÃO aplicado.
+   *
+   * O `sujo` do painel principal compara rascunho com baseline, e este formulário só entra
+   * no rascunho quando alguém clica em "Salvar no rascunho". Sem este aviso, sair ou
+   * fechar a aba com uma ficha inteira digitada não pedia confirmação nenhuma: o
+   * `beforeunload` não estava registrado e o "Sair" não perguntava — tudo o que foi
+   * digitado sumia sem uma palavra.
+   *
+   * O callback vai por REF e o efeito depende só de `sujo`: com o callback nas
+   * dependências, um pai que o recriasse a cada render faria o efeito disparar em laço.
+   */
+  const refSujo = useRef(onSujoChange);
+  useEffect(() => {
+    refSujo.current = onSujoChange;
+  });
+  useEffect(() => {
+    refSujo.current?.(sujo);
+    // Ao desmontar (trocar de aba), o formulário deixa de existir — e de contar.
+    return () => refSujo.current?.(false);
+  }, [sujo]);
 
   const times = useMemo(
     () => draft.teams.slice().sort((a, b) => a.name.localeCompare(b.name, "pt-BR")),

@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-import { readDataset, saveDataset } from "@/lib/data-store";
+import {
+  ConflitoDeVersaoError,
+  DatasetMissingError,
+  readDatasetComVersao,
+  saveDatasetComVersao,
+} from "@/lib/data-store";
 import { authorizeDatasetChange } from "@/lib/security/dataset-diff";
 import { respostaDeErro } from "@/lib/security/resposta-erro";
 import { requireAdmin } from "@/lib/security/route-guard";
@@ -16,9 +21,34 @@ export async function GET(request: NextRequest) {
   if (!guarda.ok) return guarda.response;
 
   try {
-    const dataset = await readDataset();
-    return NextResponse.json({ dataset });
+    // A VERSÃO viaja junto: é o token que o painel devolve no PUT para provar que editou
+    // em cima do estado atual. Sem ela o editor não teria como participar da trava.
+    const { dataset, versao } = await readDatasetComVersao();
+    return NextResponse.json({ dataset, versao });
   } catch (error) {
+    /*
+     * A LINHA NÃO EXISTIR é um estado com conserto, e a tela precisa saber disso.
+     *
+     * Sem o código abaixo virava um 500 genérico: o painel mostrava "Não foi possível
+     * abrir o painel" com um botão "Tentar de novo" que falharia para sempre, e a
+     * semeadura — que é justamente o conserto — não tinha caminho nenhum na interface.
+     * A mensagem do erro chegava a mandar "use a semeadura no painel admin", que não
+     * existia.
+     *
+     * O texto aqui é genérico de propósito: o nome da tabela e o id da linha ficam só no
+     * log, com o código de referência.
+     */
+    if (error instanceof DatasetMissingError) {
+      console.error("[admin/dataset GET] dataset ausente", error);
+      return NextResponse.json(
+        {
+          error:
+            "Os dados do campeonato ainda não existem neste banco. É possível semear a partir do arquivo do repositório.",
+          code: "DATASET_MISSING",
+        },
+        { status: 404 },
+      );
+    }
     return respostaDeErro("admin/dataset GET", error, "Falha ao carregar os dados do campeonato.");
   }
 }
@@ -46,6 +76,8 @@ export async function PUT(request: NextRequest) {
 
   const payload = (body as { dataset?: unknown })?.dataset ?? body;
   const forcar = (body as { force?: unknown })?.force === true;
+  const versaoDoCliente = (body as { versao?: unknown })?.versao;
+  const versaoEnviada = typeof versaoDoCliente === "number" ? versaoDoCliente : undefined;
 
   // Valida ANTES de comparar, para o diff trabalhar sobre dados confiáveis.
   const parsed = tournamentDatasetSchema.safeParse(payload);
@@ -58,15 +90,41 @@ export async function PUT(request: NextRequest) {
   }
 
   try {
-    const atual = await readDataset();
+    const { dataset: atual, versao: versaoAtual } = await readDatasetComVersao();
 
-    // Trava de concorrência. O painel carrega o dataset e edita em rascunho; se outra
-    // pessoa gravar nesse meio-tempo (inclusive um sorteio de carta ou de lado, que
-    // gravam por conta própria), salvar por cima apagaria o trabalho dela em silêncio.
-    // `lastUpdatedISO` é carimbado pelo servidor a cada gravação, então serve de versão.
-    const versaoEnviada = parsed.data.tournament.lastUpdatedISO;
-    const versaoAtual = atual.tournament.lastUpdatedISO;
-    if (!forcar && versaoEnviada && versaoAtual && versaoEnviada !== versaoAtual) {
+    /*
+     * Trava de concorrência. O painel carrega o dataset e edita em rascunho; se outra
+     * pessoa gravar nesse meio-tempo (inclusive um sorteio de carta ou de lado, que
+     * gravam por conta própria), salvar por cima apagaria o trabalho dela em silêncio.
+     *
+     * Esta conferência é só a recusa ANTECIPADA, para não gastar o diff de autorização
+     * num envio que já se sabe velho. Quem de fato garante é a gravação condicionada lá
+     * embaixo: entre esta linha e o `saveDataset` cabe outra requisição inteira, e era
+     * exatamente por aí que dois salvamentos quase simultâneos passavam os dois.
+     */
+    /*
+     * A VERSÃO É OBRIGATÓRIA (fora do `force`), e isso não é burocracia.
+     *
+     * A gravação condicionada lá embaixo usa a versão que ESTE pedido acabou de ler, então
+     * ela fecha a corrida entre a leitura e a escrita do servidor — mas não sabe nada sobre
+     * há quanto tempo o rascunho do cliente está aberto. Sem exigir o token, um corpo sem
+     * `versao` passava direto: o servidor lia a versão atual, gravava condicionado a ela, e
+     * um rascunho de meia hora atrás sobrescrevia tudo sem 409 nenhum. Ou seja, omitir o
+     * campo equivalia a `force` — uma trava que só o nosso próprio painel aplicava.
+     */
+    if (!forcar && versaoEnviada === undefined) {
+      return NextResponse.json(
+        {
+          error:
+            "Este envio não trouxe a versão do campeonato. Recarregue a página do painel e tente de novo.",
+          conflict: true,
+          serverVersion: versaoAtual,
+        },
+        { status: 409 },
+      );
+    }
+
+    if (!forcar && versaoEnviada !== versaoAtual) {
       return NextResponse.json(
         {
           error:
@@ -174,11 +232,53 @@ export async function PUT(request: NextRequest) {
     }
 
     if (veredito.changes.length === 0) {
-      return NextResponse.json({ dataset: atual, message: "Nada mudou." });
+      return NextResponse.json({ dataset: atual, versao: versaoAtual, message: "Nada mudou." });
     }
 
-    const dataset = await saveDataset(parsed.data);
-    return NextResponse.json({ dataset, message: "Dados salvos com sucesso." });
+    /*
+     * A GRAVAÇÃO É CONDICIONADA à versão lida — é ela que fecha a corrida de verdade.
+     *
+     * `force` grava sem condição de propósito: é o "salvar por cima assim mesmo" que a
+     * tela oferece depois de mostrar o 409, e aí sobrescrever é a decisão consciente de
+     * quem está editando.
+     */
+    let gravado;
+    try {
+      // Condicionada à versão que o CLIENTE afirmou ter (já conferida acima como igual à
+      // atual), e não à que o servidor leu: assim a condição descreve o estado sobre o
+      // qual a pessoa de fato editou.
+      gravado = await saveDatasetComVersao(parsed.data, {
+        versaoEsperada: forcar ? undefined : versaoEnviada,
+      });
+    } catch (erro) {
+      if (erro instanceof ConflitoDeVersaoError) {
+        return NextResponse.json(
+          {
+            error:
+              "Outra pessoa salvou alterações enquanto você editava. Recarregue para ver a versão atual, ou salve novamente para sobrescrever.",
+            conflict: true,
+            serverVersion: erro.versaoAtual,
+          },
+          { status: 409 },
+        );
+      }
+      throw erro;
+    }
+
+    /*
+     * A versão devolvida é a que a GRAVAÇÃO caiu — nem previsão, nem releitura.
+     *
+     * Prever `versaoAtual + 1` quebrava o provedor local (que devolve sempre 0): o painel
+     * guardava 1, mandava 1 no salvamento seguinte, o servidor lia 0 e recusava, e a partir
+     * do SEGUNDO "Salvar" tudo caía em 409. E reler depois de gravar tem o problema oposto:
+     * entre a gravação e a releitura cabe a gravação de OUTRA pessoa, e o painel sairia
+     * carregando o número dela — passando a sobrescrevê-la no próximo Salvar.
+     */
+    return NextResponse.json({
+      dataset: gravado.dataset,
+      versao: gravado.versao,
+      message: "Dados salvos com sucesso.",
+    });
   } catch (error) {
     return respostaDeErro("admin/dataset PUT", error, "Falha ao salvar os dados do campeonato.");
   }

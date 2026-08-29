@@ -240,7 +240,8 @@ describe("tournament helpers", () => {
     };
 
     expect(inferGameMvpPlayerId([])).toBe("");
-    expect(getGameMvpPlayerId(emptyGame)).toBe("legacy");
+    // Sem linha de estatística no elenco, vale o MVP gravado à mão.
+    expect(getGameMvpPlayerId(emptyGame, new Set())).toBe("legacy");
     expect(getSeriesFormat(semifinal, dataset)).toBe("BO5");
     expect(getSeriesFormatLabel(semifinal, dataset)).toBe("MD5");
     expect(getSeriesTargetWins(semifinal, dataset)).toBe(3);
@@ -729,5 +730,31 @@ describe("tournament helpers", () => {
       to: "2026-03-21",
     });
     expect(invalidDateAggs.find((player) => player.playerId === "a1")?.kills).toBe(1);
+  });
+
+  it("não escolhe MVP fora do elenco dos dois times da série", () => {
+    /*
+     * `inferGameMvpPlayerId` pega a melhor linha de K/D/A do jogo, e uma linha pode
+     * carregar um id que não é de nenhum dos dois times — resto de uma troca de time na
+     * série, ou id digitado errado no painel. Sem o recorte pelo elenco, o MVP anunciado
+     * podia ser alguém que não aparece em NENHUMA das duas tabelas daquele jogo: na tela
+     * parece defeito de renderização, mas é o dado.
+     *
+     * O intruso tem o MELHOR KDA de propósito — é ele que venceria sem o recorte.
+     */
+    const jogo = {
+      winnerTeamId: "a",
+      mvpPlayerId: "",
+      durationMin: 30,
+      statsByPlayer: [
+        { playerId: "intruso", kills: 20, deaths: 0, assists: 20 },
+        { playerId: "a1", kills: 5, deaths: 2, assists: 5 },
+      ],
+    };
+
+    // Dentro do elenco, o intruso venceria — é o que prova que o recorte é o que decide.
+    expect(getGameMvpPlayerId(jogo, new Set(["intruso", "a1"]))).toBe("intruso");
+    // Fora do elenco, ele não concorre.
+    expect(getGameMvpPlayerId(jogo, new Set(["a1"]))).toBe("a1");
   });
 });

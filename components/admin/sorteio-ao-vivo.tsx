@@ -64,9 +64,9 @@ type Props = Readonly<{
     blueSideTeamId: string | null;
     cardsUsed: { teamId: string; cardId: string; dupla?: boolean }[];
     /** Versão nova do dataset. Sem ela o painel salva com a versão velha e leva 409. */
-    versao?: string;
+    versao?: number;
     /** Versão que a rota leu. O painel só adota `versao` se o rascunho estiver nela. */
-    versaoLida?: string;
+    versaoLida?: number;
     /** Histórico atualizado: os avisos de exclusão/renomeação do painel dependem dele. */
     sorteios?: unknown[];
   }) => void;
@@ -91,10 +91,10 @@ type RespostaSorteio = {
   cardsUsed: { teamId: string; cardId: string; dupla?: boolean }[];
   /** Quantas vezes ESTE sorteio já foi feito nesta série. 1 = primeira. */
   vezes: number;
-  /** `lastUpdatedISO` do dataset depois da gravação, para o painel não cair em 409. */
-  versao?: string;
-  /** `lastUpdatedISO` que a rota LEU antes de gravar — o painel só adota `versao` se casar. */
-  versaoLida?: string;
+  /** Versão da linha DEPOIS da gravação, para o painel não cair em 409. */
+  versao?: number;
+  /** Versão que a rota LEU antes de gravar — o painel só adota `versao` se casar. */
+  versaoLida?: number;
   /** Histórico já com o registro deste sorteio, para o rascunho do painel acompanhar. */
   sorteios?: unknown[];
 };

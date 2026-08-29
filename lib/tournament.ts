@@ -65,8 +65,50 @@ export function inferGameMvpPlayerId(rows: PlayerGameStats[]) {
   return ranked[0].playerId;
 }
 
-export function getGameMvpPlayerId(game: SeriesGame) {
-  return inferGameMvpPlayerId(game.statsByPlayer) || game.mvpPlayerId;
+/**
+ * Índice teamId → ids dos jogadores. Montado uma vez e reaproveitado.
+ *
+ * Existe para o elenco de uma série sair sem varrer `dataset.players` a cada jogo:
+ * `applyAutoGameMvpsToDataset` roda em toda gravação E na canonicalização do diff de
+ * autorização, então o custo aparece.
+ */
+function idsPorTime(dataset: TournamentDataset): Map<string, Set<string>> {
+  const mapa = new Map<string, Set<string>>();
+  for (const jogador of dataset.players) {
+    const balde = mapa.get(jogador.teamId);
+    if (balde) balde.add(jogador.id);
+    else mapa.set(jogador.teamId, new Set([jogador.id]));
+  }
+  return mapa;
+}
+
+/** Quem pode ser MVP desta série: o elenco dos DOIS times que a disputam. */
+export function elencoDaSerie(
+  series: SeriesMatch,
+  dataset: TournamentDataset,
+  indice = idsPorTime(dataset),
+): Set<string> {
+  return new Set([
+    ...(indice.get(series.teamAId) ?? []),
+    ...(indice.get(series.teamBId) ?? []),
+  ]);
+}
+
+/**
+ * O MVP do jogo, restrito a quem de fato joga por um dos dois times.
+ *
+ * O `elenco` é OBRIGATÓRIO de propósito. `inferGameMvpPlayerId` escolhe a melhor linha de
+ * K/D/A do jogo, e uma linha pode carregar um `playerId` que não é de nenhum dos dois
+ * times — resto de uma troca de time na série, ou id digitado errado no painel. Sem o
+ * recorte, o MVP anunciado podia ser alguém que não aparece em NENHUMA das duas tabelas
+ * daquele jogo, o que na tela parece defeito de renderização e na verdade é o dado.
+ *
+ * Quando o recorte não sobra ninguém, vale o `mvpPlayerId` gravado à mão — que é o mesmo
+ * comportamento de sempre para jogo sem estatística.
+ */
+export function getGameMvpPlayerId(game: SeriesGame, elenco: ReadonlySet<string>) {
+  const doElenco = game.statsByPlayer.filter((linha) => elenco.has(linha.playerId));
+  return inferGameMvpPlayerId(doElenco) || game.mvpPlayerId;
 }
 
 export function getSeriesFormat(series: SeriesMatch, dataset: TournamentDataset): SeriesFormat {
@@ -96,6 +138,22 @@ export function getSeriesStageLabel(series: SeriesMatch) {
   return "Fase regular";
 }
 
+/**
+ * Carimba o MVP automático em cada jogo — SEM o recorte por elenco, de propósito.
+ *
+ * Esta função alimenta duas coisas que não podem depender de quem está em qual time:
+ * `normalizeDatasetForSave` (o que vai para o banco) e `canonical()` do diff de
+ * AUTORIZAÇÃO, que compara o dataset atual com o enviado.
+ *
+ * Com o recorte aqui, mover um jogador de time mudava o elenco das séries dele, mudava o
+ * MVP derivado e fazia aparecer diferença em `seriesMatches[].games` — então transferir um
+ * jogador passava a exigir `results:write`, e um admin com apenas `players:write` levava
+ * 403 citando séries que ele nem abriu.
+ *
+ * O recorte por elenco vive onde ele resolve o problema para o qual foi criado: na
+ * EXIBIÇÃO e na AGREGAÇÃO (`buildSeriesPlayerTotals`, `applyGameMvpToAccumulators`,
+ * `getPlayerGameHistory` e as duas páginas de partida), que não gravam nada.
+ */
 export function applyAutoGameMvpsToDataset(dataset: TournamentDataset): TournamentDataset {
   return {
     ...dataset,
@@ -105,7 +163,7 @@ export function applyAutoGameMvpsToDataset(dataset: TournamentDataset): Tourname
         ? []
         : series.games.map((game) => ({
             ...game,
-            mvpPlayerId: getGameMvpPlayerId(game),
+            mvpPlayerId: inferGameMvpPlayerId(game.statsByPlayer) || game.mvpPlayerId,
           })),
     })),
   };
@@ -203,7 +261,7 @@ function buildSeriesPlayerTotals(series: SeriesMatch, dataset: TournamentDataset
   >();
 
   for (const game of series.games) {
-    const gameMvpPlayerId = getGameMvpPlayerId(game);
+    const gameMvpPlayerId = getGameMvpPlayerId(game, teamPlayerIds);
     if (teamPlayerIds.has(gameMvpPlayerId)) {
       const bucket = totals.get(gameMvpPlayerId) ?? {
         kills: 0,
@@ -678,8 +736,9 @@ function applyGameMvpToAccumulators(
   indexes: DatasetIndexes,
   filters: AggregationFilters | undefined,
   game: SeriesGame,
+  elenco: ReadonlySet<string>,
 ) {
-  const mvpPlayer = indexes.playersById.get(getGameMvpPlayerId(game));
+  const mvpPlayer = indexes.playersById.get(getGameMvpPlayerId(game, elenco));
   if (mvpPlayer && (!filters?.teamId || mvpPlayer.teamId === filters.teamId)) {
     ensurePlayerAccumulator(accumulators, mvpPlayer.id).gameMvps += 1;
   }
@@ -738,12 +797,15 @@ export function calculatePlayerAggregates(
   const indexes = createIndexes(dataset);
   const accumulators = new Map<string, PlayerAccumulator>();
 
+  const indice = idsPorTime(dataset);
+
   for (const series of dataset.seriesMatches) {
     if (!seriesInRange(series, filters)) continue;
 
+    const elenco = elencoDaSerie(series, dataset, indice);
     for (const game of series.games) {
       applyPlayerGameStats(accumulators, indexes, filters, game);
-      applyGameMvpToAccumulators(accumulators, indexes, filters, game);
+      applyGameMvpToAccumulators(accumulators, indexes, filters, game, elenco);
     }
 
     applySeriesMvpToAccumulators(accumulators, indexes, filters, series, dataset);
@@ -947,10 +1009,12 @@ export function getPlayerGameHistory(
   if (!player) return [];
 
   const rows: PlayerGameHistoryRow[] = [];
+  const indice = idsPorTime(dataset);
   for (const series of dataset.seriesMatches) {
     if (series.teamAId !== player.teamId && series.teamBId !== player.teamId) continue;
     const opponentTeamId = series.teamAId === player.teamId ? series.teamBId : series.teamAId;
     const opponentTeamName = indexes.teamsById.get(opponentTeamId)?.name ?? opponentTeamId;
+    const elencoDestaSerie = elencoDaSerie(series, dataset, indice);
 
     series.games.forEach((game, gameIdx) => {
       const stat = game.statsByPlayer.find((row) => row.playerId === playerId);
@@ -965,7 +1029,7 @@ export function getPlayerGameHistory(
         kills: stat.kills,
         deaths: stat.deaths,
         assists: stat.assists,
-        mvp: getGameMvpPlayerId(game) === playerId,
+        mvp: getGameMvpPlayerId(game, elencoDestaSerie) === playerId,
       });
     });
   }
