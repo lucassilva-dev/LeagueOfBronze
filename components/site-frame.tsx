@@ -7,6 +7,7 @@ import { emPreTemporada } from "@/lib/fase-do-site";
 import { AVISO_RIOT_OFICIAL, CONTATO_EMAIL } from "@/lib/i18n/messages/legal";
 import { getLocale, getMessages } from "@/lib/i18n/server";
 import { ehAmbienteDeTeste, problemaDeAmbiente } from "@/lib/data-store";
+import { SITE_DOMINIO, SITE_URL } from "@/lib/site-url";
 
 type SiteFrameProps = Readonly<{ children: React.ReactNode }>;
 
@@ -137,10 +138,10 @@ export async function SiteFrame({ children }: SiteFrameProps) {
               ⚠ AMBIENTE DE TESTE — DADOS FALSOS · nada aqui vale para o campeonato de
               verdade. O site oficial é{" "}
               <a
-                href="https://league-of-bronze.vercel.app"
+                href={SITE_URL}
                 style={{ color: "#fff", textDecoration: "underline" }}
               >
-                league-of-bronze.vercel.app
+                {SITE_DOMINIO}
               </a>
             </div>
           </div>

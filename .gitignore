@@ -13,3 +13,7 @@ coverage
 
 # Regenerado pelo Next em todo dev/build — versionar so gera diff eterno.
 next-env.d.ts
+
+# Material de divulgação (trailer, prompts, vídeos): fica fora do repositório. Os vídeos
+# que o site usa estão em public/trailer; o do WhatsApp passa de 100 MB e travaria o push.
+divulgacao/

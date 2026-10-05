@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { SITE_URL } from "@/lib/site-url";
 
 /**
  * Sitemap das páginas públicas.
@@ -8,12 +9,13 @@ import type { MetadataRoute } from "next";
  * O painel de administração fica de fora de propósito.
  */
 export default function sitemap(): MetadataRoute.Sitemap {
-  const base = "https://league-of-bronze.vercel.app";
+  const base = SITE_URL;
   const agora = new Date();
 
   const rotas = [
     { caminho: "/", prioridade: 1 },
     { caminho: "/inscricao", prioridade: 0.9 },
+    { caminho: "/trailer", prioridade: 0.8 },
     { caminho: "/times", prioridade: 0.8 },
     { caminho: "/jogadores", prioridade: 0.8 },
     { caminho: "/calendario", prioridade: 0.8 },

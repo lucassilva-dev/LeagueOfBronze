@@ -5,7 +5,8 @@ const config = [
   ...nextCoreWebVitals,
   ...nextTypescript,
   {
-    ignores: ["coverage/**", "design_handoff_rebrand/**"],
+    // divulgacao/: material do trailer (o support.js é o runtime do Claude Design), fora do repositório.
+    ignores: ["coverage/**", "design_handoff_rebrand/**", "divulgacao/**"],
   },
 ];
 

@@ -662,3 +662,43 @@ a:hover {
 .lobd-tv [role="status"][style*="ffcf3f"] {
   display: none !important;
 }
+
+/*
+  TRAILER da 4ª Edição (components/trailer-4a.tsx).
+
+  Dois vídeos, um visível: o 16:9 no computador e o 9:16 no celular. Trocar só `display`
+  — nada de opacidade (ver o histórico de `.lob-fade`). O escondido não baixa o VÍDEO
+  (`preload="none"`); as duas capas baixam sempre. O corte de 767 px também está em
+  components/trailer-4a.tsx (que pausa o vídeo que some na troca) — mudar os dois juntos.
+
+  Nenhum dos dois passa da altura da tela (`svh`, que não pula quando a barra do navegador
+  some): a largura sai da altura, e o vídeo inteiro cabe com os controles, sem rolar. O 16:9
+  desconta o cabeçalho fixo; navegador sem `svh` descarta a regra e fica nos 100%.
+*/
+.lob-trailer video {
+  display: block;
+  width: 100%;
+  background: #000;
+  border: 1px solid rgba(232, 184, 120, 0.35);
+  border-radius: 4px;
+  box-shadow: 0 30px 90px -40px rgba(232, 184, 120, 0.45);
+}
+.lob-trailer .lob-trailer-largo {
+  aspect-ratio: 16 / 9;
+  width: min(100%, calc((100svh - 90px) * 16 / 9));
+  margin: 0 auto;
+}
+.lob-trailer .lob-trailer-alto {
+  display: none;
+  aspect-ratio: 9 / 16;
+  width: min(100%, calc(82svh * 9 / 16));
+  margin: 0 auto;
+}
+@media (max-width: 767px) {
+  .lob-trailer .lob-trailer-largo {
+    display: none;
+  }
+  .lob-trailer .lob-trailer-alto {
+    display: block;
+  }
+}

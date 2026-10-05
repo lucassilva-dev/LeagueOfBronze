@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 
 import { ehAmbienteDeTeste } from "@/lib/data-store";
+import { SITE_URL } from "@/lib/site-url";
 
 /**
  * robots.txt.
@@ -10,7 +11,7 @@ import { ehAmbienteDeTeste } from "@/lib/data-store";
  * visita do robô — e a ausência de robots.txt foi apontada na auditoria de conformidade.
  */
 export default function robots(): MetadataRoute.Robots {
-  const base = "https://league-of-bronze.vercel.app";
+  const base = SITE_URL;
 
   /*
    * O ambiente de teste sai INTEIRO dos buscadores.

@@ -34,6 +34,18 @@ export const preTemporada = definir({
     pilulaTaxa: "TAXA DE {valor}",
     pilulaPremio: "100% DO ARRECADADO VIRA PRÊMIO",
 
+    // ---------- trailer (home e /trailer) ----------
+    trailerTitulo: "ASSISTA AO TRAILER",
+    trailerTexto:
+      "Hall da Fama, Hall da Lama, cartas e draft ao vivo: a 4ª Edição em 3 minutos. Ligue o som.",
+    trailerAria: "Trailer da 4ª Edição do League of Bronze",
+    trailerSemSuporte: "Seu navegador não conseguiu tocar o vídeo.",
+    trailerPaginaSobretitulo: "League of Bronze · 4ª Edição",
+    trailerPaginaTitulo: "O TRAILER",
+    trailerMetaTitulo: "Trailer · League of Bronze · 4ª Edição",
+    trailerMetaDescricao:
+      "Hall da Fama, Hall da Lama, cartas e draft ao vivo: o trailer da 4ª Edição do League of Bronze.",
+
     // ---------- home · como funciona ----------
     comoTitulo: "COMO FUNCIONA",
     passo1Titulo: "INSCRIÇÃO",
@@ -88,6 +100,17 @@ export const preTemporada = definir({
     pilulaIndividual: "INDIVIDUAL SIGN-UP",
     pilulaTaxa: "{valor} FEE",
     pilulaPremio: "100% OF THE POT GOES TO PRIZES",
+
+    trailerTitulo: "WATCH THE TRAILER",
+    trailerTexto:
+      "Hall of Fame, Hall of Shame, cards and a live draft: the 4th Edition in 3 minutes. Sound on. (The video is in Portuguese.)",
+    trailerAria: "League of Bronze 4th Edition trailer",
+    trailerSemSuporte: "Your browser couldn't play the video.",
+    trailerPaginaSobretitulo: "League of Bronze · 4th Edition",
+    trailerPaginaTitulo: "THE TRAILER",
+    trailerMetaTitulo: "Trailer · League of Bronze · 4th Edition",
+    trailerMetaDescricao:
+      "Hall of Fame, Hall of Shame, cards and a live draft: the League of Bronze 4th Edition trailer.",
 
     comoTitulo: "HOW IT WORKS",
     passo1Titulo: "SIGN-UP",

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Eyebrow, GoldTitle, Pill, SectionTitle } from "@/components/lob/ui";
+import { Trailer4a } from "@/components/trailer-4a";
 import { getMessages } from "@/lib/i18n/server";
 import { estadoDaJanela, type EstadoJanela } from "@/lib/inscricoes/schema";
 import { lerConfigOuNulo } from "@/lib/inscricoes/store";
@@ -148,6 +149,23 @@ export async function HomePreTemporada() {
           <Pill>{t.pilulaIndividual}</Pill>
           {valor ? <Pill>{t.pilulaTaxa.replace("{valor}", valor)}</Pill> : null}
           <Pill>{t.pilulaPremio}</Pill>
+        </div>
+      </section>
+
+      {/* TRAILER — logo abaixo da chamada, porque ele termina na própria tela de inscrição */}
+      <section className="lob-fade" style={{ margin: "18px 0 44px" }}>
+        <div style={{ marginBottom: 10 }}>
+          <SectionTitle>{t.trailerTitulo}</SectionTitle>
+        </div>
+        <p style={{ maxWidth: 620, fontSize: 14, lineHeight: 1.55, color: "#a99e8b", margin: "0 0 16px" }}>
+          {t.trailerTexto}
+        </p>
+        <Trailer4a aria={t.trailerAria} semSuporte={t.trailerSemSuporte} />
+        {/* O vídeo termina na tela de inscrição; o botão fica logo embaixo dele. */}
+        <div style={{ marginTop: 18 }}>
+          <Link href="/inscricao" className="lob-btn-gold" style={{ padding: "16px 28px", fontSize: 14 }}>
+            {janela === "aberta" ? t.botaoInscrever : t.botaoVerInscricao}
+          </Link>
         </div>
       </section>
 
