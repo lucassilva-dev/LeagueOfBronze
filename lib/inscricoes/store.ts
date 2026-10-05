@@ -3,7 +3,7 @@
 // disso pode ser arrastado para o navegador num refactor futuro.
 import "server-only";
 
-import { createSupabaseAdminClient } from "@/lib/data-store";
+import { createSupabaseAdminClient, isSupabaseConfigured } from "@/lib/data-store";
 import { ErroDeRegra } from "@/lib/security/erros";
 import {
   distribuirTimes,
@@ -121,6 +121,10 @@ export async function lerConfig(): Promise<EdicaoConfig> {
  * lá, seguir sem configuração seria gravar com parâmetro errado.
  */
 export async function lerConfigOuNulo(): Promise<EdicaoConfig | null> {
+  // Sem as chaves (desenvolvimento local, pré-visualização sem segredo) não há o que ler,
+  // e isso não é falha: o `console.error` abaixo virava a tela vermelha do Next em todo
+  // carregamento local. O log fica para quando o banco EXISTE e não respondeu.
+  if (!isSupabaseConfigured()) return null;
   try {
     return await lerConfig();
   } catch (error) {
