@@ -1,6 +1,8 @@
 import Link from "next/link";
 
 import { Eyebrow, GoldTitle, TeamMark } from "@/components/lob/ui";
+import { PreTemporadaAviso } from "@/components/pre-temporada-aviso";
+import { semTemporadaAoVivo } from "@/lib/fase-do-site";
 import { teamColor } from "@/lib/design";
 import { getMessages } from "@/lib/i18n/server";
 import { buildDesignTeams } from "@/lib/roster";
@@ -38,6 +40,7 @@ export default async function TabelaPage() {
     },
   ];
   const { dataset } = await getServerDataset();
+  if (semTemporadaAoVivo(dataset)) return <PreTemporadaAviso pagina="tabela" />;
   const standings = calculateStandings(dataset).rows;
   const teamsById = new Map(buildDesignTeams(dataset).map((team) => [team.id, team]));
 

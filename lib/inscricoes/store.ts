@@ -65,6 +65,8 @@ export type Inscricao = {
   pontos: number;
   rota_primaria: string;
   rota_secundaria: string;
+  /** Turnos (`manha`, `tarde`, `noite`) — regra 9. Vazio em quem se inscreveu antes da pergunta. */
+  disponibilidade: string[];
   quer_capitao: boolean;
   entrou_no_grupo: string | null;
   situacao: "pendente" | "apto" | "recusado" | "desistiu" | "sobra";
@@ -253,14 +255,18 @@ export async function listarPagamentos(): Promise<Pagamento[]> {
 
 // ---------------------------------------------------------------- a minha inscrição
 
-/** O que o próprio jogador pode ver da sua inscrição. Sem id interno, sem ip_hash. */
+/**
+ * O que o próprio jogador pode ver da sua inscrição. Sem id interno, sem ip_hash.
+ *
+ * Sem `pontos`, também: a tabela de valores da 4ª só sai depois de fechar a lista
+ * (seção 3 do regulamento), e o número gravado hoje vem da tabela da 3ª.
+ */
 export type MinhaInscricao = {
   riotId: string;
   elo: string;
-  pontos: number;
   rotaPrimaria: string;
   rotaSecundaria: string;
-  querCapitao: boolean;
+  disponibilidade: string[];
   situacao: Inscricao["situacao"];
   observacao: string | null;
   criadoEm: string;
@@ -281,7 +287,7 @@ export async function minhaInscricao(jogadorId: string): Promise<MinhaInscricao 
   const { data: inscricao, error } = await cliente
     .from("inscricoes")
     .select(
-      "id,criado_em,riot_id,elo_declarado,elo_verificado,elo_congelado,pontos,rota_primaria,rota_secundaria,quer_capitao,situacao,observacao",
+      "id,criado_em,riot_id,elo_declarado,elo_verificado,elo_congelado,rota_primaria,rota_secundaria,disponibilidade,situacao,observacao",
     )
     .eq("jogador_id", jogadorId)
     .maybeSingle<{
@@ -291,10 +297,9 @@ export async function minhaInscricao(jogadorId: string): Promise<MinhaInscricao 
       elo_declarado: string;
       elo_verificado: string | null;
       elo_congelado: string | null;
-      pontos: number;
       rota_primaria: string;
       rota_secundaria: string;
-      quer_capitao: boolean;
+      disponibilidade: string[] | null;
       situacao: Inscricao["situacao"];
       observacao: string | null;
     }>();
@@ -322,16 +327,13 @@ export async function minhaInscricao(jogadorId: string): Promise<MinhaInscricao 
      * no draft) → verificado (o que a organização conferiu) → declarado (a palavra do
      * jogador).
      *
-     * Faltava o verificado aqui, e esta tela era a única do site que o pulava. Como
-     * `pontos` JÁ é derivado do elo verificado, o jogador via o elo que declarou ao
-     * lado do preço do elo que a organização confirmou — "Ouro · 8 pontos" — sem nada
-     * na tela explicando a diferença.
+     * Faltava o verificado aqui, e esta tela era a única do site que o pulava: o
+     * jogador via o elo que declarou mesmo depois de a organização confirmar outro.
      */
     elo: inscricao.elo_congelado ?? inscricao.elo_verificado ?? inscricao.elo_declarado,
-    pontos: inscricao.pontos,
     rotaPrimaria: inscricao.rota_primaria,
     rotaSecundaria: inscricao.rota_secundaria,
-    querCapitao: inscricao.quer_capitao,
+    disponibilidade: inscricao.disponibilidade ?? [],
     situacao: inscricao.situacao,
     observacao: inscricao.observacao,
     criadoEm: inscricao.criado_em,
@@ -413,6 +415,8 @@ export type PatchInscricao = {
   organizador?: boolean;
   eloVerificado?: string | null;
   entrouNoGrupo?: string | null;
+  disponibilidade?: string[];
+  nomeReal?: string;
 };
 
 export async function atualizarInscricao(
@@ -426,6 +430,8 @@ export async function atualizarInscricao(
   if (patch.observacao !== undefined) linha.observacao = patch.observacao;
   if (patch.organizador !== undefined) linha.organizador = patch.organizador;
   if (patch.entrouNoGrupo !== undefined) linha.entrou_no_grupo = patch.entrouNoGrupo;
+  if (patch.disponibilidade !== undefined) linha.disponibilidade = patch.disponibilidade;
+  if (patch.nomeReal !== undefined) linha.nome_real = patch.nomeReal;
 
   if (patch.eloVerificado !== undefined) {
     linha.elo_verificado = patch.eloVerificado;
@@ -534,7 +540,8 @@ export async function listarAuditoria(limite = 60) {
 export async function atualizarConferencia(args: {
   inscricaoId: string;
   item: ItemConferencia;
-  estado: string;
+  /** Ausente preserva o veredicto gravado (quem só escreveu uma observação). */
+  estado?: string;
   observacao?: string;
   retrato?: Record<string, unknown>;
   autor: string;
@@ -545,6 +552,7 @@ export async function atualizarConferencia(args: {
   const { error } = await cliente
     .from("inscricao_conferencias")
     .update({
+      // `undefined` sai do JSON do update: a coluna fica como está.
       estado: args.estado,
       // Ausente PRESERVA o texto que já estava lá; string vazia é que limpa.
       // Antes isto era `?? null`, então trocar o estado sem redigitar apagava a
@@ -568,7 +576,11 @@ export async function atualizarConferencia(args: {
     inscricaoId: args.inscricaoId,
     autor: args.autor,
     acao: `conferencia_${args.item}`,
-    detalhe: { estado: args.estado, observacao: args.observacao ?? null },
+    // Só o que esta gravação mudou — o que ficou ausente foi preservado, não "apagado".
+    detalhe: {
+      ...(args.estado !== undefined && { estado: args.estado }),
+      ...(args.observacao !== undefined && { observacao: args.observacao || null }),
+    },
   });
 }
 

@@ -15,11 +15,12 @@ const EMAIL_DA_SESSAO = "nak4y@exemplo.com";
 const valida = {
   nick: "Nak4y",
   tag: "JPN",
+  nomeReal: "Fulano de Tal",
   discord: "nak4y",
   elo: "Diamante",
   rotaPrimaria: "MEIO",
   rotaSecundaria: "ATIRADOR",
-  querCapitao: true,
+  disponibilidade: ["noite"],
   aceiteRegulamento: true as const,
   aceiteImagem: true as const,
   aceiteRequisitos: true as const,
@@ -103,13 +104,79 @@ describe("tag", () => {
   });
 });
 
-describe("aceites são obrigatórios (regras s e t)", () => {
+describe("aceites são obrigatórios (regras 17 e 22)", () => {
   it("não passa sem aceitar o regulamento", () => {
     expect(inscricaoPublicaSchema.safeParse({ ...valida, aceiteRegulamento: false }).success).toBe(false);
   });
 
   it("não passa sem autorizar o uso de imagem", () => {
     expect(inscricaoPublicaSchema.safeParse({ ...valida, aceiteImagem: false }).success).toBe(false);
+  });
+
+  it("não passa sem confirmar os requisitos", () => {
+    expect(inscricaoPublicaSchema.safeParse({ ...valida, aceiteRequisitos: false }).success).toBe(false);
+  });
+});
+
+describe("nome e sobrenome (seção 2 do regulamento da 4ª)", () => {
+  it("é obrigatório", () => {
+    expect(inscricaoPublicaSchema.safeParse({ ...valida, nomeReal: undefined }).success).toBe(false);
+    expect(inscricaoPublicaSchema.safeParse({ ...valida, nomeReal: "   " }).success).toBe(false);
+  });
+
+  it("um nome só não basta — o grupo confere pelo nome completo", () => {
+    expect(inscricaoPublicaSchema.safeParse({ ...valida, nomeReal: "Fulano" }).success).toBe(false);
+  });
+
+  it("vai para a ficha sem espaços sobrando", () => {
+    const linha = linhaDeInscricao(
+      inscricaoPublicaSchema.parse({ ...valida, nomeReal: "  Fulano de Tal  " }),
+      EMAIL_DA_SESSAO,
+    );
+    expect(linha.nome_real).toBe("Fulano de Tal");
+  });
+});
+
+describe("disponibilidade por turno (regra 9)", () => {
+  it("exige pelo menos um turno", () => {
+    expect(inscricaoPublicaSchema.safeParse({ ...valida, disponibilidade: [] }).success).toBe(false);
+    expect(inscricaoPublicaSchema.safeParse({ ...valida, disponibilidade: undefined }).success).toBe(false);
+  });
+
+  it("recusa turno que o banco não aceita", () => {
+    expect(inscricaoPublicaSchema.safeParse({ ...valida, disponibilidade: ["madrugada"] }).success).toBe(false);
+  });
+
+  it("grava os turnos marcados, sem repetição", () => {
+    const linha = linhaDeInscricao(
+      inscricaoPublicaSchema.parse({ ...valida, disponibilidade: ["tarde", "noite", "tarde"] }),
+      EMAIL_DA_SESSAO,
+    );
+    expect(linha.disponibilidade).toEqual(["tarde", "noite"]);
+  });
+});
+
+describe("Discord", () => {
+  it("tira o @ do começo — senão a mesma pessoa passava duas vezes no índice único", () => {
+    const linha = linhaDeInscricao(
+      inscricaoPublicaSchema.parse({ ...valida, discord: "@nak4y" }),
+      EMAIL_DA_SESSAO,
+    );
+    expect(linha.discord).toBe("nak4y");
+  });
+
+  it("só um @ não é um usuário", () => {
+    expect(inscricaoPublicaSchema.safeParse({ ...valida, discord: "@" }).success).toBe(false);
+  });
+});
+
+describe("capitão não é candidatura na 4ª (seção 3)", () => {
+  it("grava quer_capitao falso mesmo que um formulário antigo mande verdadeiro", () => {
+    const linha = linhaDeInscricao(
+      inscricaoPublicaSchema.parse({ ...valida, querCapitao: true }),
+      EMAIL_DA_SESSAO,
+    );
+    expect(linha.quer_capitao).toBe(false);
   });
 });
 

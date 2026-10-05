@@ -2,6 +2,8 @@ import { DurationRanking } from "@/components/lob/duration-ranking";
 import { RoleBests } from "@/components/lob/role-bests";
 import { StatsToggles } from "@/components/lob/stats-toggles";
 import { Eyebrow, EloCrest, GoldTitle, Pill } from "@/components/lob/ui";
+import { PreTemporadaAviso } from "@/components/pre-temporada-aviso";
+import { semTemporadaAoVivo } from "@/lib/fase-do-site";
 import { ELO_ORDER, eloSvgUrl } from "@/lib/design";
 import { getMessages } from "@/lib/i18n/server";
 import { buildDesignPlayers, buildDesignTeams } from "@/lib/roster";
@@ -49,6 +51,7 @@ function StatCard({ title, children }: Readonly<{ title: string; children: React
 
 export default async function EstatisticasPage() {
   const { dataset } = await getServerDataset();
+  if (semTemporadaAoVivo(dataset)) return <PreTemporadaAviso pagina="estatisticas" />;
   const mensagens = await getMessages();
   const t = mensagens.paginasStats;
   // Tag de idioma para os números (KDA): sem ela os rankings saíam sempre com o

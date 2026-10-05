@@ -35,6 +35,7 @@ function inscrito(situacao: Inscricao["situacao"], pontos = 3): Inscricao {
     pontos,
     rota_primaria: "MID",
     rota_secundaria: "TOP",
+    disponibilidade: ["noite"],
     quer_capitao: false,
     entrou_no_grupo: null,
     situacao,

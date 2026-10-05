@@ -1,5 +1,7 @@
 import { AvisoConsentimento } from "@/components/aviso-consentimento";
 import { JogadoresClient, type PlayerPerf } from "@/components/lob/jogadores-client";
+import { PreTemporadaAviso } from "@/components/pre-temporada-aviso";
+import { semTemporadaAoVivo } from "@/lib/fase-do-site";
 import { Eyebrow, GoldTitle, Pill } from "@/components/lob/ui";
 import { getMessages } from "@/lib/i18n/server";
 import { buildDesignPlayers } from "@/lib/roster";
@@ -11,6 +13,7 @@ export const dynamic = "force-dynamic";
 export default async function JogadoresPage() {
   const { paginasHome: t, paginasStats: ts } = await getMessages();
   const { dataset } = await getServerDataset();
+  if (semTemporadaAoVivo(dataset)) return <PreTemporadaAviso pagina="jogadores" />;
   const players = buildDesignPlayers(dataset);
 
   const perfByPlayer: Record<string, PlayerPerf> = {};

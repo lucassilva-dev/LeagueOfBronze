@@ -45,6 +45,7 @@ function inscrito(over: Partial<Inscrito> & { id: string }): Inscrito {
     pontos: 4,
     rota_primaria: "MID",
     rota_secundaria: "TOP",
+    disponibilidade: ["tarde", "noite"],
     quer_capitao: false,
     entrou_no_grupo: null,
     situacao: "apto",
@@ -82,6 +83,9 @@ function pagamento(over: Partial<Pagamento> & { inscricao_id: string }): Pagamen
 function dados(): DadosEdicao {
   const inscritos: Inscrito[] = [
     inscrito({ id: "a1", situacao: "apto", pontos: 8, elo_verificado: "Diamante", quer_capitao: true }),
+    // Inscritos antes de o formulário perguntar os turnos — e um vindo sem a coluna.
+    inscrito({ id: "v1", situacao: "pendente", disponibilidade: [] }),
+    inscrito({ id: "v2", situacao: "pendente", disponibilidade: null }),
     inscrito({ id: "a2", situacao: "apto", pontos: 1, elo_declarado: "Ferro", rota_primaria: "JUNG" }),
     inscrito({ id: "a3", situacao: "apto", pontos: 3, rota_primaria: "SUP", rota_secundaria: "ADC" }),
     inscrito({ id: "a4", situacao: "apto", pontos: 5, elo_congelado: "Platina", congelado: true } as never),
@@ -248,6 +252,36 @@ describe("regras do produto que a tela não pode contrariar", () => {
     const html = renderToStaticMarkup(<SecaoPagamentos {...props()} />);
     // arrecadado = 2000 centavos = R$ 20,00
     expect(html).toMatch(/20,00/);
+  });
+
+  it("Pagamentos divide o prêmio entre campeão e vice — a organização não fica com nada", () => {
+    const html = renderToStaticMarkup(<SecaoPagamentos {...props()} />);
+    // A tela dizia "30% ficam com a organização", o contrário do regulamento.
+    expect(html).not.toMatch(/ficam? com a organiza/i);
+    // 70% de R$ 20,00 = R$ 14,00 para o campeão; o vice leva a diferença, R$ 6,00.
+    expect(html).toMatch(/vice/i);
+    expect(html).toMatch(/14,00/);
+    expect(html).toMatch(/6,00/);
+  });
+
+  it("Inscritos aponta quem ainda está sem disponibilidade", () => {
+    const html = renderToStaticMarkup(<SecaoInscritos {...props()} />);
+    expect(html).toMatch(/sem turno/i);
+  });
+
+  it("nenhuma seção cita as regras por letra da 3ª Edição", () => {
+    // "regra (w)", "(regra s)", "regras (d) … e (e)" — as três formas que já apareceram.
+    for (const { nome, Componente } of SECOES) {
+      const html = renderToStaticMarkup(<Componente {...props()} />);
+      expect(html, nome).not.toMatch(/regras? \([a-z]\)|\(regras? [a-z]\)/i);
+    }
+  });
+
+  it("nenhuma seção fala em tempo mínimo de grupo — a regra 1 da 4ª não tem", () => {
+    for (const { nome, Componente } of SECOES) {
+      const html = renderToStaticMarkup(<Componente {...props()} />);
+      expect(html, nome).not.toMatch(/tempo de grupo é contado|mínimo de \d+ dias/i);
+    }
   });
 
   it("Times mostra a divisão derivada, não um número fixo", () => {

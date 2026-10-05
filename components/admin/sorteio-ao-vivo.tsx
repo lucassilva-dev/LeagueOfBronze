@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { ALL_CARDS, CARDS, CARDS_BY_ID, isDuplaCard, type CardDef } from "@/lib/cards";
+import { CARDS_BY_ID, baralhoDoSorteio, isDuplaCard, letraDaCarta, type CardDef } from "@/lib/cards";
 import type { CardId } from "@/lib/schema";
 import {
   Banner,
@@ -511,12 +511,13 @@ function defDaCarta(id: string): CardDef | undefined {
   return CARDS_BY_ID[id as CardId];
 }
 
+// O baralho de AGORA, o mesmo em que o servidor sorteia (sem as cartas retiradas).
 function itensDeCartas(dupla: boolean): ItemDaRoda[] {
-  return (dupla ? ALL_CARDS : CARDS).map((carta) => ({
+  return baralhoDoSorteio(dupla).map((carta) => ({
     chave: carta.cardId,
     cor: carta.color,
     rotulo: carta.emoji,
-    nota: carta.letter ?? "DUPLA",
+    nota: letraDaCarta(carta.cardId) ?? "DUPLA",
   }));
 }
 
@@ -794,8 +795,12 @@ export function SorteioAoVivo({
   );
 
   const revelacao = telaAtual.fase === "revelado" ? telaAtual.resposta : null;
-  const cartaRevelada =
+  const definicaoRevelada =
     revelacao && revelacao.sorteio.tipo === "carta" ? defDaCarta(revelacao.sorteio.resultado) : undefined;
+  // A letra é a do baralho do dia do sorteio (A–E na 4ª), não a da 3ª gravada na definição.
+  const cartaRevelada = definicaoRevelada
+    ? { ...definicaoRevelada, letter: letraDaCarta(definicaoRevelada.cardId, revelacao?.sorteio.emISO) }
+    : undefined;
   const detalhe = revelacao?.sorteio.detalhe;
   const letras = Array.isArray(detalhe?.letras)
     ? detalhe.letras.filter((letra): letra is string => typeof letra === "string")

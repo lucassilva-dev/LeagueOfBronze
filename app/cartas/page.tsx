@@ -1,6 +1,6 @@
 import { TcgCard } from "@/components/lob/tcg-card";
 import { Eyebrow, GoldTitle, SectionTitle } from "@/components/lob/ui";
-import { CARDS_BY_ID, ALL_CARDS } from "@/lib/cards";
+import { CARDS_BY_ID, CARTAS_ATIVAS } from "@/lib/cards";
 import { getMessages } from "@/lib/i18n/server";
 import type { CardId } from "@/lib/schema";
 import { getServerDataset } from "@/lib/server-data";
@@ -61,8 +61,13 @@ export default async function CartasPage() {
         </p>
       </section>
 
+      {/*
+        A vitrine mostra só as cartas EM VIGOR (a INVASÃO DA YUUMI saiu na 4ª Edição). As
+        estatísticas logo abaixo continuam contando tudo que já foi sorteado, inclusive
+        cartas retiradas — é histórico, não regra.
+      */}
       <section className="lob-fade" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(236px,1fr))", gap: 20 }}>
-        {ALL_CARDS.map((card) => {
+        {CARTAS_ATIVAS.map((card) => {
           const texto = t.cartas[card.cardId];
           return (
             <TcgCard

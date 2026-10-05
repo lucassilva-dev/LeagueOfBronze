@@ -75,8 +75,8 @@ describe("o sorteio é reproduzível — é isso que o torna conferível", () =>
      * devolver `false`: a ferramenta que existe para provar honestidade acusava de
      * fraude um sorteio honesto.
      *
-     * ⚠ SEMENTE FIXA, e não `novaSemente()`. Como `ALL_CARDS` começa com as 6 do pool
-     * individual, em ~25% das sementes o índice cai na mesma carta nos dois pools e a
+     * ⚠ SEMENTE FIXA, e não `novaSemente()`. Como o pool duplo começa com as cartas do
+     * individual, em boa parte das sementes o índice cai na mesma carta nos dois pools e a
      * conferência bateria por acidente MESMO com o defeito de volta — o teste virava
      * cara-ou-coroa. Esta semente separa os dois pools, e a asserção logo abaixo garante
      * que ela continua separando se a tabela de cartas mudar.
@@ -136,17 +136,19 @@ describe("o sorteio é justo", () => {
     expect(azul / n).toBeLessThan(0.55);
   });
 
-  it("as 6 cartas individuais saem todas, sem nenhuma dominar", () => {
+  it("as cartas individuais em vigor saem todas, sem nenhuma dominar", () => {
     const conta: Record<string, number> = {};
     const n = 6000;
     for (let i = 0; i < n; i++) {
       const c = sortearCarta(`c${i}`, false);
       conta[c] = (conta[c] ?? 0) + 1;
     }
-    expect(Object.keys(conta)).toHaveLength(CARDS.length);
+    const emVigor = poolDeCartas(false).length;
+    expect(Object.keys(conta)).toHaveLength(emVigor);
     for (const vezes of Object.values(conta)) {
-      expect(vezes / n).toBeGreaterThan(0.13); // esperado ≈ 0,167
-      expect(vezes / n).toBeLessThan(0.20);
+      // Margem de ±20% em volta de 1/N: pega viés grosseiro, não flutuação.
+      expect(vezes / n).toBeGreaterThan(0.8 / emVigor);
+      expect(vezes / n).toBeLessThan(1.2 / emVigor);
     }
   });
 
@@ -167,18 +169,69 @@ describe("o sorteio é justo", () => {
 });
 
 describe("as regras do regulamento valem no sorteio", () => {
-  it("o sorteio individual usa só as 6 que afetam o adversário", () => {
-    expect(poolDeCartas(false)).toHaveLength(CARDS.length);
+  const EM_VIGOR = CARDS.filter((c) => !c.retirada);
+
+  it("o sorteio individual usa só as que afetam o adversário e estão em vigor", () => {
+    expect(poolDeCartas(false)).toEqual(EM_VIGOR.map((c) => c.cardId));
     for (let i = 0; i < 500; i++) {
       expect(isDuplaCard(sortearCarta(`i${i}`, false))).toBe(false);
     }
   });
 
-  it("o sorteio duplo abre as 8, e as duplas de fato aparecem", () => {
-    expect(poolDeCartas(true)).toHaveLength(CARDS.length + DUPLAS.length);
+  it("o sorteio duplo abre também as duplas, e elas de fato aparecem", () => {
+    expect(poolDeCartas(true)).toHaveLength(EM_VIGOR.length + DUPLAS.length);
 
     const saiuDupla = Array.from({ length: 300 }, (_, i) => sortearCarta(`d${i}`, true)).some(isDuplaCard);
     expect(saiuDupla).toBe(true);
+  });
+
+  it("a INVASÃO DA YUUMI, retirada na 4ª, não sai mais em sorteio nenhum", () => {
+    expect(poolDeCartas(false)).not.toContain("INVASAO_YUUMI");
+    expect(poolDeCartas(true)).not.toContain("INVASAO_YUUMI");
+    for (let i = 0; i < 3000; i++) {
+      expect(sortearCarta(`y${i}`, i % 2 === 0)).not.toBe("INVASAO_YUUMI");
+    }
+  });
+});
+
+describe("sorteios da 3ª continuam conferíveis depois da retirada da Yuumi", () => {
+  const DIA_DA_3A = "2026-08-02T19:00:00.000Z";
+
+  it("o baralho de antes da retirada ainda tem as seis individuais", () => {
+    expect(poolDeCartas(false, DIA_DA_3A)).toEqual(CARDS.map((c) => c.cardId));
+    expect(poolDeCartas(false, DIA_DA_3A)).toContain("INVASAO_YUUMI");
+  });
+
+  it("uma Yuumi sorteada na 3ª confere — e só confere com o baralho da época", () => {
+    // Acha uma semente que, no baralho antigo, deu a Yuumi. É o caso que a data protege:
+    // conferido contra o baralho de hoje, um sorteio honesto viraria "adulterado".
+    const semente = Array.from({ length: 500 }, (_, i) => `antiga-${i}`).find(
+      (s) => sortearCarta(s, false, "carta", DIA_DA_3A) === "INVASAO_YUUMI",
+    )!;
+    expect(semente).toBeDefined();
+
+    const registro = {
+      tipo: "carta" as const,
+      semente,
+      emISO: DIA_DA_3A,
+      autor: "lucas",
+      resultado: "INVASAO_YUUMI",
+    };
+    expect(conferirSorteio(registro, { teamAId: "a", teamBId: "b" })).toBe(true);
+    // O mesmo registro, datado de hoje, não fecha — prova de que é a data que decide.
+    expect(
+      conferirSorteio({ ...registro, emISO: "2026-11-20T15:00:00.000Z" }, { teamAId: "a", teamBId: "b" }),
+    ).toBe(false);
+  });
+
+  it("qualquer carta da 3ª confere com o baralho da época", () => {
+    for (let i = 0; i < 200; i++) {
+      const semente = `velha-${i}`;
+      const resultado = sortearCarta(semente, false, "carta", DIA_DA_3A);
+      expect(
+        conferirSorteio({ tipo: "carta", semente, emISO: DIA_DA_3A, autor: "x", resultado }, { teamAId: "a", teamBId: "b" }),
+      ).toBe(true);
+    }
   });
 });
 

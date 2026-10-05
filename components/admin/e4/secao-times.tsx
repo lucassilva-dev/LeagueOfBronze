@@ -544,12 +544,13 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
 
       {/* ---------------------------------------------------------- 4. substituição */}
 
-      <BlockTitle right={<Chip>regra (g)</Chip>}>Quem pode substituir</BlockTitle>
+      <BlockTitle right={<Chip>regra 6</Chip>}>Quem pode substituir</BlockTitle>
 
       <Card padding="16px 18px" style={{ display: "grid", gap: 12 }}>
         <p style={{ margin: 0, fontSize: 12.5, color: C.ink3, lineHeight: 1.6 }}>
-          O substituto tem de ser do mesmo elo ou abaixo. A comparação é por pontos, que são o preço
-          do elo. Consulta pura: nada aqui grava nada.
+          O substituto tem de valer o mesmo ou menos em pontos — acima disso, só com aprovação da
+          organização. Ele também precisa cumprir as regras 3, 4, 5 e 21, e ninguém é obrigado a
+          aceitar. Consulta pura: nada aqui grava nada.
         </p>
 
         <Field label="Jogador a substituir" hint="Só aprovados (apto ou sobra) aparecem na lista.">

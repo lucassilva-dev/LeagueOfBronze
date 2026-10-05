@@ -24,14 +24,14 @@ export async function generateMetadata(): Promise<Metadata> {
 
   return locale === "en"
     ? {
-        title: "League of Bronze · 3rd Edition",
+        title: "League of Bronze · 4th Edition",
         description:
-          "League of Bronze 3rd Edition — amateur League of Legends tournament. Teams, players, schedule, standings and statistics.",
+          "League of Bronze — amateur League of Legends tournament. Sign-ups for the 4th Edition, rules and the archive of past seasons.",
       }
     : {
-        title: "League of Bronze · 3ª Edição",
+        title: "League of Bronze · 4ª Edição",
         description:
-          "League of Bronze, 3ª Edição — campeonato amador de League of Legends. Times, jogadores, calendário, tabela e estatísticas.",
+          "League of Bronze — campeonato amador de League of Legends. Inscrição para a 4ª Edição, regulamento e o arquivo das temporadas anteriores.",
       };
 }
 

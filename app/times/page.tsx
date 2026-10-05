@@ -1,6 +1,8 @@
 import Link from "next/link";
 
 import { Eyebrow, GoldTitle, RoleIcon, SectionTitle } from "@/components/lob/ui";
+import { PreTemporadaAviso } from "@/components/pre-temporada-aviso";
+import { semTemporadaAoVivo } from "@/lib/fase-do-site";
 import { rotaCurto, type PaginasHomeTextos } from "@/lib/i18n/messages/paginas-home";
 import { getMessages } from "@/lib/i18n/server";
 import { buildDesignTeams, type DesignTeam } from "@/lib/roster";
@@ -92,6 +94,7 @@ function TeamCard({
 export default async function TimesPage() {
   const { paginasHome: t } = await getMessages();
   const { dataset } = await getServerDataset();
+  if (semTemporadaAoVivo(dataset)) return <PreTemporadaAviso pagina="times" />;
   const teams = buildDesignTeams(dataset);
 
   const standings = calculateStandings(dataset);

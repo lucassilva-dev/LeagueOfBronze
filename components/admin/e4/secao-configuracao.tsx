@@ -71,7 +71,8 @@ const DATAS = [
   {
     chave: "abertura_inscricoes",
     rotulo: "Abertura das inscrições",
-    efeito: "Item (a): o tempo de grupo é contado até esta data.",
+    efeito:
+      "Só registro de quando o formulário abriu. Não é âncora de item nenhum: a regra 1 da 4ª não pede tempo mínimo no grupo.",
   },
   {
     chave: "fechamento_inscricoes",
@@ -81,7 +82,8 @@ const DATAS = [
   {
     chave: "prazo_vinculo_riot",
     rotulo: "Prazo do vínculo Riot",
-    efeito: "Item (b): até quando dá para vincular a conta Riot ao Discord e deixá-la visível.",
+    efeito:
+      "Item (b), regra 21: até quando dá para vincular a conta Riot ao Discord e deixá-la visível. O regulamento diz antes do início do torneio.",
   },
   {
     chave: "congelamento_elo",
@@ -92,7 +94,7 @@ const DATAS = [
   {
     chave: "inicio_campeonato",
     rotulo: "Início do campeonato",
-    efeito: "Item (e) olha os 30 dias anteriores a esta data. Sem ela, (e) não é avaliável.",
+    efeito: "Item (e) olha os 10 dias anteriores a esta data (regra 4). Sem ela, (e) não é avaliável.",
   },
 ] as const satisfies readonly { chave: ChaveData; rotulo: string; efeito: string }[];
 
@@ -116,14 +118,15 @@ const NUMEROS = [
     rotulo: "Mínimo de ranqueadas",
     min: 0,
     max: 999,
-    efeito: "Usado nos itens (d) e (e). Só solo/duo conta; flex e normal não.",
+    efeito:
+      "Item (e) e o aceite do formulário: partidas solo/duo nos 10 dias antes do início (regra 4 — o regulamento diz 5). Flex e normal não contam.",
   },
   {
     chave: "dias_no_grupo",
     rotulo: "Dias no grupo",
     min: 0,
     max: 3650,
-    efeito: "Item (a): tempo mínimo no grupo oficial antes da abertura.",
+    efeito: "Sem uso na 4ª: a regra 1 não pede tempo mínimo no grupo, só ser do grupo e conhecido.",
   },
   {
     chave: "prazo_pagamento_dias",
@@ -672,7 +675,7 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar }: 
         O site declara publicamente que{" "}
         <strong style={{ color: C.ink2 }}>100% do arrecadado vira prêmio</strong>: campeão e vice
         acima precisam somar exatamente o arrecadado — e somam, porque o vice recebe a diferença em
-        vez de um arredondamento próprio. As taxas isentas dos cinco organizadores (
+        vez de um arredondamento próprio. As taxas isentas dos organizadores desta edição (
         {emReais(panorama.caixa.isento)}) nunca entram nessa conta, e o que estiver marcado como
         estorno devido ainda vai sair do caixa.
       </p>

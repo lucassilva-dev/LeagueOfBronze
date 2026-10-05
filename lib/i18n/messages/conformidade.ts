@@ -45,7 +45,7 @@ export const conformidade = definir({
     formatoVariaTexto:
       "Não existe um formato fixo. Antes de cada campeonato, a organização decide o regulamento junto com o grupo — quantos times, se haverá semifinal, o tipo de série, se entra alguma regra especial — e publica tudo nesta página antes da primeira partida.",
     formatoVariaExemplos:
-      "Por isso muda de uma edição para a outra: a 2ª Edição teve semifinal e final; a 3ª, que está descrita abaixo, foi disputada em pontos corridos com Grande Final direta, sem semifinal; a 4ª está sendo desenhada com um formato próprio, ainda em discussão com o grupo.",
+      "Por isso muda de uma edição para a outra: a 2ª Edição teve semifinal e final; a 3ª foi disputada em pontos corridos com Grande Final direta em MD5, sem semifinal; a 4ª, descrita abaixo, tem pontos corridos em MD3, semifinais 1º x 4º e 2º x 3º em MD3 e final em MD5.",
     formatoVariaGarantia:
       "O que nunca muda: o regulamento vale igualmente para todos os times, é acordado com os participantes e fica publicado por completo antes de qualquer jogo ser disputado. Nenhuma regra é criada ou alterada com o campeonato em andamento.",
   },
@@ -74,7 +74,7 @@ export const conformidade = definir({
     formatoVariaTexto:
       "There is no fixed format. Before each tournament, the organisation decides the rulebook together with the group — how many teams, whether there will be a semifinal, the series length, whether any special rule applies — and publishes all of it on this page before the first match.",
     formatoVariaExemplos:
-      "That is why it changes between editions: the 2nd Edition had a semifinal and a final; the 3rd, described below, was a round robin with a direct Grand Final and no semifinal; the 4th is being designed with its own format, still under discussion with the group.",
+      "That is why it changes between editions: the 2nd Edition had a semifinal and a final; the 3rd was a round robin with a direct Grand Final played as a Bo5, with no semifinal; the 4th, described below, has a Bo3 round robin, semifinals (1st v 4th and 2nd v 3rd) in Bo3 and a Bo5 final.",
     formatoVariaGarantia:
       "What never changes: the rulebook applies equally to every team, is agreed with the participants, and is published in full before any game is played. No rule is created or changed while a tournament is running.",
   },

@@ -32,7 +32,7 @@ const corpoSchema = z.object({
   tipo: z.enum(["lados", "carta"]),
   /** Dono da carta no sorteio individual. Ignorado nos lados e no sorteio duplo. */
   teamId: z.string().trim().min(1).max(120).optional(),
-  /** true = os dois capitães usaram; uma carta só, valendo para ambos, com as 8 no pool. */
+  /** true = os dois capitães usaram; uma carta só, valendo para ambos, com as duplas no pool. */
   dupla: z.boolean().optional(),
 });
 

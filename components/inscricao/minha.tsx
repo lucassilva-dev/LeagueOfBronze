@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { resolveRole } from "@/lib/design";
 import type { Messages } from "@/lib/i18n/messages";
+import { TURNOS } from "@/lib/inscricoes/turnos";
 
 /**
  * "Minha inscrição" — o que a organização já conferiu e o que falta.
@@ -39,10 +40,9 @@ type Conferencia = { item: string; estado: string; observacao: string | null };
 type MinhaInscricao = {
   riotId: string;
   elo: string;
-  pontos: number;
   rotaPrimaria: string;
   rotaSecundaria: string;
-  querCapitao: boolean;
+  disponibilidade: string[];
   situacao: keyof Rotulos["situacoes"];
   observacao: string | null;
   criadoEm: string;
@@ -190,27 +190,22 @@ export default function MinhaInscricaoCliente({ t }: Readonly<{ t: Rotulos }>) {
   const i = dados.inscricao;
   const pag = i.pagamento;
   const podeAvisar = pag?.estado === "aguardando";
+  // Na ordem do dia, e só os turnos que esta tela conhece.
+  const turnos = TURNOS.filter((x) => i.disponibilidade.includes(x)).map((x) => t.turnos[x]);
 
   return (
     <div className="lob-fade" style={{ display: "grid", gap: 16 }}>
       <div className="lob-card-2" style={{ padding: "22px 24px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-          <div>
-            <div className="lob-display" style={{ fontSize: 24, color: "var(--lob-text)" }}>{i.riotId}</div>
-            <div style={{ marginTop: 4, fontSize: 13, color: "var(--lob-muted)" }}>
-              {[i.elo, rotuloDaRota(i.rotaPrimaria, t.rotas), rotuloDaRota(i.rotaSecundaria, t.rotas)]
-                .filter(Boolean)
-                .join(" · ")}
-            </div>
+        <div>
+          <div className="lob-display" style={{ fontSize: 24, color: "var(--lob-text)" }}>{i.riotId}</div>
+          <div style={{ marginTop: 4, fontSize: 13, color: "var(--lob-muted)" }}>
+            {[i.elo, rotuloDaRota(i.rotaPrimaria, t.rotas), rotuloDaRota(i.rotaSecundaria, t.rotas)]
+              .filter(Boolean)
+              .join(" · ")}
           </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 10, letterSpacing: ".2em", color: "var(--lob-bronze)" }}>{t.valorLabel}</div>
-            <div
-              className="lob-display"
-              style={{ fontSize: 28, color: "var(--lob-gold-1)", fontVariantNumeric: "tabular-nums" }}
-            >
-              {i.pontos}
-            </div>
+          <div style={{ marginTop: 4, fontSize: 13, color: "var(--lob-muted)" }}>
+            {t.disponibilidadeLabel}:{" "}
+            {turnos.length > 0 ? turnos.join(" · ") : t.disponibilidadeNaoInformada}
           </div>
         </div>
 

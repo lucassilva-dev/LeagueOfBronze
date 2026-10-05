@@ -1,10 +1,33 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  conferenciaPatchSchema,
   configPatchSchema,
   estadoDaJanela,
   fichaPatchSchema,
 } from "@/lib/inscricoes/schema";
+
+describe("conferência de um item", () => {
+  const base = { inscricaoId: "3f2504e0-4f89-11d3-9a0c-0305e82c3301", item: "b" };
+
+  it("aceita só a observação — o veredicto gravado fica como está", () => {
+    const parsed = conferenciaPatchSchema.parse({ ...base, observacao: "print no privado" });
+    expect("estado" in parsed && parsed.estado !== undefined).toBe(false);
+  });
+
+  it("aceita só o estado — a observação gravada fica como está", () => {
+    const parsed = conferenciaPatchSchema.parse({ ...base, estado: "ok" });
+    expect(parsed.observacao).toBeUndefined();
+  });
+
+  it("recusa um corpo sem nada para gravar", () => {
+    expect(conferenciaPatchSchema.safeParse(base).success).toBe(false);
+  });
+
+  it("recusa estado fora da lista", () => {
+    expect(conferenciaPatchSchema.safeParse({ ...base, estado: "talvez" }).success).toBe(false);
+  });
+});
 
 describe("ficha editada pela organização", () => {
   const base = { inscricaoId: "3f2504e0-4f89-11d3-9a0c-0305e82c3301" };
@@ -37,6 +60,18 @@ describe("ficha editada pela organização", () => {
 
   it("exige um id de inscrição de verdade", () => {
     expect(fichaPatchSchema.safeParse({ inscricaoId: "1", situacao: "apto" }).success).toBe(false);
+  });
+
+  it("registra a disponibilidade de quem se inscreveu antes de o formulário perguntar", () => {
+    const parsed = fichaPatchSchema.parse({ ...base, disponibilidade: ["noite", "manha", "noite"] });
+    expect(parsed.disponibilidade).toEqual(["noite", "manha"]);
+    // Vazio é legítimo aqui: desfaz um registro feito por engano.
+    expect(fichaPatchSchema.safeParse({ ...base, disponibilidade: [] }).success).toBe(true);
+    expect(fichaPatchSchema.safeParse({ ...base, disponibilidade: ["madrugada"] }).success).toBe(false);
+  });
+
+  it("ficha sem disponibilidade não mexe nela", () => {
+    expect("disponibilidade" in fichaPatchSchema.parse({ ...base, situacao: "apto" })).toBe(false);
   });
 });
 

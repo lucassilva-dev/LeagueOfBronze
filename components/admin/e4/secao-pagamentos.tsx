@@ -230,7 +230,11 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: Pr
    */
   const identidade = caixa.recebido - caixa.estornado - caixa.aDevolver;
   const caixaFecha = identidade === caixa.arrecadado;
-  const premiacao = Math.round((caixa.arrecadado * config.pct_campeao) / 100);
+  // 100% do arrecadado vira prêmio: o campeão fica com `pct_campeao` e o vice com o
+  // resto. A organização não fica com nada — o vice é a SUBTRAÇÃO, e não um segundo
+  // arredondamento, para os dois somarem exatamente o arrecadado.
+  const premioCampeao = Math.round((caixa.arrecadado * config.pct_campeao) / 100);
+  const premioVice = caixa.arrecadado - premioCampeao;
 
   const salvar = async (inscricaoId: string, estado: EstadoPagamento) => {
     const obs = (rascunhoObs[inscricaoId] ?? "").trim();
@@ -301,12 +305,17 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: Pr
         <Metric
           label="Arrecadado"
           value={moeda(caixa.arrecadado)}
-          detail="da organização — é este que vira premiação"
+          detail="100% vira premiação — a organização não fica com nada"
         />
         <Metric
-          label={`Premiação do campeão (${config.pct_campeao}%)`}
-          value={moeda(premiacao)}
-          detail={`${100 - config.pct_campeao}% ficam com a organização`}
+          label={`Prêmio do campeão (${config.pct_campeao}%)`}
+          value={moeda(premioCampeao)}
+          detail="sobre o arrecadado"
+        />
+        <Metric
+          label={`Prêmio do vice (${100 - config.pct_campeao}%)`}
+          value={moeda(premioVice)}
+          detail="o restante do arrecadado"
         />
         <Metric label="Em caixa" value={moeda(caixa.emCaixa)} detail="recebido − estornado" />
         <Metric label="A receber" value={moeda(caixa.aReceber)} detail="aguardando + declarado" />
@@ -316,7 +325,7 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: Pr
         <Metric small label="Recebido (bruto)" value={moeda(caixa.recebido)} detail="tudo que um dia entrou" />
         <Metric small label="Estornado" value={moeda(caixa.estornado)} detail="já devolvido" />
         <Metric small label="A devolver" value={moeda(caixa.aDevolver)} detail="na conta, mas comprometido" />
-        <Metric small label="Isento" value={moeda(caixa.isento)} detail="organizadores (regra w)" />
+        <Metric small label="Isento" value={moeda(caixa.isento)} detail="organizadores desta edição" />
       </FieldGrid>
 
       <Card padding="14px 16px" style={{ marginTop: 12 }}>
@@ -493,9 +502,9 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: Pr
       </BlockTitle>
 
       <p style={{ margin: "0 0 12px", fontSize: 12.5, color: C.ink3, lineHeight: 1.7 }}>
-        Isto existe porque as regras (d) colocação concluída e (e) atividade ranqueada recente só
-        são verificáveis perto do início: alguém aprovado em setembro pode ser recusado em outubro
-        já tendo pago — e recebe o dinheiro de volta.
+        Isto existe porque o item E — partidas recentes na solo/duo (regra 4) — só é verificável
+        nos 10 dias antes do início: alguém aprovado em outubro pode ser recusado em novembro já
+        tendo pago, e aí o dinheiro precisa voltar.
       </p>
 
       <FieldGrid min={300}>
@@ -627,7 +636,7 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: Pr
                       {nome}
                       {inscrito?.organizador ? (
                         <span style={{ marginLeft: 8 }}>
-                          <Chip tone="gold" title="Organizador: isento da taxa pela regra (w).">
+                          <Chip tone="gold" title="Organizador desta edição: não paga inscrição.">
                             organização
                           </Chip>
                         </span>

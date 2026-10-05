@@ -1,7 +1,9 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { AvisoConsentimento } from "@/components/aviso-consentimento";
+import { caminhoNoArquivo } from "@/lib/arquivo";
+import { semTemporadaAoVivo } from "@/lib/fase-do-site";
 import { EloCrest, RoleIcon } from "@/components/lob/ui";
 import { formatKda } from "@/lib/format";
 import { eloLabel, rotaLabel } from "@/lib/i18n/messages/paginas-home";
@@ -21,9 +23,14 @@ export default async function PlayerFichaPage({ params }: PlayerPageParams) {
   const { dataset } = await getServerDataset();
   const player = buildDesignPlayers(dataset).find((p) => p.slug === slug);
 
-  if (!player) {
-    notFound();
+  // Link antigo de um jogador que saiu do ar — ou que ficou no dataset só porque a nova
+  // temporada nasceu mantendo os elencos (ver `semTemporadaAoVivo`): manda para a ficha
+  // arquivada, com os jogos de verdade, em vez de 404 ou de uma ficha zerada.
+  if (!player || semTemporadaAoVivo(dataset)) {
+    const arquivado = caminhoNoArquivo(dataset.archivedSeasons, { tipo: "jogador", slug });
+    if (arquivado) redirect(arquivado);
   }
+  if (!player) notFound();
 
   const aggregate = calculatePlayerAggregates(dataset).find((a) => a.playerId === player.id);
   const games = aggregate?.gamesPlayed ?? 0;

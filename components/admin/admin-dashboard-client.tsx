@@ -355,7 +355,7 @@ function AdminLoginCard({
             color: C.bronze,
           }}
         >
-          League of Bronze · 3ª Edição
+          League of Bronze · 4ª Edição
         </p>
 
         <Alertas erro={error} faltando={[]} esperaSegundos={esperaSegundos} mensagem={message} />

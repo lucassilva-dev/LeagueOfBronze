@@ -3,6 +3,7 @@ import Link from "next/link";
 import { LanguageToggle } from "@/components/language-toggle";
 import { MainNav, type NavLabel } from "@/components/main-nav";
 import { SessaoNoCabecalho } from "@/components/sessao-no-cabecalho";
+import { emPreTemporada } from "@/lib/fase-do-site";
 import { AVISO_RIOT_OFICIAL, CONTATO_EMAIL } from "@/lib/i18n/messages/legal";
 import { getLocale, getMessages } from "@/lib/i18n/server";
 import { ehAmbienteDeTeste, problemaDeAmbiente } from "@/lib/data-store";
@@ -32,17 +33,26 @@ export async function SiteFrame({ children }: SiteFrameProps) {
   const locale = await getLocale();
   const t = await getMessages();
 
-  const navLabels: NavLabel[] = [
-    { href: "/", label: t.comum.navInicio },
-    { href: "/times", label: t.comum.navTimes },
-    { href: "/jogadores", label: t.comum.navJogadores },
-    { href: "/calendario", label: t.comum.navCalendario },
-    { href: "/tabela", label: t.comum.navTabela },
-    { href: "/stats", label: t.comum.navEstatisticas },
-    { href: "/cartas", label: t.comum.navCartas },
-    { href: "/regras", label: t.comum.navRegras },
-    { href: "/temporadas", label: t.comum.navTemporadas },
-  ];
+  // Na pré-temporada o menu fica só com o que existe de fato: sem times no ar, as abas da
+  // temporada levariam a páginas vazias. Elas voltam quando lib/fase-do-site.ts virar.
+  const navLabels: NavLabel[] = emPreTemporada()
+    ? [
+        { href: "/", label: t.comum.navInicio },
+        { href: "/inscricao", label: t.comum.navInscricao, destaque: true },
+        { href: "/regras", label: t.comum.navRegras },
+        { href: "/temporadas", label: t.comum.navTemporadas },
+      ]
+    : [
+        { href: "/", label: t.comum.navInicio },
+        { href: "/times", label: t.comum.navTimes },
+        { href: "/jogadores", label: t.comum.navJogadores },
+        { href: "/calendario", label: t.comum.navCalendario },
+        { href: "/tabela", label: t.comum.navTabela },
+        { href: "/stats", label: t.comum.navEstatisticas },
+        { href: "/cartas", label: t.comum.navCartas },
+        { href: "/regras", label: t.comum.navRegras },
+        { href: "/temporadas", label: t.comum.navTemporadas },
+      ];
 
   return (
     <div style={{ position: "relative", minHeight: "100vh", color: "#b8ab97", overflowX: "hidden" }}>

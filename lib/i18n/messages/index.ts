@@ -9,6 +9,7 @@ import { paginasStats } from "@/lib/i18n/messages/paginas-stats";
 import { paginasCompeticao } from "@/lib/i18n/messages/paginas-competicao";
 import { paginasHome } from "@/lib/i18n/messages/paginas-home";
 import { paginasRegras } from "@/lib/i18n/messages/paginas-regras";
+import { preTemporada } from "@/lib/i18n/messages/pre-temporada";
 
 /**
  * Junta os blocos de texto de cada área do site nos dois idiomas.
@@ -29,6 +30,7 @@ export const MESSAGES = {
     paginasHome: paginasHome.pt,
     paginasRegras: paginasRegras.pt,
     paginasStats: paginasStats.pt,
+    preTemporada: preTemporada.pt,
   },
   en: {
     comum: comum.en,
@@ -41,6 +43,7 @@ export const MESSAGES = {
     paginasHome: paginasHome.en,
     paginasRegras: paginasRegras.en,
     paginasStats: paginasStats.en,
+    preTemporada: preTemporada.en,
   },
 } satisfies Record<Locale, unknown>;
 

@@ -1,6 +1,6 @@
 import { createHmac, randomBytes } from "node:crypto";
 
-import { ALL_CARDS, CARDS, isDuplaCard } from "@/lib/cards";
+import { baralhoDoSorteio, isDuplaCard } from "@/lib/cards";
 import { CHAMPIONS } from "@/lib/champions";
 import type { CardId } from "@/lib/schema";
 
@@ -79,16 +79,18 @@ export function sortearLado(semente: string, teamAId: string, teamBId: string): 
 /**
  * O pool de cada modalidade.
  *
- * No sorteio individual valem as 6 cartas que afetam o adversário. No sorteio duplo —
- * quando os DOIS capitães usam e uma carta só vale para ambos — entram também as 2
- * duplas. Mesma regra que a rota antiga já validava.
+ * No sorteio individual valem as cartas que afetam o adversário. No sorteio duplo —
+ * quando os DOIS capitães usam e uma carta só vale para ambos — entram também as
+ * duplas. Cartas retiradas (a INVASÃO DA YUUMI, na 4ª) só entram no pool de sorteios
+ * feitos ANTES da retirada — é o que mantém um sorteio da 3ª conferível pela semente
+ * (ver `baralhoDoSorteio`). Sem `emISO`, o pool de agora.
  */
-export function poolDeCartas(dupla: boolean): CardId[] {
-  return (dupla ? ALL_CARDS : CARDS).map((c) => c.cardId);
+export function poolDeCartas(dupla: boolean, emISO?: string): CardId[] {
+  return baralhoDoSorteio(dupla, emISO).map((c) => c.cardId);
 }
 
-export function sortearCarta(semente: string, dupla: boolean, rotulo = "carta"): CardId {
-  const pool = poolDeCartas(dupla);
+export function sortearCarta(semente: string, dupla: boolean, rotulo = "carta", emISO?: string): CardId {
+  const pool = poolDeCartas(dupla, emISO);
   const escolhida = pool[sortearIndice(semente, rotulo, pool.length)]!;
 
   // Rede: uma carta dupla no sorteio individual quebraria a regra do regulamento.
@@ -185,7 +187,7 @@ export function conferirSorteio(
   /*
    * O tipo de pool sai do PRÓPRIO REGISTRO, não de quem está conferindo.
    *
-   * O sorteio duplo usa as 8 cartas; o individual, só as 6. Com `contexto.dupla ?? false`,
+   * O sorteio duplo inclui as duplas; o individual, não. Com `contexto.dupla ?? false`,
    * quem conferisse um registro duplo sem saber que precisava avisar recebia `false` — a
    * ferramenta que existe para provar honestidade acusava de fraude um sorteio honesto.
    * E quem confere meses depois tem em mãos exatamente o registro, que já carrega
@@ -199,7 +201,9 @@ export function conferirSorteio(
     (registro.detalhe?.dupla === true || isDuplaCard(registro.resultado as CardId));
 
   try {
-    return sortearCarta(registro.semente, dupla) === registro.resultado;
+    // O baralho é o do DIA do sorteio: o de hoje não tem a Yuumi, e conferir um sorteio da
+    // 3ª contra ele acusaria de fraude um resultado honesto.
+    return sortearCarta(registro.semente, dupla, "carta", registro.emISO) === registro.resultado;
   } catch {
     return false;
   }

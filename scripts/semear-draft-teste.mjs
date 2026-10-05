@@ -66,9 +66,10 @@ const inscritos = APELIDOS.map((nick, i) => {
     pontos: faixa.pts,
     rotaPrimaria: ROTAS[i % 5],
     rotaSecundaria: ROTAS[(i + 2) % 5],
-    // Dez querem ser capitão para a escolha ter opções — com exatamente seis, o "sorteio"
-    // de capitães não sortearia nada.
-    querCapitao: i < 10,
+    // Regra 9 da 4ª: ao menos um turno. Varia para o cruzamento de agenda ter o que
+    // cruzar. (Não existe mais "quero ser capitão": na 4ª os capitães são os maiores
+    // elos na solo/duo, e o servidor ignora o campo.)
+    disponibilidade: [["manha", "tarde", "noite"], ["tarde", "noite"], ["noite"]][i % 3],
   };
 });
 
@@ -102,7 +103,7 @@ async function criar(p) {
       elo: p.elo,
       rotaPrimaria: p.rotaPrimaria,
       rotaSecundaria: p.rotaSecundaria,
-      querCapitao: p.querCapitao,
+      disponibilidade: p.disponibilidade,
       aceiteRegulamento: true,
       aceiteImagem: true,
       aceiteRequisitos: true,

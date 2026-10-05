@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 
 import { Eyebrow, GoldTitle, SectionTitle } from "@/components/lob/ui";
+import { ADMIN_SESSION_COOKIE } from "@/lib/admin-auth";
+import { LOCALE_COOKIE } from "@/lib/i18n/config";
 import { AVISO_RIOT_OFICIAL, CONTATO_EMAIL } from "@/lib/i18n/messages/legal";
 import { getMessages } from "@/lib/i18n/server";
+import { JOGADOR_COOKIE } from "@/lib/jogadores/auth";
 
 /**
  * Renderização por requisição — OBRIGATÓRIO enquanto a CSP usar nonce (ver proxy.ts).
@@ -23,6 +26,12 @@ export async function generateMetadata(): Promise<Metadata> {
  * local prontamente visível (também está no rodapé de todas as páginas), a origem dos assets,
  * e um canal de contato público para pedidos de correção/remoção de dados — inclusive os
  * repassados pela Riot.
+ *
+ * A parte de privacidade descreve o que o site GRAVA de fato: cookies, conta de jogador
+ * (lib/jogadores) e inscrição (lib/inscricoes, supabase/schema-4a-edicao.sql), e o que
+ * atravessa para o público (lib/draft/virada.ts e a transmissão do draft). Quem mudar o
+ * que é coletado ou publicado precisa mudar este texto junto — política desatualizada
+ * é afirmação falsa com o nome da organização embaixo.
  */
 
 const BLOCO = {
@@ -40,6 +49,26 @@ const P = {
 } as const;
 
 const DESTAQUE = { color: "#cfa877" } as const;
+
+const LISTA = {
+  margin: 0,
+  paddingLeft: 18,
+  display: "flex",
+  flexDirection: "column",
+  gap: 7,
+  fontSize: 13.5,
+  lineHeight: 1.6,
+  color: "#b3a690",
+} as const;
+
+const NOME_COOKIE = {
+  ...DESTAQUE,
+  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+  fontSize: 12.5,
+  overflowWrap: "anywhere",
+} as const;
+
+const LINK_EMAIL = { color: "#e6c592", textDecoration: "none", overflowWrap: "anywhere" } as const;
 
 function Secao({
   titulo,
@@ -102,26 +131,76 @@ export default async function LegalPage() {
       <Secao titulo={t.legal.secaoGuarda}>
         <p style={P}>{t.legal.guardaIntro}</p>
         <div style={BLOCO}>
-          <ul
-            style={{
-              margin: 0,
-              paddingLeft: 18,
-              display: "flex",
-              flexDirection: "column",
-              gap: 7,
-              fontSize: 13.5,
-              lineHeight: 1.6,
-              color: "#b3a690",
-            }}
-          >
+          <ul style={LISTA}>
             <li>{t.legal.guardaItem1}</li>
             <li>{t.legal.guardaItem2}</li>
             <li>{t.legal.guardaItem3}</li>
           </ul>
         </div>
         <p style={P}>{t.legal.guardaVisitante}</p>
+        {/*
+          Os nomes vêm das MESMAS constantes que criam os cookies — se um deles mudar de
+          nome, esta lista acompanha sozinha. Se um cookie NOVO for criado, ele precisa
+          entrar aqui à mão: a página diz que esta é a lista inteira.
+        */}
+        <div style={BLOCO}>
+          <ul style={LISTA}>
+            <li>
+              <span style={NOME_COOKIE}>{LOCALE_COOKIE}</span> — {t.legal.cookieIdioma}
+            </li>
+            <li>
+              <span style={NOME_COOKIE}>{JOGADOR_COOKIE}</span> — {t.legal.cookieJogador}
+            </li>
+            <li>
+              <span style={NOME_COOKIE}>{ADMIN_SESSION_COOKIE}</span> — {t.legal.cookieAdmin}
+            </li>
+          </ul>
+        </div>
         <p style={P}>{t.legal.guardaLinksExternos}</p>
         <p style={P}>{t.legal.guardaConsentimento}</p>
+      </Secao>
+
+      <Secao titulo={t.legal.secaoConta}>
+        <p style={P}>{t.legal.contaIntro}</p>
+        <p style={P}>{t.legal.contaSenha}</p>
+        <p style={P}>{t.legal.contaRegistros}</p>
+        <p style={P}>{t.legal.contaEmail}</p>
+        <p style={P}>{t.legal.contaRetencao}</p>
+      </Secao>
+
+      <Secao titulo={t.legal.secaoInscricao}>
+        <p style={P}>{t.legal.inscricaoIntro}</p>
+        <div style={BLOCO}>
+          <ul style={LISTA}>
+            <li>{t.legal.inscricaoItem1}</li>
+            <li>{t.legal.inscricaoItem2}</li>
+            <li>{t.legal.inscricaoItem3}</li>
+            <li>{t.legal.inscricaoItem4}</li>
+            <li>{t.legal.inscricaoItem5}</li>
+            <li>{t.legal.inscricaoItem6}</li>
+          </ul>
+        </div>
+        <p style={P}>{t.legal.inscricaoAutomatico}</p>
+        <p style={P}>{t.legal.inscricaoOrganizacao}</p>
+        <p style={P}>{t.legal.inscricaoPagamento}</p>
+        <p style={P}>
+          <span style={DESTAQUE}>{t.legal.rotuloParaQue}</span> {t.legal.inscricaoParaQue}
+        </p>
+        <p style={P}>
+          <span style={DESTAQUE}>{t.legal.rotuloQuemVe}</span> {t.legal.inscricaoQuemVe}
+        </p>
+        <p style={P}>{t.legal.inscricaoPublico}</p>
+        <p style={P}>{t.legal.inscricaoTransmissao}</p>
+        <p style={P}>
+          <span style={DESTAQUE}>{t.legal.rotuloPrazo}</span> {t.legal.inscricaoPrazo}
+        </p>
+        <p style={P}>
+          <span style={DESTAQUE}>{t.legal.rotuloCorrecao}</span> {t.legal.inscricaoCorrecaoAntes}{" "}
+          <a href={`mailto:${CONTATO_EMAIL}`} style={LINK_EMAIL}>
+            {CONTATO_EMAIL}
+          </a>{" "}
+          {t.legal.inscricaoCorrecaoDepois}
+        </p>
       </Secao>
 
       <Secao titulo={t.legal.secaoApi}>

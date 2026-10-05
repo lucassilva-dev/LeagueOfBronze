@@ -34,6 +34,7 @@ import {
   type EstadoConferencia,
   type ItemConferencia,
 } from "@/lib/inscricoes/schema";
+import { TURNOS, type Turno } from "@/lib/inscricoes/turnos";
 
 /**
  * Matriz de conferência + ficha do inscrito.
@@ -135,14 +136,21 @@ const TOM_SITUACAO: Record<Inscrito["situacao"], TomChip> = {
  *
  * Enquanto a data for nula o item é "não avaliável", nunca "não cumpre" — a organização
  * ainda não decidiu quando é o campeonato, e reprovar alguém por isso seria reprovar
- * pela nossa indecisão. Os outros quatro itens (b, d, f, m) se avaliam a qualquer hora.
+ * pela nossa indecisão. Os outros cinco itens (a, b, d, f, m) se avaliam a qualquer hora
+ * — o (a) dependia da abertura enquanto havia tempo mínimo de grupo, que a 4ª não tem.
  */
 const ANCORA_DO_ITEM: Partial<
   Record<ItemConferencia, Readonly<{ campo: "abertura_inscricoes" | "inicio_campeonato"; texto: string }>>
 > = {
-  a: { campo: "abertura_inscricoes", texto: "a data de abertura das inscrições" },
   e: { campo: "inicio_campeonato", texto: "a data de início do campeonato" },
 };
+
+const ROTULO_TURNO: Record<Turno, string> = { manha: "Manhã", tarde: "Tarde", noite: "Noite" };
+
+/** Os turnos na ordem do dia, ignorando qualquer valor que esta tela não conheça. */
+function turnosDe(valores: readonly string[] | null | undefined): Turno[] {
+  return TURNOS.filter((t) => (valores ?? []).includes(t));
+}
 
 const SEM_ESCOPO = "Falta o escopo inscricoes:conferir para editar.";
 
@@ -244,11 +252,22 @@ function BlocoItem({
   ocupado,
   podeConferir,
 }: PropsBloco) {
-  const [estado, setEstado] = useState<EstadoConferencia>(estadoSalvo);
-  const [observacao, setObservacao] = useState(observacaoSalva ?? "");
+  // Rascunho só do que foi tocado, como na ficha (ver `RascunhoFicha`): o bloco não remonta
+  // quando o painel recarrega, e um estado semeado na montagem reenviaria o veredicto
+  // velho por cima do que outro organizador acabou de gravar neste item.
+  const [estadoEditado, setEstadoEditado] = useState<EstadoConferencia | undefined>(undefined);
+  const [observacaoEditada, setObservacaoEditada] = useState<string | undefined>(undefined);
+  const estado = estadoEditado ?? estadoSalvo;
+  const observacao = observacaoEditada ?? observacaoSalva ?? "";
 
   const regra = REGRA_DO_ITEM[item];
-  const mudou = estado !== estadoSalvo || observacao.trim() !== (observacaoSalva ?? "").trim();
+  // Cada campo só "mudou" se FOI tocado e difere do banco — e só o que mudou vai no corpo.
+  // Mandar a observação intocada apagava a que outro organizador gravou depois da última
+  // carga desta tela; mandar o estado intocado desfazia o veredicto dele.
+  const estadoMudou = estadoEditado !== undefined && estadoEditado !== estadoSalvo;
+  const observacaoMudou =
+    observacaoEditada !== undefined && observacaoEditada.trim() !== (observacaoSalva ?? "").trim();
+  const mudou = estadoMudou || observacaoMudou;
 
   // Marcar "cumpre" num item cuja data-âncora nem existe é afirmar o que ninguém pode
   // ter verificado. Não bloqueamos (a organização pode ter checado por fora e explicado
@@ -256,12 +275,16 @@ function BlocoItem({
   const afirmacaoSemBase = Boolean(faltaAncora) && (estado === "ok" || estado === "provisorio");
 
   const salvar = async () => {
-    await executar("conferencia", {
+    const ok = await executar("conferencia", {
       inscricaoId,
       item,
-      estado,
-      observacao: observacao.trim(),
+      ...(estadoMudou && { estado }),
+      ...(observacaoMudou && { observacao: observacao.trim() }),
     });
+    if (ok) {
+      setEstadoEditado(undefined);
+      setObservacaoEditada(undefined);
+    }
   };
 
   return (
@@ -294,7 +317,11 @@ function BlocoItem({
           <Select
             value={estado}
             disabled={!podeConferir || ocupado}
-            onChange={(v) => setEstado(comoEstado(v))}
+            // Voltar ao valor do banco é deixar de mexer: o campo volta a acompanhar o servidor.
+            onChange={(v) => {
+              const novo = comoEstado(v);
+              setEstadoEditado(novo === estadoSalvo ? undefined : novo);
+            }}
             ariaLabel={`Estado do item ${item.toUpperCase()}`}
           >
             {ESTADOS_CONFERENCIA.map((e) => (
@@ -313,7 +340,9 @@ function BlocoItem({
             value={observacao}
             rows={2}
             disabled={!podeConferir || ocupado}
-            onChange={setObservacao}
+            // Igualdade EXATA, não com trim: comparar aparado engoliria o espaço enquanto a
+            // pessoa digita ("abc" + espaço voltaria a "abc", e "abc def" nunca sairia).
+            onChange={(v) => setObservacaoEditada(v === (observacaoSalva ?? "") ? undefined : v)}
             placeholder="Ex.: print do perfil enviado no privado em 03/09."
             ariaLabel={`Observação do item ${item.toUpperCase()}`}
           />
@@ -368,46 +397,113 @@ type PropsFicha = Readonly<{
   podeConferir: boolean;
 }>;
 
+/**
+ * O que a pessoa digitou na ficha e ainda não salvou — SÓ os campos que ela tocou.
+ *
+ * Campo ausente aqui = intocado, e campo intocado mostra sempre o valor que veio do
+ * servidor. Isso importa porque a ficha não remonta quando o painel recarrega (a chave é
+ * o id do inscrito): com um `useState` por campo semeado na montagem, um recarregamento
+ * deixava a tela com a foto velha, e o próximo "Salvar" devolvia ao banco o valor antigo
+ * de um campo que outro organizador tinha acabado de mudar — inclusive a situação.
+ */
+type RascunhoFicha = Partial<{
+  situacao: Inscrito["situacao"];
+  eloVerificado: string;
+  entrouNoGrupo: string;
+  organizador: boolean;
+  observacao: string;
+  turnos: Turno[];
+  nomeReal: string;
+}>;
+
 function FichaInscrito({ inscrito, config, conferencias, executar, ocupado, podeConferir }: PropsFicha) {
-  const [situacao, setSituacao] = useState<Inscrito["situacao"]>(inscrito.situacao);
-  // Guardamos o RÓTULO canônico ("Grão-Mestre"), não o que veio do banco: o valor gravado
-  // pode ser um alias ("GM", "diamante 2") que não casa com nenhuma <option>, e aí o
-  // select apareceria vazio como se ninguém tivesse verificado nada.
-  const [eloVerificado, setEloVerificado] = useState(resolveElo(inscrito.elo_verificado)?.label ?? "");
-  const [entrouNoGrupo, setEntrouNoGrupo] = useState(inscrito.entrou_no_grupo ?? "");
-  const [organizador, setOrganizador] = useState(inscrito.organizador);
-  const [observacao, setObservacao] = useState(inscrito.observacao ?? "");
+  const [rascunho, setRascunho] = useState<RascunhoFicha>({});
+
+  const turnosSalvos = turnosDe(inscrito.disponibilidade);
+
+  /** O que está no banco, já no formato dos controles. */
+  const salvo = {
+    situacao: inscrito.situacao,
+    // Guardamos o RÓTULO canônico ("Grão-Mestre"), não o que veio do banco: o valor
+    // gravado pode ser um alias ("GM", "diamante 2") que não casa com nenhuma <option>, e
+    // aí o select apareceria vazio como se ninguém tivesse verificado nada.
+    eloVerificado: resolveElo(inscrito.elo_verificado)?.label ?? "",
+    entrouNoGrupo: inscrito.entrou_no_grupo ?? "",
+    organizador: inscrito.organizador,
+    observacao: inscrito.observacao ?? "",
+    turnos: turnosSalvos,
+    nomeReal: inscrito.nome_real ?? "",
+  };
+
+  /*
+   * Grava o campo no rascunho — ou o TIRA de lá, se a pessoa voltou ao valor do banco.
+   * Sem isso, "mudei para apto e voltei para pendente" deixava `situacao: pendente` no
+   * rascunho: a tela dizia "nada mudou", mas o campo parava de acompanhar o servidor, e
+   * depois de um recarregamento reenviava o "pendente" por cima do "apto" de outra pessoa.
+   *
+   * Igualdade EXATA (turnos na ordem do dia): comparar texto aparado aqui engoliria o
+   * espaço enquanto a pessoa digita.
+   */
+  const editar = <K extends keyof RascunhoFicha>(campo: K, valor: NonNullable<RascunhoFicha[K]>) => {
+    const igualAoBanco =
+      campo === "turnos"
+        ? turnosDe(valor as Turno[]).join(",") === salvo.turnos.join(",")
+        : valor === salvo[campo as Exclude<keyof RascunhoFicha, "turnos">];
+    setRascunho((atual) => {
+      const proximo = { ...atual };
+      if (igualAoBanco) delete proximo[campo];
+      else proximo[campo] = valor;
+      return proximo;
+    });
+  };
+
+  /** O que a tela mostra: o rascunho onde houver, o banco no resto. */
+  const situacao = rascunho.situacao ?? salvo.situacao;
+  const eloVerificado = rascunho.eloVerificado ?? salvo.eloVerificado;
+  const entrouNoGrupo = rascunho.entrouNoGrupo ?? salvo.entrouNoGrupo;
+  const organizador = rascunho.organizador ?? salvo.organizador;
+  const observacao = rascunho.observacao ?? salvo.observacao;
+  const turnos = rascunho.turnos ?? salvo.turnos;
+  const nomeReal = rascunho.nomeReal ?? salvo.nomeReal;
 
   const elo = eloExibido(inscrito);
   const rotas = rotasDoInscrito(inscrito);
   const congelado = Boolean(inscrito.elo_congelado);
 
   // Uma comparação por campo, reaproveitada pelo botão (habilitar) e pelo envio
-  // (decidir o que vai no corpo).
+  // (decidir o que vai no corpo). Campo intocado nunca "mudou", mesmo que o servidor
+  // tenha mudado por baixo: quem mudou foi outra pessoa, e não cabe a esta tela desfazer.
   const mudou = {
-    situacao: situacao !== inscrito.situacao,
-    eloVerificado: eloVerificado !== (resolveElo(inscrito.elo_verificado)?.label ?? ""),
-    entrouNoGrupo: entrouNoGrupo !== (inscrito.entrou_no_grupo ?? ""),
-    organizador: organizador !== inscrito.organizador,
-    observacao: observacao.trim() !== (inscrito.observacao ?? "").trim(),
+    situacao: rascunho.situacao !== undefined && situacao !== salvo.situacao,
+    eloVerificado: rascunho.eloVerificado !== undefined && eloVerificado !== salvo.eloVerificado,
+    entrouNoGrupo: rascunho.entrouNoGrupo !== undefined && entrouNoGrupo !== salvo.entrouNoGrupo,
+    organizador: rascunho.organizador !== undefined && organizador !== salvo.organizador,
+    observacao: rascunho.observacao !== undefined && observacao.trim() !== salvo.observacao.trim(),
+    disponibilidade:
+      rascunho.turnos !== undefined && turnosDe(turnos).join(",") !== salvo.turnos.join(","),
+    nomeReal: rascunho.nomeReal !== undefined && nomeReal.trim() !== salvo.nomeReal.trim(),
   };
 
   const fichaMudou = Object.values(mudou).some(Boolean);
 
+  // Mesmo critério do formulário público: duas palavras. Vazio também barra — a ficha
+  // não apaga o nome de ninguém.
+  const nomeInvalido = mudou.nomeReal && nomeReal.trim().split(/\s+/).filter(Boolean).length < 2;
+
   /*
    * Envia SÓ o que esta tela mudou.
    *
-   * Antes ia sempre o pacote inteiro dos cinco campos, montado do estado local — que é
-   * uma foto de quando a ficha foi aberta. Com dois organizadores trabalhando ao mesmo
-   * tempo (o modo normal aqui), quem salvasse por último devolvia os valores VELHOS dos
-   * campos que nem tocou: bastava alguém abrir a ficha, o outro marcar "apto", e o
-   * primeiro salvar uma observação para a situação voltar a "pendente" sem aviso nenhum.
+   * Antes ia sempre o pacote inteiro dos campos, montado do estado local — que é uma foto
+   * de quando a ficha foi aberta. Com dois organizadores trabalhando ao mesmo tempo (o
+   * modo normal aqui), quem salvasse por último devolvia os valores VELHOS dos campos que
+   * nem tocou: bastava alguém abrir a ficha, o outro marcar "apto", e o primeiro salvar
+   * uma observação para a situação voltar a "pendente" sem aviso nenhum.
    *
    * `PatchInscricao` já é todo opcional e `atualizarInscricao` só grava o que vem
    * definido, então omitir o campo intocado é o bastante para ele sobreviver.
    */
   const salvarFicha = async () => {
-    await executar("ficha", {
+    const ok = await executar("ficha", {
       inscricaoId: inscrito.id,
       ...(mudou.situacao && { situacao }),
       ...(mudou.eloVerificado && { eloVerificado: eloVerificado === "" ? null : eloVerificado }),
@@ -416,7 +512,12 @@ function FichaInscrito({ inscrito, config, conferencias, executar, ocupado, pode
       ...(mudou.observacao && {
         observacao: observacao.trim() === "" ? null : observacao.trim(),
       }),
+      ...(mudou.disponibilidade && { disponibilidade: turnosDe(turnos) }),
+      ...(mudou.nomeReal && { nomeReal: nomeReal.trim() }),
     });
+    // Salvou: o banco agora tem o que estava no rascunho, e o recarregamento já trouxe.
+    // Falhou: o rascunho fica, para a pessoa não perder o que digitou.
+    if (ok) setRascunho({});
   };
 
   return (
@@ -429,11 +530,15 @@ function FichaInscrito({ inscrito, config, conferencias, executar, ocupado, pode
           </h3>
           <Chip tone={TOM_SITUACAO[inscrito.situacao]}>{ROTULO_SITUACAO[inscrito.situacao]}</Chip>
           {inscrito.organizador ? (
-            <Chip tone="gold" title="Organizador — isento da taxa (regra w)">
+            <Chip tone="gold" title="Organizador desta edição — não paga inscrição e não é capitão">
               organização
             </Chip>
           ) : null}
-          {inscrito.quer_capitao ? <Chip tone="neutro">quer ser capitão</Chip> : null}
+          {turnosSalvos.length === 0 ? (
+            <Chip tone="warn" title="Inscrito antes de o formulário perguntar os turnos — preencha na ficha abaixo.">
+              sem disponibilidade
+            </Chip>
+          ) : null}
         </div>
         <p style={{ margin: "6px 0 0", fontSize: 11.5, color: C.ink4, ...tabular }}>
           Inscrito em {formatDateTimeLabel(inscrito.criado_em)}
@@ -442,11 +547,19 @@ function FichaInscrito({ inscrito, config, conferencias, executar, ocupado, pode
         <div style={{ marginTop: 14 }}>
           <FieldGrid min={170}>
             <Dado rotulo="Riot ID" valor={inscrito.riot_id} />
-            <Dado rotulo="Nome real" valor={inscrito.nome_real ?? "não informado"} />
+            <Dado rotulo="Nome e sobrenome" valor={inscrito.nome_real ?? "não informado"} />
             <Dado rotulo="E-mail" valor={inscrito.email} />
             <Dado rotulo="Discord" valor={inscrito.discord} />
             <Dado rotulo="WhatsApp" valor={inscrito.whatsapp ?? "não informado"} />
             <Dado rotulo="Rotas" valor={<span title={rotas.longo}>{rotas.longo}</span>} />
+            <Dado
+              rotulo="Disponibilidade"
+              valor={
+                turnosSalvos.length > 0
+                  ? turnosSalvos.map((t) => ROTULO_TURNO[t]).join(" · ")
+                  : "não informada"
+              }
+            />
           </FieldGrid>
           {/* Contato é dado do jogador e fica só de leitura: se o Discord está errado, quem
               corrige é ele na própria inscrição — corrigir por cima aqui apagaria a pista de
@@ -530,7 +643,7 @@ function FichaInscrito({ inscrito, config, conferencias, executar, ocupado, pode
             <Select
               value={situacao}
               disabled={!podeConferir || ocupado}
-              onChange={(v) => setSituacao(comoSituacao(v))}
+              onChange={(v) => editar("situacao", comoSituacao(v))}
               ariaLabel="Situação do inscrito"
             >
               {SITUACOES.map((s) => (
@@ -552,7 +665,7 @@ function FichaInscrito({ inscrito, config, conferencias, executar, ocupado, pode
             <Select
               value={eloVerificado}
               disabled={!podeConferir || ocupado}
-              onChange={setEloVerificado}
+              onChange={(v) => editar("eloVerificado", v)}
               ariaLabel="Elo verificado"
             >
               <option value="">— não verificado —</option>
@@ -566,14 +679,35 @@ function FichaInscrito({ inscrito, config, conferencias, executar, ocupado, pode
 
           <Field
             label="Entrou no grupo"
-            hint={`Usado no item A (mínimo de ${config.dias_no_grupo} dias). No WhatsApp não há data auditável: quem preenche atesta.`}
+            hint="Só registro: a 4ª não pede tempo mínimo no grupo (regra 1). No WhatsApp não há data auditável: quem preenche atesta."
           >
             <Input
               type="date"
               value={entrouNoGrupo}
               disabled={!podeConferir || ocupado}
-              onChange={setEntrouNoGrupo}
+              onChange={(v) => editar("entrouNoGrupo", v)}
               ariaLabel="Data de entrada no grupo"
+            />
+          </Field>
+
+          {/*
+            Editável pelo mesmo motivo da disponibilidade: quem se inscreveu quando o campo
+            ainda era "Nome (opcional)" pode ter mandado só o apelido, e a regra 1 é
+            conferida pelo nome do grupo do WhatsApp.
+          */}
+          <Field
+            label="Nome e sobrenome"
+            hint={
+              nomeInvalido
+                ? "Use nome e sobrenome — duas palavras, como no grupo do WhatsApp."
+                : "Como no grupo do WhatsApp. Corrija só com o que o jogador informou."
+            }
+          >
+            <Input
+              value={nomeReal}
+              disabled={!podeConferir || ocupado}
+              onChange={(v) => editar("nomeReal", v)}
+              ariaLabel="Nome e sobrenome do inscrito"
             />
           </Field>
         </FieldGrid>
@@ -582,12 +716,41 @@ function FichaInscrito({ inscrito, config, conferencias, executar, ocupado, pode
           <Check
             checked={organizador}
             disabled={!podeConferir || ocupado}
-            onChange={setOrganizador}
+            onChange={(v) => editar("organizador", v)}
           >
-            É da organização (regra w) — <b>isento da taxa</b>. Isento não é inadimplente: a
-            cobrança some do caixa em vez de ficar em aberto. São cinco pessoas ao todo.
+            É da organização desta edição — <b>não paga inscrição e não é capitão</b>, mas joga.
+            Marcar aqui não mexe no pagamento: lance o pagamento como <b>Isento</b> na aba
+            Pagamentos, senão a cobrança continua em aberto.
           </Check>
         </div>
+
+        {/*
+          A disponibilidade é do jogador, mas fica editável aqui por um motivo só: quem se
+          inscreveu antes de o formulário perguntar os turnos não tem como responder pelo
+          site, e a organização registra o que ele disser no grupo.
+        */}
+        <fieldset style={{ margin: "14px 0 0", padding: 0, border: 0, minWidth: 0 }}>
+          <legend style={{ padding: 0, fontSize: 12, color: C.ink2, marginBottom: 6 }}>
+            Disponibilidade (regra 9)
+          </legend>
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+            {TURNOS.map((turno) => (
+              <Check
+                key={turno}
+                checked={turnos.includes(turno)}
+                disabled={!podeConferir || ocupado}
+                onChange={(marcado) =>
+                  editar("turnos", marcado ? [...turnos, turno] : turnos.filter((x) => x !== turno))
+                }
+              >
+                {ROTULO_TURNO[turno]}
+              </Check>
+            ))}
+          </div>
+          <p style={{ margin: "6px 0 0", fontSize: 11, color: C.ink4 }}>
+            Vem do formulário. Edite só para registrar o que o jogador informou à organização.
+          </p>
+        </fieldset>
 
         <div style={{ marginTop: 14 }}>
           <Field
@@ -598,7 +761,7 @@ function FichaInscrito({ inscrito, config, conferencias, executar, ocupado, pode
               value={observacao}
               rows={3}
               disabled={!podeConferir || ocupado}
-              onChange={setObservacao}
+              onChange={(v) => editar("observacao", v)}
               placeholder="Ex.: pediu para jogar no mesmo time do irmão; combinado que não há garantia."
               ariaLabel="Observação da ficha"
             />
@@ -610,7 +773,7 @@ function FichaInscrito({ inscrito, config, conferencias, executar, ocupado, pode
             right={
               <Button
                 tone="gold"
-                disabled={!podeConferir || ocupado || !fichaMudou}
+                disabled={!podeConferir || ocupado || !fichaMudou || nomeInvalido}
                 title={podeConferir ? undefined : SEM_ESCOPO}
                 onClick={() => void salvarFicha()}
               >
@@ -621,6 +784,26 @@ function FichaInscrito({ inscrito, config, conferencias, executar, ocupado, pode
             <span style={{ fontSize: 11.5, color: C.ink4 }}>
               {fichaMudou ? "Há mudanças não salvas." : "Nada mudou desde o último salvamento."}
             </span>
+            {fichaMudou ? (
+              <button
+                type="button"
+                onClick={() => setRascunho({})}
+                disabled={ocupado}
+                style={{
+                  marginLeft: 10,
+                  padding: 0,
+                  border: 0,
+                  background: "none",
+                  fontFamily: "inherit",
+                  fontSize: 11.5,
+                  color: C.bronzeLit,
+                  cursor: "pointer",
+                  textDecoration: "underline",
+                }}
+              >
+                descartar
+              </button>
+            ) : null}
           </Toolbar>
         </div>
       </Card>
@@ -849,13 +1032,13 @@ export function SecaoInscritos({ dados, executar, ocupado, podeConferir }: Props
                           >
                             <span style={{ fontSize: 11, color: C.ink4 }}>{inscrito.riot_id}</span>
                             {inscrito.organizador ? (
-                              <Chip tone="gold" title="Organizador — isento da taxa (regra w)">
+                              <Chip tone="gold" title="Organizador desta edição — não paga inscrição e não é capitão">
                                 org
                               </Chip>
                             ) : null}
-                            {inscrito.quer_capitao ? (
-                              <Chip tone="neutro" title="Quer ser capitão">
-                                cap
+                            {turnosDe(inscrito.disponibilidade).length === 0 ? (
+                              <Chip tone="warn" title="Sem disponibilidade informada — preencha na ficha.">
+                                sem turno
                               </Chip>
                             ) : null}
                           </div>

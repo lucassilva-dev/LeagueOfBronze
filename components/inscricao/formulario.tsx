@@ -4,6 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 
 import type { Messages } from "@/lib/i18n/messages";
+import { problemasDoPasso1 } from "@/lib/inscricoes/passo1";
+import { TURNOS, type Turno } from "@/lib/inscricoes/turnos";
 import { avisarSessaoMudou } from "@/lib/sessao-mudou";
 
 /**
@@ -11,10 +13,10 @@ import { avisarSessaoMudou } from "@/lib/sessao-mudou";
  *
  * Três coisas que este componente NÃO faz, e a razão de cada uma:
  *
- * 1. NÃO calcula quantos pontos o jogador vale. O número aparece na tela porque a
- *    pessoa precisa vê-lo antes de confirmar, mas ele é recalculado no servidor a
- *    partir do elo. O formulário original do design enviava `pontos` no corpo, o que
- *    permitia declarar elo Ferro valendo 15 pontos — adulteração direta do draft.
+ * 1. NÃO calcula nem mostra quantos pontos o jogador vale. O servidor deriva o número
+ *    do elo (o formulário original do design enviava `pontos` no corpo, o que permitia
+ *    declarar elo Ferro valendo 15 pontos). E a tela não mostra porque a tabela de
+ *    valores da 4ª só é definida depois que a lista fechar (seção 3 do regulamento).
  *
  * 2. NÃO fala com o banco. Toda escrita passa pelas nossas rotas, que validam de novo.
  *
@@ -33,7 +35,8 @@ export type ConfigPublica = {
   chavePix: string | null;
   prazoPagamentoDias: number;
   minRanqueadas: number;
-  diasNoGrupo: number;
+  /** Percentual do prêmio do campeão; o do vice é o resto. */
+  pctCampeao: number;
 };
 
 type Props = Readonly<{
@@ -50,7 +53,7 @@ type Props = Readonly<{
  * cliente a conhecer o idioma, e mandar o texto traduzido para a API faria o
  * `resolveElo` recusar uma inscrição em inglês.
  */
-export type OpcaoElo = { valor: string; rotulo: string; pts: number };
+export type OpcaoElo = { valor: string; rotulo: string };
 export type OpcaoRota = { valor: string; rotulo: string };
 
 const CHAVES_ROTA = ["TOPO", "SELVA", "MEIO", "ATIRADOR", "SUPORTE"] as const;
@@ -84,13 +87,14 @@ export default function FormularioInscricao({ t, config, elos, jogadorInicial }:
   const [elo, setElo] = useState("");
   const [rota1, setRota1] = useState("");
   const [rota2, setRota2] = useState("");
-  const [querCapitao, setQuerCapitao] = useState(false);
+  const [turnos, setTurnos] = useState<Turno[]>([]);
 
   const [aceites, setAceites] = useState([false, false, false]);
   const [problemas, setProblemas] = useState<Problema[]>([]);
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [pronto, setPronto] = useState<string | null>(null);
+  const [jaInscrito, setJaInscrito] = useState(false);
   const [pixCopiado, setPixCopiado] = useState(false);
 
   const eloEscolhido = elos.find((e) => e.valor === elo) ?? null;
@@ -139,8 +143,24 @@ export default function FormularioInscricao({ t, config, elos, jogadorInicial }:
 
   // ------------------------------------------------------------------ passo 1
 
+  /*
+   * Os campos da inscrição que moram no passo 1 são conferidos ANTES de sair dele — o
+   * mesmo motivo do passo 2: o servidor só os vê no envio final, no passo 3, e o erro
+   * apontaria para campos que já não estão na tela. As regras são as do servidor (ver
+   * `lib/inscricoes/passo1.ts`); a validação de verdade continua lá.
+   */
+  function faltasDoPasso1(): Problema[] {
+    return problemasDoPasso1({ nick, tag, nome, discord, whatsapp }, t);
+  }
+
   async function avancarDoPasso1() {
     limparAvisos();
+
+    const faltas = faltasDoPasso1();
+    if (faltas.length > 0) {
+      setProblemas(faltas);
+      return;
+    }
 
     // Quem já tem sessão pula a criação de conta e vai direto ao passo 2.
     if (jogador) {
@@ -149,7 +169,7 @@ export default function FormularioInscricao({ t, config, elos, jogadorInicial }:
     }
 
     setEnviando(true);
-    const r = await postar("/api/conta/cadastro", { email, nome: nome.trim() || nick, senha });
+    const r = await postar("/api/conta/cadastro", { email, nome: nome.trim(), senha });
     setEnviando(false);
 
     if (r.ok && r.dados.jogador) {
@@ -174,6 +194,17 @@ export default function FormularioInscricao({ t, config, elos, jogadorInicial }:
     setErro(r.dados.error ?? t.erroGenerico);
   }
 
+  /** Na dúvida (falha de rede), `false`: o servidor recusa a duplicata de qualquer jeito. */
+  async function jaTemInscricao(): Promise<boolean> {
+    try {
+      const r = await fetch("/api/sessao", { cache: "no-store", signal: AbortSignal.timeout(10000) });
+      const corpo = (await r.json().catch(() => ({}))) as { jogador?: { temInscricao?: boolean } | null };
+      return corpo.jogador?.temInscricao === true;
+    } catch {
+      return false;
+    }
+  }
+
   async function entrar() {
     limparAvisos();
     setEnviando(true);
@@ -184,10 +215,43 @@ export default function FormularioInscricao({ t, config, elos, jogadorInicial }:
       setJogador(r.dados.jogador);
       avisarSessaoMudou();
       setModoEntrar(false);
+
+      // Entrou com uma conta que JÁ se inscreveu: o formulário não serve para nada além
+      // de levar a "esse e-mail já está inscrito" no fim. Mesmo critério da página, que
+      // faz esta checagem quando a pessoa chega já logada.
+      if (await jaTemInscricao()) {
+        setJaInscrito(true);
+        return;
+      }
+
+      // O login esconde os campos do passo 1. Se algum ficou em branco, a pessoa volta
+      // para eles (já logada) em vez de descobrir a falta só no envio final.
+      const faltas = faltasDoPasso1();
+      if (faltas.length > 0) {
+        setProblemas(faltas);
+        return;
+      }
       setPasso(2);
       return;
     }
     setErro(r.dados.error ?? t.erroGenerico);
+  }
+
+  // ------------------------------------------------------------------ passo 2
+
+  function avancarDoPasso2() {
+    limparAvisos();
+    const faltas: Problema[] = [];
+    if (!elo) faltas.push({ campo: "elo", mensagem: t.campoObrigatorio });
+    if (!rota1) faltas.push({ campo: "rotaPrimaria", mensagem: t.campoObrigatorio });
+    if (!rota2) faltas.push({ campo: "rotaSecundaria", mensagem: t.campoObrigatorio });
+    else if (rota1 === rota2) faltas.push({ campo: "rotaSecundaria", mensagem: t.rotasIguais });
+    if (turnos.length === 0) faltas.push({ campo: "disponibilidade", mensagem: t.disponibilidadeFaltando });
+    if (faltas.length > 0) {
+      setProblemas(faltas);
+      return;
+    }
+    setPasso(3);
   }
 
   // ------------------------------------------------------------------ envio
@@ -206,13 +270,13 @@ export default function FormularioInscricao({ t, config, elos, jogadorInicial }:
     const r = await postar("/api/inscricao", {
       nick,
       tag,
-      nomeReal: nome.trim() || undefined,
+      nomeReal: nome.trim(),
       discord,
       whatsapp: whatsapp.trim() || undefined,
       elo,
       rotaPrimaria: rota1,
       rotaSecundaria: rota2,
-      querCapitao,
+      disponibilidade: turnos,
       aceiteRegulamento: aceites[0],
       aceiteImagem: aceites[1],
       aceiteRequisitos: aceites[2],
@@ -237,6 +301,22 @@ export default function FormularioInscricao({ t, config, elos, jogadorInicial }:
         </div>
         <p style={{ margin: "12px auto 22px", maxWidth: "52ch", color: "var(--lob-muted)" }}>
           {t.pagamentoAjuda}
+        </p>
+        <Link className="lob-btn-gold" href="/minha-inscricao">
+          {t.prontoVer}
+        </Link>
+      </div>
+    );
+  }
+
+  if (jaInscrito) {
+    return (
+      <div className="lob-card-2 lob-fade" style={{ padding: "34px 30px", textAlign: "center" }}>
+        <div className="lob-display" style={{ fontSize: 26, color: "var(--lob-gold-1)" }}>
+          {t.jaInscritoTitulo}
+        </div>
+        <p style={{ margin: "12px auto 22px", maxWidth: "52ch", color: "var(--lob-muted)" }}>
+          {t.jaInscritoTexto}
         </p>
         <Link className="lob-btn-gold" href="/minha-inscricao">
           {t.prontoVer}
@@ -313,11 +393,13 @@ export default function FormularioInscricao({ t, config, elos, jogadorInicial }:
             elo={elo}
             rota1={rota1}
             rota2={rota2}
-            querCapitao={querCapitao}
-            setElo={setElo}
-            setRota1={setRota1}
-            setRota2={setRota2}
-            setQuerCapitao={setQuerCapitao}
+            turnos={turnos}
+            // Mexer em qualquer campo apaga os avisos do clique anterior: o próximo
+            // CONTINUAR confere tudo de novo.
+            setElo={(v) => { limparAvisos(); setElo(v); }}
+            setRota1={(v) => { limparAvisos(); setRota1(v); }}
+            setRota2={(v) => { limparAvisos(); setRota2(v); }}
+            setTurnos={(v) => { limparAvisos(); setTurnos(v); }}
             problemaDe={problemaDe}
           />
         )}
@@ -331,8 +413,9 @@ export default function FormularioInscricao({ t, config, elos, jogadorInicial }:
               elo: eloEscolhido?.rotulo ?? "",
               rota1: rota1 ? t.rotas[rota1 as keyof typeof t.rotas] : "",
               rota2: rota2 ? t.rotas[rota2 as keyof typeof t.rotas] : "",
+              // Na ordem do dia, não na ordem em que a pessoa clicou.
+              turnos: TURNOS.filter((x) => turnos.includes(x)).map((x) => t.turnos[x]),
             }}
-            pontos={eloEscolhido?.pts ?? null}
             aceites={aceites}
             setAceites={setAceites}
             pixCopiado={pixCopiado}
@@ -394,12 +477,10 @@ export default function FormularioInscricao({ t, config, elos, jogadorInicial }:
             // elo ou rota em branco (ou as duas rotas iguais): o erro só aparecia ao
             // enviar, no passo 3, apontando para campos que não estão mais na tela — e
             // a pessoa lia "Confira os campos destacados" sem ver campo destacado nenhum.
-            <button
-              type="button"
-              className="lob-btn-gold"
-              onClick={() => { limparAvisos(); setPasso(3); }}
-              disabled={!elo || !rota1 || !rota2 || rota1 === rota2}
-            >
+            //
+            // O botão fica HABILITADO e diz o que falta ao ser clicado: desabilitado, ele
+            // ficava cinza sem explicação — o caso típico era esquecer de marcar um turno.
+            <button type="button" className="lob-btn-gold" onClick={avancarDoPasso2}>
               {t.continuar}
             </button>
           )}
@@ -444,6 +525,46 @@ function Campo({
         <span style={{ display: "block", marginTop: 5, fontSize: 11.5, color: "var(--lob-muted)" }}>{hint}</span>
       ) : null}
     </label>
+  );
+}
+
+/**
+ * Um grupo de controles com título, no lugar de `Campo` quando o conteúdo são vários
+ * botões ou caixas. O `<label>` do `Campo` rotula o PRIMEIRO controle dentro dele: em
+ * volta dos botões de elo, clicar no título, na ajuda ou no aviso de erro escolhia Ferro
+ * sem a pessoa pedir. `fieldset`/`legend` agrupa sem esse efeito.
+ */
+function Grupo({
+  label,
+  hint,
+  erro,
+  children,
+  margem = "0",
+}: Readonly<{ label: string; hint?: string; erro?: string; children: React.ReactNode; margem?: string }>) {
+  return (
+    <fieldset style={{ margin: margem, padding: 0, border: 0, minWidth: 0 }}>
+      <legend
+        style={{
+          padding: 0,
+          fontSize: 10,
+          letterSpacing: ".16em",
+          textTransform: "uppercase",
+          color: "var(--lob-bronze)",
+          marginBottom: 6,
+        }}
+      >
+        {label}
+      </legend>
+      {children}
+      {erro || hint ? (
+        <span
+          role={erro ? "alert" : undefined}
+          style={{ display: "block", marginTop: 5, fontSize: 11.5, color: erro ? "#f0a79e" : "var(--lob-muted)" }}
+        >
+          {erro ?? hint}
+        </span>
+      ) : null}
+    </fieldset>
   );
 }
 
@@ -596,7 +717,7 @@ function Passo1({
       )}
 
       <Grade>
-        <Campo label={t.discordLabel} erro={problemaDe("discord")}>
+        <Campo label={t.discordLabel} hint={t.discordAjuda} erro={problemaDe("discord")}>
           <input
             style={entradaEstilo}
             value={campos.discord}
@@ -621,11 +742,12 @@ function Passo1({
         digita uma letra só — não acendia em campo nenhum, e a pessoa lia "Confira os
         campos destacados" sem nenhum campo destacado.
       */}
-      <Campo label={t.nomeLabel} erro={problemaDe("nomeReal") ?? problemaDe("nome")}>
+      <Campo label={t.nomeLabel} hint={t.nomeAjuda} erro={problemaDe("nomeReal") ?? problemaDe("nome")}>
         <input
           style={entradaEstilo}
           value={campos.nome}
           placeholder={t.nomePlaceholder}
+          autoComplete="name"
           onChange={(e) => setters.setNome(e.target.value)}
         />
       </Campo>
@@ -633,17 +755,19 @@ function Passo1({
   );
 }
 
-function Passo2({
+// Exportados só para os testes renderizarem os passos 2 e 3, que pela tela só se alcançam
+// depois de criar uma conta.
+export function Passo2({
   t,
   elos,
   elo,
   rota1,
   rota2,
-  querCapitao,
+  turnos,
   setElo,
   setRota1,
   setRota2,
-  setQuerCapitao,
+  setTurnos,
   problemaDe,
 }: Readonly<{
   t: Rotulos;
@@ -651,18 +775,18 @@ function Passo2({
   elo: string;
   rota1: string;
   rota2: string;
-  querCapitao: boolean;
+  turnos: readonly Turno[];
   setElo: (v: string) => void;
   setRota1: (v: string) => void;
   setRota2: (v: string) => void;
-  setQuerCapitao: (v: boolean) => void;
+  setTurnos: (v: Turno[]) => void;
   problemaDe: (campo: string) => string | undefined;
 }>) {
   const rotasIguais = rota1 !== "" && rota1 === rota2;
 
   return (
     <>
-      <Campo label={t.eloLabel} hint={t.eloAjuda} erro={problemaDe("elo")}>
+      <Grupo label={t.eloLabel} hint={t.eloAjuda} erro={problemaDe("elo")}>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 2 }}>
           {elos.map((e) => {
             const ativo = elo === e.valor;
@@ -687,12 +811,11 @@ function Passo2({
                 }}
               >
                 {e.rotulo}
-                <span style={{ fontVariantNumeric: "tabular-nums", color: "var(--lob-bronze)" }}>{e.pts}</span>
               </button>
             );
           })}
         </div>
-      </Campo>
+      </Grupo>
 
       <div style={{ height: 18 }} />
 
@@ -722,29 +845,70 @@ function Passo2({
         </Campo>
       </Grade>
 
-      <label style={{ display: "flex", alignItems: "flex-start", gap: 11, cursor: "pointer" }}>
-        <input
-          type="checkbox"
-          checked={querCapitao}
-          onChange={(e) => setQuerCapitao(e.target.checked)}
-          style={{ marginTop: 3, width: 17, height: 17, accentColor: "var(--lob-gold-1)" }}
-        />
-        <span>
-          <span style={{ display: "block", fontSize: 13.5, color: "var(--lob-text)" }}>{t.capitaoLabel}</span>
-          <span style={{ display: "block", marginTop: 3, fontSize: 12, color: "var(--lob-muted)" }}>
-            {t.capitaoAjuda}
-          </span>
-        </span>
-      </label>
+      {/* Um `Grupo`, e não um `Campo`: ver o comentário de `Grupo`. */}
+      <Grupo
+        label={t.disponibilidadeLabel}
+        hint={t.disponibilidadeAjuda}
+        erro={problemaDe("disponibilidade")}
+        margem="0 0 18px"
+      >
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 2 }}>
+          {TURNOS.map((turno) => {
+            const marcado = turnos.includes(turno);
+            return (
+              <label
+                key={turno}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "8px 12px",
+                  borderRadius: 6,
+                  cursor: "pointer",
+                  fontSize: 13,
+                  color: marcado ? "var(--lob-text)" : "var(--lob-muted)",
+                  background: marcado ? "rgba(201,138,75,.16)" : "rgba(0,0,0,.28)",
+                  border: `1px solid ${marcado ? "var(--lob-gold-1)" : "var(--lob-line)"}`,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={marcado}
+                  onChange={(e) =>
+                    setTurnos(
+                      e.target.checked ? [...turnos, turno] : turnos.filter((x) => x !== turno),
+                    )
+                  }
+                  style={{ width: 15, height: 15, margin: 0, accentColor: "var(--lob-gold-1)" }}
+                />
+                {t.turnos[turno]}
+              </label>
+            );
+          })}
+        </div>
+      </Grupo>
+
+      <div
+        style={{
+          padding: "12px 14px",
+          borderRadius: 8,
+          border: "1px solid var(--lob-line)",
+          background: "rgba(0,0,0,.2)",
+        }}
+      >
+        <div style={{ fontSize: 10, letterSpacing: ".2em", color: "var(--lob-bronze)" }}>{t.capitaesTitulo}</div>
+        <p style={{ margin: "6px 0 0", fontSize: 12.5, lineHeight: 1.55, color: "var(--lob-muted)" }}>
+          {t.capitaesTexto}
+        </p>
+      </div>
     </>
   );
 }
 
-function Passo3({
+export function Passo3({
   t,
   config,
   resumo,
-  pontos,
   aceites,
   setAceites,
   pixCopiado,
@@ -752,57 +916,40 @@ function Passo3({
 }: Readonly<{
   t: Rotulos;
   config: ConfigPublica;
-  resumo: { riotId: string; elo: string; rota1: string; rota2: string };
-  pontos: number | null;
+  resumo: { riotId: string; elo: string; rota1: string; rota2: string; turnos: string[] };
   aceites: boolean[];
   setAceites: (v: boolean[]) => void;
   pixCopiado: boolean;
   onCopiarPix: () => void;
 }>) {
-  const meses = Math.max(1, Math.round(config.diasNoGrupo / 30));
   const textos = [
     t.aceite1,
     t.aceite2,
-    preencher(t.aceite3, {
-      meses: `${meses} ${meses === 1 ? "mês" : "meses"}`,
-      partidas: config.minRanqueadas,
-    }),
+    preencher(t.aceite3, { partidas: config.minRanqueadas }),
   ];
 
   return (
     <>
       <div
         style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 16,
-          flexWrap: "wrap",
           padding: "16px 18px",
           borderRadius: 8,
           border: "1px solid var(--lob-line)",
           background: "rgba(0,0,0,.24)",
         }}
       >
-        <div>
-          <div style={{ fontSize: 10, letterSpacing: ".2em", color: "var(--lob-bronze)" }}>{t.resumoTitulo}</div>
-          <div className="lob-display" style={{ fontSize: 20, color: "var(--lob-text)", marginTop: 4 }}>
-            {resumo.riotId}
-          </div>
+        <div style={{ fontSize: 10, letterSpacing: ".2em", color: "var(--lob-bronze)" }}>{t.resumoTitulo}</div>
+        <div className="lob-display" style={{ fontSize: 20, color: "var(--lob-text)", marginTop: 4 }}>
+          {resumo.riotId}
+        </div>
+        <div style={{ fontSize: 12.5, color: "var(--lob-muted)", marginTop: 2 }}>
+          {[resumo.elo, resumo.rota1, resumo.rota2].filter(Boolean).join(" · ")}
+        </div>
+        {resumo.turnos.length > 0 && (
           <div style={{ fontSize: 12.5, color: "var(--lob-muted)", marginTop: 2 }}>
-            {[resumo.elo, resumo.rota1, resumo.rota2].filter(Boolean).join(" · ")}
+            {t.disponibilidadeLabel}: {resumo.turnos.join(" · ")}
           </div>
-        </div>
-        <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: 10, letterSpacing: ".2em", color: "var(--lob-bronze)" }}>{t.valorLabel}</div>
-          <div
-            className="lob-display"
-            style={{ fontSize: 30, color: "var(--lob-gold-1)", fontVariantNumeric: "tabular-nums" }}
-          >
-            {pontos ?? "—"}
-          </div>
-          <div style={{ fontSize: 10, letterSpacing: ".18em", color: "var(--lob-muted)" }}>{t.pontosSufixo}</div>
-        </div>
+        )}
       </div>
 
       <div style={{ height: 16 }} />
@@ -811,7 +958,9 @@ function Passo3({
         <div style={{ fontSize: 10, letterSpacing: ".2em", color: "var(--lob-bronze)" }}>
           {t.taxaTitulo} — {moeda(config.taxaCentavos)}
         </div>
-        <p style={{ margin: "8px 0 14px", fontSize: 12.5, color: "var(--lob-muted)" }}>{t.taxaTexto}</p>
+        <p style={{ margin: "8px 0 14px", fontSize: 12.5, color: "var(--lob-muted)" }}>
+          {preencher(t.taxaTexto, { campeao: config.pctCampeao, vice: 100 - config.pctCampeao })}
+        </p>
 
         {config.chavePix ? (
           <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
@@ -836,6 +985,16 @@ function Passo3({
       </div>
 
       <div style={{ height: 16 }} />
+
+      {/* Aba nova: quem está no meio do formulário não perde o que preencheu. */}
+      <Link
+        href="/regras"
+        target="_blank"
+        rel="noopener"
+        style={{ display: "inline-block", marginBottom: 10, fontSize: 12.5, color: "var(--lob-gold-1)" }}
+      >
+        {t.lerRegulamento} ↗
+      </Link>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {textos.map((texto, i) => (

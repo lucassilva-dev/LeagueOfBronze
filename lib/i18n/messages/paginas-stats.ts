@@ -189,7 +189,7 @@ export const paginasStats = definir<TextosStats>({
     cartasEyebrow: "Mecânica duvidosa · entretenimento imaculado",
     cartasTitulo: "CARTAS",
     cartasIntro:
-      "Em cada série (MD3), cada capitão pode — se quiser — sortear uma cartinha surpresa. O sorteio é opcional, idêntico para os dois capitães, está previsto no regulamento divulgado antes do início da temporada e acontece publicamente, ao vivo, na página da série: antes do pick & ban e valendo só para aquela partida. São 6 cartas individuais (afetam o time adversário) e 2 cartas duplas, que só entram em jogo quando os dois capitães sorteiam na mesma partida.",
+      "Em cada série, cada capitão pode — se quiser — sortear uma cartinha surpresa. O sorteio é opcional, idêntico para os dois capitães, está previsto no regulamento divulgado antes do início da temporada e acontece publicamente, ao vivo, na página da série: antes do pick & ban e valendo só para aquela partida. As cartas individuais afetam o time adversário; as duplas só entram em jogo quando os dois capitães sorteiam na mesma partida.",
     cartasMaisSorteadas: "CARTAS MAIS SORTEADAS",
     cartasSorteios: "sorteio(s)",
     cartasChipDupla: "DUPLA",
@@ -339,7 +339,7 @@ export const paginasStats = definir<TextosStats>({
     cartasEyebrow: "Questionable mechanics · immaculate entertainment",
     cartasTitulo: "CARDS",
     cartasIntro:
-      "In every series (Bo3), each captain may — if they want to — draw a surprise wildcard. The draw is optional, identical for both captains, written into the rulebook published before the season starts, and it happens publicly and live on the series page: before pick & ban and valid for that game only. There are 6 individual cards (they affect the opposing team) and 2 double cards, which only come into play when both captains draw in the same game.",
+      "In every series, each captain may — if they want to — draw a surprise wildcard. The draw is optional, identical for both captains, written into the rulebook published before the season starts, and it happens publicly and live on the series page: before pick & ban and valid for that game only. Individual cards affect the opposing team; double cards only come into play when both captains draw in the same game.",
     cartasMaisSorteadas: "MOST DRAWN CARDS",
     cartasSorteios: "draw(s)",
     cartasChipDupla: "DOUBLE",

@@ -1,6 +1,8 @@
 import Link from "next/link";
 
 import { Eyebrow, GoldTitle, Pill, TeamMark } from "@/components/lob/ui";
+import { PreTemporadaAviso } from "@/components/pre-temporada-aviso";
+import { semTemporadaAoVivo } from "@/lib/fase-do-site";
 import { buildCalendarDays, buildFinalGame } from "@/lib/calendar";
 import { getLocale, getMessages } from "@/lib/i18n/server";
 import { getServerDataset } from "@/lib/server-data";
@@ -30,6 +32,7 @@ export default async function CalendarioPage() {
     return turno.toUpperCase();
   };
   const { dataset } = await getServerDataset();
+  if (semTemporadaAoVivo(dataset)) return <PreTemporadaAviso pagina="calendario" />;
   const days = buildCalendarDays(dataset);
   const confrontos = days.reduce((sum, day) => sum + day.games.length, 0);
   const finalGame = buildFinalGame(dataset);

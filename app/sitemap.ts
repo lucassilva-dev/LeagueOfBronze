@@ -13,6 +13,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   const rotas = [
     { caminho: "/", prioridade: 1 },
+    { caminho: "/inscricao", prioridade: 0.9 },
     { caminho: "/times", prioridade: 0.8 },
     { caminho: "/jogadores", prioridade: 0.8 },
     { caminho: "/calendario", prioridade: 0.8 },

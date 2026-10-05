@@ -4,7 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
-export type NavLabel = { href: string; label: string };
+/**
+ * `destaque` marca o item que é a chamada principal da fase (hoje, a inscrição): ele ganha
+ * moldura dourada no desktop e cor dourada no menu do celular. É estático de propósito —
+ * nada de pulso ou piscar, porque animação de opacidade já apagou este site quatro vezes.
+ */
+export type NavLabel = { href: string; label: string; destaque?: boolean };
 
 type MainNavProps = Readonly<{
   /** Itens já traduzidos, montados no Server Component (o cliente não lê mensagens). */
@@ -60,13 +65,22 @@ export function MainNav({ labels, ariaLabel, abrirMenu }: MainNavProps) {
               aria-current={active ? "page" : undefined}
               style={{
                 position: "relative",
-                padding: "9px 11px",
+                padding: item.destaque ? "7px 12px" : "9px 11px",
+                margin: item.destaque ? "0 5px" : undefined,
                 fontWeight: 700,
                 fontSize: 11,
                 letterSpacing: ".11em",
-                color: active ? "#f3ece0" : "#d9cbb0",
+                color: item.destaque ? "#f5d79a" : active ? "#f3ece0" : "#d9cbb0",
                 whiteSpace: "nowrap",
                 textDecoration: "none",
+                ...(item.destaque
+                  ? {
+                      border: "1px solid rgba(232,184,120,.55)",
+                      background: "linear-gradient(180deg,rgba(201,138,75,.22),rgba(201,138,75,.08))",
+                      borderRadius: 2,
+                      boxShadow: "0 0 18px -6px rgba(232,184,120,.55)",
+                    }
+                  : null),
               }}
             >
               {item.label}
@@ -74,8 +88,8 @@ export function MainNav({ labels, ariaLabel, abrirMenu }: MainNavProps) {
                 <span
                   style={{
                     position: "absolute",
-                    left: 11,
-                    right: 11,
+                    left: item.destaque ? 12 : 11,
+                    right: item.destaque ? 12 : 11,
                     bottom: -1,
                     height: 2,
                     background: "linear-gradient(90deg,#f0c88a,#b97e40)",
@@ -139,7 +153,8 @@ export function MainNav({ labels, ariaLabel, abrirMenu }: MainNavProps) {
                   width: "100%",
                   padding: "15px clamp(16px,4vw,24px)",
                   borderTop: "1px solid rgba(201,138,75,.10)",
-                  color: active ? "#f0d9ac" : "#e6d8bf",
+                  color: item.destaque ? "#f5d79a" : active ? "#f0d9ac" : "#e6d8bf",
+                  background: item.destaque ? "rgba(201,138,75,.10)" : undefined,
                   fontWeight: 700,
                   fontSize: 14,
                   letterSpacing: ".10em",

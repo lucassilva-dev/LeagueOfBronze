@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { ALL_CARDS, CARDS, CARDS_BY_ID, type CardDef } from "@/lib/cards";
+import { CARDS_BY_ID, baralhoDoSorteio, letraDaCarta, type CardDef } from "@/lib/cards";
 import type { CardId } from "@/lib/schema";
 import {
   CURVA_DO_FREIO,
@@ -395,12 +395,13 @@ export function CerimoniaDeSorteio({
         { chave: teamBId ?? "b", cor: VERMELHO, rotulo: teamBName ?? "—" },
       ];
     }
-    const baralho: CardDef[] = dupla ? ALL_CARDS : CARDS;
-    return baralho.map((c) => ({
+    // O baralho de AGORA: a roda gira antes da resposta, e o servidor sorteia neste mesmo
+    // baralho (sem as cartas retiradas — ver `baralhoDoSorteio`).
+    return baralhoDoSorteio(dupla).map((c) => ({
       chave: c.cardId,
       cor: c.color,
       rotulo: c.emoji,
-      nota: c.letter ?? "DUPLA",
+      nota: letraDaCarta(c.cardId) ?? "DUPLA",
     }));
   }, [tipoDoPedido, dupla, teamAId, teamAName, teamBId, teamBName]);
 
@@ -687,8 +688,13 @@ export function CerimoniaDeSorteio({
   const nomeDoTime = (id?: string | null) =>
     id === teamA?.id ? (teamA?.name ?? "—") : id === teamB?.id ? (teamB?.name ?? "—") : "—";
 
-  const cartaSorteada: CardDef | undefined =
+  const definicao: CardDef | undefined =
     sorteio && pedido.tipo === "carta" ? CARDS_BY_ID[sorteio.resultado as CardId] : undefined;
+  // A cerimônia só revela o sorteio que ACABOU de acontecer, então a letra é a do baralho
+  // de agora (A–E na 4ª), não a da 3ª gravada na definição.
+  const cartaSorteada: CardDef | undefined = definicao
+    ? { ...definicao, letter: letraDaCarta(definicao.cardId) }
+    : undefined;
 
   return (
     <div

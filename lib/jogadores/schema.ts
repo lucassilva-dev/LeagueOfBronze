@@ -11,7 +11,10 @@ import { z } from "zod";
 
 export const LIMITES_CONTA = {
   email: 254,
-  nome: 60,
+  // O mesmo teto do nome na inscrição (`LIMITES_INSCRICAO.nome`): desde a 4ª o formulário
+  // cria a conta com o nome e sobrenome do grupo, e um teto menor aqui travava o passo 1
+  // de quem tem nome comprido — com a mensagem crua do zod, em inglês.
+  nome: 120,
   senha: 200,
 } as const;
 
@@ -32,7 +35,11 @@ const senhaField = z
 
 export const cadastroJogadorSchema = z.object({
   email: emailField,
-  nome: z.string().trim().min(2, "Informe como quer ser chamado.").max(LIMITES_CONTA.nome),
+  nome: z
+    .string()
+    .trim()
+    .min(2, "Informe seu nome e sobrenome.")
+    .max(LIMITES_CONTA.nome, `Use no máximo ${LIMITES_CONTA.nome} caracteres.`),
   senha: senhaField,
 });
 

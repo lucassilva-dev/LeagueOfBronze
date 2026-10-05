@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
+import Link from "next/link";
 
 import FormularioInscricao from "@/components/inscricao/formulario";
 import { Eyebrow, GoldTitle, LobShell } from "@/components/lob/ui";
 import { ELO_ORDER } from "@/lib/design";
 import { getMessages } from "@/lib/i18n/server";
 import { estadoDaJanela } from "@/lib/inscricoes/schema";
-import { lerConfigOuNulo } from "@/lib/inscricoes/store";
+import { inscricaoIdDoJogador, lerConfigOuNulo } from "@/lib/inscricoes/store";
 import { JOGADOR_COOKIE, identidadePorToken } from "@/lib/jogadores/auth";
 
 /**
@@ -27,13 +28,22 @@ export const metadata: Metadata = {
   description: "Inscrição individual para a 4ª Edição do League of Bronze.",
 };
 
-function Aviso({ titulo, texto }: Readonly<{ titulo: string; texto: string }>) {
+function Aviso({
+  titulo,
+  texto,
+  link,
+}: Readonly<{ titulo: string; texto: string; link?: { href: string; rotulo: string } }>) {
   return (
     <div className="lob-card-2 lob-fade" style={{ padding: "30px 28px" }}>
       <h2 className="lob-display" style={{ margin: "0 0 10px", fontSize: 22, color: "var(--lob-text)" }}>
         {titulo}
       </h2>
       <p style={{ margin: 0, maxWidth: "60ch", color: "var(--lob-muted)", lineHeight: 1.6 }}>{texto}</p>
+      {link ? (
+        <Link className="lob-btn-gold" href={link.href} style={{ display: "inline-block", marginTop: 20 }}>
+          {link.rotulo}
+        </Link>
+      ) : null}
     </div>
   );
 }
@@ -48,16 +58,22 @@ export default async function InscricaoPage() {
   const token = (await cookies()).get(JOGADOR_COOKIE)?.value;
   const jogador = await identidadePorToken(token).catch(() => null);
 
+  // Quem JÁ se inscreveu não refaz os três passos para ouvir "esse e-mail já está
+  // inscrito" no fim: vai direto para a própria inscrição. Na dúvida (leitura falhou),
+  // mostra o formulário — o servidor recusa a duplicata do mesmo jeito.
+  const jaInscrito = jogador ? Boolean(await inscricaoIdDoJogador(jogador.id).catch(() => null)) : false;
+
   // A decisão sai de uma função pura, com o "agora" resolvido fora do render.
   const janela = estadoDaJanela(config);
 
   const eloRotulos: Record<string, string> = ts.elos;
+  // Sem os pontos de cada elo: a tabela da 4ª só sai depois que a lista fechar
+  // (seção 3 do regulamento), e a que existe hoje é a da 3ª.
   const elos = ELO_ORDER.map((e) => ({
     // `valor` é sempre o rótulo canônico em português — é o que `resolveElo`
     // entende no servidor. O que muda com o idioma é só o que se lê.
     valor: e.label,
     rotulo: eloRotulos[e.key] ?? e.label,
-    pts: e.pts,
   }));
 
   return (
@@ -68,7 +84,13 @@ export default async function InscricaoPage() {
         <p style={{ margin: "10px 0 0", color: "var(--lob-muted)", maxWidth: "62ch" }}>{t.subtitulo}</p>
       </header>
 
-      {janela === "indisponivel" ? (
+      {jaInscrito ? (
+        <Aviso
+          titulo={t.jaInscritoTitulo}
+          texto={t.jaInscritoTexto}
+          link={{ href: "/minha-inscricao", rotulo: t.prontoVer }}
+        />
+      ) : janela === "indisponivel" ? (
         <Aviso titulo={t.indisponivelTitulo} texto={t.indisponivelTexto} />
       ) : janela === "encerrada" ? (
         <Aviso titulo={t.encerradaTitulo} texto={t.encerradaTexto} />
@@ -83,7 +105,7 @@ export default async function InscricaoPage() {
             chavePix: config.chave_pix,
             prazoPagamentoDias: config.prazo_pagamento_dias,
             minRanqueadas: config.min_ranqueadas,
-            diasNoGrupo: config.dias_no_grupo,
+            pctCampeao: config.pct_campeao,
           }}
           jogadorInicial={jogador ? { displayName: jogador.displayName, email: jogador.email } : null}
         />

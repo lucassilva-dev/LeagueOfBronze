@@ -380,3 +380,18 @@ alter table public.admin_users
 alter table public.admin_users
   add constraint admin_users_username_minusculo check (username = lower(username)) not valid;
 alter table public.admin_users validate constraint admin_users_username_minusculo;
+
+-- ---------------------------------------------------------------- disponibilidade (regra 9)
+-- Turnos em que o jogador pode jogar, pedidos pelo regulamento da 4a Edicao. Entrou
+-- com as inscricoes ja abertas: quem se inscreveu antes fica com '{}' e a organizacao
+-- preenche pela ficha. Aplicado em producao (public e lob_teste) em 2026-10-05 como a
+-- migracao `inscricoes_disponibilidade_por_turno`.
+alter table public.inscricoes
+  add column if not exists disponibilidade text[] not null default '{}';
+alter table public.inscricoes
+  drop constraint if exists inscricoes_disponibilidade_valida;
+alter table public.inscricoes
+  add constraint inscricoes_disponibilidade_valida
+  check (disponibilidade <@ array['manha','tarde','noite']::text[]);
+comment on column public.inscricoes.disponibilidade is
+  'Turnos (manha, tarde, noite) em que o jogador pode jogar - regra 9 da 4a Edicao. Vale para o time inteiro.';

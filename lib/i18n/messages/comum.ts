@@ -30,11 +30,12 @@ export const comum = definir({
     navCartas: "CARTAS",
     navRegras: "REGRAS",
     navTemporadas: "TEMPORADAS",
+    navInscricao: "INSCRIÇÃO",
     navAriaPrincipal: "Navegação principal",
     navAbrirMenu: "Abrir menu",
 
-    edicao: "3ª EDIÇÃO",
-    rodapeAssinatura: "LEAGUE OF BRONZE · 3ª EDIÇÃO · 2026",
+    edicao: "4ª EDIÇÃO",
+    rodapeAssinatura: "LEAGUE OF BRONZE · 4ª EDIÇÃO · 2026",
     rodapeLema: "MECÂNICA DUVIDOSA · ENTRETENIMENTO IMACULADO",
     // Tradução fiel do aviso obrigatório. A versão em inglês (abaixo, no bloco `en`) é o
     // texto EXIGIDO literalmente pela Riot e não pode ser reescrita.
@@ -72,11 +73,12 @@ export const comum = definir({
     navCartas: "CARDS",
     navRegras: "RULES",
     navTemporadas: "SEASONS",
+    navInscricao: "SIGN-UP",
     navAriaPrincipal: "Main navigation",
     navAbrirMenu: "Open menu",
 
-    edicao: "3RD EDITION",
-    rodapeAssinatura: "LEAGUE OF BRONZE · 3RD EDITION · 2026",
+    edicao: "4TH EDITION",
+    rodapeAssinatura: "LEAGUE OF BRONZE · 4TH EDITION · 2026",
     rodapeLema: "QUESTIONABLE MECHANICS · IMMACULATE ENTERTAINMENT",
     // NÃO substituir por outra redação: é o texto obrigatório, palavra por palavra.
     rodapeAviso: AVISO_RIOT_OFICIAL,

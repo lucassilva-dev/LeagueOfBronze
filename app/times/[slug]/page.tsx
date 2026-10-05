@@ -1,7 +1,9 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { PlayerCard } from "@/components/lob/player-card";
+import { caminhoNoArquivo } from "@/lib/arquivo";
+import { semTemporadaAoVivo } from "@/lib/fase-do-site";
 import { rotaCurto } from "@/lib/i18n/messages/paginas-home";
 import { getMessages } from "@/lib/i18n/server";
 import { getOpGgMultiSearchUrlFromNicks } from "@/lib/opgg";
@@ -18,9 +20,14 @@ export default async function TeamRosterPage({ params }: TeamPageParams) {
   const { dataset } = await getServerDataset();
   const team = buildDesignTeams(dataset).find((time) => time.slug === slug);
 
-  if (!team) {
-    notFound();
+  // Link antigo de um time que saiu do ar — ou que ficou no dataset só porque a nova
+  // temporada nasceu mantendo os elencos (ver `semTemporadaAoVivo`): manda para a cópia
+  // arquivada, com os jogos de verdade, em vez de 404 ou de uma página zerada.
+  if (!team || semTemporadaAoVivo(dataset)) {
+    const arquivado = caminhoNoArquivo(dataset.archivedSeasons, { tipo: "time", slug });
+    if (arquivado) redirect(arquivado);
   }
+  if (!team) notFound();
 
   const multiOpGg = getOpGgMultiSearchUrlFromNicks(team.roster.map((player) => player.nick));
 

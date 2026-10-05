@@ -57,6 +57,8 @@ export type Inscrito = {
   pontos: number;
   rota_primaria: string;
   rota_secundaria: string;
+  /** Turnos (`manha`, `tarde`, `noite`). Pode vir vazio — e de banco antigo, sem a coluna. */
+  disponibilidade?: string[] | null;
   quer_capitao: boolean;
   entrou_no_grupo: string | null;
   situacao: "pendente" | "apto" | "recusado" | "desistiu" | "sobra";
@@ -162,7 +164,8 @@ export function PainelEdicao({
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
 
-  const carregar = useCallback(async () => {
+  /** Devolve se a tela ficou com os dados do servidor — quem salvou precisa saber. */
+  const carregar = useCallback(async (): Promise<boolean> => {
     setCarregando(true);
     try {
       const r = await fetch("/api/admin/edicao", { cache: "no-store" });
@@ -170,8 +173,10 @@ export function PainelEdicao({
       if (!r.ok) throw new Error(corpo.error ?? `Falha ${r.status}`);
       setDados(corpo);
       setErro(null);
+      return true;
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível carregar a edição.");
+      return false;
     } finally {
       setCarregando(false);
     }
@@ -206,7 +211,17 @@ export function PainelEdicao({
           return false;
         }
 
-        await carregar();
+        /*
+         * Gravou, mas a tela não conseguiu buscar o resultado: devolve `false` para quem
+         * chamou NÃO limpar o rascunho. Com `true`, a ficha descartava o que a pessoa
+         * acabou de salvar e voltava a mostrar a foto de antes — "Nada mudou" ao lado de
+         * "Salvo.", e quem olhasse concluiria que não salvou. O rascunho que fica é o
+         * que já está no banco; salvar de novo só regrava o mesmo valor.
+         */
+        if (!(await carregar())) {
+          onAlert("erro", "Salvo — mas a tela não conseguiu se atualizar. Recarregue a página antes de continuar.");
+          return false;
+        }
         onAlert("ok", "Salvo.");
         return true;
       } catch {

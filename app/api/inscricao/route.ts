@@ -41,6 +41,29 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  /*
+   * Formulário de antes de 05/10/2026, aberto numa aba que não recarregou depois do deploy.
+   * Ele nunca manda `disponibilidade` (o campo não existia), e o schema o recusaria
+   * apontando para um campo que aquela tela nem tem: a pessoa leria "Confira os campos
+   * destacados" sem nada destacado. Aqui ela lê o que fazer. O formulário atual sempre
+   * manda o campo — vazio ou não —, então isto não alcança ninguém mais.
+   */
+  if (
+    lido.corpo !== null &&
+    typeof lido.corpo === "object" &&
+    !Array.isArray(lido.corpo) &&
+    !("disponibilidade" in lido.corpo)
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "O formulário de inscrição foi atualizado. Recarregue a página (F5) e preencha de novo — a sua conta continua criada, é só seguir.",
+        formularioDesatualizado: true,
+      },
+      { status: 409 },
+    );
+  }
+
   const parsed = inscricaoPublicaSchema.safeParse(lido.corpo);
   if (!parsed.success) {
     // Diferente das rotas de admin: aqui quem lê é o jogador preenchendo o

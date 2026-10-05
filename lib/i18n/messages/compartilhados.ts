@@ -83,7 +83,7 @@ export const compartilhados = definir({
     sorteioBotaoLados: "Sortear lados",
     sorteioBotaoDupla: "Sortear carta dupla (2 capitães)",
     sorteioDuplaExplicacao:
-      "Quando os dois capitães usam a carta na mesma partida: sorteio único entre as 8 cartas (as 6 individuais + as 2 duplas), valendo para os dois times.",
+      "Quando os dois capitães usam a carta na mesma partida: sorteio único entre todas as cartas em vigor, individuais e duplas, valendo para os dois times.",
 
     // components/series/cerimonia-de-sorteio.tsx — a roleta em tela cheia
     cerimoniaTitulo: "Sorteio ao vivo",
@@ -197,7 +197,7 @@ export const compartilhados = definir({
     sorteioBotaoLados: "Draw sides",
     sorteioBotaoDupla: "Draw double wildcard (2 captains)",
     sorteioDuplaExplicacao:
-      "When both captains play their wildcard in the same match: a single draw among the 8 wildcards (the 6 single ones + the 2 double ones), applied to both teams.",
+      "When both captains play their wildcard in the same match: a single draw among every wildcard in force, single and double, applied to both teams.",
 
     cerimoniaTitulo: "Live draw",
     cerimoniaFechar: "Close",

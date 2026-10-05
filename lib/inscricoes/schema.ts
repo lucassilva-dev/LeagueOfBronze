@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 import { resolveElo, resolveRole } from "@/lib/design";
+import { LIMITES_INSCRICAO } from "@/lib/inscricoes/passo1";
+import { TURNOS } from "@/lib/inscricoes/turnos";
 
 /**
  * Validação da inscrição da 4ª Edição.
@@ -14,17 +16,9 @@ import { resolveElo, resolveRole } from "@/lib/design";
 
 // ---------------------------------------------------------------- limites
 
-export const LIMITES_INSCRICAO = {
-  nick: 32,
-  tag: 8,
-  nome: 120,
-  email: 254,
-  discord: 64,
-  whatsapp: 24,
-  texto: 500,
-} as const;
-
-const texto = (max: number) => z.string().trim().min(1).max(max);
+// Moram em `passo1.ts`, que não depende de zod, porque o formulário também os usa no
+// navegador. Reexportados aqui para quem já os importava deste arquivo.
+export { LIMITES_INSCRICAO };
 
 // ---------------------------------------------------------------- elo e rota
 
@@ -98,25 +92,59 @@ const tagField = z
 
 // ---------------------------------------------------------------- inscrição
 
+/**
+ * Nome e sobrenome, como no grupo do WhatsApp (seção 2 do regulamento da 4ª). Obrigatório:
+ * é por ele que a organização confere a regra 1 — ser do grupo e conhecido.
+ */
+const nomeCompletoField = z
+  .string()
+  .trim()
+  .min(3, "Informe nome e sobrenome.")
+  .max(LIMITES_INSCRICAO.nome)
+  .refine((v) => v.split(/\s+/).filter(Boolean).length >= 2, "Informe nome e sobrenome.");
+
+/**
+ * O @ sai antes de gravar. O índice único do banco é sobre `lower(discord)`, e com o @ a
+ * mesma pessoa passava duas vezes como "@fulano" e "fulano" — o regulamento manda o
+ * Discord repetido bloquear a inscrição.
+ */
+const discordField = z
+  .string()
+  .trim()
+  .transform((v) => v.replace(/^@+/, "").trim())
+  .pipe(z.string().min(1, "Informe o usuário do Discord.").max(LIMITES_INSCRICAO.discord));
+
+/** Regra 9: ao menos um turno, sem repetição. */
+const disponibilidadeField = z
+  .array(z.enum(TURNOS))
+  .min(1, "Marque pelo menos um turno.")
+  .max(TURNOS.length)
+  .transform((v) => [...new Set(v)]);
+
 /** O que o formulário público envia. Note que `pontos` NÃO está aqui, de propósito. */
 export const inscricaoPublicaSchema = z
   .object({
     nick: nickField,
     tag: tagField,
-    nomeReal: z.string().trim().max(LIMITES_INSCRICAO.nome).optional(),
+    nomeReal: nomeCompletoField,
     // `email` NÃO está aqui: vem da sessão do jogador, no servidor. Mesmo princípio
     // dos pontos — se o cliente pudesse escolher, daria para inscrever no e-mail de
     // outra pessoa e depois disputar a titularidade da inscrição.
-    discord: texto(LIMITES_INSCRICAO.discord),
+    discord: discordField,
     whatsapp: z.string().trim().max(LIMITES_INSCRICAO.whatsapp).optional(),
 
     elo: eloField,
     rotaPrimaria: rotaField,
     rotaSecundaria: rotaField,
+    disponibilidade: disponibilidadeField,
+    // IGNORADO: na 4ª os capitães são os inscritos de maior elo na solo/duo (seção 3),
+    // não voluntários — `linhaDeInscricao` grava sempre falso. Continua no schema só para
+    // um `querCapitao` de tipo errado ainda ser recusado em vez de passar calado. (Quem
+    // abriu o formulário antigo é tratado na rota: ele nem manda `disponibilidade`.)
     querCapitao: z.boolean().default(false),
 
     aceiteRegulamento: z.literal(true, { message: "É preciso aceitar o regulamento." }),
-    aceiteImagem: z.literal(true, { message: "É preciso autorizar o uso de imagem (regra s)." }),
+    aceiteImagem: z.literal(true, { message: "É preciso autorizar o uso de imagem (regra 17)." }),
     aceiteRequisitos: z.literal(true, { message: "É preciso confirmar que cumpre os requisitos." }),
   })
   .refine((d) => rotaCanonica(d.rotaPrimaria) !== rotaCanonica(d.rotaSecundaria), {
@@ -143,7 +171,7 @@ export function linhaDeInscricao(dados: InscricaoPublica, email: string) {
   return {
     nick: dados.nick,
     tag: dados.tag.toUpperCase(),
-    nome_real: dados.nomeReal || null,
+    nome_real: dados.nomeReal,
     email: email.trim().toLowerCase(),
     discord: dados.discord,
     whatsapp: dados.whatsapp || null,
@@ -151,7 +179,9 @@ export function linhaDeInscricao(dados: InscricaoPublica, email: string) {
     pontos,
     rota_primaria: rotaCanonica(dados.rotaPrimaria)!,
     rota_secundaria: rotaCanonica(dados.rotaSecundaria)!,
-    quer_capitao: dados.querCapitao,
+    disponibilidade: dados.disponibilidade,
+    // Sempre falso: na 4ª ninguém se candidata a capitão (seção 3 do regulamento).
+    quer_capitao: false,
     aceite_regulamento: dados.aceiteRegulamento,
     aceite_imagem: dados.aceiteImagem,
     aceite_requisitos: dados.aceiteRequisitos,
@@ -163,37 +193,43 @@ export function linhaDeInscricao(dados: InscricaoPublica, email: string) {
 export const ITENS_CONFERENCIA = ["a", "b", "d", "e", "f", "m"] as const;
 export type ItemConferencia = (typeof ITENS_CONFERENCIA)[number];
 
-/** O texto de cada item, para a tela nunca deixar dois critérios parecerem o mesmo. */
+/**
+ * O texto de cada item, para a tela nunca deixar dois critérios parecerem o mesmo.
+ *
+ * As CHAVES (a, b, d, e, f, m) vêm da numeração por letra da 3ª Edição e ficam como estão:
+ * estão no `check` do banco e nas conferências já gravadas. O que a organização lê é o
+ * título, que cita a regra da 4ª.
+ */
 export const REGRA_DO_ITEM: Record<ItemConferencia, { titulo: string; detalhe: string }> = {
   a: {
-    titulo: "Tempo de grupo",
+    titulo: "Membro do grupo (regra 1)",
     detalhe:
-      "Está no grupo oficial (Discord/WhatsApp) há pelo menos o mínimo definido, contado antes da abertura das inscrições. O WhatsApp não tem data de entrada auditável — para quem só está lá, alguém da organização precisa atestar à mão.",
+      "É do grupo oficial (WhatsApp/Discord) e a organização conhece. Não existe tempo mínimo no grupo. O WhatsApp não tem data de entrada auditável — para quem só está lá, alguém da organização atesta à mão.",
   },
   b: {
-    titulo: "Riot vinculada ao Discord",
+    titulo: "Riot vinculada ao Discord (regra 21)",
     detalhe:
-      "No Discord, vincular a conta e exibir a conexão no perfil são configurações diferentes. Se o jogador não deixar visível, peça o print — não reprove sem avisar.",
+      "No Discord, vincular a conta (Configurações > Conexões) e exibir a conexão no perfil são configurações diferentes. Se o jogador não deixar visível, peça o print — não reprove sem avisar.",
   },
   d: {
-    titulo: "Colocação concluída",
+    titulo: "MD5 da solo/duo (regra 3)",
     detalhe:
-      "São as 5 PRIMEIRAS ranqueadas da temporada, na fila solo/duo. Flex e normal não contam. Não confunda com o item (e): alguém pode ter feito a colocação em janeiro e não jogar nada em outubro — cumpre (d) e falha (e).",
+      "As 5 PRIMEIRAS ranqueadas da temporada, na fila solo/duo. Flex e normal não contam. Não confunda com o item (e): alguém pode ter feito a MD5 em janeiro e não jogar nada em novembro — cumpre (d) e falha (e).",
   },
   e: {
-    titulo: "Atividade ranqueada recente",
+    titulo: "Partidas recentes (regra 4)",
     detalhe:
-      "Mínimo de partidas na fila solo/duo dentro dos 30 dias anteriores ao início. Normais, ARAM e flex não contam. Só é avaliável depois que a data de início existir.",
+      "Mínimo de partidas na fila solo/duo nos 10 dias anteriores ao início do torneio. Normais, ARAM e flex não contam. Só é avaliável depois que a data de início existir.",
   },
   f: {
-    titulo: "Não é smurf",
+    titulo: "Não é smurf (regra 5)",
     detalhe:
       "Conta criada para jogar num elo mais baixo que o real. Critério da organização: tempo de conta, nível de invocador e histórico de elo. Guarde o retrato do que foi visto — o histórico externo muda.",
   },
   m: {
-    titulo: "Riot ID informado",
+    titulo: "Riot ID informado (regra 12)",
     detalhe:
-      "O nick declarado precisa bater com a conta que vai jogar. Jogar com conta diferente, sem aviso, dá W.O. para o time.",
+      "O nick declarado precisa bater com a conta que vai jogar. Trocar de conta ou mudar o nickname sem aviso prévio gera desclassificação da partida.",
   },
 };
 
@@ -208,13 +244,20 @@ export const ESTADOS_CONFERENCIA = [
 ] as const;
 export type EstadoConferencia = (typeof ESTADOS_CONFERENCIA)[number];
 
-export const conferenciaPatchSchema = z.object({
-  inscricaoId: z.string().uuid(),
-  item: z.enum(ITENS_CONFERENCIA),
-  estado: z.enum(ESTADOS_CONFERENCIA),
-  observacao: z.string().trim().max(LIMITES_INSCRICAO.texto).optional(),
-  retrato: z.record(z.string(), z.unknown()).optional(),
-});
+export const conferenciaPatchSchema = z
+  .object({
+    inscricaoId: z.string().uuid(),
+    item: z.enum(ITENS_CONFERENCIA),
+    // Ausente PRESERVA o veredicto gravado, como a observação. Com o estado obrigatório,
+    // quem só escrevia uma observação reenviava o estado da foto que tinha na tela — e
+    // desfazia o veredicto que outro organizador acabara de dar.
+    estado: z.enum(ESTADOS_CONFERENCIA).optional(),
+    observacao: z.string().trim().max(LIMITES_INSCRICAO.texto).optional(),
+    retrato: z.record(z.string(), z.unknown()).optional(),
+  })
+  .refine((d) => d.estado !== undefined || d.observacao !== undefined || d.retrato !== undefined, {
+    message: "Nada para gravar.",
+  });
 
 // ---------------------------------------------------------------- pagamento
 
@@ -274,6 +317,16 @@ export const fichaPatchSchema = z.object({
     .trim()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Use o formato AAAA-MM-DD.")
     .nullable()
+    .optional(),
+  // Quem se inscreveu quando o campo era "Nome (opcional)" pode ter mandado só o apelido.
+  // Mesma regra do formulário: duas palavras; a ficha não apaga o nome de ninguém.
+  nomeReal: nomeCompletoField.optional(),
+  // A organização registra a disponibilidade de quem se inscreveu antes de o formulário
+  // perguntar (o campo entrou depois da abertura). Vazio = não informado.
+  disponibilidade: z
+    .array(z.enum(TURNOS))
+    .max(TURNOS.length)
+    .transform((v) => [...new Set(v)])
     .optional(),
 });
 

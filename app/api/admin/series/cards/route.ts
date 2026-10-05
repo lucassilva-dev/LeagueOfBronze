@@ -5,7 +5,7 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 
 import { requireAdmin } from "@/lib/security/route-guard";
-import { isDuplaCard } from "@/lib/cards";
+import { CARDS_BY_ID, isDuplaCard } from "@/lib/cards";
 import { ConflitoDeVersaoError, readDatasetComVersao, saveDataset } from "@/lib/data-store";
 import { cardIdSchema, MAX_SORTEIOS_POR_SERIE, type SeriesMatch } from "@/lib/schema";
 
@@ -38,7 +38,16 @@ export async function POST(request: NextRequest) {
   }
   const { seriesId, teamId, cardId, dupla } = parsed.data;
 
-  // No sorteio duplo valem as 8 cartas; no individual, só as 6 (as duplas não entram no pool).
+  // Carta retirada pelo regulamento (a INVASÃO DA YUUMI, na 4ª) não entra mais em série
+  // nenhuma — nem sorteada, nem registrada à mão. O histórico dela fica no arquivo.
+  if (CARDS_BY_ID[cardId]?.retirada) {
+    return NextResponse.json(
+      { error: `A carta ${CARDS_BY_ID[cardId].title} foi retirada do regulamento desta edição.` },
+      { status: 400 },
+    );
+  }
+
+  // No sorteio duplo valem todas as cartas em vigor; no individual, as duplas não entram.
   if (!dupla && isDuplaCard(cardId)) {
     return NextResponse.json(
       { error: "Cartas duplas só valem quando os dois capitães usam." },

@@ -2,7 +2,7 @@ import type { CardId } from "@/lib/schema";
 
 export type CardDef = {
   id: string;
-  cardId: CardId; // id tipado usado no sorteio/registro (6 individuais + 2 duplas)
+  cardId: CardId; // id tipado usado no sorteio/registro (individuais + duplas)
   letter?: string; // A–F nas individuais
   title: string;
   description: string; // regra completa
@@ -14,9 +14,20 @@ export type CardDef = {
   from: string;
   to: string;
   dupla: boolean;
+  /**
+   * Carta fora de circulação a partir da edição atual.
+   *
+   * Ela CONTINUA neste arquivo de propósito: o arquivo das edições passadas (/temporadas)
+   * e o histórico de sorteios guardam o `cardId` dela, e `CARDS_BY_ID` precisa resolver
+   * esse id para mostrar nome e arte. Apagar a carta quebraria o passado; marcar como
+   * retirada só tira ela do que é apresentado como regra em vigor (ver `CARTAS_ATIVAS`).
+   */
+  retirada?: boolean;
 };
 
 // 6 Cartinhas individuais (A–F) — afetam o adversário; base do sorteio.
+// A letra (`letter`) é a da 3ª Edição. A 4ª retirou a INVASÃO DA YUUMI, então as letras
+// mostradas vêm de `letraDaCarta`, que conta no baralho do momento (A–E hoje).
 export const CARDS: CardDef[] = [
   {
     id: "ABCDRAFT",
@@ -80,6 +91,8 @@ export const CARDS: CardDef[] = [
     flavor: "O suporte adversário não escolhe nada: cola na Yuumi e reza. THALAO e Onigami sabem como é.",
     description: "O suporte do time adversário é obrigado a jogar de Yuumi na partida. Banimentos normais.",
     dupla: false,
+    // Retirada pelo regulamento da 4ª Edição. Fica aqui pelo histórico da 3ª (ver `retirada`).
+    retirada: true,
   },
   {
     id: "INVERSAO_ROTAS",
@@ -150,15 +163,57 @@ export const DUPLAS: CardDef[] = [
 
 export const ALL_CARDS: CardDef[] = [...CARDS, ...DUPLAS];
 
+/**
+ * Cartas em vigor na edição atual: todas menos as retiradas, na ordem do regulamento
+ * (individuais primeiro, depois as duplas).
+ *
+ * É o que se apresenta como REGRA — /regras e a vitrine de /cartas. Estatística e
+ * histórico continuam usando `ALL_CARDS`/`CARDS_BY_ID`, porque uma carta retirada
+ * pode ter sido sorteada numa edição anterior.
+ */
+export const CARTAS_ATIVAS: CardDef[] = ALL_CARDS.filter((c) => !c.retirada);
+
+/**
+ * A partir de quando o baralho do SORTEIO deixou de ter as cartas retiradas.
+ *
+ * O sorteio é conferível pela semente (`conferirSorteio`): refazer a conta com outro
+ * baralho dá outra carta. Então um sorteio da 3ª Edição precisa ser conferido contra o
+ * baralho de seis individuais que existia quando ele aconteceu, e um de hoje em diante
+ * contra o de cinco. A data separa os dois sem mexer no formato dos registros já gravados.
+ */
+export const BARALHO_SEM_RETIRADAS_DESDE = "2026-10-05T00:00:00.000Z";
+
+/**
+ * O baralho do sorteio num momento: só as individuais, ou todas quando os dois capitães
+ * usam carta na mesma partida. Sem `emISO`, o de agora.
+ */
+export function baralhoDoSorteio(dupla: boolean, emISO?: string): CardDef[] {
+  const antigo = emISO !== undefined && emISO < BARALHO_SEM_RETIRADAS_DESDE;
+  return (dupla ? ALL_CARDS : CARDS).filter((c) => antigo || !c.retirada);
+}
+
+/**
+ * A letra da carta individual no baralho daquele momento — A, B, C… na ordem do
+ * regulamento. Na 3ª eram seis (A–F); na 4ª, sem a Yuumi, cinco (A–E), e é assim que
+ * /regras as mostra. Duplas não têm letra. Sem `emISO`, o baralho de agora.
+ */
+export function letraDaCarta(cardId: CardId, emISO?: string): string | undefined {
+  const individuais = baralhoDoSorteio(false, emISO);
+  const i = individuais.findIndex((c) => c.cardId === cardId);
+  return i < 0 ? undefined : String.fromCharCode(65 + i);
+}
+
 export const CARDS_BY_ID = Object.fromEntries(ALL_CARDS.map((c) => [c.cardId, c])) as Record<
   CardId,
   CardDef
 >;
 
-// Opções tipadas (CardId) de todas as cartas registráveis (6 individuais + 2 duplas).
+// Opções tipadas (CardId) de todas as cartas registráveis, individuais e duplas. A
+// retirada continua na lista — o editor de séries precisa exibir um registro antigo
+// que a use —, mas marcada, para ninguém escolhê-la numa série nova sem perceber.
 export const CARD_OPTIONS: { id: CardId; title: string }[] = ALL_CARDS.map((c) => ({
   id: c.cardId,
-  title: c.dupla ? `${c.title} (dupla)` : c.title,
+  title: `${c.title}${c.dupla ? " (dupla)" : ""}${c.retirada ? " (retirada)" : ""}`,
 }));
 
 export function getCardTitle(id: CardId): string {

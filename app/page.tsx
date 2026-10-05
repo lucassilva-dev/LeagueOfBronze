@@ -1,6 +1,8 @@
 import Link from "next/link";
 
+import { HomePreTemporada } from "@/components/home-pre-temporada";
 import { Eyebrow, GoldTitle, Pill, SectionTitle, TeamMark } from "@/components/lob/ui";
+import { emPreTemporada } from "@/lib/fase-do-site";
 import { buildCalendarDays, buildFinalGame } from "@/lib/calendar";
 import { turnoLabel } from "@/lib/i18n/messages/paginas-home";
 import { getMessages } from "@/lib/i18n/server";
@@ -12,6 +14,13 @@ import { getChampionshipResult } from "@/lib/tournament";
 export const dynamic = "force-dynamic";
 
 export default async function InicioPage() {
+  // Na pré-temporada a home é a porta da inscrição; a home do campeonato abaixo volta
+  // quando lib/fase-do-site.ts virar para "temporada".
+  if (emPreTemporada()) return <HomePreTemporada />;
+  return <HomeTemporada />;
+}
+
+async function HomeTemporada() {
   const { paginasHome: t, conformidade: conf } = await getMessages();
   const { dataset, indexes } = await getServerDataset();
 

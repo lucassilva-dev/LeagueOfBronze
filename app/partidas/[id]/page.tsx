@@ -1,6 +1,8 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Crown } from "lucide-react";
+
+import { caminhoNoArquivo } from "@/lib/arquivo";
 
 import { PageHero } from "@/components/page-hero";
 import { PageShell } from "@/components/page-shell";
@@ -413,6 +415,10 @@ export default async function PartidaDetalhePage({ params }: PartidaDetalhePageP
   const series = getSeriesById(dataset, id);
 
   if (!series) {
+    // Link antigo de uma série que saiu do ar (ex.: a final, compartilhada no grupo): manda
+    // para a cópia arquivada, em vez de 404.
+    const arquivado = caminhoNoArquivo(dataset.archivedSeasons, { tipo: "serie", id });
+    if (arquivado) redirect(arquivado);
     notFound();
   }
 
