@@ -130,7 +130,7 @@ const NUMEROS = [
     rotulo: "Prazo de pagamento (dias)",
     min: 1,
     max: 365,
-    efeito: "Contado da aprovação; é o que gera o vencimento de cada pagamento.",
+    efeito: "Contado do envio da inscrição; é o que gera o vencimento de cada pagamento.",
   },
   {
     chave: "segundos_por_escolha",
