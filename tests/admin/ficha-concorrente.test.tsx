@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { DadosEdicao, Inscrito } from "@/components/admin/e4/painel-edicao";
+import { PainelEdicao, type DadosEdicao, type Inscrito } from "@/components/admin/e4/painel-edicao";
 import { SecaoInscritos } from "@/components/admin/e4/secao-inscritos";
 import { ITENS_CONFERENCIA } from "@/lib/inscricoes/schema";
 
@@ -175,6 +175,19 @@ describe("um «Salvar tudo» só", () => {
       aba(nome);
       expect(within(gaveta()).queryByText(/entrou no grupo/i)).toBeNull();
       expect(within(gaveta()).queryByText("19/06/2025")).toBeNull();
+      // Nem o critério volta a pedir tempo de grupo (a fumaça SSR não abre a gaveta).
+      expect(gaveta().textContent).not.toMatch(/tempo mínimo|mínimo de \d+ dias/i);
+    }
+  });
+
+  it("nenhuma aba tem campo de pontos — o preço deriva do elo no servidor", () => {
+    montar();
+    for (const nome of ["Requisitos", "Ficha", "Contato"]) {
+      aba(nome);
+      for (const controle of gaveta().querySelectorAll("input, select, textarea")) {
+        const rotulo = `${controle.getAttribute("aria-label") ?? ""} ${controle.getAttribute("name") ?? ""}`;
+        expect(rotulo).not.toMatch(/pontos?/i);
+      }
     }
   });
 });
@@ -403,7 +416,7 @@ describe("navegar pela lista sem perder trabalho", () => {
     expect(executar).not.toHaveBeenCalled();
   });
 
-  it("o rascunho de uma pessoa não vai para a próxima", () => {
+  it("descartar e abrir outra pessoa não leva o rascunho junto", () => {
     const { executar } = montar(undefined, dois());
     marcar("Estado do item A", "Cumpre");
     fireEvent.keyDown(gaveta(), { key: "Escape" });
@@ -506,5 +519,141 @@ describe("teclado", () => {
 
     expect(executar).toHaveBeenCalledWith("inscrito", { inscricaoId: "x1", ficha: { situacao: "apto" } });
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+});
+
+describe("lacunas apontadas pela revisão dos testes", () => {
+  const dois = () => [inscrito(), inscrito({ id: "x2", nick: "Beltrano", riot_id: "Beltrano#BR1" })];
+
+  it("o atalho não desfaz um «Não cumpre» que a pessoa acabou de marcar (olha o rascunho, não o banco)", () => {
+    const { executar } = montar();
+    marcar("Estado do item F", "Não cumpre");
+    fireEvent.click(within(gaveta()).getByRole("button", { name: /Pendentes → Cumpre/ }));
+    expect(marcado("Estado do item F")).toBe("Não cumpre");
+    salvarTudo();
+    expect(executar).toHaveBeenCalledWith(
+      "inscrito",
+      expect.objectContaining({ conferencias: expect.arrayContaining([{ item: "f", estado: "recusado" }]) }),
+    );
+  });
+
+  it("a key da gaveta: edição que não conta como mudança (só espaço) não viaja para a próxima pessoa", () => {
+    // Sem a key a gaveta não remontaria: o «Próximo» sai sem confirmar (nada mudou de
+    // fato) e Beltrano abriria com a observação de Fulano no rascunho.
+    const d = dados(dois());
+    d.conferencias = d.conferencias.map((c) =>
+      c.inscricao_id === "x1" && c.item === "b" ? { ...c, observacao: "abc" } : c,
+    );
+    render(<SecaoInscritos {...props(vi.fn(async () => true))} dados={d} />);
+    fireEvent.click(screen.getAllByRole("button", { name: /Fulano/ })[0]!);
+    fireEvent.change(screen.getByLabelText("Observação do item B"), { target: { value: "abc " } });
+    expect(within(gaveta()).getByText("Nada alterado.")).toBeTruthy();
+
+    fireEvent.click(within(gaveta()).getAllByRole("button", { name: "Próximo ›" })[0]!);
+    expect(within(gaveta()).getByRole("heading", { level: 2 }).textContent).toContain("Beltrano");
+    expect(screen.queryByLabelText("Observação do item B")).toBeNull();
+    expect(within(gaveta()).getByText("Nada alterado.")).toBeTruthy();
+  });
+
+  it("✕ Fechar com rascunho pergunta antes", () => {
+    montar();
+    marcar("Estado do item A", "Cumpre");
+    fireEvent.click(within(gaveta()).getByRole("button", { name: "✕ Fechar" }));
+    expect(screen.queryByRole("dialog")).not.toBeNull();
+    expect(within(gaveta()).getByRole("button", { name: "Descartar" })).toBeTruthy();
+  });
+
+  it("clique no fundo com rascunho pergunta antes", () => {
+    montar();
+    marcar("Estado do item A", "Cumpre");
+    fireEvent.click(gaveta().previousElementSibling as HTMLElement);
+    expect(screen.queryByRole("dialog")).not.toBeNull();
+    expect(within(gaveta()).getByRole("button", { name: "Descartar" })).toBeTruthy();
+  });
+
+  it("Tab no último focável volta ao primeiro; Shift+Tab no primeiro vai ao último", () => {
+    // O jsdom não anda pelo Tab sozinho: o que se testa é o tratador, que chama .focus().
+    montar();
+    const focaveis = Array.from(
+      gaveta().querySelectorAll<HTMLElement>("a[href], button, input, select, textarea, [tabindex]"),
+    ).filter((el) => el.tabIndex >= 0 && !el.hasAttribute("disabled"));
+    const primeiro = focaveis[0]!;
+    const ultimo = focaveis.at(-1)!;
+    ultimo.focus();
+    fireEvent.keyDown(ultimo, { key: "Tab" });
+    expect(document.activeElement).toBe(primeiro);
+    fireEvent.keyDown(primeiro, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(ultimo);
+  });
+
+  it("setas no grupo de estados trocam a escolha e levam o foco", () => {
+    montar();
+    const grupo = screen.getByRole("radiogroup", { name: "Estado do item A" });
+    const atual = within(grupo)
+      .getAllByRole("radio")
+      .find((r) => r.getAttribute("aria-checked") === "true")!;
+    fireEvent.keyDown(atual, { key: "ArrowRight" });
+    expect(marcado("Estado do item A")).toBe("Provisório");
+    expect(document.activeElement?.textContent).toContain("Provisório");
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowLeft" });
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowLeft" });
+    expect(marcado("Estado do item A")).toBe("Não cumpre");
+  });
+
+  it("com «só pendências», salvar alguém que sai do filtro não manda o «Próximo» para o começo", async () => {
+    const tres = [
+      inscrito({ id: "x0", nick: "Ciclano", riot_id: "Ciclano#BR1" }),
+      inscrito(),
+      inscrito({ id: "x2", nick: "Beltrano", riot_id: "Beltrano#BR1" }),
+    ];
+    const p = props(vi.fn(async () => true));
+    const { rerender } = render(<SecaoInscritos {...p} dados={dados(tres)} />);
+    fireEvent.click(screen.getByLabelText(/Só quem tem algum requisito pendente/));
+    fireEvent.click(screen.getAllByRole("button", { name: /Fulano/ })[0]!);
+    fireEvent.click(within(gaveta()).getByRole("button", { name: /Pendentes → Cumpre/ }));
+    await act(async () => salvarTudo());
+    rerender(
+      <SecaoInscritos {...p} dados={dados(tres, { a: "ok", b: "ok", d: "ok", e: "nao_avaliavel", f: "ok", m: "ok" })} />,
+    );
+    fireEvent.click(within(gaveta()).getAllByRole("button", { name: "Próximo ›" })[0]!);
+    expect(within(gaveta()).getByRole("heading", { level: 2 }).textContent).toContain("Beltrano");
+  });
+});
+
+describe("o painel leva o motivo da falha até a gaveta", () => {
+  it("«Salvo — mas a tela não se atualizou» aparece DENTRO da gaveta, que cobre o aviso do topo", async () => {
+    let leituras = 0;
+    const resposta = (status: number, corpo: unknown) => ({ ok: status < 400, status, json: async () => corpo });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: { method?: string }) => {
+        if (init?.method === "PATCH") return resposta(200, { ok: true });
+        leituras += 1;
+        // A primeira leitura monta a tela; a recarga depois de salvar falha.
+        return leituras === 1 ? resposta(200, dados([inscrito()])) : resposta(500, { error: "fora do ar" });
+      }),
+    );
+    try {
+      render(
+        <PainelEdicao
+          secao="inscritos"
+          onAlert={vi.fn()}
+          podeConferir
+          podeFinanceiro
+          podeConfigurar
+          render={(p) => <SecaoInscritos {...p} />}
+        />,
+      );
+      fireEvent.click((await screen.findAllByRole("button", { name: /Fulano/ }))[0]!);
+      marcar("Estado do item A", "Cumpre");
+      await act(async () => salvarTudo());
+      await waitFor(() =>
+        expect(within(gaveta()).getByRole("alert").textContent).toContain(
+          "Salvo — mas a tela não conseguiu se atualizar",
+        ),
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
