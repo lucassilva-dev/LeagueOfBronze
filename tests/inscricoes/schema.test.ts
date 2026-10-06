@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  contaParaTimes,
   distribuirTimes,
   inscricaoPublicaSchema,
   linhaDeInscricao,
@@ -177,6 +178,16 @@ describe("capitão não é candidatura na 4ª (seção 3)", () => {
       EMAIL_DA_SESSAO,
     );
     expect(linha.quer_capitao).toBe(false);
+  });
+});
+
+describe("quem entra na conta de times", () => {
+  it("todo mundo menos recusado e desistente — pendente incluso", () => {
+    expect(["pendente", "apto", "sobra", "recusado", "desistiu"].filter(contaParaTimes)).toEqual([
+      "pendente",
+      "apto",
+      "sobra",
+    ]);
   });
 });
 

@@ -23,18 +23,25 @@ import {
   tabular,
 } from "@/components/admin/ui";
 import { ELO_ORDER, resolveElo, resolveRole } from "@/lib/design";
-import { viabilidadeDeOrcamento } from "@/lib/inscricoes/schema";
+import { contaParaTimes, distribuirTimes, viabilidadeDeOrcamento } from "@/lib/inscricoes/schema";
 
 /**
  * A conta que decide se o draft é possível.
  *
  * A tela inteira gira em torno de uma distinção que já confundiu a organização por
  * escrito: existem DUAS coisas chamadas "sobra". Uma é o resto da divisão
- * (`panorama.sobra`, aprovados − vagas), a outra é a situação "sobra" gravada na ficha
+ * (`panorama.sobra`, elegíveis − vagas), a outra é a situação "sobra" gravada na ficha
  * de quem a organização já avisou que ficou de fora. Marcar alguém de sobra não muda a
  * divisão — sobra continua contando como aprovado no servidor, de propósito, senão o
  * número de times se moveria sozinho a cada marcação. Os dois números aparecem lado a
  * lado, nomeados, em vez de um só que finge ser os dois.
+ *
+ * Dois pools, de propósito:
+ * - A CONTA (divisão, orçamento, elos, rotas) usa todo inscrito que ainda pode jogar —
+ *   pendente incluso, só recusado e desistente saem (`contaParaTimes`). É previsão.
+ * - O que é DEFINITIVO (congelar o elo, escolher substituto, a lista de sobra) continua
+ *   só com aprovados: congelar o preço de quem nem foi conferido, ou oferecer um pendente
+ *   como substituto, seria tratar a previsão como fato.
  */
 
 // ---------------------------------------------------------------- estilos de tabela
@@ -139,17 +146,18 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
   const configValida = Number.isInteger(jogadoresPorTime) && jogadoresPorTime > 0;
 
   const analise = useMemo(() => {
-    // Aprovado = apto + sobra, igual ao servidor. `filter` já devolve array novo, então
-    // o `sort` não mexe na lista que veio por prop.
-    const pool = inscritos
-      .filter((i) => i.situacao === "apto" || i.situacao === "sobra")
-      .sort(porPontosDesc);
+    // A conta: todo mundo que ainda pode jogar, igual ao servidor (`panorama`). `filter`
+    // já devolve array novo, então o `sort` não mexe na lista que veio por prop.
+    const pool = inscritos.filter((i) => contaParaTimes(i.situacao)).sort(porPontosDesc);
+    // O definitivo: aprovado = apto + sobra, o mesmo pool que o servidor congela.
+    const aprovados = pool.filter((i) => i.situacao === "apto" || i.situacao === "sobra");
 
-    const marcadosSobra = pool.filter((i) => i.situacao === "sobra");
-    const semCongelar = pool.filter((i) => i.elo_congelado === null);
+    const marcadosSobra = aprovados.filter((i) => i.situacao === "sobra");
+    const semCongelar = aprovados.filter((i) => i.elo_congelado === null);
     // Mesmo `resolveElo` que o servidor usa: se ele não reconhece, `congelarElos`
     // estoura no meio do laço — e o que já passou fica congelado. Ver o cartão final.
     const eloIlegivel = pool.filter((i) => resolveElo(eloDePreco(i)) === null);
+    const eloIlegivelAprovado = eloIlegivel.filter((i) => i.situacao === "apto" || i.situacao === "sobra");
 
     const viabilidade = configValida
       ? viabilidadeDeOrcamento(
@@ -185,10 +193,12 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
 
     return {
       pool,
+      aprovados,
       marcadosSobra,
       semCongelar,
-      jaCongelados: pool.length - semCongelar.length,
+      jaCongelados: aprovados.length - semCongelar.length,
       eloIlegivel,
+      eloIlegivelAprovado,
       viabilidade,
       totalDoPool,
       porElo,
@@ -198,12 +208,12 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
     };
   }, [inscritos, jogadoresPorTime, config.orcamento_por_time, configValida]);
 
-  const alvo = analise.pool.find((i) => i.id === alvoId) ?? null;
+  const alvo = analise.aprovados.find((i) => i.id === alvoId) ?? null;
 
   /** Regra (g): substituto do mesmo elo ou abaixo. Pontos são o preço do elo. */
   const substitutos = useMemo(
-    () => (alvo ? analise.pool.filter((i) => i.id !== alvo.id && i.pontos <= alvo.pontos) : []),
-    [alvo, analise.pool],
+    () => (alvo ? analise.aprovados.filter((i) => i.id !== alvo.id && i.pontos <= alvo.pontos) : []),
+    [alvo, analise.aprovados],
   );
 
   const dataCongelamento = useMemo(
@@ -214,6 +224,16 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
   // `panorama.sobra` é o RESTO da divisão (0 … jogadoresPorTime−1), então isto é
   // sempre quanta gente falta para fechar mais um time — inclusive o primeiro.
   const faltamParaFecharTime = jogadoresPorTime - panorama.sobra;
+
+  /*
+   * O que o DRAFT montaria hoje, só com os aprovados (`montarDraftDosAprovados`). Com
+   * pendentes na conta, a previsão e o draft divergem: 22 aptos + 3 pendentes prevêem 5
+   * times e 0 de sobra, mas o draft de hoje fecha 4 e cobra 2 na sobra. Sem este número
+   * ao lado, a organização planejava (e avisava gente no grupo) pelo número errado.
+   */
+  const comPendentes = panorama.pendentes > 0;
+  const draftHoje =
+    configValida && comPendentes ? distribuirTimes(analise.aprovados.length, jogadoresPorTime) : null;
 
   const congelar = async () => {
     const deuCerto = await executar("congelar");
@@ -234,7 +254,7 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
       <SectionHead
         eyebrow="4ª Edição"
         title="Times e viabilidade"
-        description="A conta que decide se o draft é possível: quantos times fecham, se os pontos cabem no orçamento, quem sobrou e quem pode substituir quem."
+        description="A conta que decide se o draft é possível: quantos times fecham (contando todo inscrito que não foi recusado nem desistiu), se os pontos cabem no orçamento, quem sobrou e quem pode substituir quem."
       />
 
       {!podeConferir ? (
@@ -257,19 +277,31 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
       <BlockTitle right={<Chip>{jogadoresPorTime} por time</Chip>}>A divisão</BlockTitle>
 
       <FieldGrid min={150}>
-        <Metric label="Aprovados" value={panorama.aprovados} detail="apto + sobra" />
-        <Metric label="Times" value={panorama.times} detail="fecham com o pool de hoje" />
-        <Metric label="Vagas" value={panorama.vagas} detail="entram no draft" />
-        <Metric label="Sobrando" value={panorama.sobra} detail="aprovados sem vaga" />
+        <Metric
+          label="Elegíveis"
+          value={panorama.elegiveis}
+          detail={`${panorama.aprovados} aprovados · ${panorama.pendentes} pendentes`}
+        />
+        <Metric
+          label="Times"
+          value={panorama.times}
+          detail={comPendentes ? "previsão, com pendentes" : "fecham com o pool de hoje"}
+        />
+        <Metric
+          label="Vagas"
+          value={panorama.vagas}
+          detail={comPendentes ? "previsão, com pendentes" : "entram no draft"}
+        />
+        <Metric label="Sobrando" value={panorama.sobra} detail="elegíveis sem vaga" />
       </FieldGrid>
 
       <Card padding="14px 16px" style={{ marginTop: 12, display: "grid", gap: 8 }}>
         <p style={{ margin: 0, fontSize: 13, color: C.ink2, ...tabular }}>
-          times = piso(aprovados ÷ jogadores por time)
+          times = piso(elegíveis ÷ jogadores por time)
           {configValida ? (
             <>
               {" = piso("}
-              {panorama.aprovados} ÷ {jogadoresPorTime}
+              {panorama.elegiveis} ÷ {jogadoresPorTime}
               {") = "}
               <strong style={{ color: C.bronzeHi, fontFamily: display, fontSize: 16 }}>
                 {panorama.times}
@@ -282,12 +314,12 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
           panorama.times === 0 ? (
             <p style={{ margin: 0, fontSize: 12.5, color: C.warnSoft }}>
               Nenhum time fecha ainda: faltam {faltamParaFecharTime}{" "}
-              {faltamParaFecharTime === 1 ? "aprovado" : "aprovados"} para o primeiro.
+              {faltamParaFecharTime === 1 ? "inscrito" : "inscritos"} para o primeiro.
             </p>
           ) : (
             <p style={{ margin: 0, fontSize: 12.5, color: C.ink2 }}>
               Mais {faltamParaFecharTime}{" "}
-              {faltamParaFecharTime === 1 ? "aprovado fecha" : "aprovados fecham"} o{" "}
+              {faltamParaFecharTime === 1 ? "inscrito fecha" : "inscritos fecham"} o{" "}
               {panorama.times + 1}º time.
             </p>
           )
@@ -295,8 +327,29 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
 
         <p style={nota}>
           Não existe teto de inscrições nesta edição. A meta é chegar a ~50 pessoas, o que daria 10
-          times; enquanto isso, o número de times acompanha quem for aprovado.
+          times; enquanto isso, o número de times acompanha os elegíveis — todo inscrito, menos
+          quem foi recusado ou desistiu. Pendente já conta.
         </p>
+
+        {comPendentes ? (
+          <p style={{ ...nota, color: C.warnSoft }}>
+            Previsão: {panorama.pendentes}{" "}
+            {panorama.pendentes === 1 ? "pendente entra" : "pendentes entram"} nesta conta, mas o
+            draft só sorteia aprovados. Antes do draft, confira todo mundo — quem continuar
+            pendente fica de fora, e a conta pode cair.
+            {draftHoje ? (
+              <>
+                {" "}
+                Só com os {analise.aprovados.length} aprovados de hoje (o que o draft usaria):{" "}
+                <strong style={{ color: C.ink }}>
+                  {draftHoje.times} {draftHoje.times === 1 ? "time" : "times"}, {draftHoje.vagas}{" "}
+                  {draftHoje.vagas === 1 ? "vaga" : "vagas"}, {draftHoje.sobra} de sobra
+                </strong>
+                .
+              </>
+            ) : null}
+          </p>
+        ) : null}
       </Card>
 
       {/* ---------------------------------------------------- 2. viabilidade de orçamento */}
@@ -370,11 +423,11 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
             </p>
           </Card>
 
-          <BlockTitle>Distribuição de elos dos aprovados</BlockTitle>
+          <BlockTitle>Distribuição de elos dos elegíveis</BlockTitle>
 
           {analise.porElo.length === 0 ? (
-            <Empty title="Nenhum aprovado ainda">
-              A distribuição aparece quando a conferência começar a aprovar gente.
+            <Empty title="Ninguém na conta ainda">
+              A distribuição aparece com a primeira inscrição que não foi recusada.
             </Empty>
           ) : (
             <ScrollX>
@@ -443,10 +496,12 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
             <div style={{ marginTop: 12 }}>
               <Banner tone="danger" title="Elo não reconhecido em algumas fichas">
                 {analise.eloIlegivel.length}{" "}
-                {analise.eloIlegivel.length === 1 ? "aprovado está" : "aprovados estão"} com um elo
-                que a tabela do site não resolve (
-                {analise.eloIlegivel.map((i) => i.nick).join(", ")}). Esses ficam fora da
-                distribuição, e o congelamento não roda enquanto isso não for corrigido na ficha.
+                {analise.eloIlegivel.length === 1 ? "ficha está" : "fichas estão"} com um elo que a
+                tabela do site não resolve ({analise.eloIlegivel.map((i) => i.nick).join(", ")}).
+                Ficam fora da distribuição
+                {analise.eloIlegivelAprovado.length > 0
+                  ? ", e o congelamento não roda enquanto as aprovadas não forem corrigidas na ficha."
+                  : "; corrija na ficha antes de aprovar."}
               </Banner>
             </div>
           ) : null}
@@ -476,9 +531,17 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
           {panorama.sobra === 1 ? "pessoa fica" : "pessoas ficam"} de fora; {analise.marcadosSobra.length}{" "}
           {analise.marcadosSobra.length === 1 ? "está marcada" : "estão marcadas"} como sobra na
           ficha. São coisas diferentes — a primeira é o resto da divisão, a segunda é quem já foi
-          avisado. Marcar alguém como sobra não muda a divisão: sobra continua contando como
-          aprovado, senão o número de times mudaria sozinho a cada marcação.
+          avisado. Marcar alguém como sobra não muda a divisão: sobra continua na conta, senão o
+          número de times mudaria sozinho a cada marcação.
         </p>
+        {draftHoje ? (
+          <p style={{ ...nota, color: C.warnSoft }}>
+            Esse resto ainda conta {panorama.pendentes}{" "}
+            {panorama.pendentes === 1 ? "pendente" : "pendentes"}: não marque ninguém como sobra antes
+            de conferir todo mundo, senão o número de quem fica de fora muda e alguém é avisado à
+            toa. Só com os aprovados de hoje, o draft pediria {draftHoje.sobra} na sobra.
+          </p>
+        ) : null}
       </Card>
 
       {analise.marcadosSobra.length === 0 ? (
@@ -558,10 +621,10 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
             value={alvoId}
             onChange={setAlvoId}
             ariaLabel="Jogador a substituir"
-            disabled={analise.pool.length === 0}
+            disabled={analise.aprovados.length === 0}
           >
             <option value="">— escolha um jogador —</option>
-            {[...analise.pool]
+            {[...analise.aprovados]
               .sort((a, b) => a.nick.localeCompare(b.nick, "pt-BR"))
               .map((i) => (
                 <option key={i.id} value={i.id}>
@@ -576,10 +639,10 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
             Escolha alguém para ver quem, dentre os aprovados, pode entrar no lugar dele.
           </p>
         ) : substitutos.length === 0 ? (
-          <Empty title="Ninguém elegível">
-            {alvo.nick} é o mais barato do pool ({alvo.pontos}{" "}
+          <Empty title="Nenhum aprovado serve">
+            {alvo.nick} é o aprovado mais barato ({alvo.pontos}{" "}
             {alvo.pontos === 1 ? "ponto" : "pontos"}), então não há aprovado de elo igual ou
-            inferior para substituí-lo.
+            inferior para substituí-lo. Pendentes não entram nesta lista: confira-os primeiro.
           </Empty>
         ) : (
           <>
@@ -741,11 +804,11 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
         tone="danger"
         title="Congelar o elo dos aprovados"
         badge={
-          analise.semCongelar.length === 0 && analise.pool.length > 0 ? (
+          analise.semCongelar.length === 0 && analise.aprovados.length > 0 ? (
             <Chip tone="ok">todos congelados</Chip>
           ) : (
             <Chip tone="warn">
-              {analise.jaCongelados}/{analise.pool.length} congelados
+              {analise.jaCongelados}/{analise.aprovados.length} congelados
             </Chip>
           )
         }
@@ -769,20 +832,20 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
           <Metric small label="Já congelados" value={analise.jaCongelados} detail="preço fixo" />
         </FieldGrid>
 
-        {analise.eloIlegivel.length > 0 ? (
+        {analise.eloIlegivelAprovado.length > 0 ? (
           <Banner tone="danger" title="Corrija os elos antes de congelar">
             O servidor congela uma linha de cada vez e para no primeiro elo que não reconhece — o
-            que já passou fica congelado e o resto não. Com {analise.eloIlegivel.length}{" "}
-            {analise.eloIlegivel.length === 1 ? "ficha" : "fichas"} nesse estado, o botão fica
-            travado de propósito.
+            que já passou fica congelado e o resto não. Com {analise.eloIlegivelAprovado.length}{" "}
+            {analise.eloIlegivelAprovado.length === 1 ? "ficha aprovada" : "fichas aprovadas"} nesse
+            estado, o botão fica travado de propósito.
           </Banner>
         ) : null}
 
-        {analise.pool.length === 0 ? (
+        {analise.aprovados.length === 0 ? (
           <p style={nota}>Não há aprovados: não existe nada para congelar ainda.</p>
         ) : analise.semCongelar.length === 0 ? (
           <p style={nota}>
-            Todos os {analise.pool.length} aprovados já estão com elo congelado. Quem for aprovado
+            Todos os {analise.aprovados.length} aprovados já estão com elo congelado. Quem for aprovado
             depois entra sem congelamento e exige rodar isto de novo.
           </p>
         ) : (
@@ -790,7 +853,7 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
             <Check
               tone="danger"
               checked={confirmaCongelar}
-              disabled={!podeConferir || ocupado || analise.eloIlegivel.length > 0}
+              disabled={!podeConferir || ocupado || analise.eloIlegivelAprovado.length > 0}
               onChange={setConfirmaCongelar}
             >
               Entendo que isto fixa o preço de {analise.semCongelar.length}{" "}
@@ -802,12 +865,12 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
               <Button
                 tone="danger"
                 disabled={
-                  !podeConferir || ocupado || !confirmaCongelar || analise.eloIlegivel.length > 0
+                  !podeConferir || ocupado || !confirmaCongelar || analise.eloIlegivelAprovado.length > 0
                 }
                 title={
                   !podeConferir
                     ? SEM_ESCOPO
-                    : analise.eloIlegivel.length > 0
+                    : analise.eloIlegivelAprovado.length > 0
                       ? "Há elo não reconhecido entre os aprovados."
                       : confirmaCongelar
                         ? "Congela agora."

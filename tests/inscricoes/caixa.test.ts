@@ -122,6 +122,22 @@ describe("panorama", () => {
       config,
     );
 
-    expect(p).toMatchObject({ inscritos: 13, aprovados: 10, pendentes: 1, recusados: 1, times: 2 });
+    expect(p).toMatchObject({ inscritos: 13, elegiveis: 11, aprovados: 10, pendentes: 1, recusados: 1, times: 2 });
+  });
+
+  it("pendente já conta para times e vagas — só recusado e desistente saem", () => {
+    // Decisão do Lucas: quem está aguardando a conferência é elegível. Contando só os
+    // aprovados, 4 aptos + 6 pendentes davam ZERO times; contando os elegíveis, dão 2.
+    const p = panorama(
+      [
+        ...Array.from({ length: 4 }, () => inscrito("apto")),
+        ...Array.from({ length: 6 }, () => inscrito("pendente")),
+        inscrito("recusado"),
+        inscrito("desistiu"),
+      ],
+      [],
+      config,
+    );
+    expect(p).toMatchObject({ elegiveis: 10, aprovados: 4, times: 2, vagas: 10, sobra: 0 });
   });
 });

@@ -456,34 +456,51 @@ export function estadoDaJanela(
 // ---------------------------------------------------------------- times
 
 /**
- * Quantos times cabem, a partir de quem foi aprovado.
+ * Quem entra na CONTA de times e vagas: todo inscrito, menos quem foi recusado ou
+ * desistiu.
+ *
+ * Decisão do Lucas (2026-10-06): "a gente não contabiliza só se for reprovado — os que
+ * estão aguardando já são elegíveis". Contar só aprovados fazia o painel dizer "0 times"
+ * com 40 pessoas inscritas, só porque a conferência ainda não tinha chegado nelas.
+ *
+ * É uma PREVISÃO de planejamento. O sorteio do draft continua usando só os aprovados
+ * (`montarDraftDosAprovados`): pendente não é sorteado — tem de ser conferido antes.
+ */
+export function contaParaTimes(situacao: string): boolean {
+  return situacao !== "recusado" && situacao !== "desistiu";
+}
+
+/**
+ * Quantos times cabem, a partir de QUANTOS estão na conta — os elegíveis no painel
+ * (`contaParaTimes`), os aprovados no draft (`montarDraftDosAprovados`).
  *
  * NÃO existe teto de inscrições nesta edição: a organização aceita até bater o
  * mínimo, mirando ~50 pessoas. Então o número de times é derivado, nunca fixo — o
  * design entregue tinha 6 times cravados no código, o que não vale mais.
  *
- * A sobra são os aprovados que ficaram de fora quando os times fecharam. Não é fila
+ * A sobra é o resto: quem fica de fora quando os times fecham. Não é fila
  * com ordem: a organização resolve na conversa do grupo.
  */
-export function distribuirTimes(aprovados: number, jogadoresPorTime = 5) {
+export function distribuirTimes(quantos: number, jogadoresPorTime = 5) {
   if (jogadoresPorTime <= 0) throw new Error("jogadoresPorTime precisa ser positivo.");
-  const times = Math.floor(aprovados / jogadoresPorTime);
-  return { times, vagas: times * jogadoresPorTime, sobra: aprovados - times * jogadoresPorTime };
+  const times = Math.floor(quantos / jogadoresPorTime);
+  return { times, vagas: times * jogadoresPorTime, sobra: quantos - times * jogadoresPorTime };
 }
 
 /**
  * O draft cabe no orçamento? Cada time tem `orcamentoPorTime` pontos, e o capitão
- * já sai desse mesmo bolo. Se a soma dos aprovados passar do teto, não há como
- * montar os elencos — e é melhor a organização saber disso antes do sorteio.
+ * já sai desse mesmo bolo. Se a soma de quem está na conta (os elegíveis, no painel)
+ * passar do teto, não há como montar os elencos — e é melhor a organização saber
+ * disso antes do sorteio.
  */
 export function viabilidadeDeOrcamento(
-  pontosDosAprovados: readonly number[],
+  pontos: readonly number[],
   jogadoresPorTime = 5,
   orcamentoPorTime = 30,
 ) {
-  const { times, vagas, sobra } = distribuirTimes(pontosDosAprovados.length, jogadoresPorTime);
+  const { times, vagas, sobra } = distribuirTimes(pontos.length, jogadoresPorTime);
   // Só os que entram contam para o teto; a sobra fica de fora dos times.
-  const maisBaratos = [...pontosDosAprovados].sort((a, b) => a - b).slice(0, vagas);
+  const maisBaratos = [...pontos].sort((a, b) => a - b).slice(0, vagas);
   const total = maisBaratos.reduce((soma, p) => soma + p, 0);
   const teto = times * orcamentoPorTime;
   return { times, vagas, sobra, total, teto, cabe: total <= teto, folga: teto - total };

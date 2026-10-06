@@ -6,6 +6,7 @@ import "server-only";
 import { createSupabaseAdminClient, isSupabaseConfigured } from "@/lib/data-store";
 import { ErroDeRegra } from "@/lib/security/erros";
 import {
+  contaParaTimes,
   distribuirTimes,
   linhaDeInscricao,
   pontosDoElo,
@@ -722,10 +723,14 @@ export function panorama(
   // os times fecharam. Contar só os "apto" faria a conta se mover sozinha: ao marcar
   // dois como sobra, o total de aprovados cairia e a divisão mudaria de resposta.
   const aprovados = inscricoes.filter((i) => i.situacao === "apto" || i.situacao === "sobra");
-  const { times, vagas, sobra } = distribuirTimes(aprovados.length, config.jogadores_por_time);
+  // A divisão conta todo mundo que ainda pode jogar — pendente incluso. Só recusado e
+  // desistente saem (ver `contaParaTimes`).
+  const elegiveis = inscricoes.filter((i) => contaParaTimes(i.situacao));
+  const { times, vagas, sobra } = distribuirTimes(elegiveis.length, config.jogadores_por_time);
 
   return {
     inscritos: inscricoes.length,
+    elegiveis: elegiveis.length,
     aprovados: aprovados.length,
     pendentes: inscricoes.filter((i) => i.situacao === "pendente").length,
     recusados: inscricoes.filter((i) => i.situacao === "recusado").length,

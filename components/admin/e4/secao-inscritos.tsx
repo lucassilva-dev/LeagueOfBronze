@@ -65,7 +65,7 @@ import { getOpGgSummonerUrlFromNick } from "@/lib/opgg";
  *    no navegador dele, e o padrão é mostrar.
  *
  * 3. NÃO HÁ TETO DE INSCRIÇÕES. Nada aqui escreve "X de N vagas": o número de times é
- *    derivado (aprovados ÷ jogadores por time) e vem pronto do servidor, no panorama.
+ *    derivado (elegíveis ÷ jogadores por time) e vem pronto do servidor, no panorama.
  *
  * A data de entrada no grupo saiu da tela: a 4ª não pede tempo mínimo (regra 1), o que
  * conta é estar no grupo — e isso é o item (a).
@@ -1703,7 +1703,7 @@ export function SecaoInscritos({ dados, executar, ocupado, podeConferir, ultimoE
           small
           label="Times (derivado)"
           value={panorama.times}
-          detail={`${panorama.vagas} em time · ${panorama.sobra} de sobra`}
+          detail={`de ${panorama.elegiveis} (pendentes + aprovados)`}
         />
       </FieldGrid>
 

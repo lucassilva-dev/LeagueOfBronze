@@ -135,12 +135,15 @@ function dados(): DadosEdicao {
     pagamentos,
     panorama: {
       inscritos: inscritos.length,
+      // 11 inscritos menos o recusado e o desistente; os 3 pendentes contam.
+      // distribuirTimes(9, 5) = 1 time, 5 vagas, 4 de sobra.
+      elegiveis: 9,
       aprovados: 6,
-      pendentes: 1,
+      pendentes: 3,
       recusados: 1,
       times: 1,
       vagas: 5,
-      sobra: 1,
+      sobra: 4,
       caixa: {
         recebido: 6000,
         estornado: 2000,
@@ -194,6 +197,7 @@ describe("as quatro seções renderizam", () => {
       vazio.pagamentos = [];
       vazio.panorama = {
         inscritos: 0,
+        elegiveis: 0,
         aprovados: 0,
         pendentes: 0,
         recusados: 0,
@@ -287,5 +291,63 @@ describe("regras do produto que a tela não pode contrariar", () => {
   it("Times mostra a divisão derivada, não um número fixo", () => {
     const html = renderToStaticMarkup(<SecaoTimes {...props()} />);
     expect(html).toMatch(/piso|÷|dividid/i);
+  });
+
+  /** O texto que a pessoa lê: sem tags e sem os marcadores que o React põe entre pedaços. */
+  const texto = (html: string) =>
+    html.replace(/<!-- -->/g, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+
+  it("Times divide os ELEGÍVEIS (pendente conta) e avisa que o draft só sorteia aprovados", () => {
+    const lido = texto(renderToStaticMarkup(<SecaoTimes {...props()} />));
+    expect(lido).toContain("piso(elegíveis ÷ jogadores por time)");
+    expect(lido).toContain("piso(9 ÷ 5)");
+    expect(lido).toContain("draft só sorteia aprovados");
+  });
+
+  it("o que é definitivo continua só com aprovados: pendente não vira substituto nem entra no congelamento", () => {
+    const lido = texto(renderToStaticMarkup(<SecaoTimes {...props()} />));
+    // p1, v1 e v2 são pendentes: contam na divisão, mas não aparecem como substituto.
+    for (const pendente of ["Jogadorp1", "Jogadorv1", "Jogadorv2"]) {
+      expect(lido).not.toContain(pendente);
+    }
+    expect(lido).toContain("Jogadora1"); // aprovado aparece, então a lista foi mesmo montada
+    // 6 aprovados, 1 deles (a4) já congelado.
+    expect(lido).toContain("1/6 congelados");
+  });
+
+  it("orçamento, elos e rotas são calculados sobre os elegíveis, no próprio cliente", () => {
+    // Elegíveis: 8+4+4+1+3+5+2+15+4 = 46 pontos; 1 time = 5 vagas, os 5 mais baratos
+    // somam 1+2+3+4+4 = 14. Só com aprovados seria "soma 34 … usa 19".
+    const lido = texto(renderToStaticMarkup(<SecaoTimes {...props()} />));
+    expect(lido).toContain("O pool inteiro soma 46 pontos; a conta usa 14");
+  });
+
+  it("com pendentes, mostra ao lado o que o draft montaria só com os aprovados de hoje", () => {
+    // 6 aprovados → 1 time, 5 vagas, 1 de sobra (o que `montarDraftDosAprovados` faria).
+    const lido = texto(renderToStaticMarkup(<SecaoTimes {...props()} />));
+    expect(lido).toContain("Só com os 6 aprovados de hoje (o que o draft usaria): 1 time, 5 vagas, 1 de sobra");
+    expect(lido).toContain("o draft pediria 1 na sobra");
+    expect(lido).not.toContain("entram no draft"); // com pendente, Vagas é previsão
+  });
+
+  it("a Configuração projeta os times com os elegíveis", () => {
+    // distribuirTimes(9, 5): 1 time e 4 de sobra. Com aprovados (6) seria "1 de sobra".
+    const lido = texto(renderToStaticMarkup(<SecaoConfiguracao {...props()} />));
+    expect(lido).toContain("de 9 elegíveis · 4 de sobra");
+  });
+
+  it("elo ilegível num PENDENTE não trava o congelamento — o servidor só congela aprovados", () => {
+    const d = dados();
+    d.inscritos = d.inscritos.map((i) => (i.id === "p1" ? { ...i, elo_declarado: "Lata" } : i));
+    const lido = texto(renderToStaticMarkup(<SecaoTimes {...props({ dados: d })} />));
+    expect(lido).toContain("corrija na ficha antes de aprovar");
+    expect(lido).not.toContain("Corrija os elos antes de congelar");
+  });
+
+  it("elo ilegível num APROVADO trava o congelamento", () => {
+    const d = dados();
+    d.inscritos = d.inscritos.map((i) => (i.id === "a2" ? { ...i, elo_declarado: "Lata" } : i));
+    const lido = texto(renderToStaticMarkup(<SecaoTimes {...props({ dados: d })} />));
+    expect(lido).toContain("Corrija os elos antes de congelar");
   });
 });

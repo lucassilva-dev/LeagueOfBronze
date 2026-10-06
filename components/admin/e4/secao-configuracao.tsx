@@ -103,7 +103,7 @@ const NUMEROS = [
     rotulo: "Jogadores por time",
     min: 1,
     max: 10,
-    efeito: "Divide os aprovados: quantos times fecham sai daqui.",
+    efeito: "Divide os elegíveis (todo inscrito menos recusado e desistente): quantos times fecham sai daqui.",
   },
   {
     chave: "orcamento_por_time",
@@ -336,7 +336,8 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar }: 
     const porTime = inteiroNaFaixa(rascunho.jogadores_por_time, 1, 10) ?? config.jogadores_por_time;
     const segundos =
       inteiroNaFaixa(rascunho.segundos_por_escolha, 5, 600) ?? config.segundos_por_escolha;
-    const { times, sobra } = distribuirTimes(panorama.aprovados, porTime);
+    // Mesma conta do painel: todo inscrito que ainda pode jogar, pendente incluso.
+    const { times, sobra } = distribuirTimes(panorama.elegiveis, porTime);
     // O capitão já está no time antes do draft, então cada time escolhe (jogadores - 1).
     const porCapitao = Math.max(0, porTime - 1);
     return {
@@ -350,7 +351,7 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar }: 
       escolhasMeta: porCapitao * 10,
       tempoMeta: porCapitao * 10 * segundos,
     };
-  }, [rascunho.jogadores_por_time, rascunho.segundos_por_escolha, config, panorama.aprovados]);
+  }, [rascunho.jogadores_por_time, rascunho.segundos_por_escolha, config, panorama.elegiveis]);
 
   const premiacao = useMemo(() => {
     const arrecadado = panorama.caixa.arrecadado;
@@ -490,7 +491,7 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar }: 
         <Metric
           label="Times que fecham"
           value={projecao.times}
-          detail={`${projecao.sobra} de sobra`}
+          detail={`de ${panorama.elegiveis} elegíveis · ${projecao.sobra} de sobra`}
           small
         />
       </FieldGrid>
@@ -578,7 +579,7 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar }: 
         </div>
         <p style={{ margin: "8px 0 0", fontSize: 12.5, color: C.ink2, lineHeight: 1.7, ...tabular }}>
           Cada time escolhe {projecao.porCapitao} jogadores (o capitão já está nele). Com os{" "}
-          {panorama.aprovados} aprovados de hoje são{" "}
+          {panorama.elegiveis} elegíveis de hoje (todo inscrito menos recusados e desistentes) são{" "}
           <strong style={{ color: C.ink }}>{projecao.times} times</strong>, {projecao.escolhas}{" "}
           escolhas e <strong style={{ color: C.bronzeLit }}>{duracao(projecao.tempo)}</strong> só de
           relógio de pick.

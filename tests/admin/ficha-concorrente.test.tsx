@@ -90,6 +90,7 @@ function dados(lista: Inscrito[], estados: Estados = {}, inicioCampeonato: strin
     pagamentos: [],
     panorama: {
       inscritos: lista.length,
+      elegiveis: lista.length,
       aprovados: 0,
       pendentes: lista.length,
       recusados: 0,

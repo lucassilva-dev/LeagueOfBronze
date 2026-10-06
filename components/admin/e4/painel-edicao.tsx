@@ -99,6 +99,8 @@ export type Caixa = {
 
 export type Panorama = {
   inscritos: number;
+  /** Quem entra na conta de times e vagas: todo inscrito menos recusado e desistente. */
+  elegiveis: number;
   aprovados: number;
   pendentes: number;
   recusados: number;
