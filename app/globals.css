@@ -250,6 +250,25 @@ a:hover {
   animation: fadeUp 0.6s;
 }
 
+/* Gaveta lateral do painel (conferência dos inscritos). Mesma regra do .lob-fade: só
+   transform, sem fill-mode — se a animação não rodar, a gaveta já está no lugar. */
+@keyframes lobGavetaEntra {
+  from {
+    transform: translateX(32px);
+  }
+  to {
+    transform: none;
+  }
+}
+.lob-gaveta {
+  animation: lobGavetaEntra 0.16s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lob-gaveta {
+    animation: none;
+  }
+}
+
 .gold-text {
   background: linear-gradient(180deg, #f6d6a2, #dc9f57 46%, #a5692f);
   -webkit-background-clip: text;

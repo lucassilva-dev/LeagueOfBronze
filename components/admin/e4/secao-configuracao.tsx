@@ -52,7 +52,6 @@ type ChaveNumero =
   | "jogadores_por_time"
   | "orcamento_por_time"
   | "min_ranqueadas"
-  | "dias_no_grupo"
   | "prazo_pagamento_dias"
   | "segundos_por_escolha";
 
@@ -120,13 +119,6 @@ const NUMEROS = [
     max: 999,
     efeito:
       "Item (e) e o aceite do formulário: partidas solo/duo nos 10 dias antes do início (regra 4 — o regulamento diz 5). Flex e normal não contam.",
-  },
-  {
-    chave: "dias_no_grupo",
-    rotulo: "Dias no grupo",
-    min: 0,
-    max: 3650,
-    efeito: "Sem uso na 4ª: a regra 1 não pede tempo mínimo no grupo, só ser do grupo e conhecido.",
   },
   {
     chave: "prazo_pagamento_dias",
@@ -238,7 +230,6 @@ function semear(config: EdicaoConfig): Rascunho {
     jogadores_por_time: String(config.jogadores_por_time),
     orcamento_por_time: String(config.orcamento_por_time),
     min_ranqueadas: String(config.min_ranqueadas),
-    dias_no_grupo: String(config.dias_no_grupo),
     prazo_pagamento_dias: String(config.prazo_pagamento_dias),
     segundos_por_escolha: String(config.segundos_por_escolha),
     pct_campeao: String(config.pct_campeao),

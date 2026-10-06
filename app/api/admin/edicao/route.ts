@@ -19,6 +19,8 @@ import {
   conferenciaPatchSchema,
   configPatchSchema,
   fichaPatchSchema,
+  inscritoPatchSchema,
+  motivoDaRecusaDoInscrito,
   pagamentoPatchSchema,
 } from "@/lib/inscricoes/schema";
 import { requireAdmin } from "@/lib/security/route-guard";
@@ -106,6 +108,7 @@ const ESCOPO_DA_ACAO: Record<string, Scope> = {
   config: "edicao:configurar",
   conferencia: "inscricoes:conferir",
   ficha: "inscricoes:conferir",
+  inscrito: "inscricoes:conferir",
   congelar: "inscricoes:conferir",
   pagamento: "inscricoes:financeiro",
 };
@@ -163,6 +166,37 @@ export async function PATCH(request: NextRequest) {
         }
         const { inscricaoId, ...patch } = parsed.data;
         await atualizarInscricao(inscricaoId, patch, autor);
+        return NextResponse.json({ ok: true });
+      }
+
+      case "inscrito": {
+        const parsed = inscritoPatchSchema.safeParse(corpo.dados);
+        if (!parsed.success) {
+          const caminho = parsed.error.issues[0]?.path ?? [];
+          return NextResponse.json({ error: motivoDaRecusaDoInscrito(caminho, corpo.dados) }, { status: 400 });
+        }
+        const { inscricaoId, conferencias = [], ficha } = parsed.data;
+
+        /*
+         * Requisitos primeiro, ficha depois — e a ficha só se TODOS os requisitos gravaram.
+         * A ordem importa porque a ficha costuma trazer a situação: "apto" não pode ficar
+         * gravado se o requisito que o justifica falhou no caminho.
+         *
+         * Não é transação (são linhas separadas pelo cliente do Supabase). `allSettled`, e não
+         * `all`: com `all` a primeira falha respondia na hora, com as outras gravações ainda
+         * correndo — na Vercel, trabalho depois da resposta não tem garantia de terminar, e o
+         * requisito podia ficar gravado sem a linha de auditoria. Assim a resposta só sai
+         * quando tudo terminou, e a tela (que recarrega também na falha) mostra o que de fato
+         * foi gravado e deixa no rascunho só o resto.
+         */
+        const gravacoes = await Promise.allSettled(
+          conferencias.map((c) => atualizarConferencia({ inscricaoId, ...c, autor })),
+        );
+        const falha = gravacoes.find((g): g is PromiseRejectedResult => g.status === "rejected");
+        if (falha) throw falha.reason;
+        if (ficha && Object.values(ficha).some((valor) => valor !== undefined)) {
+          await atualizarInscricao(inscricaoId, ficha, autor);
+        }
         return NextResponse.json({ ok: true });
       }
 

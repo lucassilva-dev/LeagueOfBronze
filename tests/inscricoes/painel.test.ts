@@ -5,6 +5,8 @@ import {
   configPatchSchema,
   estadoDaJanela,
   fichaPatchSchema,
+  inscritoPatchSchema,
+  motivoDaRecusaDoInscrito,
 } from "@/lib/inscricoes/schema";
 
 describe("conferência de um item", () => {
@@ -137,5 +139,91 @@ describe("estado da janela de inscrição", () => {
     expect(estadoDaJanela({ inscricoes_abertas: false, fechamento_inscricoes: "nao-e-data" }, AGORA)).toBe(
       "ainda_nao_abriu",
     );
+  });
+});
+
+describe("«Salvar tudo» da gaveta do inscrito", () => {
+  const base = { inscricaoId: "3f2504e0-4f89-11d3-9a0c-0305e82c3301" };
+
+  it("aceita requisitos e ficha juntos", () => {
+    const parsed = inscritoPatchSchema.parse({
+      ...base,
+      conferencias: [
+        { item: "a", estado: "ok" },
+        { item: "f", observacao: "conta de 2019" },
+      ],
+      ficha: { situacao: "apto" },
+    });
+    expect(parsed.conferencias).toHaveLength(2);
+    expect(parsed.ficha?.situacao).toBe("apto");
+  });
+
+  it("recusa um corpo sem nada para gravar", () => {
+    expect(inscritoPatchSchema.safeParse(base).success).toBe(false);
+    expect(inscritoPatchSchema.safeParse({ ...base, conferencias: [], ficha: {} }).success).toBe(false);
+  });
+
+  it("recusa requisito sem estado nem observação — seria gravar só o carimbo de quem conferiu", () => {
+    expect(inscritoPatchSchema.safeParse({ ...base, conferencias: [{ item: "a" }] }).success).toBe(false);
+  });
+
+  it("recusa o mesmo requisito duas vezes — as gravações correm juntas, não há vencedor", () => {
+    const repetido = { ...base, conferencias: [{ item: "a", estado: "ok" }, { item: "a", estado: "recusado" }] };
+    expect(inscritoPatchSchema.safeParse(repetido).success).toBe(false);
+  });
+
+  it("IGNORA pontos e a data de entrada no grupo, mesmo vindo de um admin", () => {
+    const parsed = inscritoPatchSchema.parse({
+      ...base,
+      ficha: { situacao: "apto", pontos: 15, entrouNoGrupo: "2026-08-01" },
+    });
+    expect(parsed.ficha).toEqual({ situacao: "apto" });
+  });
+
+  it("limpar o elo verificado conta como alteração (vira nulo)", () => {
+    const parsed = inscritoPatchSchema.parse({ ...base, ficha: { eloVerificado: "" } });
+    expect(parsed.ficha?.eloVerificado).toBeNull();
+  });
+
+  it("recusa estado ou item fora da lista", () => {
+    expect(inscritoPatchSchema.safeParse({ ...base, conferencias: [{ item: "a", estado: "talvez" }] }).success).toBe(
+      false,
+    );
+    expect(inscritoPatchSchema.safeParse({ ...base, conferencias: [{ item: "z", estado: "ok" }] }).success).toBe(false);
+  });
+});
+
+describe("motivo da recusa do «Salvar tudo»", () => {
+  const base = { inscricaoId: "3f2504e0-4f89-11d3-9a0c-0305e82c3301" };
+  const motivo = (corpo: unknown) => {
+    const r = inscritoPatchSchema.safeParse(corpo);
+    if (r.success) throw new Error("devia ter recusado");
+    return motivoDaRecusaDoInscrito(r.error.issues[0]?.path ?? [], corpo);
+  };
+
+  it("aponta o requisito cuja observação passou do limite", () => {
+    const corpo = {
+      ...base,
+      conferencias: [
+        { item: "a", estado: "ok" },
+        { item: "f", observacao: "x".repeat(501) },
+      ],
+    };
+    expect(motivo(corpo)).toBe("A observação do requisito (F) passa de 500 caracteres.");
+  });
+
+  it("aponta a ficha e o nome", () => {
+    expect(motivo({ ...base, ficha: { observacao: "x".repeat(501) } })).toMatch(/observação da ficha/);
+    expect(motivo({ ...base, ficha: { nomeReal: "Fulano" } })).toMatch(/^Nome:/);
+  });
+
+  it("não ecoa letra que não seja de requisito", () => {
+    expect(motivoDaRecusaDoInscrito(["conferencias", 0, "observacao"], { conferencias: [{ item: "<b>" }] })).toBe(
+      "A observação do requisito passa de 500 caracteres.",
+    );
+  });
+
+  it("o resto continua genérico", () => {
+    expect(motivo(base)).toBe("Alterações inválidas.");
   });
 });

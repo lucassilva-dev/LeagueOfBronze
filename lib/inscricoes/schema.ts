@@ -204,7 +204,7 @@ export const REGRA_DO_ITEM: Record<ItemConferencia, { titulo: string; detalhe: s
   a: {
     titulo: "Membro do grupo (regra 1)",
     detalhe:
-      "É do grupo oficial (WhatsApp/Discord) e a organização conhece. Não existe tempo mínimo no grupo. O WhatsApp não tem data de entrada auditável — para quem só está lá, alguém da organização atesta à mão.",
+      "Está no grupo oficial (WhatsApp/Discord) e a organização conhece. Não importa desde quando: estar no grupo basta.",
   },
   b: {
     titulo: "Riot vinculada ao Discord (regra 21)",
@@ -329,6 +329,77 @@ export const fichaPatchSchema = z.object({
     .transform((v) => [...new Set(v)])
     .optional(),
 });
+
+/**
+ * O "Salvar" único da gaveta do inscrito: requisitos e ficha numa requisição só.
+ *
+ * Antes eram sete botões — um por requisito e outro para a ficha — e conferir 50 pessoas
+ * virava 350 cliques. Cada pedaço continua com a regra que já tinha: só vai o que a tela
+ * MUDOU, e campo ausente preserva o que está no banco (é isso que impede um organizador
+ * de desfazer o que o outro acabou de gravar).
+ *
+ * A data de entrada no grupo fica de fora: a 4ª não pede tempo mínimo (regra 1), e o que
+ * conta é estar no grupo — o item (a). A coluna continua no banco, só ninguém edita.
+ */
+const conferenciaDoLoteSchema = z
+  .object({
+    item: z.enum(ITENS_CONFERENCIA),
+    estado: z.enum(ESTADOS_CONFERENCIA).optional(),
+    observacao: z.string().trim().max(LIMITES_INSCRICAO.texto).optional(),
+  })
+  .refine((d) => d.estado !== undefined || d.observacao !== undefined, {
+    message: "Item sem nada para gravar.",
+  });
+
+export const inscritoPatchSchema = z
+  .object({
+    inscricaoId: z.string().uuid(),
+    conferencias: z
+      .array(conferenciaDoLoteSchema)
+      .max(ITENS_CONFERENCIA.length)
+      // O mesmo item duas vezes não tem vencedor definido: as gravações correm juntas.
+      .refine((lista) => new Set(lista.map((c) => c.item)).size === lista.length, {
+        message: "Item repetido.",
+      })
+      .optional(),
+    ficha: fichaPatchSchema.omit({ inscricaoId: true, entrouNoGrupo: true }).optional(),
+  })
+  .refine(
+    (d) =>
+      (d.conferencias?.length ?? 0) > 0 ||
+      Object.values(d.ficha ?? {}).some((valor) => valor !== undefined),
+    { message: "Nada para gravar." },
+  );
+
+export type InscritoPatch = z.infer<typeof inscritoPatchSchema>;
+
+/**
+ * O porquê de uma recusa do "Salvar tudo", em português e apontando o campo.
+ *
+ * Com um botão por requisito, a falha ficava no botão que a pessoa acabou de clicar e já
+ * dizia onde estava o problema. Num salvamento único, "Alterações inválidas." deixava a
+ * pessoa sem saber o que corrigir. Só cita o caminho e o limite — nada do que foi enviado
+ * volta na resposta, a não ser a letra do item, e só se for uma letra conhecida.
+ */
+export function motivoDaRecusaDoInscrito(caminho: readonly PropertyKey[], dados: unknown): string {
+  const [parte, posicao, campo] = caminho;
+
+  if (parte === "conferencias" && typeof posicao === "number" && campo === "observacao") {
+    const item = (dados as { conferencias?: { item?: unknown }[] } | null)?.conferencias?.[posicao]?.item;
+    const letra =
+      typeof item === "string" && (ITENS_CONFERENCIA as readonly string[]).includes(item)
+        ? ` (${item.toUpperCase()})`
+        : "";
+    return `A observação do requisito${letra} passa de ${LIMITES_INSCRICAO.texto} caracteres.`;
+  }
+  if (parte === "ficha" && posicao === "observacao") {
+    return `A observação da ficha passa de ${LIMITES_INSCRICAO.texto} caracteres.`;
+  }
+  if (parte === "ficha" && posicao === "nomeReal") {
+    return `Nome: use nome e sobrenome, com até ${LIMITES_INSCRICAO.nome} caracteres.`;
+  }
+  return "Alterações inválidas.";
+}
 
 /** Data-âncora: string ISO ou nulo. Nulo é estado legítimo — "ainda não decidimos". */
 const dataOpcional = z.string().trim().datetime({ offset: true }).nullable().optional();

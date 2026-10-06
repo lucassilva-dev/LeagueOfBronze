@@ -126,7 +126,7 @@ export type DadosEdicao = {
   auditoria: Auditoria[];
 };
 
-export type AcaoEdicao = "config" | "conferencia" | "ficha" | "pagamento" | "congelar";
+export type AcaoEdicao = "config" | "conferencia" | "ficha" | "inscrito" | "pagamento" | "congelar";
 
 /** O que toda seção recebe. */
 export type PropsSecao = Readonly<{
@@ -136,6 +136,12 @@ export type PropsSecao = Readonly<{
   podeConferir: boolean;
   podeFinanceiro: boolean;
   podeConfigurar: boolean;
+  /**
+   * O motivo da última ação que falhou (nulo se a última deu certo). O aviso normal sai no
+   * topo da página, e quem salva de dentro da gaveta do inscrito não o enxerga — a gaveta
+   * cobre a tela. Opcional porque só ela lê.
+   */
+  ultimoErro?: string | null;
 }>;
 
 // ---------------------------------------------------------------- contêiner
@@ -163,6 +169,7 @@ export function PainelEdicao({
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
+  const [ultimoErro, setUltimoErro] = useState<string | null>(null);
 
   /** Devolve se a tela ficou com os dados do servidor — quem salvou precisa saber. */
   const carregar = useCallback(async (): Promise<boolean> => {
@@ -197,6 +204,12 @@ export function PainelEdicao({
   const executar = useCallback(
     async (acao: AcaoEdicao, corpo?: unknown) => {
       setOcupado(true);
+      setUltimoErro(null);
+      const falhar = (texto: string) => {
+        onAlert("erro", texto);
+        setUltimoErro(texto);
+        return false;
+      };
       try {
         const r = await fetch("/api/admin/edicao", {
           method: "PATCH",
@@ -207,8 +220,12 @@ export function PainelEdicao({
 
         if (!r.ok) {
           const falta = resposta.missing?.length ? ` (falta: ${resposta.missing.join(", ")})` : "";
-          onAlert("erro", `${resposta.error ?? "Não foi possível salvar."}${falta}`);
-          return false;
+          // O "Salvar tudo" da gaveta grava várias linhas e pode ter gravado parte antes de
+          // falhar. Recarregar mostra o que entrou, e a gaveta tira do rascunho o que já está
+          // no banco — senão o próximo clique reenviaria por cima do que outra pessoa gravou
+          // depois. As outras ações tocam uma linha só: falhou, não gravou nada.
+          if (acao === "inscrito") await carregar();
+          return falhar(`${resposta.error ?? "Não foi possível salvar."}${falta}`);
         }
 
         /*
@@ -219,14 +236,14 @@ export function PainelEdicao({
          * que já está no banco; salvar de novo só regrava o mesmo valor.
          */
         if (!(await carregar())) {
-          onAlert("erro", "Salvo — mas a tela não conseguiu se atualizar. Recarregue a página antes de continuar.");
-          return false;
+          return falhar("Salvo — mas a tela não conseguiu se atualizar. Recarregue a página antes de continuar.");
         }
         onAlert("ok", "Salvo.");
         return true;
       } catch {
-        onAlert("erro", "Não foi possível falar com o servidor.");
-        return false;
+        // A resposta pode ter se perdido DEPOIS de gravar; mesma razão do recarregamento acima.
+        if (acao === "inscrito") await carregar();
+        return falhar("Não foi possível falar com o servidor.");
       } finally {
         setOcupado(false);
       }
@@ -260,7 +277,7 @@ export function PainelEdicao({
 
   return (
     <div key={secao}>
-      {render({ dados, executar, ocupado, podeConferir, podeFinanceiro, podeConfigurar })}
+      {render({ dados, executar, ocupado, podeConferir, podeFinanceiro, podeConfigurar, ultimoErro })}
     </div>
   );
 }

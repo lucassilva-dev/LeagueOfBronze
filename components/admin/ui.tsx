@@ -287,6 +287,7 @@ export function Input({
   style,
   ariaLabel,
   autoComplete,
+  maxLength,
 }: Readonly<{
   value: string | number;
   onChange: (v: string) => void;
@@ -297,10 +298,12 @@ export function Input({
   style?: CSSProperties;
   ariaLabel?: string;
   autoComplete?: string;
+  maxLength?: number;
 }>) {
   return (
     <input
       type={type}
+      maxLength={maxLength}
       value={value}
       disabled={disabled}
       placeholder={placeholder}
@@ -328,6 +331,8 @@ export function Textarea({
   disabled,
   style,
   ariaLabel,
+  id,
+  maxLength,
 }: Readonly<{
   value: string;
   onChange: (v: string) => void;
@@ -338,12 +343,17 @@ export function Textarea({
   disabled?: boolean;
   style?: CSSProperties;
   ariaLabel?: string;
+  id?: string;
+  /** O mesmo teto do servidor: passar dele só seria descoberto ao salvar, sem dizer onde. */
+  maxLength?: number;
 }>) {
   return (
     <textarea
+      id={id}
       value={value}
       rows={rows}
       disabled={disabled}
+      maxLength={maxLength}
       placeholder={placeholder}
       aria-label={ariaLabel}
       onChange={(e) => onChange(e.target.value)}
