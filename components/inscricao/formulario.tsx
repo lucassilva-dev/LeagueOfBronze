@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 
 import type { Messages } from "@/lib/i18n/messages";
@@ -29,6 +30,13 @@ import { avisarSessaoMudou } from "@/lib/sessao-mudou";
  */
 
 type Rotulos = Messages["inscricao"];
+
+// Carregado sob demanda: o gerador de QR (~9 KB com gzip) só é usado depois do envio, e
+// não precisa pesar nos três passos do formulário de quem ainda está preenchendo.
+const PagamentoPix = dynamic(
+  () => import("@/components/pix/pagamento-pix").then((m) => m.PagamentoPix),
+  { ssr: false, loading: () => <p style={{ margin: 0, color: "var(--lob-muted)" }}>…</p> },
+);
 
 export type ConfigPublica = {
   taxaCentavos: number;
@@ -295,16 +303,45 @@ export default function FormularioInscricao({ t, config, elos, jogadorInicial }:
 
   if (pronto) {
     return (
-      <div className="lob-card-2 lob-fade" style={{ padding: "34px 30px", textAlign: "center" }}>
-        <div className="lob-display" style={{ fontSize: 26, color: "var(--lob-gold-1)" }}>
-          {t.prontoTitulo}
+      <div className="lob-card-2 lob-fade" style={{ padding: "34px 30px" }}>
+        <div style={{ textAlign: "center" }}>
+          <div className="lob-display" style={{ fontSize: 26, color: "var(--lob-gold-1)" }}>
+            {t.prontoTitulo}
+          </div>
+          <p style={{ margin: "12px auto 22px", maxWidth: "52ch", color: "var(--lob-muted)" }}>
+            {t.pagamentoAjuda}
+          </p>
         </div>
-        <p style={{ margin: "12px auto 22px", maxWidth: "52ch", color: "var(--lob-muted)" }}>
-          {t.pagamentoAjuda}
-        </p>
-        <Link className="lob-btn-gold" href="/minha-inscricao">
-          {t.prontoVer}
-        </Link>
+
+        {/*
+          O QR aparece AQUI, depois do envio, e não no passo 3: pagar antes de a inscrição
+          existir deixaria um Pix sem dono se o envio falhasse (nick repetido, rede caindo).
+        */}
+        {config.chavePix ? (
+          <div
+            style={{
+              margin: "0 auto 22px",
+              maxWidth: 640,
+              padding: "16px 18px",
+              borderRadius: 8,
+              border: "1px solid var(--lob-line)",
+            }}
+          >
+            <div style={{ fontSize: 10, letterSpacing: ".2em", color: "var(--lob-bronze)", marginBottom: 12 }}>
+              {t.taxaTitulo} — {moeda(config.taxaCentavos)}
+            </div>
+            <PagamentoPix t={t} chave={config.chavePix} valorCentavos={config.taxaCentavos} />
+            <p style={{ margin: "12px 0 0", fontSize: 12.5, color: "var(--lob-muted)" }}>
+              {preencher(t.prazoAviso, { dias: config.prazoPagamentoDias })}
+            </p>
+          </div>
+        ) : null}
+
+        <div style={{ textAlign: "center" }}>
+          <Link className="lob-btn-gold" href="/minha-inscricao">
+            {t.prontoVer}
+          </Link>
+        </div>
       </div>
     );
   }
@@ -973,6 +1010,9 @@ export function Passo3({
             <button type="button" className="lob-btn-ghost" onClick={onCopiarPix}>
               {pixCopiado ? t.pixCopiado : t.pixCopiar}
             </button>
+            <p style={{ flexBasis: "100%", margin: 0, fontSize: 12, color: "var(--lob-muted)" }}>
+              {t.pixDepoisDoEnvio}
+            </p>
           </div>
         ) : (
           <p style={{ margin: 0, fontSize: 12.5, color: "var(--lob-muted)" }}>{t.pixIndisponivel}</p>

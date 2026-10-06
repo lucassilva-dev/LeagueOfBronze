@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 import { getJogadorIdentity } from "@/lib/jogadores/auth";
-import { minhaInscricao } from "@/lib/inscricoes/store";
+import { inscricaoEsperaPagamento } from "@/lib/inscricoes/pagamento";
+import { lerConfigOuNulo, minhaInscricao } from "@/lib/inscricoes/store";
 import { respostaDeErro } from "@/lib/security/resposta-erro";
 
 export const dynamic = "force-dynamic";
@@ -24,9 +25,21 @@ export async function GET(request: NextRequest) {
 
   try {
     const inscricao = await minhaInscricao(identidade.id);
+
+    // A chave Pix só vai junto enquanto há o que pagar. Quem se inscreveu antes de a
+    // chave existir só a recebia pelo Discord — agora ela aparece aqui, com o QR.
+    // `lerConfigOuNulo` não lança: sem configuração, a ficha sai sem o Pix, e não quebra.
+    //
+    // A situação também conta: recusar ou registrar desistência mexe só na ficha, e o
+    // pagamento continua "aguardando". Sem isto, quem foi recusado recebia o QR com o
+    // valor preenchido — um convite a pagar o que a organização teria de estornar.
+    const devendo = inscricao !== null && inscricaoEsperaPagamento(inscricao);
+    const chave = devendo ? ((await lerConfigOuNulo())?.chave_pix ?? null) : null;
+
     const resposta = NextResponse.json({
       jogador: { displayName: identidade.displayName, email: identidade.email },
       inscricao,
+      pix: chave ? { chave } : null,
     });
     resposta.headers.set("Cache-Control", "no-store, private");
     return resposta;

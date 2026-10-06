@@ -128,6 +128,13 @@ export const inscricao = definir({
     pixCopiar: "COPIAR",
     pixCopiado: "COPIADO",
     pixIndisponivel: "A organização ainda vai divulgar a chave.",
+    pixQrRotulo: "QR code do Pix da inscrição, {valor}",
+    pixQrAjuda:
+      "No app do banco, escolha Pix e leia o QR code — o valor de {valor} já vem preenchido. Antes de confirmar, o app mostra o nome de quem recebe.",
+    pixCopiaEColaLabel: "PIX COPIA E COLA",
+    pixCopiarCodigo: "COPIAR CÓDIGO PIX",
+    pixDepoisDoEnvio:
+      "Assim que você enviar a inscrição, aparece o QR code do Pix com o valor já preenchido. Pague depois de enviar.",
     pagamentoAjuda:
       "Depois de pagar, avise a organização no Discord. A inscrição só é confirmada quando alguém conferir o extrato.",
     prazoAviso:
@@ -303,6 +310,13 @@ export const inscricao = definir({
     pixCopiar: "COPY",
     pixCopiado: "COPIED",
     pixIndisponivel: "The organizers haven't published the key yet.",
+    pixQrRotulo: "Pix QR code for the sign-up fee, {valor}",
+    pixQrAjuda:
+      "In your bank app, choose Pix and scan the QR code — the {valor} amount is already filled in. Before you confirm, the app shows who receives it.",
+    pixCopiaEColaLabel: "PIX COPY AND PASTE",
+    pixCopiarCodigo: "COPY PIX CODE",
+    pixDepoisDoEnvio:
+      "As soon as you submit your sign-up, the Pix QR code shows up with the amount already filled in. Pay after submitting.",
     pagamentoAjuda:
       "After paying, tell the organizers on Discord. Sign-up is only confirmed once someone checks the bank statement.",
     prazoAviso:

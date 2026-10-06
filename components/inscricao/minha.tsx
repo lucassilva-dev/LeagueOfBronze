@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 
 import { resolveRole } from "@/lib/design";
 import type { Messages } from "@/lib/i18n/messages";
+import { inscricaoEsperaPagamento } from "@/lib/inscricoes/pagamento";
 import { TURNOS } from "@/lib/inscricoes/turnos";
 
 /**
@@ -17,6 +19,13 @@ import { TURNOS } from "@/lib/inscricoes/turnos";
  */
 
 type Rotulos = Messages["inscricao"];
+
+// Carregado sob demanda: o gerador de QR (~9 KB com gzip) só serve a quem ainda tem o que
+// pagar.
+const PagamentoPix = dynamic(
+  () => import("@/components/pix/pagamento-pix").then((m) => m.PagamentoPix),
+  { ssr: false, loading: () => <p style={{ margin: 0, color: "var(--lob-muted)" }}>…</p> },
+);
 
 /**
  * Traduz a rota gravada na ficha.
@@ -53,6 +62,8 @@ type MinhaInscricao = {
 type Resposta = {
   jogador: { displayName: string; email: string } | null;
   inscricao: MinhaInscricao | null;
+  /** Só vem enquanto o pagamento está em aberto. */
+  pix?: { chave: string } | null;
 };
 
 const TOM: Record<string, { cor: string; fundo: string; borda: string }> = {
@@ -189,7 +200,8 @@ export default function MinhaInscricaoCliente({ t }: Readonly<{ t: Rotulos }>) {
 
   const i = dados.inscricao;
   const pag = i.pagamento;
-  const podeAvisar = pag?.estado === "aguardando";
+  // Mesma regra da rota: recusado ou desistente não tem mais o que pagar nem avisar.
+  const podeAvisar = inscricaoEsperaPagamento(i);
   // Na ordem do dia, e só os turnos que esta tela conhece.
   const turnos = TURNOS.filter((x) => i.disponibilidade.includes(x)).map((x) => t.turnos[x]);
 
@@ -236,6 +248,19 @@ export default function MinhaInscricaoCliente({ t }: Readonly<{ t: Rotulos }>) {
         {i.observacao && (
           <p style={{ margin: "16px 0 0", fontSize: 13, color: "var(--lob-muted)" }}>{i.observacao}</p>
         )}
+
+        {podeAvisar && pag && dados.pix ? (
+          <div
+            style={{
+              marginTop: 18,
+              padding: "16px 18px",
+              borderRadius: 8,
+              border: "1px solid var(--lob-line)",
+            }}
+          >
+            <PagamentoPix t={t} chave={dados.pix.chave} valorCentavos={pag.valorCentavos} />
+          </div>
+        ) : null}
 
         {podeAvisar && (
           <div style={{ marginTop: 18 }}>
