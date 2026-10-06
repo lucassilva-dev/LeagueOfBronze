@@ -90,9 +90,18 @@ export type DecisaoDoRobo = {
 
 const DIA_MS = 24 * 60 * 60 * 1000;
 
-/** Nome comparável: a Riot não diferencia maiúsculas e o espaço não muda a conta. */
+/**
+ * Nome comparável: a Riot não diferencia maiúsculas, o espaço não muda a conta e o acento
+ * também não — a busca por "BETY CLARAO" devolve a conta "BETY CLARÃO". Na primeira
+ * simulação em produção, sem tirar o acento, dois inscritos apareciam como "trocou de nick"
+ * sem ter trocado nada.
+ */
 function comparavel(s: string): string {
-  return s.normalize("NFC").toLowerCase().replace(/\s+/g, "");
+  return s
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/\s+/g, "");
 }
 
 export function mesmoRiotId(a: string, b: string): boolean {

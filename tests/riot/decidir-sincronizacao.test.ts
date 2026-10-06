@@ -170,6 +170,14 @@ describe("requisitos", () => {
     expect(itemDe(d, "m")).toMatchObject({ estado: "ok" });
   });
 
+  it("acento diferente não é troca de nick: a Riot acha «BETY CLARÃO» buscando «BETY CLARAO»", () => {
+    const d = decidir({
+      i: { nick: "BETY CLARAO", tag: "2424" },
+      r: { conta: { tipo: "ok", puuid: "p", gameName: "BETY CLARÃO", tagLine: "2424" } },
+    });
+    expect(itemDe(d, "m")).toMatchObject({ estado: "ok" });
+  });
+
   it("trocou de nick (regra 12): (m) vai a risco e cita o Riot ID novo", () => {
     const d = decidir({ r: { conta: { tipo: "ok", puuid: "p", gameName: "OutroNome", tagLine: "BR1" } } });
     expect(itemDe(d, "m")).toMatchObject({ estado: "risco" });

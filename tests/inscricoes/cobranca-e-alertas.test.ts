@@ -96,6 +96,9 @@ describe("pontos de atenção", () => {
   it("troca de Riot ID, sem confundir caixa diferente com troca", () => {
     expect(codigos({ inscrito: inscrito({ riot_id_atual: "Outro#BR1" }) })).toContain("nick_trocado");
     expect(codigos({ inscrito: inscrito({ riot_id_atual: "fulano#br1" }) })).not.toContain("nick_trocado");
+    expect(codigos({ inscrito: inscrito({ riot_id: "Famoso Parrudao#6969", riot_id_atual: "Famoso Parrudão#6969" }) })).not.toContain(
+      "nick_trocado",
+    );
   });
 
   it("declarou 2+ pontos de diferença da Riot: aponta o fato", () => {
