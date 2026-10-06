@@ -1794,6 +1794,9 @@ export function SecaoInscritos({ dados, executar, ocupado, podeConferir, ultimoE
                     <tr
                       key={inscrito.id}
                       onClick={() => setSelecionadoId(inscrito.id)}
+                      // Hover e foco (globals.css): dizem que a linha inteira abre a gaveta.
+                      className="lob-linha-abre"
+                      title={`Abrir a conferência de ${inscrito.nick}`}
                       style={{
                         background: aberto ? "rgba(201,138,75,.12)" : undefined,
                         cursor: "pointer",
@@ -1805,6 +1808,7 @@ export function SecaoInscritos({ dados, executar, ocupado, podeConferir, ultimoE
                             coisa nem outra. O clique na linha é atalho de mouse. */}
                         <button
                           id={`inscrito-${inscrito.id}`}
+                          className="lob-linha-abre__nome"
                           type="button"
                           aria-haspopup="dialog"
                           aria-expanded={aberto}
@@ -1880,6 +1884,9 @@ export function SecaoInscritos({ dados, executar, ocupado, podeConferir, ultimoE
                         <Chip tone={TOM_SITUACAO[inscrito.situacao]}>
                           {ROTULO_SITUACAO[inscrito.situacao]}
                         </Chip>
+                        <span className="lob-linha-abre__seta" aria-hidden>
+                          ›
+                        </span>
                       </td>
                     </tr>
                   );

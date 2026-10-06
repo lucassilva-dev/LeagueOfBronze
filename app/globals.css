@@ -269,6 +269,48 @@ a:hover {
   }
 }
 
+/* Linha da tabela de inscritos: o clique abre a gaveta de conferência. O painel é todo em
+   estilo inline, que não tem :hover — por isso a classe. Só cor e deslocamento, nada de
+   opacidade (ver .lob-fade). :focus-within dá o mesmo destaque a quem chega pelo Tab. */
+.lob-linha-abre > td {
+  transition: background-color 0.12s ease;
+}
+.lob-linha-abre:hover > td,
+.lob-linha-abre:focus-within > td {
+  background-color: rgba(201, 138, 75, 0.08);
+}
+.lob-linha-abre:hover > td:first-child,
+.lob-linha-abre:focus-within > td:first-child {
+  box-shadow: inset 3px 0 0 #c98a4b;
+}
+.lob-linha-abre:hover .lob-linha-abre__nome,
+.lob-linha-abre:focus-within .lob-linha-abre__nome {
+  text-decoration: underline;
+  text-decoration-color: #c98a4b;
+  text-underline-offset: 3px;
+}
+.lob-linha-abre__seta {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 15px;
+  line-height: 1;
+  color: #6f6656;
+  transition:
+    color 0.12s ease,
+    transform 0.12s ease;
+}
+.lob-linha-abre:hover .lob-linha-abre__seta,
+.lob-linha-abre:focus-within .lob-linha-abre__seta {
+  color: #f0c88a;
+  transform: translateX(3px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .lob-linha-abre > td,
+  .lob-linha-abre__seta {
+    transition: none;
+  }
+}
+
 .gold-text {
   background: linear-gradient(180deg, #f6d6a2, #dc9f57 46%, #a5692f);
   -webkit-background-clip: text;
