@@ -83,9 +83,9 @@ export const legal = definir({
     inscricaoItem6:
       "Os aceites: regulamento e ciência do pagamento; gravação e transmissão com a sua imagem e o seu nick (regra 17) e publicação no site do seu Riot ID, elo, rotas, time e estatísticas; e a confirmação de que você cumpre os requisitos das regras 1, 3, 4, 5 e 21.",
     inscricaoAutomatico:
-      "Junto com o formulário, o site grava o e-mail da sua conta, a data do envio, o valor em pontos do seu elo para o draft (calculado pelo servidor, nunca enviado pelo navegador) e um hash do IP de onde a inscrição saiu — usado só para frear envio em massa, nunca o IP em claro.",
+      "Junto com o formulário, o site grava o e-mail da sua conta, a data do envio, o valor em pontos do seu elo para o draft (calculado pelo servidor, nunca enviado pelo navegador) e um hash do IP de onde a inscrição saiu — usado só para frear envio em massa, nunca o IP em claro. No envio, o site também confere na API oficial da Riot se o Riot ID informado existe.",
     inscricaoOrganizacao:
-      "Depois do envio, a organização registra na sua ficha a conferência de cada requisito (situação e observações), o elo verificado, a situação da inscrição e a do pagamento. Cada alteração fica num histórico interno, com quem fez e quando.",
+      "Depois do envio, o site consulta uma vez por dia, na API oficial da Riot, a sua conta: Riot ID atual, servidor, elo, divisão, PDL, vitórias e derrotas da fila solo/duo, nível da conta e — perto do início do torneio — quantas partidas da solo/duo você jogou nos 10 dias anteriores. Com isso ele mantém o seu elo atualizado e confere sozinho os requisitos das regras 3, 4 e 12. A organização registra na sua ficha a conferência dos demais requisitos (situação e observações), a situação da inscrição e a do pagamento. Cada alteração, automática ou não, fica num histórico interno, com quem fez e quando.",
     inscricaoPagamento:
       "O pagamento não passa pelo site: não pedimos nem guardamos dados bancários ou de cartão. O site registra só a situação da cobrança — valor, prazo, o seu aviso de pagamento, quando você o dá pelo site, e a conferência feita pela organização.",
     rotuloParaQue: "Para quê.",
@@ -107,9 +107,9 @@ export const legal = definir({
 
     secaoApi: "USO DA API DA RIOT GAMES",
     apiComoUsamos:
-      "Este site usa a API oficial da Riot Games para importar dados das partidas do campeonato. O acesso é feito somente pelo servidor, em conexão segura, e apenas pela organização a partir do painel administrativo. A chave de API nunca é enviada ao navegador.",
+      "Este site usa a API oficial da Riot Games para importar dados das partidas do campeonato e para conferir os inscritos de cada edição (elo da fila solo/duo e os requisitos do regulamento). O acesso é feito somente pelo servidor, em conexão segura: pela organização a partir do painel administrativo, por uma rotina automática uma vez por dia e na conferência do Riot ID no envio da inscrição. A chave de API nunca é enviada ao navegador.",
     apiQuaisDados:
-      "Quais dados buscamos: identificador da partida (match ID), identificador da conta dos participantes (PUUID), campeões escolhidos e banidos, abates, mortes, assistências, duração e time vencedor. Quando passarmos a usar a Tournament API, também geraremos códigos de torneio e receberemos os resultados das partidas jogadas com esses códigos.",
+      "Quais dados buscamos: identificador da partida (match ID), identificador da conta dos participantes (PUUID), campeões escolhidos e banidos, abates, mortes, assistências, duração e time vencedor. Dos inscritos, buscamos também o Riot ID atual, o servidor, o elo, a divisão, os PDL e as vitórias e derrotas da fila solo/duo, o nível da conta e a quantidade de partidas da fila solo/duo no período da regra 4. Quando passarmos a usar a Tournament API, também geraremos códigos de torneio e receberemos os resultados das partidas jogadas com esses códigos.",
     apiRetencao:
       "Por quanto tempo: os dados de partida ficam guardados enquanto o campeonato e seu histórico público existirem, porque são o próprio conteúdo do site (classificação e histórico). Identificadores técnicos como PUUID e match ID são usados apenas para vincular a partida ao jogador já cadastrado e não são exibidos publicamente.",
     apiExclusao:
@@ -188,9 +188,9 @@ export const legal = definir({
     inscricaoItem6:
       "The acceptances: the rules and awareness of the payment; recording and streaming with your image and nickname (rule 17) and publication on the site of your Riot ID, rank, roles, team and stats; and confirmation that you meet the requirements of rules 1, 3, 4, 5 and 21.",
     inscricaoAutomatico:
-      "Along with the form, the site records your account's email address, the submission date, the points value of your rank for the draft (calculated by the server, never sent by the browser) and a hash of the IP address the sign-up came from — used only to stop mass submissions, never the IP in the clear.",
+      "Along with the form, the site records your account's email address, the submission date, the points value of your rank for the draft (calculated by the server, never sent by the browser) and a hash of the IP address the sign-up came from — used only to stop mass submissions, never the IP in the clear. On submission, the site also checks with the official Riot API that the Riot ID you entered exists.",
     inscricaoOrganizacao:
-      "After submission, the organisation records on your entry the check of each requirement (status and notes), the verified rank, the status of your sign-up and the status of your payment. Every change goes into an internal log, with who made it and when.",
+      "After submission, the site looks up your account once a day through the official Riot API: current Riot ID, server, solo/duo rank, division, LP, wins and losses, account level and — close to the tournament start — how many solo/duo games you played in the previous 10 days. It uses this to keep your rank up to date and to check the requirements of rules 3, 4 and 12 on its own. The organisation records on your entry the check of the other requirements (status and notes), the status of your sign-up and the status of your payment. Every change, automatic or not, goes into an internal log, with who made it and when.",
     inscricaoPagamento:
       "Payment does not go through the site: we neither ask for nor store bank or card details. The site records only the state of the charge — amount, due date, your payment notice when you send it through the site, and the organisation's check.",
     rotuloParaQue: "What for.",
@@ -212,9 +212,9 @@ export const legal = definir({
 
     secaoApi: "USE OF THE RIOT GAMES API",
     apiComoUsamos:
-      "This site uses the official Riot Games API to import tournament match data. Access happens server-side only, over a secure connection, and solely by the organisation from the admin panel. The API key is never sent to the browser.",
+      "This site uses the official Riot Games API to import tournament match data and to check each edition's sign-ups (solo/duo rank and the rulebook requirements). Access happens server-side only, over a secure connection: by the organisation from the admin panel, by an automatic routine once a day, and when checking the Riot ID on sign-up. The API key is never sent to the browser.",
     apiQuaisDados:
-      "What we request: match ID, participant account identifier (PUUID), champions picked and banned, kills, deaths, assists, duration and winning team. Once we start using the Tournament API, we will also generate tournament codes and receive the results of matches played with those codes.",
+      "What we request: match ID, participant account identifier (PUUID), champions picked and banned, kills, deaths, assists, duration and winning team. For sign-ups we also request the current Riot ID, server, solo/duo rank, division, LP, wins and losses, account level and the number of solo/duo games in the rule 4 period. Once we start using the Tournament API, we will also generate tournament codes and receive the results of matches played with those codes.",
     apiRetencao:
       "How long we keep it: match data is retained for as long as the tournament and its public history exist, because it is the site's actual content (standings and match history). Technical identifiers such as PUUID and match ID are used only to link a match to an already registered player and are never displayed publicly.",
     apiExclusao:

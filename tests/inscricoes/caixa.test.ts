@@ -93,6 +93,26 @@ describe("caixa da edição", () => {
 });
 
 describe("panorama", () => {
+  it("recusado ou desistente que não pagou não é «a receber» — e quem pagou continua no caixa", () => {
+    const config = { jogadores_por_time: 5 };
+    const recusado = inscrito("recusado");
+    const desistiu = inscrito("desistiu");
+    const pendente = inscrito("pendente");
+    const recusadoPagou = inscrito("recusado");
+    const p = panorama(
+      [recusado, desistiu, pendente, recusadoPagou],
+      [
+        { ...pagamento("aguardando"), inscricao_id: recusado.id },
+        { ...pagamento("aguardando"), inscricao_id: desistiu.id },
+        { ...pagamento("aguardando"), inscricao_id: pendente.id },
+        { ...pagamento("pago"), inscricao_id: recusadoPagou.id },
+      ],
+      config,
+    );
+    expect(p.caixa.aReceber).toBe(TAXA); // só o pendente
+    expect(p.caixa.arrecadado).toBe(TAXA); // o dinheiro de quem pagou não some
+  });
+
   const config = { jogadores_por_time: 5 };
 
   it("marcar quem sobrou não muda a conta — sobra continua sendo aprovado", () => {

@@ -65,6 +65,9 @@ alter default privileges in schema public revoke all on functions from anon, aut
 --   f3_historico_append_only    → schema history + trigger + trava append-only
 --   f3_backups_automaticos      → schema backup + resgate da cópia órfã
 --   f3_agenda_snapshot_diario   → pg_cron: snapshot diário (60 dias) e higiene de auth
+--   lob_snapshot_4a             → pg_cron `lob-snapshot-4a`: cópia diária de inscrições,
+--                                 conferências, pagamentos e config da 4a Edição (state_id
+--                                 'inscricoes-4a'; a retenção de 60 dias é a do job acima)
 --
 -- Verificado em produção: apagar ou editar uma revisão é BLOQUEADO; anon e
 -- service_role não alcançam history nem backup.

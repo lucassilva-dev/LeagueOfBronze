@@ -25,7 +25,7 @@ export const conformidade = definir({
       "Nada disso é aplicado por software: não há integração com o cliente do jogo nem com a API da Riot. É um acordo entre os participantes, cumprido manualmente na sala personalizada. As condições de vitória não mudam — a partida continua sendo decidida pela destruição do Nexus.",
 
     eloAviso:
-      "Os pontos por elo são apenas moeda de draft deste campeonato, calculada a partir do ranque oficial que o próprio jogador declara. Não é uma avaliação de habilidade criada por este site, nem um sistema de ranqueamento alternativo ao da Riot Games.",
+      "Os pontos por elo são apenas moeda de draft deste campeonato, calculada a partir do ranque oficial da fila solo/duo — o que o jogador declara, conferido na API oficial da Riot. Não é uma avaliação de habilidade criada por este site, nem um sistema de ranqueamento alternativo ao da Riot Games.",
 
     consentimentoJogadores:
       "Foto e Riot ID são publicados com autorização do participante, conforme o regulamento. Para correção ou remoção, escreva para",
@@ -57,7 +57,7 @@ export const conformidade = definir({
       "None of this is enforced by software: there is no integration with the game client or with the Riot API. It is an agreement between participants, applied manually inside the custom lobby. Win conditions do not change — the match is still decided by destroying the Nexus.",
 
     eloAviso:
-      "Rank points are only this tournament's draft currency, derived from the official rank each player declares. They are not a skill rating created by this site, nor an alternative ranking system to Riot Games'.",
+      "Rank points are only this tournament's draft currency, derived from the official solo/duo rank — the one each player declares, checked against the official Riot API. They are not a skill rating created by this site, nor an alternative ranking system to Riot Games'.",
 
     consentimentoJogadores:
       "Photos and Riot IDs are published with the participant's consent, as stated in the rules. For correction or removal, write to",

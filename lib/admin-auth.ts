@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createHash } from "node:crypto";
 
 import type { NextRequest } from "next/server";
 
@@ -12,6 +12,7 @@ import {
   revokeSession,
   type AdminUserRow,
 } from "@/lib/security/admin-store";
+import { iguaisEmTempoConstante } from "@/lib/security/comparar";
 import { newSessionId, signSessionToken, verifySessionToken } from "@/lib/security/session";
 
 /**
@@ -79,12 +80,9 @@ function sha256(value: string) {
   return createHash("sha256").update(value).digest("hex");
 }
 
-function constantEquals(a: string, b: string) {
-  const aBuffer = Buffer.from(a);
-  const bBuffer = Buffer.from(b);
-  if (aBuffer.length !== bBuffer.length) return false;
-  return timingSafeEqual(aBuffer, bBuffer);
-}
+// Mora em `lib/security/comparar.ts` para a rota do cron usar a mesma comparação. A versão
+// que ficava aqui recusava na hora quando o tamanho diferia — o que contava o tamanho.
+const constantEquals = iguaisEmTempoConstante;
 
 export function getAdminAuthToken() {
   const password = getAdminPasswordFromEnv();

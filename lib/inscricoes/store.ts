@@ -4,16 +4,23 @@
 import "server-only";
 
 import { createSupabaseAdminClient, isSupabaseConfigured } from "@/lib/data-store";
-import { ErroDeRegra } from "@/lib/security/erros";
+import { foraDaCobranca } from "@/lib/inscricoes/pagamento";
 import {
   contaParaTimes,
   distribuirTimes,
+  estadoDaJanela,
   linhaDeInscricao,
   pontosDoElo,
   type EstadoPagamento,
   type InscricaoPublica,
   type ItemConferencia,
 } from "@/lib/inscricoes/schema";
+import { AUTOR_SISTEMA, situacaoSugerida } from "@/lib/inscricoes/situacao";
+import { criarClienteRiot } from "@/lib/riot/cliente";
+import { AUTOR_RIOT, type DecisaoDoRobo } from "@/lib/riot/decidir";
+import { ErroDeRegra } from "@/lib/security/erros";
+
+export { AUTOR_RIOT, AUTOR_SISTEMA };
 
 /**
  * Acesso às tabelas da 4ª Edição.
@@ -26,6 +33,16 @@ import {
 
 /** Teto de inscrições vindas da mesma origem por hora. Ver `criarInscricao`. */
 const LIMITE_POR_ORIGEM_HORA = 5;
+
+/**
+ * Teto de consultas à Riot pelo formulário, por conta OU por origem, por hora.
+ *
+ * O freio acima conta só inscrições GRAVADAS — e uma consulta que dá "Riot ID não existe"
+ * não grava nada. Sem este teto, alguém com sessão podia mandar o formulário em loop, gastar
+ * a cota da chave da Riot do campeonato (100 a cada 2 min) e manter o robô diário pausado.
+ * Passou do teto: a inscrição segue sem conferir, como quando a Riot está fora do ar.
+ */
+const CONSULTAS_RIOT_POR_HORA = 6;
 
 // ---------------------------------------------------------------- tipos
 
@@ -48,9 +65,36 @@ export type EdicaoConfig = {
   pct_campeao: number;
   chave_pix: string | null;
   responsavel_financeiro: string | null;
+  /** Robô da Riot: última rodada que GRAVOU e o resumo dela (só contagens). */
+  riot_ultima_execucao?: string | null;
+  riot_ultimo_resumo?: Record<string, unknown> | null;
+  /** Trava contra duas rodadas ao mesmo tempo (cron duplicado, cron e botão). */
+  riot_trava_ate?: string | null;
+  /** Depois de um 429 da Riot, ninguém consulta até esta hora. */
+  riot_pausa_ate?: string | null;
 };
 
-export type Inscricao = {
+/** O que o robô da Riot guarda de cada inscrito. Só a organização vê; o jogador, nunca. */
+export type ColunasRiot = {
+  puuid?: string | null;
+  /** O Riot ID que a conta tem HOJE na Riot — diferente de `riot_id` = trocou de nick. */
+  riot_id_atual?: string | null;
+  riot_regiao?: string | null;
+  /** O elo da solo/duo na Riot, já em português. Não é o elo que vale: ver `elo_verificado`. */
+  elo_riot?: string | null;
+  riot_divisao?: string | null;
+  riot_pdl?: number | null;
+  riot_vitorias?: number | null;
+  riot_derrotas?: number | null;
+  riot_nivel?: number | null;
+  riot_nivel_em?: string | null;
+  riot_partidas_janela?: number | null;
+  riot_sincronizado_em?: string | null;
+  riot_status?: "ok" | "sem_ranque_solo" | "riot_id_inexistente" | "outro_servidor" | "erro" | null;
+  riot_erro?: string | null;
+};
+
+export type Inscricao = ColunasRiot & {
   id: string;
   criado_em: string;
   nick: string;
@@ -73,6 +117,13 @@ export type Inscricao = {
   situacao: "pendente" | "apto" | "recusado" | "desistiu" | "sobra";
   organizador: boolean;
   observacao: string | null;
+  /**
+   * De onde veio o `elo_verificado`: `riot` (o robô atualiza), `organizacao` (travado à
+   * mão — o robô não mexe) ou nulo (ninguém confirmou ainda, ou foi gravado antes do robô).
+   */
+  elo_fonte?: "riot" | "organizacao" | null;
+  /** Falso quando a organização tirou a pessoa de apto: o sistema não a promove de novo. */
+  promocao_automatica?: boolean;
 };
 
 export type Conferencia = {
@@ -161,8 +212,13 @@ export async function criarInscricao(
   dono: { ipHash: string; jogadorId: string; email: string },
 ): Promise<Inscricao> {
   const config = await lerConfig();
-  if (!config.inscricoes_abertas) {
-    throw new ErroDeRegra("As inscrições não estão abertas no momento.");
+  // A data de fechamento também fecha — não só a chave. Antes a data só escolhia o aviso,
+  // e a inscrição seguia aberta depois dela até alguém lembrar de desligar.
+  const janela = estadoDaJanela(config, Date.now());
+  if (janela !== "aberta") {
+    throw new ErroDeRegra(
+      janela === "encerrada" ? "As inscrições estão encerradas." : "As inscrições não estão abertas no momento.",
+    );
   }
 
   const cliente = createSupabaseAdminClient();
@@ -186,10 +242,32 @@ export async function criarInscricao(
     }
   }
 
+  // Já inscrito nesta conta: barra ANTES de consultar a Riot (o índice único do e-mail
+  // barraria no insert, mas aí a consulta já teria gastado cota).
+  {
+    const { count, error: erroJa } = await cliente
+      .from("inscricoes")
+      .select("id", { count: "exact", head: true })
+      .eq("jogador_id", dono.jogadorId);
+    if (erroJa) throw new Error(`Falha ao conferir a inscrição existente: ${erroJa.message}`);
+    if ((count ?? 0) > 0) {
+      throw new ErroDeRegra("Você já tem uma inscrição nesta edição. Para corrigir algo nela, fale com a organização.");
+    }
+  }
+
+  // Depois dos freios, para quem já foi barrado não gastar consulta à Riot.
+  const conta = await conferirContaNaRiot(dados.nick, dados.tag, config, dono);
+  if (conta.tipo === "nao_encontrado") {
+    throw new ErroDeRegra(
+      `Não encontramos o Riot ID ${dados.nick}#${dados.tag} na Riot. Confira o nick e a tag exatamente como aparecem no cliente do LoL (a tag é o que vem depois do #). Se tiver certeza de que está certo, fale com a organização.`,
+    );
+  }
+
   const linha = {
     ...linhaDeInscricao(dados, dono.email),
     ip_hash: dono.ipHash,
     jogador_id: dono.jogadorId,
+    ...(conta.tipo === "ok" && { puuid: conta.puuid, riot_id_atual: conta.riotIdAtual }),
   };
 
   const { data, error } = await cliente
@@ -225,6 +303,68 @@ export async function criarInscricao(
   });
 
   return data;
+}
+
+/**
+ * O Riot ID existe na Riot? Consultado no envio da inscrição, antes de gravar.
+ *
+ * Só um "não existe" DEFINITIVO (404) barra a inscrição — é o erro de digitação que hoje só
+ * aparece dias depois, na conferência. Qualquer outra coisa (Riot fora do ar, limite de
+ * taxa, chave ausente, robô pausado) deixa passar sem conferir: a inscrição não pode
+ * depender da disponibilidade da Riot, e o robô confere de novo na rodada seguinte.
+ */
+async function conferirContaNaRiot(
+  nick: string,
+  tag: string,
+  config: Pick<EdicaoConfig, "riot_pausa_ate">,
+  dono: { jogadorId: string; ipHash: string },
+): Promise<{ tipo: "ok"; puuid: string; riotIdAtual: string } | { tipo: "nao_encontrado" } | { tipo: "sem_conferencia" }> {
+  if (roboPausado(config, Date.now())) return { tipo: "sem_conferencia" };
+  if (!(await podeConsultarARiot(dono))) return { tipo: "sem_conferencia" };
+
+  const resposta = await criarClienteRiot({ timeoutMs: 3000 }).contaPorRiotId(nick, tag);
+  if (resposta.tipo === "ok") {
+    return {
+      tipo: "ok",
+      puuid: resposta.dados.puuid,
+      riotIdAtual: `${resposta.dados.gameName}#${resposta.dados.tagLine}`,
+    };
+  }
+  if (resposta.tipo === "nao_encontrado") return { tipo: "nao_encontrado" };
+  if (resposta.tipo === "limite" && !resposta.proprio) {
+    await pausarRobo(resposta.esperarSegundos).catch((erro) => console.error("[inscricoes] falha ao pausar o robô", erro));
+  }
+  return { tipo: "sem_conferencia" };
+}
+
+/**
+ * Registra a tentativa e diz se ainda cabe no teto (`CONSULTAS_RIOT_POR_HORA`).
+ *
+ * Qualquer falha aqui deixa passar SEM consultar: o freio existe para proteger a cota, e
+ * na dúvida não gastamos cota — mas também não barramos a inscrição de ninguém.
+ */
+async function podeConsultarARiot(dono: { jogadorId: string; ipHash: string }): Promise<boolean> {
+  try {
+    const cliente = createSupabaseAdminClient();
+    const desde = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const { count, error } = await cliente
+      .from("inscricao_consultas_riot")
+      .select("id", { count: "exact", head: true })
+      // Os dois valores são gerados no servidor (UUID da sessão e hash hexadecimal do IP).
+      .or(`jogador_id.eq.${dono.jogadorId},ip_hash.eq.${dono.ipHash}`)
+      .gte("ocorrido_em", desde);
+    if (error) throw new Error(error.message);
+    if ((count ?? 0) >= CONSULTAS_RIOT_POR_HORA) return false;
+
+    const { error: erroRegistro } = await cliente
+      .from("inscricao_consultas_riot")
+      .insert({ jogador_id: dono.jogadorId, ip_hash: dono.ipHash });
+    if (erroRegistro) throw new Error(erroRegistro.message);
+    return true;
+  } catch (erro) {
+    console.error("[inscricoes] freio de consultas à Riot indisponível", erro);
+    return false;
+  }
 }
 
 export async function listarInscricoes(): Promise<Inscricao[]> {
@@ -438,37 +578,63 @@ export async function atualizarInscricao(
   if (patch.disponibilidade !== undefined) linha.disponibilidade = patch.disponibilidade;
   if (patch.nomeReal !== undefined) linha.nome_real = patch.nomeReal;
 
-  if (patch.eloVerificado !== undefined) {
-    linha.elo_verificado = patch.eloVerificado;
-
-    /*
-     * O preço acompanha o elo que a organização confirmou. Derivado aqui, no
-     * servidor, pela mesma tabela do site — nunca digitado.
-     *
-     * Duas regras que a versão anterior desta função quebrava:
-     *
-     * 1. DEPOIS DO CONGELAMENTO o preço para de acompanhar o elo (é a promessa que
-     *    `congelarElos` faz logo abaixo: "um draft em que o preço muda no meio não é
-     *    um draft"). Salvar a ficha reprecificava o jogador mesmo com o elo já
-     *    congelado — inclusive durante o draft.
-     * 2. LIMPAR o elo verificado precisa devolver o preço ao elo declarado. Com a
-     *    guarda só de verdadeiro, `null` apagava o elo e deixava para trás os pontos
-     *    do elo que acabara de ser removido.
-     */
+  if (patch.eloVerificado !== undefined || patch.situacao !== undefined) {
     const { data: atual, error: erroLeitura } = await createSupabaseAdminClient()
       .from("inscricoes")
-      .select("elo_declarado,elo_congelado")
+      .select("elo_declarado,elo_congelado,elo_riot,situacao")
       .eq("id", inscricaoId)
-      .maybeSingle<{ elo_declarado: string; elo_congelado: string | null }>();
+      .maybeSingle<{
+        elo_declarado: string;
+        elo_congelado: string | null;
+        elo_riot: string | null;
+        situacao: Inscricao["situacao"];
+      }>();
 
     if (erroLeitura) throw new Error(`Falha ao ler a ficha: ${erroLeitura.message}`);
     if (!atual) throw new ErroDeRegra("Inscrição não encontrada.");
 
-    if (!atual.elo_congelado) {
-      const eloValendo = patch.eloVerificado ?? atual.elo_declarado;
-      const pontos = pontosDoElo(eloValendo);
-      if (pontos === null) throw new ErroDeRegra(`Elo não reconhecido: ${eloValendo}`);
-      linha.pontos = pontos;
+    if (patch.eloVerificado !== undefined) {
+      /*
+       * Escolher um elo à mão TRAVA o inscrito: o robô da Riot para de mexer no elo dele
+       * (serve para a exceção — conta principal em outro lugar, combinado no grupo…).
+       * Escolher "automático" (vazio) devolve o elo à Riot: vale o último que o robô leu,
+       * ou o declarado se ele ainda não leu nada.
+       */
+      const manual = patch.eloVerificado;
+      const verificado = manual ?? atual.elo_riot ?? null;
+      linha.elo_verificado = verificado;
+      linha.elo_fonte = manual ? "organizacao" : atual.elo_riot ? "riot" : null;
+
+      /*
+       * O preço acompanha o elo que vale. Derivado aqui, no servidor, pela mesma tabela do
+       * site — nunca digitado.
+       *
+       * Duas regras que uma versão anterior desta função quebrava:
+       *
+       * 1. DEPOIS DO CONGELAMENTO o preço para de acompanhar o elo (é a promessa que
+       *    `congelarElos` faz logo abaixo: "um draft em que o preço muda no meio não é
+       *    um draft"). Salvar a ficha reprecificava o jogador mesmo com o elo já
+       *    congelado — inclusive durante o draft.
+       * 2. LIMPAR o elo verificado precisa devolver o preço ao elo que passa a valer. Com a
+       *    guarda só de verdadeiro, `null` apagava o elo e deixava para trás os pontos
+       *    do elo que acabara de ser removido.
+       */
+      if (!atual.elo_congelado) {
+        const eloValendo = verificado ?? atual.elo_declarado;
+        const pontos = pontosDoElo(eloValendo);
+        if (pontos === null) throw new ErroDeRegra(`Elo não reconhecido: ${eloValendo}`);
+        linha.pontos = pontos;
+      }
+    }
+
+    if (patch.situacao !== undefined) {
+      // Voltar alguém de aprovado para pendente é a organização SEGURANDO a pessoa: o
+      // sistema não pode promovê-la de novo no próximo pagamento conferido. Qualquer outra
+      // situação escolhida à mão devolve a promoção automática.
+      linha.promocao_automatica = !(
+        patch.situacao === "pendente" &&
+        (atual.situacao === "apto" || atual.situacao === "sobra")
+      );
     }
   }
 
@@ -502,21 +668,29 @@ export async function congelarElos(autor: string): Promise<number> {
   if (error) throw new Error(`Falha ao ler os aprovados: ${error.message}`);
   if (!data || data.length === 0) return 0;
 
+  let quantidade = 0;
   for (const linha of data) {
     const elo = linha.elo_verificado ?? linha.elo_declarado;
     const pontos = pontosDoElo(elo);
     if (pontos === null) throw new ErroDeRegra(`Elo não reconhecido em ${linha.id}: ${elo}`);
 
-    const { error: erroUpdate } = await cliente
+    // `is elo_congelado null` também no UPDATE: o cron diário e o botão podem rodar ao
+    // mesmo tempo, e quem chegar depois não pode recongelar com outro valor nem contar de novo.
+    const { data: congelada, error: erroUpdate } = await cliente
       .from("inscricoes")
       .update({ elo_congelado: elo, congelado_em: agora, pontos, atualizado_em: agora })
-      .eq("id", linha.id);
+      .eq("id", linha.id)
+      .is("elo_congelado", null)
+      .select("id");
 
     if (erroUpdate) throw new Error(`Falha ao congelar ${linha.id}: ${erroUpdate.message}`);
+    quantidade += congelada?.length ?? 0;
   }
 
-  await registrarAuditoria({ autor, acao: "elos_congelados", detalhe: { quantidade: data.length } });
-  return data.length;
+  if (quantidade > 0) {
+    await registrarAuditoria({ autor, acao: "elos_congelados", detalhe: { quantidade } });
+  }
+  return quantidade;
 }
 
 export async function listarAuditoria(limite = 60) {
@@ -738,6 +912,260 @@ export function panorama(
     times,
     vagas,
     sobra,
-    caixa: fecharCaixa(pagamentos),
+    // Recusado ou desistente que não pagou não é "a receber": a cobrança morreu com a
+    // inscrição. Fica fora da conta do caixa sem gravar nada (ver `foraDaCobranca`).
+    caixa: fecharCaixa(
+      pagamentos.filter((p) => {
+        const dono = inscricoes.find((i) => i.id === p.inscricao_id);
+        return !dono || !foraDaCobranca(dono.situacao, p.estado);
+      }),
+    ),
   };
+}
+
+// ---------------------------------------------------------------- robô da Riot
+
+/**
+ * Filtro de posse de um requisito pelo robô: ninguém gravou, ou quem gravou foi ele.
+ *
+ * Aspas no valor: o filtro `or` do PostgREST usa vírgula, ponto e parênteses como sintaxe,
+ * e com aspas o nome do autor nunca é lido como parte dela.
+ */
+export const FILTRO_ITEM_DO_ROBO = `conferido_por.is.null,conferido_por.eq."${AUTOR_RIOT}"`;
+/** O elo só é do robô se ninguém da organização travou. */
+export const FILTRO_ELO_DO_ROBO = "elo_fonte.is.null,elo_fonte.eq.riot";
+
+/**
+ * Grava o que o robô decidiu para um inscrito (ver `decidirSincronizacao`).
+ *
+ * Cada gravação que pode colidir com um organizador é CONDICIONAL numa instrução só: o
+ * robô leu, consultou a Riot (segundos) e só então grava — se nesse meio-tempo alguém
+ * travou o elo ou deu veredicto num requisito, o WHERE não casa mais e nada muda. O
+ * Postgres reavalia o WHERE depois de esperar a trava da linha, então o humano sempre
+ * ganha. A auditoria só é gravada quando a linha foi de fato alterada.
+ */
+export async function aplicarSincronizacao(
+  inscricaoId: string,
+  decisao: DecisaoDoRobo,
+): Promise<{ eloGravado: boolean; itensGravados: number }> {
+  const cliente = createSupabaseAdminClient();
+  const agora = new Date().toISOString();
+
+  // Colunas de exibição: só o robô escreve nelas, não há com quem colidir.
+  const { error: erroColunas } = await cliente.from("inscricoes").update(decisao.colunasRiot).eq("id", inscricaoId);
+  if (erroColunas) throw new Error(`Falha ao gravar os dados da Riot: ${erroColunas.message}`);
+
+  let eloGravado = false;
+  if (decisao.elo) {
+    const { data, error } = await cliente
+      .from("inscricoes")
+      .update({ elo_verificado: decisao.elo.para, elo_fonte: "riot", pontos: decisao.elo.pontos, atualizado_em: agora })
+      .eq("id", inscricaoId)
+      .is("elo_congelado", null)
+      .or(FILTRO_ELO_DO_ROBO)
+      .select("id");
+
+    if (error) throw new Error(`Falha ao atualizar o elo: ${error.message}`);
+    eloGravado = (data?.length ?? 0) > 0;
+    if (eloGravado && decisao.elo.mudouValor) {
+      await registrarAuditoria({
+        inscricaoId,
+        autor: AUTOR_RIOT,
+        acao: "elo_atualizado_pela_riot",
+        detalhe: {
+          de: decisao.elo.de,
+          para: decisao.elo.para,
+          pontosDe: decisao.elo.pontosDe,
+          pontosPara: decisao.elo.pontos,
+        },
+      });
+    }
+  }
+
+  let itensGravados = 0;
+  for (const item of decisao.itens) {
+    const { data, error } = await cliente
+      .from("inscricao_conferencias")
+      .update({
+        estado: item.estado,
+        observacao: item.observacao || null,
+        retrato: item.retrato,
+        conferido_por: AUTOR_RIOT,
+        conferido_em: agora,
+        atualizado_em: agora,
+      })
+      .eq("inscricao_id", inscricaoId)
+      .eq("item", item.item)
+      .or(FILTRO_ITEM_DO_ROBO)
+      .select("inscricao_id");
+
+    if (error) throw new Error(`Falha ao gravar o requisito ${item.item}: ${error.message}`);
+    if ((data?.length ?? 0) === 0) continue;
+
+    itensGravados += 1;
+    await registrarAuditoria({
+      inscricaoId,
+      autor: AUTOR_RIOT,
+      acao: `conferencia_${item.item}`,
+      detalhe: { estado: item.estado, observacao: item.observacao || null },
+    });
+  }
+
+  return { eloGravado, itensGravados };
+}
+
+/** A consulta à Riot deste inscrito falhou: registra para o painel e o põe no fim da fila. */
+export async function registrarFalhaDoRobo(inscricaoId: string, mensagem: string): Promise<void> {
+  const { error } = await createSupabaseAdminClient()
+    .from("inscricoes")
+    .update({ riot_status: "erro", riot_erro: mensagem.slice(0, 200), riot_sincronizado_em: new Date().toISOString() })
+    .eq("id", inscricaoId);
+  if (error) throw new Error(`Falha ao registrar o erro da Riot: ${error.message}`);
+}
+
+/**
+ * Trava da rodada do robô. Só um por vez: o cron da Vercel pode disparar em dobro, e o
+ * botão do painel pode ser apertado enquanto o cron roda — duas rodadas juntas gastariam a
+ * cota da Riot em dobro e gravariam a mesma coisa duas vezes.
+ *
+ * A trava expira sozinha: se a função morrer no meio (tempo esgotado na Vercel), a
+ * próxima rodada não fica bloqueada para sempre.
+ */
+export async function adquirirTravaDoRobo(minutos: number, agoraMs = Date.now()): Promise<boolean> {
+  const agora = new Date(agoraMs).toISOString();
+  const ate = new Date(agoraMs + minutos * 60_000).toISOString();
+  const { data, error } = await createSupabaseAdminClient()
+    .from("edicao_config")
+    .update({ riot_trava_ate: ate })
+    .eq("id", 1)
+    // Aspas: a data ISO tem ":" e ".", que no filtro `or` são sintaxe.
+    .or(`riot_trava_ate.is.null,riot_trava_ate.lt."${agora}"`)
+    .select("id");
+
+  if (error) throw new Error(`Falha ao travar o robô: ${error.message}`);
+  return (data?.length ?? 0) > 0;
+}
+
+/** Solta a trava. Com resumo, registra também a rodada (a simulação não registra). */
+export async function liberarTravaDoRobo(resumo?: Record<string, unknown>): Promise<void> {
+  const { error } = await createSupabaseAdminClient()
+    .from("edicao_config")
+    .update({
+      riot_trava_ate: null,
+      ...(resumo && { riot_ultima_execucao: new Date().toISOString(), riot_ultimo_resumo: resumo }),
+    })
+    .eq("id", 1);
+  if (error) throw new Error(`Falha ao liberar o robô: ${error.message}`);
+}
+
+/**
+ * Depois de um 429 de verdade, ninguém (robô, botão, formulário) consulta a Riot até o
+ * prazo que ela pediu. É o que as políticas da Riot exigem — e a contagem fica no banco
+ * porque cada execução do servidor na Vercel não enxerga a memória da outra.
+ */
+export async function pausarRobo(segundos: number): Promise<void> {
+  const ate = new Date(Date.now() + Math.max(1, segundos) * 1000).toISOString();
+  const { error } = await createSupabaseAdminClient().from("edicao_config").update({ riot_pausa_ate: ate }).eq("id", 1);
+  if (error) throw new Error(`Falha ao pausar o robô: ${error.message}`);
+}
+
+export function roboPausado(config: Pick<EdicaoConfig, "riot_pausa_ate">, agoraMs: number): boolean {
+  if (!config.riot_pausa_ate) return false;
+  const ate = new Date(config.riot_pausa_ate).getTime();
+  return Number.isFinite(ate) && ate > agoraMs;
+}
+
+// ---------------------------------------------------------------- situação automática
+
+/**
+ * Promove UM inscrito a apto, se ele cumpre tudo (ver `situacaoSugerida`).
+ *
+ * Chamada depois de toda gravação que pode completar a lista: requisito, ficha, pagamento.
+ * O UPDATE só casa com quem AINDA está pendente e com a promoção automática ligada — se
+ * alguém da organização mudou a situação no meio, nada acontece.
+ */
+export async function reavaliarSituacao(inscricaoId: string, gatilho: string): Promise<boolean> {
+  const cliente = createSupabaseAdminClient();
+  const [inscricao, conferencias, pagamento, config] = await Promise.all([
+    cliente
+      .from("inscricoes")
+      .select("situacao,promocao_automatica")
+      .eq("id", inscricaoId)
+      .maybeSingle<{ situacao: string; promocao_automatica: boolean | null }>(),
+    cliente
+      .from("inscricao_conferencias")
+      .select("item,estado")
+      .eq("inscricao_id", inscricaoId)
+      .returns<{ item: string; estado: string }[]>(),
+    cliente
+      .from("inscricao_pagamentos")
+      .select("estado")
+      .eq("inscricao_id", inscricaoId)
+      .maybeSingle<{ estado: string }>(),
+    lerConfig(),
+  ]);
+
+  if (inscricao.error) throw new Error(`Falha ao ler a inscrição: ${inscricao.error.message}`);
+  if (conferencias.error) throw new Error(`Falha ao ler os requisitos: ${conferencias.error.message}`);
+  if (pagamento.error) throw new Error(`Falha ao ler o pagamento: ${pagamento.error.message}`);
+  if (!inscricao.data) return false;
+
+  const sugerida = situacaoSugerida({
+    situacao: inscricao.data.situacao,
+    promocaoAutomatica: inscricao.data.promocao_automatica !== false,
+    conferencias: conferencias.data ?? [],
+    pagamento: pagamento.data ?? null,
+    inicioCampeonato: config.inicio_campeonato,
+    agoraMs: Date.now(),
+  });
+  if (sugerida !== "apto") return false;
+
+  return promoverAApto(inscricaoId, gatilho);
+}
+
+async function promoverAApto(inscricaoId: string, gatilho: string): Promise<boolean> {
+  const { data, error } = await createSupabaseAdminClient()
+    .from("inscricoes")
+    .update({ situacao: "apto", atualizado_em: new Date().toISOString() })
+    .eq("id", inscricaoId)
+    .eq("situacao", "pendente")
+    .eq("promocao_automatica", true)
+    .select("id");
+
+  if (error) throw new Error(`Falha ao promover a inscrição: ${error.message}`);
+  if ((data?.length ?? 0) === 0) return false;
+
+  await registrarAuditoria({ inscricaoId, autor: AUTOR_SISTEMA, acao: "situacao_promovida", detalhe: { para: "apto", gatilho } });
+  return true;
+}
+
+/**
+ * Passa por todos os pendentes. Roda no cron diário, como rede para o caso de uma
+ * reavaliação pontual ter falhado. Na simulação só diz QUEM seria promovido.
+ */
+export async function reavaliarPendentes(opcoes: { simular?: boolean } = {}): Promise<string[]> {
+  const [inscricoes, conferencias, pagamentos, config] = await Promise.all([
+    listarInscricoes(),
+    listarConferencias(),
+    listarPagamentos(),
+    lerConfig(),
+  ]);
+  const agoraMs = Date.now();
+  const promovidos: string[] = [];
+
+  for (const i of inscricoes) {
+    const sugerida = situacaoSugerida({
+      situacao: i.situacao,
+      promocaoAutomatica: i.promocao_automatica !== false,
+      conferencias: conferencias.filter((c) => c.inscricao_id === i.id),
+      pagamento: pagamentos.find((p) => p.inscricao_id === i.id) ?? null,
+      inicioCampeonato: config.inicio_campeonato,
+      agoraMs,
+    });
+    if (sugerida !== "apto") continue;
+    // O lote acima foi lido de uma vez e envelhece enquanto o laço anda. Quem é candidato
+    // é reavaliado com leitura FRESCA antes de ser promovido.
+    if (opcoes.simular || (await reavaliarSituacao(i.id, "rotina_diaria"))) promovidos.push(i.riot_id);
+  }
+  return promovidos;
 }

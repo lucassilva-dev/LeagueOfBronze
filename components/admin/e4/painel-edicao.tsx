@@ -39,6 +39,20 @@ export type EdicaoConfig = {
   pct_campeao: number;
   chave_pix: string | null;
   responsavel_financeiro: string | null;
+  /** Robô da Riot — opcionais porque um banco sem a migração ainda não tem as colunas. */
+  riot_ultima_execucao?: string | null;
+  riot_ultimo_resumo?: ResumoDoRobo | null;
+  riot_pausa_ate?: string | null;
+};
+
+/** Só contagens: o resumo da última rodada que gravou (ver `lib/riot/sincronizar.ts`). */
+export type ResumoDoRobo = {
+  naFila?: number;
+  processados?: number;
+  elosMudados?: number;
+  itensGravados?: number;
+  erros?: number;
+  parouPor?: string;
 };
 
 export type Inscrito = {
@@ -64,6 +78,24 @@ export type Inscrito = {
   situacao: "pendente" | "apto" | "recusado" | "desistiu" | "sobra";
   organizador: boolean;
   observacao: string | null;
+  /** `riot` = o robô atualiza; `organizacao` = travado à mão; nulo = ninguém confirmou ainda. */
+  elo_fonte?: "riot" | "organizacao" | null;
+  /** Falso quando a organização segurou a pessoa: o sistema não a promove a apto sozinho. */
+  promocao_automatica?: boolean;
+  // O que a Riot mostrou na última consulta (espelha `ColunasRiot` em lib/inscricoes/store.ts).
+  puuid?: string | null;
+  riot_id_atual?: string | null;
+  riot_regiao?: string | null;
+  elo_riot?: string | null;
+  riot_divisao?: string | null;
+  riot_pdl?: number | null;
+  riot_vitorias?: number | null;
+  riot_derrotas?: number | null;
+  riot_nivel?: number | null;
+  riot_partidas_janela?: number | null;
+  riot_sincronizado_em?: string | null;
+  riot_status?: "ok" | "sem_ranque_solo" | "riot_id_inexistente" | "outro_servidor" | "erro" | null;
+  riot_erro?: string | null;
 };
 
 export type Conferencia = {
@@ -128,7 +160,14 @@ export type DadosEdicao = {
   auditoria: Auditoria[];
 };
 
-export type AcaoEdicao = "config" | "conferencia" | "ficha" | "inscrito" | "pagamento" | "congelar";
+export type AcaoEdicao =
+  | "config"
+  | "conferencia"
+  | "ficha"
+  | "inscrito"
+  | "pagamento"
+  | "congelar"
+  | "sincronizar_riot";
 
 /** O que toda seção recebe. */
 export type PropsSecao = Readonly<{
@@ -218,7 +257,11 @@ export function PainelEdicao({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ acao, dados: corpo }),
         });
-        const resposta = (await r.json().catch(() => ({}))) as { error?: string; missing?: string[] };
+        const resposta = (await r.json().catch(() => ({}))) as {
+          error?: string;
+          missing?: string[];
+          mensagem?: string;
+        };
 
         if (!r.ok) {
           const falta = resposta.missing?.length ? ` (falta: ${resposta.missing.join(", ")})` : "";
@@ -240,7 +283,9 @@ export function PainelEdicao({
         if (!(await carregar())) {
           return falhar("Salvo — mas a tela não conseguiu se atualizar. Recarregue a página antes de continuar.");
         }
-        onAlert("ok", "Salvo.");
+        // A rota pode dizer algo além de "Salvo." — o resumo da rodada da Riot, ou que a
+        // pessoa acabou de virar apto sozinha.
+        onAlert("ok", resposta.mensagem ?? "Salvo.");
         return true;
       } catch {
         // A resposta pode ter se perdido DEPOIS de gravar; mesma razão do recarregamento acima.

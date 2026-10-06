@@ -437,20 +437,22 @@ export type EstadoJanela = "aberta" | "ainda_nao_abriu" | "encerrada" | "indispo
  *
  * "ainda não abriu" e "encerrada" são estados diferentes porque a resposta que a
  * pessoa precisa é diferente: um pede paciência, o outro pede falar com a organização.
- * O que manda é a chave `inscricoes_abertas`; a data só distingue os dois avisos.
+ *
+ * A chave `inscricoes_abertas` abre; a data de fechamento FECHA sozinha. Antes a data só
+ * escolhia o aviso, e a inscrição seguia aberta depois dela até alguém lembrar de
+ * desligar a chave — ninguém precisa mais estar acordado na hora do fechamento.
  */
 export function estadoDaJanela(
   config: { inscricoes_abertas: boolean; fechamento_inscricoes: string | null } | null,
   agoraMs: number = Date.now(),
 ): EstadoJanela {
   if (!config) return "indisponivel";
-  if (config.inscricoes_abertas) return "aberta";
 
-  if (config.fechamento_inscricoes) {
-    const fim = new Date(config.fechamento_inscricoes).getTime();
-    if (Number.isFinite(fim) && fim < agoraMs) return "encerrada";
-  }
-  return "ainda_nao_abriu";
+  const fim = config.fechamento_inscricoes ? new Date(config.fechamento_inscricoes).getTime() : NaN;
+  const passouDoFechamento = Number.isFinite(fim) && fim <= agoraMs;
+
+  if (config.inscricoes_abertas) return passouDoFechamento ? "encerrada" : "aberta";
+  return passouDoFechamento ? "encerrada" : "ainda_nao_abriu";
 }
 
 // ---------------------------------------------------------------- times

@@ -12,9 +12,13 @@ import {
   listarInscricoes,
   listarPagamentos,
   panorama,
+  reavaliarPendentes,
+  reavaliarSituacao,
   salvarConfig,
   type EdicaoConfig,
 } from "@/lib/inscricoes/store";
+import { z } from "zod";
+
 import {
   conferenciaPatchSchema,
   configPatchSchema,
@@ -23,12 +27,15 @@ import {
   motivoDaRecusaDoInscrito,
   pagamentoPatchSchema,
 } from "@/lib/inscricoes/schema";
+import { sincronizarComRiot, type ResumoDaRodada } from "@/lib/riot/sincronizar";
 import { requireAdmin } from "@/lib/security/route-guard";
 import { respostaDeErro } from "@/lib/security/resposta-erro";
 import { lerCorpoPublico } from "@/lib/security/rota-publica";
 import { hasScope, type Scope } from "@/lib/security/scopes";
 
 export const dynamic = "force-dynamic";
+// "Atualizar da Riot agora" consulta a Riot por até 25 s; o padrão da Vercel cortaria antes.
+export const maxDuration = 60;
 
 /**
  * Painel da 4ª Edição — leitura e escrita.
@@ -111,7 +118,50 @@ const ESCOPO_DA_ACAO: Record<string, Scope> = {
   inscrito: "inscricoes:conferir",
   congelar: "inscricoes:conferir",
   pagamento: "inscricoes:financeiro",
+  sincronizar_riot: "inscricoes:conferir",
 };
+
+const sincronizarSchema = z.object({ inscricaoId: z.string().uuid().optional() }).optional();
+
+/**
+ * Depois de toda gravação que pode completar a lista de alguém (requisito, ficha,
+ * pagamento), o sistema confere se a pessoa já pode virar apto (ver `situacaoSugerida`).
+ *
+ * Falhar aqui NÃO derruba o salvamento: o que a organização gravou já está no banco, e a
+ * rotina diária reavalia todos os pendentes de novo. Devolver erro faria a tela dizer "não
+ * foi possível salvar" sobre algo que foi salvo.
+ */
+const VIROU_APTO = "Salvo. Virou Apto: requisitos cumpridos e pagamento confirmado.";
+
+/** O que a organização lê depois de "Atualizar da Riot agora". */
+function mensagemDaRodada(resumo: ResumoDaRodada, promovidos: number): string {
+  if (resumo.desligado === "sem_chave") return "O robô da Riot está desligado neste ambiente (sem chave da API).";
+  if (resumo.desligado === "pausado") {
+    return "A Riot pediu uma pausa (limite de requisições). Tente de novo em alguns minutos.";
+  }
+  if (resumo.desligado === "travado") return "Outra atualização da Riot está rodando agora. Tente de novo em instantes.";
+
+  const partes = [
+    `Riot: ${resumo.processados} de ${resumo.naFila} consultados`,
+    `${resumo.elosMudados} elo(s) mudaram`,
+    `${resumo.itensGravados} requisito(s) atualizados`,
+  ];
+  if (resumo.erros > 0) partes.push(`${resumo.erros} com erro`);
+  let texto = partes.join(", ") + ".";
+  if (resumo.parouPor === "chave_recusada") texto += " A Riot recusou a chave da API — renove a RIOT_API_KEY.";
+  else if (resumo.parouPor) texto += " Parou antes do fim (tempo ou limite da Riot) — clique de novo para continuar.";
+  if (promovidos > 0) texto += ` ${promovidos} virou(aram) Apto.`;
+  return texto;
+}
+
+async function reavaliar(inscricaoId: string, gatilho: string): Promise<boolean> {
+  try {
+    return await reavaliarSituacao(inscricaoId, gatilho);
+  } catch (erro) {
+    console.error("[api/admin/edicao] falha ao reavaliar a situação", erro);
+    return false;
+  }
+}
 
 export async function PATCH(request: NextRequest) {
   // Guarda mínima primeiro (sessão + origem), sem escopo: o escopo depende da ação,
@@ -156,7 +206,8 @@ export async function PATCH(request: NextRequest) {
           return NextResponse.json({ error: "Conferência inválida." }, { status: 400 });
         }
         await atualizarConferencia({ ...parsed.data, autor });
-        return NextResponse.json({ ok: true });
+        const promovido = await reavaliar(parsed.data.inscricaoId, "conferencia");
+        return NextResponse.json({ ok: true, promovido, ...(promovido && { mensagem: VIROU_APTO }) });
       }
 
       case "ficha": {
@@ -166,7 +217,8 @@ export async function PATCH(request: NextRequest) {
         }
         const { inscricaoId, ...patch } = parsed.data;
         await atualizarInscricao(inscricaoId, patch, autor);
-        return NextResponse.json({ ok: true });
+        const promovido = await reavaliar(inscricaoId, "ficha");
+        return NextResponse.json({ ok: true, promovido, ...(promovido && { mensagem: VIROU_APTO }) });
       }
 
       case "inscrito": {
@@ -197,7 +249,8 @@ export async function PATCH(request: NextRequest) {
         if (ficha && Object.values(ficha).some((valor) => valor !== undefined)) {
           await atualizarInscricao(inscricaoId, ficha, autor);
         }
-        return NextResponse.json({ ok: true });
+        const promovido = await reavaliar(inscricaoId, "inscrito");
+        return NextResponse.json({ ok: true, promovido, ...(promovido && { mensagem: VIROU_APTO }) });
       }
 
       case "pagamento": {
@@ -206,12 +259,33 @@ export async function PATCH(request: NextRequest) {
           return NextResponse.json({ error: "Pagamento inválido." }, { status: 400 });
         }
         await atualizarPagamento({ ...parsed.data, autor });
-        return NextResponse.json({ ok: true });
+        const promovido = await reavaliar(parsed.data.inscricaoId, "pagamento");
+        return NextResponse.json({ ok: true, promovido, ...(promovido && { mensagem: VIROU_APTO }) });
       }
 
       case "congelar": {
         const quantidade = await congelarElos(autor);
         return NextResponse.json({ ok: true, quantidade });
+      }
+
+      case "sincronizar_riot": {
+        // A mesma rodada do cron diário, curta: 25 s. A fila começa por quem está há mais
+        // tempo sem consulta, então apertar de novo continua de onde parou.
+        const parsed = sincronizarSchema.safeParse(corpo.dados);
+        if (!parsed.success) {
+          return NextResponse.json({ error: "Pedido inválido." }, { status: 400 });
+        }
+        const inscricaoId = parsed.data?.inscricaoId;
+        const resumo = await sincronizarComRiot({ orcamentoMs: 25_000, inscricaoId });
+        const promovidos = inscricaoId
+          ? (await reavaliar(inscricaoId, "riot"))
+            ? 1
+            : 0
+          : (await reavaliarPendentes().catch((erro) => {
+              console.error("[api/admin/edicao] falha ao reavaliar os pendentes", erro);
+              return [];
+            })).length;
+        return NextResponse.json({ ok: true, resumo, promovidos, mensagem: mensagemDaRodada(resumo, promovidos) });
       }
 
       default:

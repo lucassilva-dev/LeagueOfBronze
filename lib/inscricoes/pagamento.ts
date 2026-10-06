@@ -12,3 +12,16 @@ export function inscricaoEsperaPagamento(
   if (inscricao.situacao === "recusado" || inscricao.situacao === "desistiu") return false;
   return inscricao.pagamento?.estado === "aguardando";
 }
+
+/**
+ * Cobrança que não vale mais: a pessoa foi recusada ou desistiu e ainda não pagou.
+ *
+ * Derivado na LEITURA, de propósito — nada é gravado. O pagamento continua "aguardando"
+ * no banco até alguém cancelar à mão; o painel só deixa de contar esse valor como "a
+ * receber" e de listar a pessoa entre os vencidos. Gravar sozinho exigiria desfazer
+ * sozinho quando a organização voltasse atrás, e mexer no caixa sem ninguém do
+ * financeiro ter clicado.
+ */
+export function foraDaCobranca(situacao: string, estadoDoPagamento: string | null | undefined): boolean {
+  return (situacao === "recusado" || situacao === "desistiu") && estadoDoPagamento === "aguardando";
+}

@@ -20,7 +20,7 @@ import {
   display,
   tabular,
 } from "@/components/admin/ui";
-import { distribuirTimes } from "@/lib/inscricoes/schema";
+import { distribuirTimes, estadoDaJanela } from "@/lib/inscricoes/schema";
 
 /**
  * Configuração da 4ª Edição: a chave das inscrições e os parâmetros que o formulário
@@ -76,7 +76,8 @@ const DATAS = [
   {
     chave: "fechamento_inscricoes",
     rotulo: "Fechamento das inscrições",
-    efeito: "Só distingue os avisos: com ela no passado, o site diz encerrada em vez de ainda não abriu.",
+    efeito:
+      "Fecha sozinho nesta data: daí em diante o formulário recusa inscrição, mesmo com a chave «aberta». Vazio = só a chave decide.",
   },
   {
     chave: "prazo_vinculo_riot",
@@ -87,13 +88,15 @@ const DATAS = [
   {
     chave: "congelamento_elo",
     rotulo: "Congelamento do elo",
-    efeito: "A partir daqui o elo vira retrato e os pontos param de mudar.",
+    efeito:
+      "Desde esta data o robô da Riot para de mudar elo e pontos, e na rodada diária seguinte o elo dos aprovados congela sozinho. O botão «Congelar» da aba Times também faz o robô parar.",
   },
   { chave: "data_draft", rotulo: "Draft ao vivo", efeito: "Dia em que os capitães escolhem." },
   {
     chave: "inicio_campeonato",
     rotulo: "Início do campeonato",
-    efeito: "Item (e) olha os 10 dias anteriores a esta data (regra 4). Sem ela, (e) não é avaliável.",
+    efeito:
+      "Item (e) olha os 10 dias anteriores a esta data (regra 4) — o robô da Riot conta as partidas da solo/duo sozinho. Sem ela, (e) não é avaliável.",
   },
 ] as const satisfies readonly { chave: ChaveData; rotulo: string; efeito: string }[];
 
@@ -369,6 +372,9 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar }: 
   };
 
   const abertas = config.inscricoes_abertas;
+  // A chave ligada não basta: a data de fechamento fecha sozinha (ver `estadoDaJanela`), e
+  // esta tela não pode dizer "ABERTAS" enquanto o servidor recusa toda inscrição.
+  const encerradaPelaData = abertas && estadoDaJanela(config) === "encerrada";
 
   return (
     <div>
@@ -407,14 +413,16 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar }: 
               fontFamily: display,
               fontSize: 22,
               letterSpacing: ".08em",
-              color: abertas ? C.ok : C.ink3,
+              color: encerradaPelaData ? C.warn : abertas ? C.ok : C.ink3,
             }}
           >
-            {abertas ? "ABERTAS" : "FECHADAS"}
+            {encerradaPelaData ? "ENCERRADAS" : abertas ? "ABERTAS" : "FECHADAS"}
           </span>
         }
         description={
-          abertas
+          encerradaPelaData
+            ? "A chave está ligada, mas a data de fechamento já passou: o formulário recusa inscrições. Para reabrir, apague ou adie a data de fechamento abaixo."
+            : abertas
             ? "Qualquer pessoa com o link consegue se inscrever agora. Fechar é reversível e não apaga nada do que já entrou."
             : "Com as inscrições fechadas, /inscricao mostra a página de espera e o servidor recusa o envio. Ao abrir, o formulário fica público na hora."
         }

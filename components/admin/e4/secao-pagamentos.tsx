@@ -22,6 +22,9 @@ import {
   tabular,
   Toolbar,
 } from "@/components/admin/ui";
+import { alertasDoInscrito, type Alerta } from "@/lib/inscricoes/alertas";
+import { linkDeCobranca, listaDeQuemFaltaPagar } from "@/lib/inscricoes/cobranca";
+import { foraDaCobranca } from "@/lib/inscricoes/pagamento";
 import { ESTADOS_PAGAMENTO, ROTULO_PAGAMENTO, type EstadoPagamento } from "@/lib/inscricoes/schema";
 
 /**
@@ -122,12 +125,22 @@ type Linha = Readonly<{
   inscrito: Inscrito | null;
   nome: string;
   venceMs: number | null;
+  /** Recusado ou desistente que não pagou: a cobrança não vale mais (ver `foraDaCobranca`). */
+  fora: boolean;
 }>;
+
+/** Os alertas que são do caixa — os de requisito ficam na aba Inscritos. */
+const ALERTAS_DO_CAIXA = new Set(["organizador_cobrado", "recusado_pago", "recusado_declarado", "desistiu_com_pagamento"]);
+
+const ROTULO_DA_ACAO: Record<NonNullable<Alerta["acaoPagamento"]>, string> = {
+  isento: "Isentar",
+  estorno_devido: "Marcar estorno devido",
+};
 
 // ---------------------------------------------------------------- seção
 
 export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: PropsSecao) {
-  const { config, panorama, pagamentos, inscritos } = dados;
+  const { config, panorama, pagamentos, inscritos, conferencias } = dados;
   const caixa = panorama.caixa;
 
   /**
@@ -141,9 +154,16 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: Pr
    * vez de chutar um prazo.
    */
   const [agoraMs, setAgoraMs] = useState<number | null>(null);
+  // A origem do site em que o painel está aberto: o link da cobrança aponta para ELE (o site
+  // de teste não pode mandar jogador para a produção). Lida junto com o relógio, no efeito.
+  const [origem, setOrigem] = useState("");
+  const [copiado, setCopiado] = useState<"ok" | "falhou" | null>(null);
   useEffect(() => {
     const marcar = () => setAgoraMs(Date.now());
-    const inicial = window.setTimeout(marcar, 0);
+    const inicial = window.setTimeout(() => {
+      setOrigem(window.location.origin);
+      marcar();
+    }, 0);
     const cadencia = window.setInterval(marcar, 60_000);
     return () => {
       window.clearTimeout(inicial);
@@ -172,6 +192,7 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: Pr
         // Sem ficha casada, o id truncado ainda permite achar a linha no banco.
         nome: inscrito ? `${inscrito.nick}#${inscrito.tag}` : `inscrição ${pagamento.inscricao_id.slice(0, 8)}`,
         venceMs: emMs(pagamento.vence_em),
+        fora: inscrito ? foraDaCobranca(inscrito.situacao, pagamento.estado) : false,
       };
     });
     return lista.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
@@ -191,12 +212,64 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: Pr
     const fora: { linha: Linha; dias: number }[] = [];
     for (const linha of linhas) {
       if (linha.pagamento.estado !== "aguardando" || linha.venceMs === null) continue;
+      // Fora do campeonato ou da organização: não se cobra (o alerta do caixa cuida do segundo).
+      if (linha.fora || linha.inscrito?.organizador) continue;
       // `ceil` de propósito: faltando 3 horas, o texto certo é "vence em 1 dia", não "0".
       const dias = Math.ceil((linha.venceMs - agoraMs) / DIA_MS);
       if (dias <= JANELA_DE_AVISO) fora.push({ linha, dias });
     }
     return fora.sort((a, b) => a.dias - b.dias);
   }, [linhas, agoraMs]);
+
+  /** Quem ainda deve: aguardando, nem fora do campeonato, nem organizador. */
+  const devendo = useMemo(
+    () => linhas.filter((l) => l.pagamento.estado === "aguardando" && !l.fora && !l.inscrito?.organizador),
+    [linhas],
+  );
+
+  /** O que pede um clique de quem cuida do caixa (ver `alertasDoInscrito`). */
+  const pendenciasDoCaixa = useMemo(() => {
+    const lista: { linha: Linha; alerta: Alerta }[] = [];
+    for (const linha of linhas) {
+      if (!linha.inscrito) continue;
+      const doInscrito = conferencias.filter((c) => c.inscricao_id === linha.inscrito!.id);
+      for (const alerta of alertasDoInscrito({
+        inscrito: linha.inscrito,
+        conferencias: doInscrito,
+        pagamento: linha.pagamento,
+        config,
+        agoraMs: agoraMs ?? 0,
+      })) {
+        if (ALERTAS_DO_CAIXA.has(alerta.codigo)) lista.push({ linha, alerta });
+      }
+    }
+    return lista;
+  }, [linhas, conferencias, config, agoraMs]);
+
+  const copiarLista = async () => {
+    const texto = listaDeQuemFaltaPagar(
+      devendo.map((l) => ({ riotId: l.nome, venceEm: l.pagamento.vence_em })),
+      config.taxa_centavos,
+    );
+    try {
+      await navigator.clipboard.writeText(texto);
+      setCopiado("ok");
+    } catch {
+      setCopiado("falhou");
+    }
+  };
+
+  const cobranca = (linha: Linha) =>
+    linha.inscrito && origem
+      ? linkDeCobranca({
+          whatsapp: linha.inscrito.whatsapp,
+          riotId: linha.nome,
+          valorCentavos: linha.pagamento.valor_centavos,
+          chavePix: config.chave_pix,
+          venceEm: linha.pagamento.vence_em,
+          origem,
+        })
+      : null;
 
   const aDevolver = useMemo(() => linhas.filter((l) => l.pagamento.estado === "estorno_devido"), [linhas]);
   const devolvidos = useMemo(() => linhas.filter((l) => l.pagamento.estado === "estornado"), [linhas]);
@@ -318,7 +391,11 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: Pr
           detail="o restante do arrecadado"
         />
         <Metric label="Em caixa" value={moeda(caixa.emCaixa)} detail="recebido − estornado" />
-        <Metric label="A receber" value={moeda(caixa.aReceber)} detail="aguardando + declarado" />
+        <Metric
+          label="A receber"
+          value={moeda(caixa.aReceber)}
+          detail="aguardando + declarado (sem recusados e desistentes)"
+        />
       </FieldGrid>
 
       <FieldGrid min={150} style={{ marginTop: 12 }}>
@@ -345,6 +422,39 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: Pr
           dinheiro nunca existiu.
         </p>
       </Card>
+
+      {/* ------------------------------------------------------------ pendências */}
+
+      {pendenciasDoCaixa.length > 0 ? (
+        <>
+          <BlockTitle right={<Chip tone="warn">{pendenciasDoCaixa.length}</Chip>}>Pendências do caixa</BlockTitle>
+          <p style={{ margin: "0 0 12px", fontSize: 12.5, color: C.ink3, lineHeight: 1.7 }}>
+            O sistema não mexe em dinheiro sozinho: ele aponta, e quem cuida do caixa decide com um clique.
+          </p>
+          <div style={{ display: "grid", gap: 8 }}>
+            {pendenciasDoCaixa.map(({ linha, alerta }) => (
+              <Card key={`${linha.pagamento.inscricao_id}-${alerta.codigo}`} padding="12px 16px">
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <span style={{ fontFamily: display, fontSize: 15, color: C.ink }}>{linha.nome}</span>
+                  <Chip tone={TOM_DO_ESTADO[linha.pagamento.estado]}>{ROTULO_PAGAMENTO[linha.pagamento.estado]}</Chip>
+                  <span style={{ flex: "1 1 260px", fontSize: 12.5, color: C.warnSoft }}>{alerta.texto}</span>
+                  {alerta.acaoPagamento ? (
+                    <Button
+                      small
+                      tone="gold"
+                      disabled={travado}
+                      title={motivo}
+                      onClick={() => void salvar(linha.pagamento.inscricao_id, alerta.acaoPagamento!)}
+                    >
+                      {ROTULO_DA_ACAO[alerta.acaoPagamento]}
+                    </Button>
+                  ) : null}
+                </div>
+              </Card>
+            ))}
+          </div>
+        </>
+      ) : null}
 
       {/* ------------------------------------------------------------ fila de declarados */}
 
@@ -442,8 +552,29 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: Pr
         Quem está <strong style={{ color: C.ink2 }}>aguardando</strong> e vence nos próximos{" "}
         {plural(JANELA_DE_AVISO, "dia", "dias")} ou já venceu. O prazo é de{" "}
         {plural(config.prazo_pagamento_dias, "dia", "dias")} a partir da inscrição. Vencido não é
-        recusado: é hora de cobrar no grupo.
+        recusado: é hora de cobrar. «Cobrar» abre o seu WhatsApp com a mensagem pronta (valor, Pix e
+        link) — quem envia é você.
       </p>
+
+      <Toolbar style={{ marginBottom: 12 }}>
+        <Button
+          small
+          disabled={devendo.length === 0}
+          title="Copia só os Riot IDs e os prazos — nada de contato. Para colar no grupo."
+          onClick={() => void copiarLista()}
+        >
+          Copiar lista de quem falta pagar ({devendo.length})
+        </Button>
+        {copiado === "ok" ? (
+          <span role="status" style={{ fontSize: 12, color: C.okSoft }}>
+            ✓ Copiado.
+          </span>
+        ) : copiado === "falhou" ? (
+          <span role="status" style={{ fontSize: 12, color: C.dangerSoft }}>
+            O navegador não deixou copiar.
+          </span>
+        ) : null}
+      </Toolbar>
 
       {agoraMs === null ? (
         <p style={{ margin: 0, fontSize: 12.5, color: C.ink4 }}>Calculando os prazos…</p>
@@ -468,6 +599,9 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: Pr
                 <th scope="col" style={th}>
                   Situação do prazo
                 </th>
+                <th scope="col" style={th}>
+                  Cobrar
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -486,6 +620,20 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: Pr
                             ? "vence hoje"
                             : `vence em ${plural(dias, "dia", "dias")}`}
                       </Chip>
+                    </td>
+                    <td style={td}>
+                      {cobranca(linha) ? (
+                        <a href={cobranca(linha)!} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12.5 }}>
+                          Cobrar no WhatsApp ↗
+                        </a>
+                      ) : (
+                        <span
+                          style={{ fontSize: 11.5, color: C.ink4 }}
+                          title={linha.inscrito ? `Discord: ${linha.inscrito.discord}` : undefined}
+                        >
+                          sem WhatsApp válido
+                        </span>
+                      )}
                     </td>
                   </tr>
                 );
@@ -638,6 +786,16 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: Pr
                         <span style={{ marginLeft: 8 }}>
                           <Chip tone="gold" title="Organizador desta edição: não paga inscrição.">
                             organização
+                          </Chip>
+                        </span>
+                      ) : null}
+                      {inscrito && foraDaCobranca(inscrito.situacao, pagamento.estado) ? (
+                        <span style={{ marginLeft: 8 }}>
+                          <Chip
+                            tone="off"
+                            title="Recusado ou desistente que não pagou: não entra em «a receber» nem nos prazos. Para encerrar de vez, mude para «Cancelado»."
+                          >
+                            fora — não cobrar
                           </Chip>
                         </span>
                       ) : null}

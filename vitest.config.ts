@@ -15,6 +15,10 @@ export default defineConfig({
     // `.tsx` também: as telas do painel são testadas com renderToStaticMarkup, que é
     // o jeito de exercitar o render inteiro sem navegador nem login.
     include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
+    // Os testes de tela renderizam o painel inteiro no jsdom (~1 s cada sozinhos). Com os 58
+    // arquivos rodando em paralelo, um deles passava dos 5 s padrão sem nada de errado — só
+    // a máquina ocupada. Folga para o teste falhar por defeito, não por fila de CPU.
+    testTimeout: 20_000,
     coverage: {
       provider: "v8",
       reporter: ["text", "html", "lcov"],

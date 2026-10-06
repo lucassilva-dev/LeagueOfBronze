@@ -395,3 +395,90 @@ alter table public.inscricoes
   check (disponibilidade <@ array['manha','tarde','noite']::text[]);
 comment on column public.inscricoes.disponibilidade is
   'Turnos (manha, tarde, noite) em que o jogador pode jogar - regra 9 da 4a Edicao. Vale para o time inteiro.';
+
+-- =====================================================================
+-- ROBÔ DA RIOT E SITUAÇÃO AUTOMÁTICA (2026-10-06)
+-- =====================================================================
+-- Aplicado em producao como a migracao `robo_riot_e_situacao_automatica`, em public e
+-- lob_teste. Tudo aditivo e anulavel: o codigo anterior le `select *` e nao cita estas
+-- colunas, entao a migracao pode (e deve) entrar ANTES do deploy.
+--
+-- O bloco percorre os dois schemas de proposito: este arquivo e escrito com `public.` e
+-- o ambiente de teste (lob_teste, no MESMO banco) precisa das mesmas colunas, senao a
+-- inscricao do site de teste quebra no insert que grava `puuid`.
+--
+--   puuid ... riot_erro   o que a Riot mostrou na ultima consulta (so exibicao; o jogador
+--                         nunca recebe estas colunas — `minhaInscricao` usa select explicito)
+--   elo_fonte             de onde veio elo_verificado: 'riot' (o robo atualiza) ou
+--                         'organizacao' (travado a mao; o robo nao mexe). Nulo = ainda
+--                         ninguem confirmou, ou foi gravado antes do robo existir
+--   promocao_automatica   falso quando a organizacao tirou a pessoa de apto — o sistema
+--                         nao a promove de novo sozinho
+--   riot_trava_ate        uma rodada do robo por vez (cron duplicado, cron e botao)
+--   riot_pausa_ate        depois de um 429 da Riot, ninguem consulta ate esta hora
+--   inscricao_consultas_riot  cada consulta da Riot feita pelo formulario publico, para o
+--                         teto por conta/origem (o freio de inscricoes so conta o que GRAVOU,
+--                         e "Riot ID nao existe" nao grava nada). Mesmo padrao de seguranca
+--                         das outras: RLS forcado, zero policies, revoke. No lob_teste o
+--                         service_role precisa do grant explicito (la nao ha privilegio padrao).
+do $migracao$
+declare s text;
+begin
+  foreach s in array array['public', 'lob_teste'] loop
+    continue when not exists (select 1 from pg_namespace where nspname = s);
+    execute format($sql$
+      alter table %1$I.inscricoes
+        add column if not exists puuid                text,
+        add column if not exists riot_id_atual        text,
+        add column if not exists riot_regiao          text,
+        add column if not exists elo_riot             text,
+        add column if not exists riot_divisao         text,
+        add column if not exists riot_pdl             smallint,
+        add column if not exists riot_vitorias        integer,
+        add column if not exists riot_derrotas        integer,
+        add column if not exists riot_nivel           integer,
+        add column if not exists riot_nivel_em        timestamptz,
+        add column if not exists riot_partidas_janela smallint,
+        add column if not exists riot_sincronizado_em timestamptz,
+        add column if not exists riot_status          text,
+        add column if not exists riot_erro            text,
+        add column if not exists elo_fonte            text,
+        add column if not exists promocao_automatica  boolean not null default true;
+
+      alter table %1$I.inscricoes drop constraint if exists inscricoes_riot_status_valido;
+      alter table %1$I.inscricoes add constraint inscricoes_riot_status_valido check (
+        riot_status is null
+        or riot_status in ('ok', 'sem_ranque_solo', 'riot_id_inexistente', 'outro_servidor', 'erro'));
+
+      alter table %1$I.inscricoes drop constraint if exists inscricoes_elo_fonte_valida;
+      alter table %1$I.inscricoes add constraint inscricoes_elo_fonte_valida
+        check (elo_fonte is null or elo_fonte in ('riot', 'organizacao'));
+
+      alter table %1$I.edicao_config
+        add column if not exists riot_ultima_execucao timestamptz,
+        add column if not exists riot_ultimo_resumo   jsonb,
+        add column if not exists riot_trava_ate       timestamptz,
+        add column if not exists riot_pausa_ate       timestamptz;
+
+      create table if not exists %1$I.inscricao_consultas_riot (
+        id          bigserial primary key,
+        ocorrido_em timestamptz not null default now(),
+        jogador_id  uuid,
+        ip_hash     text
+      );
+      create index if not exists inscricao_consultas_riot_jogador_idx
+        on %1$I.inscricao_consultas_riot (jogador_id, ocorrido_em desc);
+      create index if not exists inscricao_consultas_riot_ip_idx
+        on %1$I.inscricao_consultas_riot (ip_hash, ocorrido_em desc);
+      alter table %1$I.inscricao_consultas_riot enable row level security;
+      alter table %1$I.inscricao_consultas_riot force  row level security;
+      revoke all on %1$I.inscricao_consultas_riot from anon, authenticated;
+      grant all on %1$I.inscricao_consultas_riot to service_role;
+      grant usage, select on sequence %1$I.inscricao_consultas_riot_id_seq to service_role;
+    $sql$, s);
+  end loop;
+end
+$migracao$;
+
+comment on column public.inscricoes.elo_verificado is
+  'O elo que vale antes do congelamento: vindo da Riot (elo_fonte = riot) ou travado pela organizacao (elo_fonte = organizacao).';

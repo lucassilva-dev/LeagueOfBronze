@@ -12,7 +12,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
-import type { EdicaoConfig, Inscrito, PropsSecao } from "@/components/admin/e4/painel-edicao";
+import type { EdicaoConfig, Inscrito, Pagamento, PropsSecao } from "@/components/admin/e4/painel-edicao";
 import {
   Banner,
   Button,
@@ -35,16 +35,19 @@ import {
 } from "@/components/admin/ui";
 import { ELO_ORDER, resolveElo, resolveRole } from "@/lib/design";
 import { formatDateTimeLabel } from "@/lib/format";
+import { alertasDoInscrito, type Alerta } from "@/lib/inscricoes/alertas";
 import { LIMITES_INSCRICAO } from "@/lib/inscricoes/passo1";
 import {
   ESTADOS_CONFERENCIA,
   ITENS_CONFERENCIA,
   REGRA_DO_ITEM,
+  estadoDaJanela,
   type EstadoConferencia,
   type ItemConferencia,
 } from "@/lib/inscricoes/schema";
 import { TURNOS, type Turno } from "@/lib/inscricoes/turnos";
 import { getOpGgSummonerUrlFromNick } from "@/lib/opgg";
+import { AUTOR_RIOT } from "@/lib/riot/decidir";
 
 /**
  * Matriz de conferência + gaveta do inscrito.
@@ -195,6 +198,10 @@ const SEM_ESCOPO = "Falta o escopo inscricoes:conferir para editar.";
 
 /** Mapa vazio ESTÁVEL: um `new Map()` por render faria a gaveta achar que os dados mudaram. */
 const SEM_CONFERENCIAS: ReadonlyMap<ItemConferencia, RegistroConferencia> = new Map();
+const SEM_ALERTAS: readonly Alerta[] = [];
+
+/** Mais que isto sem rodada da Riot: o cron diário provavelmente parou (segredo, Vercel…). */
+const ROBO_ATRASADO_MS = 26 * 60 * 60 * 1000;
 
 /** Preferência de quem já sabe os critérios de cor. Só conveniência: pode sumir sem dano. */
 const CHAVE_OCULTAR_CRITERIOS = "lob:inscritos:ocultar-criterios";
@@ -227,17 +234,58 @@ function comoEstado(valor: string | undefined): EstadoConferencia {
  * Qual elo mostrar e de onde ele veio.
  *
  * A ordem é congelado > verificado > declarado, e a origem vai junto na tela: os três
- * podem discordar, e "Ouro" sem dizer quem afirmou isso é informação pela metade.
+ * podem discordar, e "Ouro" sem dizer quem afirmou isso é informação pela metade. O
+ * verificado diz também QUEM verificou: a Riot (o robô atualiza todo dia) ou a organização
+ * (travado à mão — o robô não mexe mais).
  */
 function eloExibido(inscrito: Inscrito) {
   const bruto = inscrito.elo_congelado ?? inscrito.elo_verificado ?? inscrito.elo_declarado;
   const origem = inscrito.elo_congelado
     ? "congelado"
     : inscrito.elo_verificado
-      ? "verificado"
+      ? inscrito.elo_fonte === "organizacao"
+        ? "travado"
+        : inscrito.elo_fonte === "riot"
+          ? "Riot"
+          : "verificado"
       : "declarado";
   const meta = resolveElo(bruto);
   return { rotulo: meta?.label ?? bruto, cor: meta?.color ?? C.ink3, origem };
+}
+
+/** Os elos que não têm divisão (I–IV) na Riot. */
+const SEM_DIVISAO = new Set(["Mestre", "Grão-Mestre", "Desafiante"]);
+
+/** "Ouro II · 45 PDL", do que a Riot mostrou na última consulta. */
+function eloNaRiot(inscrito: Inscrito): string | null {
+  if (!inscrito.elo_riot) return null;
+  const divisao = inscrito.riot_divisao && !SEM_DIVISAO.has(inscrito.elo_riot) ? ` ${inscrito.riot_divisao}` : "";
+  const pdl = inscrito.riot_pdl !== null && inscrito.riot_pdl !== undefined ? ` · ${inscrito.riot_pdl} PDL` : "";
+  return `${inscrito.elo_riot}${divisao}${pdl}`;
+}
+
+/** "há 3 h", "há 2 dias" — o quão velha está a consulta à Riot. */
+function haQuanto(iso: string | null | undefined, agoraMs: number | null): string {
+  if (!iso || agoraMs === null) return "";
+  const decorrido = agoraMs - new Date(iso).getTime();
+  if (!Number.isFinite(decorrido)) return "";
+  const horas = Math.floor(decorrido / 3_600_000);
+  if (horas < 1) return "há menos de 1 h";
+  if (horas < 48) return `há ${horas} h`;
+  return `há ${Math.floor(horas / 24)} dias`;
+}
+
+/**
+ * O relógio da tela: lido UMA vez na montagem (inicializador preguiçoso, o mesmo da gaveta)
+ * e remarcado a cada minuto — a resolução de que "há 3 h" e o aviso de robô parado precisam.
+ */
+function useAgora(): number {
+  const [agora, setAgora] = useState(() => Date.now());
+  useEffect(() => {
+    const cadencia = window.setInterval(() => setAgora(Date.now()), 60_000);
+    return () => window.clearInterval(cadencia);
+  }, []);
+  return agora;
 }
 
 function rotasDoInscrito(inscrito: Inscrito) {
@@ -437,6 +485,8 @@ type PropsRequisito = Readonly<{
   conferidoEm: string | null;
   /** Por que o item ainda não pode ser medido (data inexistente ou janela fechada). */
   semBase: string | null;
+  /** O item é do robô da Riot: ninguém da organização escreveu nele ainda. */
+  doRobo: boolean;
   verCriterio: boolean;
   observacaoAberta: boolean;
   bloqueado: boolean;
@@ -459,6 +509,7 @@ function Requisito({
   conferidoPor,
   conferidoEm,
   semBase,
+  doRobo,
   verCriterio,
   observacaoAberta,
   bloqueado,
@@ -516,7 +567,7 @@ function Requisito({
             </Chip>
           ) : conferidoPor ? (
             <span title={`Conferido por ${conferidoPor} em ${formatDateTimeLabel(conferidoEm)}`}>
-              {conferidoPor} · {quandoCurto(conferidoEm)}
+              {conferidoPor === AUTOR_RIOT ? "Riot (robô)" : conferidoPor} · {quandoCurto(conferidoEm)}
             </span>
           ) : (
             "não conferido"
@@ -531,6 +582,13 @@ function Requisito({
 
       {semBase ? (
         <p style={{ margin: "6px 0 0", fontSize: 11.5, lineHeight: 1.55, color: C.warnSoft }}>{semBase}</p>
+      ) : null}
+
+      {doRobo && conferidoPor === AUTOR_RIOT ? (
+        <p style={{ margin: "6px 0 0", fontSize: 11.5, lineHeight: 1.55, color: C.ink3 }}>
+          Conferido pela Riot e atualizado todo dia. Marcar outro estado (ou escrever uma observação) tira
+          este item do robô — daí em diante vale o que a organização gravou.
+        </p>
       ) : null}
 
       <div style={{ marginTop: 8 }}>
@@ -562,6 +620,9 @@ function Requisito({
             placeholder="O que foi visto, e onde. Ex.: print do perfil enviado no privado em 03/09."
             ariaLabel={`Observação do item ${letra}`}
           />
+          <p style={{ margin: "4px 0 0", fontSize: 11, color: C.ink4 }}>
+            O jogador lê esta observação em «Minha inscrição».
+          </p>
         </div>
       ) : null}
     </section>
@@ -669,6 +730,7 @@ const FOCAVEIS = "a[href], button, input, select, textarea, [tabindex]";
 type PropsGaveta = Readonly<{
   inscrito: Inscrito;
   config: EdicaoConfig;
+  alertas: readonly Alerta[];
   conferencias: ReadonlyMap<ItemConferencia, RegistroConferencia>;
   executar: PropsSecao["executar"];
   ocupado: boolean;
@@ -685,6 +747,7 @@ type PropsGaveta = Readonly<{
 function GavetaInscrito({
   inscrito,
   config,
+  alertas,
   conferencias,
   executar,
   ocupado,
@@ -744,10 +807,13 @@ function GavetaInscrito({
 
   const fichaSalva: FichaSalva = {
     situacao: inscrito.situacao,
+    // O select escolhe a TRAVA manual: vazio = "automático (Riot)". Só um elo travado pela
+    // organização aparece selecionado; o que veio da Riot (ou de antes do robô) é automático.
+    //
     // Guardamos o RÓTULO canônico ("Grão-Mestre"), não o que veio do banco: o valor
     // gravado pode ser um alias ("GM", "diamante 2") que não casa com nenhuma <option>, e
-    // aí o select apareceria vazio como se ninguém tivesse verificado nada.
-    eloVerificado: resolveElo(inscrito.elo_verificado)?.label ?? "",
+    // aí o select apareceria vazio como se ninguém tivesse travado nada.
+    eloVerificado: inscrito.elo_fonte === "organizacao" ? (resolveElo(inscrito.elo_verificado)?.label ?? "") : "",
     organizador: inscrito.organizador,
     observacao: inscrito.observacao ?? "",
     turnos: turnosSalvos,
@@ -905,8 +971,22 @@ function GavetaInscrito({
   const nomeInvalido =
     mudouNaFicha.nomeReal && nomeReal.trim().split(/\s+/).filter(Boolean).length < 2;
 
+  // Quem está Apto e acabou de ganhar um requisito ruim no rascunho: o sistema não rebaixa
+  // ninguém sozinho, então a tela lembra que a situação continua a mesma.
+  const aptoComItemRuim =
+    fichaSalva.situacao === "apto" &&
+    situacao === "apto" &&
+    ITENS_CONFERENCIA.some((item) => {
+      const novo = rascunho.itens[item]?.estado;
+      return novo === "risco" || novo === "recusado";
+    });
+
   const pendentes = ITENS_CONFERENCIA.filter((item) => estadoDe(item) === "pendente");
-  const pendentesSemBase = pendentes.filter((item) => semBaseDe(item));
+  // Item pendente que ainda é do robô (ex.: (D) sem ranque na solo/duo) fica fora do atalho:
+  // marcar «Cumpre» ali afirmaria o contrário do que a Riot acabou de mostrar.
+  const doRoboPendentes = pendentes.filter((item) => itemSalvo(item).conferidoPor === AUTOR_RIOT);
+  const pendentesDoAtalho = pendentes.filter((item) => !doRoboPendentes.includes(item));
+  const pendentesSemBase = pendentesDoAtalho.filter((item) => semBaseDe(item));
 
   // ------------------------------------------------ ações
 
@@ -932,7 +1012,7 @@ function GavetaInscrito({
 
   /** Atalho do caso comum: quem cumpre tudo resolve em um clique, e ainda dá para ajustar. */
   const marcarPendentesComoCumpre = () => {
-    for (const item of pendentes) {
+    for (const item of pendentesDoAtalho) {
       // Item que ainda não dá para medir não "cumpre": o estado honesto é «não avaliável».
       editarItem(item, "estado", semBaseDe(item) ? "nao_avaliavel" : "ok");
     }
@@ -1060,7 +1140,7 @@ function GavetaInscrito({
           <Button
             small
             tone="gold"
-            disabled={bloqueado || pendentes.length === 0}
+            disabled={bloqueado || pendentesDoAtalho.length === 0}
             title={podeConferir ? "Marca «Cumpre» em tudo que está pendente. Nada é gravado até você salvar." : SEM_ESCOPO}
             onClick={marcarPendentesComoCumpre}
           >
@@ -1083,6 +1163,24 @@ function GavetaInscrito({
           avaliável»: ainda não dá para medir.
         </p>
       ) : null}
+      {doRoboPendentes.length > 0 ? (
+        <p style={{ margin: "6px 0 0", fontSize: 11, color: C.ink4 }}>
+          O atalho pula {doRoboPendentes.map((item) => `(${item.toUpperCase()})`).join(", ")}: quem está
+          acompanhando é a Riot.
+        </p>
+      ) : null}
+
+      {alertas.length > 0 ? (
+        <div style={{ marginTop: 10 }}>
+          <Banner tone="warn" title={plural(alertas.length, "ponto de atenção", "pontos de atenção")}>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {alertas.map((a) => (
+                <li key={a.codigo}>{a.texto}</li>
+              ))}
+            </ul>
+          </Banner>
+        </div>
+      ) : null}
 
       {ITENS_CONFERENCIA.map((item) => {
         const salvo = itemSalvo(item);
@@ -1097,6 +1195,7 @@ function GavetaInscrito({
             conferidoPor={salvo.conferidoPor}
             conferidoEm={salvo.conferidoEm}
             semBase={semBaseDe(item)}
+            doRobo={salvo.conferidoPor === null || salvo.conferidoPor === AUTOR_RIOT}
             verCriterio={verCriterios}
             observacaoAberta={observacoesAbertas.has(item)}
             bloqueado={bloqueado}
@@ -1113,11 +1212,13 @@ function GavetaInscrito({
     <div style={{ display: "grid", gap: 16 }}>
       <FieldGrid min={210}>
         <Field
-          label="Elo verificado"
+          label="Elo"
           hint={
             congelado
               ? "O elo já está congelado: isto corrige o registro, mas não o preço no draft."
-              : "Vazio = ninguém abriu o perfil ainda. É este valor que vira o preço no draft."
+              : inscrito.elo_fonte === "organizacao"
+                ? `Travado à mão${inscrito.elo_riot ? ` — a Riot mostra ${inscrito.elo_riot}` : ""}. Escolha «automático» para voltar a seguir a Riot.`
+                : `Automático: segue a solo/duo na Riot todo dia${inscrito.elo_riot ? ` (hoje ${inscrito.elo_riot})` : ""}. Escolher um elo trava este inscrito nesse valor.`
           }
         >
           <Select
@@ -1126,7 +1227,7 @@ function GavetaInscrito({
             onChange={(v) => editarFicha("eloVerificado", v)}
             ariaLabel="Elo verificado"
           >
-            <option value="">— não verificado —</option>
+            <option value="">— automático (Riot) —</option>
             {ELO_ORDER.map((e) => (
               <option key={e.key} value={e.label}>
                 {e.label} · {e.pts} pts
@@ -1168,8 +1269,8 @@ function GavetaInscrito({
 
       <Check checked={organizador} disabled={bloqueado} onChange={(v) => editarFicha("organizador", v)}>
         É da organização desta edição — <b>não paga inscrição e não é capitão</b>, mas joga.
-        Marcar aqui não mexe no pagamento: lance o pagamento como <b>Isento</b> na aba
-        Pagamentos, senão a cobrança continua em aberto.
+        Marcar aqui não mexe no pagamento: a aba Pagamentos avisa e oferece o botão
+        <b> Isentar</b> para quem cuida do caixa.
       </Check>
 
       {/*
@@ -1258,6 +1359,12 @@ function GavetaInscrito({
             Para mudar o preço de alguém, corrija o ELO VERIFICADO na aba Ficha.
           */}
           <Metric small label="Pontos no draft" value={inscrito.pontos} detail="derivado do elo — não editável" />
+          <Metric
+            small
+            label="Na Riot (solo/duo)"
+            value={eloNaRiot(inscrito) ?? "—"}
+            detail={inscrito.riot_sincronizado_em ? `consultado em ${quandoCurto(inscrito.riot_sincronizado_em)}` : "ainda não consultado"}
+          />
         </FieldGrid>
       </div>
     </div>
@@ -1372,6 +1479,20 @@ function GavetaInscrito({
           ariaLabel="Situação do inscrito"
         />
       </div>
+      {aptoComItemRuim ? (
+        <p role="alert" style={{ margin: "-4px 0 10px", fontSize: 11.5, color: C.warnSoft }}>
+          Este inscrito continua <b>Apto</b> — se o requisito marcado agora o tira do campeonato, ajuste a
+          situação também.
+        </p>
+      ) : inscrito.promocao_automatica === false && situacao === "pendente" ? (
+        <p style={{ margin: "-4px 0 10px", fontSize: 11.5, color: C.ink3 }}>
+          Segurado pela organização: o sistema não promove este inscrito a Apto sozinho.
+        </p>
+      ) : situacao === "pendente" ? (
+        <p style={{ margin: "-4px 0 10px", fontSize: 11, color: C.ink4 }}>
+          Vira Apto sozinho quando todos os requisitos cumprirem e o pagamento estiver confirmado.
+        </p>
+      ) : null}
       <Toolbar
         right={
           <>
@@ -1508,6 +1629,42 @@ function GavetaInscrito({
             ) : null}
           </div>
 
+          {/* O que a Riot mostrou: fatos para a conferência — inclusive para o (F), que a
+              organização decide. Nada aqui é rótulo de suspeita. */}
+          <div
+            style={{ display: "flex", alignItems: "center", gap: "4px 12px", flexWrap: "wrap", marginTop: 4, fontSize: 11.5, color: C.ink3, ...tabular }}
+          >
+            <span style={{ color: C.bronze, letterSpacing: ".12em", textTransform: "uppercase", fontSize: 10 }}>Riot</span>
+            {inscrito.riot_sincronizado_em ? (
+              <>
+                <span>{eloNaRiot(inscrito) ?? "sem ranque na solo/duo"}</span>
+                {inscrito.riot_nivel !== null && inscrito.riot_nivel !== undefined ? (
+                  <span>nível {inscrito.riot_nivel}</span>
+                ) : null}
+                {inscrito.riot_vitorias !== null &&
+                inscrito.riot_vitorias !== undefined &&
+                inscrito.riot_derrotas !== null &&
+                inscrito.riot_derrotas !== undefined ? (
+                  <span>
+                    {inscrito.riot_vitorias}V/{inscrito.riot_derrotas}D
+                    {inscrito.riot_vitorias + inscrito.riot_derrotas > 0
+                      ? ` (${Math.round((100 * inscrito.riot_vitorias) / (inscrito.riot_vitorias + inscrito.riot_derrotas))}%)`
+                      : ""}
+                  </span>
+                ) : null}
+                <span style={{ color: C.ink4 }}>{haQuanto(inscrito.riot_sincronizado_em, agora)}</span>
+              </>
+            ) : (
+              <span style={{ color: C.ink4 }}>ainda não consultado</span>
+            )}
+            <BotaoLink
+              disabled={bloqueado}
+              onClick={() => void executar("sincronizar_riot", { inscricaoId: inscrito.id })}
+            >
+              atualizar da Riot
+            </BotaoLink>
+          </div>
+
           <div role="tablist" aria-label="Partes da inscrição" style={{ display: "flex", gap: 4, marginTop: 10 }}>
             {ABAS.map((a, indice) => {
               const ativa = a.id === aba;
@@ -1572,6 +1729,79 @@ function GavetaInscrito({
   );
 }
 
+// ---------------------------------------------------------------- robô da Riot
+
+/**
+ * Estado do robô da Riot e o botão de rodar agora.
+ *
+ * O robô roda sozinho uma vez por dia (Vercel Cron). Esta barra existe para a organização
+ * saber que ele está vivo: um cron que para de rodar não dá erro em lugar nenhum — o elo
+ * só fica velho em silêncio. Mais de 26 h sem rodada vira aviso.
+ */
+function BarraDoRobo({
+  config,
+  agora,
+  bloqueado,
+  ocupado,
+  onAtualizar,
+}: Readonly<{
+  config: EdicaoConfig;
+  agora: number | null;
+  bloqueado: boolean;
+  ocupado: boolean;
+  onAtualizar: () => void;
+}>) {
+  const ultima = config.riot_ultima_execucao ?? null;
+  const resumo = config.riot_ultimo_resumo ?? null;
+  const pausaAte = config.riot_pausa_ate ? new Date(config.riot_pausa_ate).getTime() : NaN;
+  const pausado = agora !== null && Number.isFinite(pausaAte) && pausaAte > agora;
+  const atrasado = agora !== null && ultima !== null && agora - new Date(ultima).getTime() > ROBO_ATRASADO_MS;
+
+  let texto: ReactNode;
+  if (!ultima) {
+    texto = "Ainda não rodou. Roda sozinho todo dia às 6h; o botão roda agora.";
+  } else {
+    const partes = [`última rodada ${quandoCurto(ultima)} (${haQuanto(ultima, agora)})`];
+    if (resumo?.processados !== undefined) partes.push(`${resumo.processados} consultados`);
+    if (resumo?.elosMudados) partes.push(`${resumo.elosMudados} elo(s) mudaram`);
+    if (resumo?.erros) partes.push(`${resumo.erros} com erro`);
+    texto = partes.join(" · ");
+  }
+
+  return (
+    <Card padding="12px 16px" style={{ marginBottom: 12 }}>
+      <Toolbar
+        right={
+          <Button
+            small
+            tone="gold"
+            disabled={bloqueado || pausado}
+            title={bloqueado && !ocupado ? SEM_ESCOPO : "Consulta a Riot agora — quem está há mais tempo sem consulta vai primeiro."}
+            onClick={onAtualizar}
+          >
+            {ocupado ? "Atualizando…" : "Atualizar da Riot agora"}
+          </Button>
+        }
+      >
+        <span style={{ fontSize: 10, letterSpacing: ".16em", textTransform: "uppercase", color: C.bronze }}>
+          Robô da Riot
+        </span>
+        <span style={{ fontSize: 12, color: C.ink3, ...tabular }}>{texto}</span>
+      </Toolbar>
+      {pausado ? (
+        <p style={{ margin: "8px 0 0", fontSize: 11.5, color: C.warnSoft }}>
+          Pausado até {quandoCurto(config.riot_pausa_ate ?? null)}: a Riot pediu para esperar (limite de requisições).
+        </p>
+      ) : atrasado ? (
+        <p style={{ margin: "8px 0 0", fontSize: 11.5, color: C.warnSoft }}>
+          Mais de 26 h sem rodada automática — a rotina diária pode ter parado. Use o botão e avise quem
+          cuida do site.
+        </p>
+      ) : null}
+    </Card>
+  );
+}
+
 // ---------------------------------------------------------------- seção
 
 export function SecaoInscritos({ dados, executar, ocupado, podeConferir, ultimoErro = null }: PropsSecao) {
@@ -1579,9 +1809,12 @@ export function SecaoInscritos({ dados, executar, ocupado, podeConferir, ultimoE
   const [busca, setBusca] = useState("");
   const [filtroSituacao, setFiltroSituacao] = useState("todos");
   const [soPendencia, setSoPendencia] = useState(false);
+  const [soAlerta, setSoAlerta] = useState(false);
   const contagemId = useId();
+  const agora = useAgora();
 
-  const { config, inscritos, conferencias, panorama } = dados;
+  const { config, inscritos, conferencias, pagamentos, panorama } = dados;
+  const janelaAberta = estadoDaJanela(config, agora) === "aberta";
 
   /** Conferências indexadas por inscrito e item — a tabela lê isto 6 vezes por linha. */
   const porInscrito = useMemo(() => {
@@ -1593,6 +1826,23 @@ export function SecaoInscritos({ dados, executar, ocupado, podeConferir, ultimoE
     }
     return mapa;
   }, [conferencias]);
+
+  /** O que merece olho em cada inscrito (ver `alertasDoInscrito`). Calculado, nunca gravado. */
+  const alertasPorInscrito = useMemo(() => {
+    const pagamentoDe = new Map<string, Pagamento>(pagamentos.map((p) => [p.inscricao_id, p]));
+    const mapa = new Map<string, Alerta[]>();
+    for (const i of inscritos) {
+      const alertas = alertasDoInscrito({
+        inscrito: i,
+        conferencias: [...(porInscrito.get(i.id)?.values() ?? [])],
+        pagamento: pagamentoDe.get(i.id) ?? null,
+        config,
+        agoraMs: agora,
+      });
+      if (alertas.length > 0) mapa.set(i.id, alertas);
+    }
+    return mapa;
+  }, [inscritos, pagamentos, porInscrito, config, agora]);
 
   const visiveis = useMemo(() => {
     const termo = busca.trim().toLowerCase();
@@ -1608,12 +1858,13 @@ export function SecaoInscritos({ dados, executar, ocupado, podeConferir, ultimoE
     return inscritos.filter((i) => {
       if (filtroSituacao !== "todos" && i.situacao !== filtroSituacao) return false;
       if (soPendencia && !temPendencia(i.id)) return false;
+      if (soAlerta && !alertasPorInscrito.has(i.id)) return false;
       if (!termo) return true;
       return [i.nick, i.riot_id, i.discord, i.email, i.nome_real ?? ""].some((campo) =>
         campo.toLowerCase().includes(termo),
       );
     });
-  }, [inscritos, busca, filtroSituacao, soPendencia, porInscrito]);
+  }, [inscritos, busca, filtroSituacao, soPendencia, soAlerta, porInscrito, alertasPorInscrito]);
 
   // A gaveta busca em TODOS os inscritos, não nos visíveis: mudar um filtro (ou salvar
   // alguém que por isso sai do filtro) não pode fechar a pessoa que está aberta.
@@ -1660,7 +1911,7 @@ export function SecaoInscritos({ dados, executar, ocupado, podeConferir, ultimoE
     <SectionHead
       eyebrow="4ª Edição"
       title="Inscritos e conferência"
-      description="Clique em alguém para abrir a conferência: requisitos, ficha e contato numa gaveta, com um «Salvar tudo» só. Quando a data que um item usa ainda não foi decidida, o estado certo é «não avaliável»."
+      description="Clique em alguém para abrir a conferência: requisitos, ficha e contato numa gaveta, com um «Salvar tudo» só. O robô da Riot confere elo e os itens (D), (M) e (E) sozinho todo dia; quem cumpre tudo e pagou vira Apto sem clique."
     />
   );
 
@@ -1671,12 +1922,12 @@ export function SecaoInscritos({ dados, executar, ocupado, podeConferir, ultimoE
         <Empty
           title="Nenhuma inscrição ainda"
           action={
-            <Chip tone={config.inscricoes_abertas ? "ok" : "warn"}>
-              {config.inscricoes_abertas ? "inscrições abertas" : "inscrições fechadas"}
+            <Chip tone={janelaAberta ? "ok" : "warn"}>
+              {janelaAberta ? "inscrições abertas" : "inscrições fechadas"}
             </Chip>
           }
         >
-          {config.inscricoes_abertas
+          {janelaAberta
             ? "O formulário está no ar e ninguém enviou ainda. Assim que a primeira inscrição chegar, ela aparece aqui com os seis requisitos pendentes."
             : "As inscrições ainda não foram abertas. Abra-as na aba Configuração — enquanto a chave estiver fechada, o formulário público não aceita ninguém."}
         </Empty>
@@ -1707,6 +1958,14 @@ export function SecaoInscritos({ dados, executar, ocupado, podeConferir, ultimoE
         />
       </FieldGrid>
 
+      <BarraDoRobo
+        config={config}
+        agora={agora}
+        bloqueado={!podeConferir || ocupado}
+        ocupado={ocupado}
+        onAtualizar={() => void executar("sincronizar_riot")}
+      />
+
       <Card padding="14px 16px">
         <Toolbar style={{ alignItems: "flex-end" }}>
           <Field label="Buscar" style={{ flex: "1 1 200px" }}>
@@ -1729,9 +1988,12 @@ export function SecaoInscritos({ dados, executar, ocupado, podeConferir, ultimoE
           </Field>
         </Toolbar>
 
-        <div style={{ marginTop: 12 }}>
+        <div style={{ marginTop: 12, display: "flex", gap: "8px 22px", flexWrap: "wrap" }}>
           <Check checked={soPendencia} onChange={setSoPendencia}>
             Só quem tem algum requisito pendente
+          </Check>
+          <Check checked={soAlerta} onChange={setSoAlerta}>
+            Só quem tem ponto de atenção ({alertasPorInscrito.size})
           </Check>
         </div>
 
@@ -1758,7 +2020,7 @@ export function SecaoInscritos({ dados, executar, ocupado, podeConferir, ultimoE
                   <th
                     scope="col"
                     style={{ ...th, textAlign: "left" }}
-                    title="Congelado, se houver; senão o verificado; senão o declarado."
+                    title="Congelado, se houver; senão o verificado (pela Riot, ou travado pela organização); senão o declarado."
                   >
                     Elo
                   </th>
@@ -1852,12 +2114,28 @@ export function SecaoInscritos({ dados, executar, ocupado, podeConferir, ultimoE
                               sem turno
                             </Chip>
                           ) : null}
+                          {alertasPorInscrito.has(inscrito.id) ? (
+                            <Chip
+                              tone="warn"
+                              title={alertasPorInscrito
+                                .get(inscrito.id)!
+                                .map((a) => a.texto)
+                                .join("\n")}
+                            >
+                              ⚠ {alertasPorInscrito.get(inscrito.id)!.length}
+                            </Chip>
+                          ) : null}
                         </div>
                       </td>
 
                       <td style={td}>
                         <span style={{ color: elo.cor }}>{elo.rotulo}</span>
                         <span style={{ color: C.ink4, fontSize: 10.5 }}> {elo.origem}</span>
+                        {eloNaRiot(inscrito) && elo.origem !== "Riot" ? (
+                          <div style={{ color: C.ink4, fontSize: 10.5 }}>Riot: {eloNaRiot(inscrito)}</div>
+                        ) : eloNaRiot(inscrito) ? (
+                          <div style={{ color: C.ink4, fontSize: 10.5 }}>{eloNaRiot(inscrito)}</div>
+                        ) : null}
                       </td>
 
                       <td style={{ ...td, textAlign: "right", ...tabular }}>{inscrito.pontos}</td>
@@ -1905,6 +2183,7 @@ export function SecaoInscritos({ dados, executar, ocupado, podeConferir, ultimoE
           key={selecionado.id}
           inscrito={selecionado}
           config={config}
+          alertas={alertasPorInscrito.get(selecionado.id) ?? SEM_ALERTAS}
           conferencias={porInscrito.get(selecionado.id) ?? SEM_CONFERENCIAS}
           executar={executar}
           ocupado={ocupado}

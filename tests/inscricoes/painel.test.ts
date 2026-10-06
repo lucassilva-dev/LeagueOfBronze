@@ -135,6 +135,22 @@ describe("estado da janela de inscrição", () => {
     ).toBe("ainda_nao_abriu");
   });
 
+  it("aberta pela chave, mas a data de fechamento passou: FECHA sozinha", () => {
+    expect(
+      estadoDaJanela({ inscricoes_abertas: true, fechamento_inscricoes: "2026-09-15T11:59:59.000Z" }, AGORA),
+    ).toBe("encerrada");
+    // No instante exato também já fechou.
+    expect(
+      estadoDaJanela({ inscricoes_abertas: true, fechamento_inscricoes: "2026-09-15T12:00:00.000Z" }, AGORA),
+    ).toBe("encerrada");
+  });
+
+  it("aberta pela chave e fechamento no futuro: continua aberta", () => {
+    expect(
+      estadoDaJanela({ inscricoes_abertas: true, fechamento_inscricoes: "2026-10-16T00:00:00.000Z" }, AGORA),
+    ).toBe("aberta");
+  });
+
   it("data lixo não derruba a página nem inventa veredicto", () => {
     expect(estadoDaJanela({ inscricoes_abertas: false, fechamento_inscricoes: "nao-e-data" }, AGORA)).toBe(
       "ainda_nao_abriu",
