@@ -200,6 +200,16 @@ describe("requisitos do robô", () => {
   });
 });
 
+describe("barra do robô", () => {
+  it("chave da Riot recusada na última rodada: o painel avisa o que fazer", () => {
+    const d = dados([inscrito()]);
+    d.config.riot_ultima_execucao = new Date().toISOString();
+    d.config.riot_ultimo_resumo = { processados: 0, parouPor: "chave_recusada" };
+    render(<SecaoInscritos {...props(vi.fn(async () => true))} dados={d} />);
+    expect(screen.getByRole("alert").textContent).toMatch(/recusou a chave/);
+  });
+});
+
 describe("pontos de atenção na lista", () => {
   it("troca de Riot ID vira um ⚠ na linha e um aviso na gaveta", () => {
     abrir([inscrito({ riot_id_atual: "OutroNome#BR1" })]);

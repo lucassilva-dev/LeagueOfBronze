@@ -1792,6 +1792,11 @@ function BarraDoRobo({
         <p style={{ margin: "8px 0 0", fontSize: 11.5, color: C.warnSoft }}>
           Pausado até {quandoCurto(config.riot_pausa_ate ?? null)}: a Riot pediu para esperar (limite de requisições).
         </p>
+      ) : resumo?.parouPor === "chave_recusada" ? (
+        <p role="alert" style={{ margin: "8px 0 0", fontSize: 11.5, color: C.dangerSoft }}>
+          A Riot recusou a chave da API na última rodada — nada foi conferido. Troque a RIOT_API_KEY nas
+          variáveis da Vercel (chave pessoal, que não expira) e faça um novo deploy.
+        </p>
       ) : atrasado ? (
         <p style={{ margin: "8px 0 0", fontSize: 11.5, color: C.warnSoft }}>
           Mais de 26 h sem rodada automática — a rotina diária pode ter parado. Use o botão e avise quem
