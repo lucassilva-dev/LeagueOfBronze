@@ -57,7 +57,7 @@ export function problemasDoPasso1(c: CamposPasso1, m: MensagensPasso1): Problema
   // Um `#` no começo é tolerado (o servidor o tira), como quem copia "#BR1" do cliente.
   const tag = c.tag.trim().replace(/^#/, "");
   if (!tag) falha("tag", m.campoObrigatorio);
-  else if (tag.length < 2 || tag.length > LIMITES_INSCRICAO.tag || !/^[A-Za-z0-9]+$/.test(tag)) {
+  else if (tag.length < 2 || tag.length > LIMITES_INSCRICAO.tag || !/^[\p{L}\p{N}]+$/u.test(tag)) {
     falha("tag", m.tagInvalida);
   }
 

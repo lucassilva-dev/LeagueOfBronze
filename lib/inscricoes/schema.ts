@@ -87,7 +87,10 @@ const tagField = z
       .string()
       .min(2, "A tag precisa de ao menos 2 caracteres.")
       .max(LIMITES_INSCRICAO.tag)
-      .regex(/^[A-Za-z0-9]+$/, "A tag usa só letras e números."),
+      // Letra de qualquer alfabeto, acentuada inclusive: a Riot aceita tag como «Caçu». Só
+      // ASCII aqui, o jogador com «ç» na tag não conseguia se inscrever e digitava outra (BR1)
+      // — que já era de outra pessoa, e o robô ligava a inscrição à conta errada.
+      .regex(/^[\p{L}\p{N}]+$/u, "A tag usa só letras e números."),
   );
 
 // ---------------------------------------------------------------- inscrição

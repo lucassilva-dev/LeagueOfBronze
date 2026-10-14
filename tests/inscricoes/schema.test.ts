@@ -66,6 +66,14 @@ describe("Riot ID", () => {
 
   it("recusa tag com caractere fora de letra e número", () => {
     expect(inscricaoPublicaSchema.safeParse({ ...valida, tag: "br 1" }).success).toBe(false);
+    expect(inscricaoPublicaSchema.safeParse({ ...valida, tag: "BR-1" }).success).toBe(false);
+    expect(inscricaoPublicaSchema.safeParse({ ...valida, tag: "😀😀" }).success).toBe(false);
+  });
+
+  it("aceita tag com acento — a Riot tem tag como «Caçu» (o jogador digitava BR1 e caía em conta alheia)", () => {
+    const r = inscricaoPublicaSchema.safeParse({ ...valida, nick: "Caçu", tag: "Caçu" });
+    expect(r.success).toBe(true);
+    expect(linhaDeInscricao(r.data!, EMAIL_DA_SESSAO).tag).toBe("CAÇU");
   });
 });
 
