@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ResumoDoCalendario4a } from "@/components/calendario-4a";
 import { calendarioAindaPorVir } from "@/lib/calendario-4a";
 import type { FaseDraft } from "@/lib/draft/motor";
-import { Eyebrow, GoldTitle, Pill, SectionTitle } from "@/components/lob/ui";
+import { Eyebrow, GoldTitleEmDuasLinhas, Pill, SectionTitle } from "@/components/lob/ui";
 import { Trailer4a } from "@/components/trailer-4a";
 import { isSupabaseConfigured } from "@/lib/data-store";
 import { lerDraftCompleto } from "@/lib/draft/store";
@@ -165,11 +165,10 @@ export async function HomePreTemporada() {
           <span aria-hidden style={{ width: 8, height: 8, borderRadius: "50%", background: estiloSelo.cor }} />
           {selo}
         </span>
-        <GoldTitle style={{ fontSize: "clamp(52px,11vw,148px)", lineHeight: 1.08, margin: "12px 0 calc(14px - 0.42em)" }}>
-          {t.homeTituloLinha1}
-          <br />
-          {t.homeTituloLinha2}
-        </GoldTitle>
+        <GoldTitleEmDuasLinhas
+          linhas={[t.homeTituloLinha1, t.homeTituloLinha2]}
+          style={{ fontSize: "clamp(52px,11vw,148px)", margin: "12px 0 calc(14px - 0.42em)" }}
+        />
         <p style={{ maxWidth: 620, fontSize: "clamp(15px,2.2vw,18px)", lineHeight: 1.55, color: "#a99e8b", margin: "0 0 26px" }}>
           {intro}
         </p>

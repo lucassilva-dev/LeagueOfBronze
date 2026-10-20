@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { HomePreTemporada } from "@/components/home-pre-temporada";
-import { Eyebrow, GoldTitle, Pill, SectionTitle, TeamMark } from "@/components/lob/ui";
+import { Eyebrow, GoldTitleEmDuasLinhas, Pill, SectionTitle, TeamMark } from "@/components/lob/ui";
 import { emPreTemporada } from "@/lib/fase-do-site";
 import { buildCalendarDays, buildFinalGame, buildSemifinalGames, type CalDay, type CalGame } from "@/lib/calendar";
 import {
@@ -178,11 +178,10 @@ async function HomeTemporada() {
       {/* HERO */}
       <section className="lob-fade" style={{ padding: "clamp(48px,8vw,88px) 0 30px" }}>
         <Eyebrow>{t.homeSobretitulo}</Eyebrow>
-        <GoldTitle style={{ fontSize: "clamp(52px,11vw,148px)", lineHeight: 1.08, margin: "12px 0 calc(14px - 0.42em)" }}>
-          {t.homeTituloLinha1.replace("{temporada}", temporada)}
-          <br />
-          {t.homeTituloLinha2.replace("{temporada}", temporada)}
-        </GoldTitle>
+        <GoldTitleEmDuasLinhas
+          linhas={[t.homeTituloLinha1.replace("{temporada}", temporada), t.homeTituloLinha2.replace("{temporada}", temporada)]}
+          style={{ fontSize: "clamp(52px,11vw,148px)", margin: "12px 0 calc(14px - 0.42em)" }}
+        />
         <p style={{ maxWidth: 600, fontSize: "clamp(15px,2.2vw,18px)", lineHeight: 1.55, color: "#a99e8b", margin: "0 0 26px" }}>
           {intro}
         </p>

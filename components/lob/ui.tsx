@@ -34,6 +34,57 @@ export function GoldTitle({
   );
 }
 
+/*
+ * Quanto os glifos da Anton passam da linha de base, em "em" — medido no navegador com
+ * `measureText` (actualBoundingBoxDescent/Ascent) em 2026-10-20. Só importa o que aparece
+ * em título de caixa alta.
+ */
+const DESCIDAS_ANTON: readonly [RegExp, number][] = [
+  [/Ç/, 0.31], // o rabinho do cedilha: o único que desce de verdade
+  [/,/, 0.12],
+  [/Q/, 0.1],
+];
+const DESCIDA_COMUM_ANTON = 0.01;
+const SUBIDA_MAIUSCULA_ANTON = 0.87;
+/** Maiúscula acentuada (Ã, É…) sobe mais que a letra comum. */
+const SUBIDA_ACENTO_ANTON = 1.11;
+const ACENTO_EM_MAIUSCULA = /[ÀÁÂÃÄÈÉÊËÌÍÎÏÒÓÔÕÖÙÚÛÜ]/;
+
+/**
+ * Espaço extra (em "em") a pôr entre duas linhas de um título para a de cima não encostar
+ * na de baixo.
+ *
+ * Com altura de linha 1,08, "4ª EDIÇÃO" em cima de "LEAGUE OF BRONZE" fazia o cedilha
+ * (0,31 abaixo da base) entrar no topo das maiúsculas de baixo (0,87 acima da base):
+ * 0,31 + 0,87 − 1,08 = 0,10 de sobreposição — o Ç cravado no U. Só a linha que tem o
+ * glifo que desce ganha espaço; as outras continuam com o ritmo do título.
+ */
+export function folgaEntreLinhas(deCima: string, deBaixo: string, alturaDaLinha: number, respiro = 0.08): number {
+  const desce = DESCIDAS_ANTON.reduce((maior, [glifo, d]) => (glifo.test(deCima) ? Math.max(maior, d) : maior), DESCIDA_COMUM_ANTON);
+  const sobe = ACENTO_EM_MAIUSCULA.test(deBaixo) ? SUBIDA_ACENTO_ANTON : SUBIDA_MAIUSCULA_ANTON;
+  const falta = desce + sobe + respiro - alturaDaLinha;
+  return falta > 0 ? Math.round(falta * 100) / 100 : 0;
+}
+
+/**
+ * Título dourado em duas linhas ("4ª EDIÇÃO" / "LEAGUE OF BRONZE"), com o espaço entre
+ * elas calculado pelo que cada linha tem — use no lugar de `<GoldTitle>` com `<br />`.
+ */
+export function GoldTitleEmDuasLinhas({
+  linhas,
+  alturaDaLinha = 1.08,
+  style,
+}: Readonly<{ linhas: readonly [string, string]; alturaDaLinha?: number; style?: CSSProperties }>) {
+  const [deCima, deBaixo] = linhas;
+  const folga = folgaEntreLinhas(deCima, deBaixo, alturaDaLinha);
+  return (
+    <GoldTitle style={{ lineHeight: alturaDaLinha, ...style }}>
+      <span style={{ display: "block", marginBottom: folga ? `${folga}em` : undefined }}>{deCima}</span>
+      <span style={{ display: "block" }}>{deBaixo}</span>
+    </GoldTitle>
+  );
+}
+
 // Título de seção: losango + Anton.
 export function SectionTitle({
   children,
