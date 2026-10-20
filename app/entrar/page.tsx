@@ -8,6 +8,7 @@ import { Eyebrow } from "@/components/lob/ui";
 import { getMessages } from "@/lib/i18n/server";
 import { JOGADOR_COOKIE, identidadePorToken } from "@/lib/jogadores/auth";
 import { getAdminIdentityDeCookies } from "@/lib/admin-auth";
+import { destinoDeVolta } from "@/lib/destino-de-volta";
 
 /** Dinâmica pela CSP por nonce e porque lê a sessão. */
 export const dynamic = "force-dynamic";
@@ -24,8 +25,12 @@ export const metadata: Metadata = {
  * deixa um formulário de login encolhido no canto esquerdo com meia tela vazia ao
  * lado. Uma tela com um único objetivo se centraliza e para de competir com o resto.
  */
-export default async function EntrarPage() {
+export default async function EntrarPage({
+  searchParams,
+}: Readonly<{ searchParams: Promise<Record<string, string | string[] | undefined>> }>) {
   const { inscricao: t } = await getMessages();
+  // Lista fechada de destinos (lib/destino-de-volta.ts): nunca o que vier cru na URL.
+  const volta = destinoDeVolta((await searchParams).volta);
 
   /*
    * Quem já está logado não tem o que fazer aqui — mostrar o formulário de novo só
@@ -40,7 +45,7 @@ export default async function EntrarPage() {
   if (admin) redirect("/admin");
 
   const jogador = await identidadePorToken(jar.get(JOGADOR_COOKIE)?.value).catch(() => null);
-  if (jogador) redirect("/minha-inscricao");
+  if (jogador) redirect(volta ?? "/minha-inscricao");
 
   return (
     <main
@@ -72,7 +77,7 @@ export default async function EntrarPage() {
           </p>
         </header>
 
-        <Entrar t={t} />
+        <Entrar t={t} volta={volta} />
 
         <p style={{ margin: "22px 0 0", textAlign: "center" }}>
           <Link href="/" style={{ color: "var(--lob-muted)", fontSize: 13 }}>

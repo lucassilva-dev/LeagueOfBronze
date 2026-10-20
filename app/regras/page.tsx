@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Fragment, type CSSProperties, type ReactNode } from "react";
 
+import { CalendarioDa4a } from "@/components/calendario-4a";
 import { Eyebrow, GoldTitle, SectionTitle } from "@/components/lob/ui";
 import { CARTAS_ATIVAS, type CardDef } from "@/lib/cards";
 import { getMessages } from "@/lib/i18n/server";
@@ -139,7 +140,7 @@ function Rotulo({ children, cor = "#c98a4b" }: Readonly<{ children: ReactNode; c
 
 export default async function RegrasPage() {
   const [mensagens, config] = await Promise.all([getMessages(), lerConfigOuNulo()]);
-  const { paginasRegras: t, paginasStats: ts, conformidade: conf, compartilhados: tc } = mensagens;
+  const { paginasRegras: t, paginasStats: ts, conformidade: conf, compartilhados: tc, calendario4a: tCal } = mensagens;
 
   // ---------------------------------------------------------- números da configuração
   const taxa =
@@ -255,21 +256,6 @@ export default async function RegrasPage() {
     { k: t.pontuacaoFinalK, v: t.pontuacaoFinalV },
     { k: t.pontuacaoSeriesK, v: t.pontuacaoSeriesV },
   ];
-
-  const CALENDARIO = [
-    { data: t.calDatas1a4, turno: t.turnoManha, horarios: "09:00 · 10:30 · 12:00", oque: t.calSeries3 },
-    { data: t.calDatas1a4, turno: t.turnoTarde, horarios: "14:00 · 15:30 · 17:00", oque: t.calSeries3 },
-    { data: t.calData5, turno: t.turnoManha, horarios: "09:00 · 10:30 · 12:00", oque: t.calSeries3 },
-    { data: t.calData5, turno: t.turnoTarde, horarios: "14:00", oque: t.calUltimaSerie },
-    { data: t.calData6, turno: t.turnoTarde, horarios: "14:00 · 16:00", oque: t.calSemis },
-    { data: t.calData6, turno: t.turnoNoite, horarios: "18:30", oque: t.calFinal },
-  ];
-  const celula: CSSProperties = {
-    padding: "11px 14px",
-    borderBottom: "1px solid rgba(201,138,75,.12)",
-    textAlign: "left",
-    verticalAlign: "top",
-  };
 
   return (
     <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "0 clamp(16px,4vw,24px) 96px" }}>
@@ -547,54 +533,14 @@ export default async function RegrasPage() {
         <p style={{ ...TEXTO, maxWidth: 820, marginTop: 10 }}>{t.premiacaoOrganizadores}</p>
       </Secao>
 
-      {/* ---------------------------------------------------------- 7. CALENDÁRIO MODELO */}
+      {/* ---------------------------------------------------------- 7. CALENDÁRIO */}
+      {/*
+        O calendário oficial, de lib/calendario-4a.ts — o mesmo que /calendario e a home
+        mostram. Antes aqui havia um "calendário modelo" de 8 times escrito à mão.
+      */}
       <Secao id="calendario" titulo={t.calendarioTitulo}>
-        <p style={{ ...TEXTO, maxWidth: 820, marginBottom: 14 }}>{t.calendarioIntro}</p>
-        {/*
-          A tabela tem largura mínima e rola DENTRO da caixa no celular — a página em si
-          nunca ganha rolagem lateral.
-        */}
-        <div
-          role="region"
-          aria-label={t.calendarioTitulo}
-          tabIndex={0}
-          className="lob-card-2 lob-scroll"
-          style={{ overflowX: "auto" }}
-        >
-          <table style={{ width: "100%", minWidth: 560, borderCollapse: "collapse", fontSize: 13.5, color: "#b3a690" }}>
-            <thead>
-              <tr style={{ background: "rgba(201,138,75,.10)" }}>
-                {[t.calColData, t.calColTurno, t.calColHorarios, t.calColOque].map((col) => (
-                  <th
-                    key={col}
-                    scope="col"
-                    style={{ ...celula, fontSize: 10.5, fontWeight: 600, letterSpacing: ".12em", textTransform: "uppercase", color: "#c98a4b" }}
-                  >
-                    {col}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {CALENDARIO.map((linha, i) => (
-                <tr key={i}>
-                  <th scope="row" style={{ ...celula, fontWeight: 600, color: "#e9dfcd", whiteSpace: "nowrap" }}>
-                    {linha.data}
-                  </th>
-                  <td style={{ ...celula, whiteSpace: "nowrap" }}>{linha.turno}</td>
-                  <td style={{ ...celula, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", color: "#e2d6c0" }}>
-                    {linha.horarios}
-                  </td>
-                  <td style={celula}>{linha.oque}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p style={{ ...TEXTO, maxWidth: 820, marginTop: 14 }}>{t.calendarioNota}</p>
-        <p style={{ margin: "10px 0 0", maxWidth: 820, fontSize: 13, lineHeight: 1.6, color: "#8f8472" }}>
-          {t.calendarioOutros}
-        </p>
+        <p style={{ ...TEXTO, maxWidth: 820, marginBottom: 16 }}>{tCal.intro}</p>
+        <CalendarioDa4a t={tCal} localeTag={tc.localeTag} />
       </Secao>
     </div>
   );

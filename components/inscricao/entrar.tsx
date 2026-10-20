@@ -26,7 +26,18 @@ import { avisarSessaoMudou } from "@/lib/sessao-mudou";
  * inexistente. Errar o formato não abre porta nenhuma: dá o mesmo "inválido" de
  * sempre.
  */
-export default function Entrar({ t }: Readonly<{ t: Messages["inscricao"] }>) {
+export default function Entrar({
+  t,
+  volta = null,
+}: Readonly<{
+  t: Messages["inscricao"];
+  /**
+   * Para onde o JOGADOR volta depois de entrar — já conferido pela página contra uma lista
+   * fechada. O capitão que perdeu a sessão no dia do draft chega aqui vindo de /capitao e
+   * precisa voltar para lá, não para a ficha de inscrição.
+   */
+  volta?: string | null;
+}>) {
   const [identificador, setIdentificador] = useState("");
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState<string | null>(null);
@@ -55,7 +66,7 @@ export default function Entrar({ t }: Readonly<{ t: Messages["inscricao"] }>) {
         avisarSessaoMudou();
         // Navegação de página inteira: o cabeçalho e as telas com sessão precisam ser
         // remontados com o cookie novo.
-        window.location.assign(ehJogador ? "/minha-inscricao" : "/admin");
+        window.location.assign(ehJogador ? (volta ?? "/minha-inscricao") : "/admin");
         return;
       }
       setErro(corpo.error ?? t.erroGenerico);

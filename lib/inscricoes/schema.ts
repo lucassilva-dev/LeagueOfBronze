@@ -416,6 +416,8 @@ export const configPatchSchema = z.object({
   data_draft: dataOpcional,
   inicio_campeonato: dataOpcional,
   jogadores_por_time: z.number().int().min(1).max(10).optional(),
+  /** Teto de times. Nulo = sem teto. Mesmo intervalo do `check` do banco. */
+  max_times: z.number().int().min(1).max(20).nullable().optional(),
   orcamento_por_time: z.number().int().min(1).max(999).optional(),
   min_ranqueadas: z.number().int().min(0).max(999).optional(),
   dias_no_grupo: z.number().int().min(0).max(3650).optional(),
@@ -479,17 +481,37 @@ export function contaParaTimes(situacao: string): boolean {
  * Quantos times cabem, a partir de QUANTOS estão na conta — os elegíveis no painel
  * (`contaParaTimes`), os aprovados no draft (`montarDraftDosAprovados`).
  *
- * NÃO existe teto de inscrições nesta edição: a organização aceita até bater o
- * mínimo, mirando ~50 pessoas. Então o número de times é derivado, nunca fixo — o
- * design entregue tinha 6 times cravados no código, o que não vale mais.
+ * O número de times é derivado (piso de quantos ÷ jogadores por time), com um TETO
+ * opcional, `max_times` na Configuração. A 4ª Edição fechou em 30 jogadores = 6 times
+ * (decisão do Lucas, 2026-10-20), e o calendário de 18 séries só fecha com 6: sem o
+ * teto, 35 aprovados viravam 7 times. Teto nulo = sem teto, como era antes.
  *
- * A sobra é o resto: quem fica de fora quando os times fecham. Não é fila
- * com ordem: a organização resolve na conversa do grupo.
+ * A sobra é o resto: quem fica de fora quando os times fecham — inclusive quem passa do
+ * teto. Não é fila com ordem: a organização resolve na conversa do grupo, e quem sobra
+ * vira reserva oficial (regra 6).
  */
-export function distribuirTimes(quantos: number, jogadoresPorTime = 5) {
+export function distribuirTimes(quantos: number, jogadoresPorTime = 5, maxTimes: number | null = null) {
   if (jogadoresPorTime <= 0) throw new Error("jogadoresPorTime precisa ser positivo.");
-  const times = Math.floor(quantos / jogadoresPorTime);
+  const cabem = Math.floor(quantos / jogadoresPorTime);
+  const teto = maxTimes !== null && Number.isInteger(maxTimes) && maxTimes > 0 ? maxTimes : null;
+  const times = teto === null ? cabem : Math.min(cabem, teto);
   return { times, vagas: times * jogadoresPorTime, sobra: quantos - times * jogadoresPorTime };
+}
+
+/**
+ * O orçamento por time que o regulamento manda: a média de pontos por time + 15%,
+ * arredondada para cima (seção "Draft por pontos" de /regras).
+ *
+ * Conta em inteiros — `28.33 × 1.15` em ponto flutuante pode cair um centésimo abaixo
+ * de um inteiro exato e "arredondar para cima" para o número errado.
+ */
+export function orcamentoSugerido(totalDePontos: number, times: number): number | null {
+  if (!Number.isInteger(times) || times <= 0 || !Number.isFinite(totalDePontos) || totalDePontos <= 0) {
+    return null;
+  }
+  const numerador = Math.round(totalDePontos) * 115;
+  const denominador = times * 100;
+  return Math.floor((numerador + denominador - 1) / denominador);
 }
 
 /**
@@ -502,11 +524,21 @@ export function viabilidadeDeOrcamento(
   pontos: readonly number[],
   jogadoresPorTime = 5,
   orcamentoPorTime = 30,
+  maxTimes: number | null = null,
 ) {
-  const { times, vagas, sobra } = distribuirTimes(pontos.length, jogadoresPorTime);
+  const { times, vagas, sobra } = distribuirTimes(pontos.length, jogadoresPorTime, maxTimes);
   // Só os que entram contam para o teto; a sobra fica de fora dos times.
   const maisBaratos = [...pontos].sort((a, b) => a - b).slice(0, vagas);
   const total = maisBaratos.reduce((soma, p) => soma + p, 0);
   const teto = times * orcamentoPorTime;
-  return { times, vagas, sobra, total, teto, cabe: total <= teto, folga: teto - total };
+  return {
+    times,
+    vagas,
+    sobra,
+    total,
+    teto,
+    cabe: total <= teto,
+    folga: teto - total,
+    sugerido: orcamentoSugerido(total, times),
+  };
 }

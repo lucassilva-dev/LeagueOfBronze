@@ -21,6 +21,10 @@ export const draft = definir({
     preparandoTexto: "Os times e os capitães já estão definidos. O draft começa quando a organização iniciar.",
     pausado: "Draft pausado",
     pausadoTexto: "A organização interrompeu o relógio. Ninguém escolhe enquanto isso.",
+    pausadoAtrasoTexto:
+      "O relógio parou sozinho: ficou muito tempo sem ninguém acompanhando o draft. A organização retoma em instantes.",
+    pausadoSemJogadorTexto:
+      "O relógio parou sozinho: o time da vez não tem jogador que caiba no orçamento. A organização está resolvendo.",
     encerrado: "Draft encerrado",
     encerradoTexto: "Os elencos estão fechados. Boa sorte a todos.",
 
@@ -57,6 +61,7 @@ export const draft = definir({
     escolher: "ESCOLHER",
     escolhendo: "ESCOLHENDO…",
     caroDemais: "acima do que você pode gastar agora",
+    naoFecha: "deixaria algum elenco sem como fechar no orçamento",
     buscarJogador: "Buscar por nick, elo ou rota",
     nenhumDisponivel: "Ninguém disponível no momento.",
     meuElenco: "MEU ELENCO",
@@ -98,6 +103,10 @@ export const draft = definir({
     preparandoTexto: "Teams and captains are set. The draft begins when the organizers start it.",
     pausado: "Draft paused",
     pausadoTexto: "The organizers stopped the clock. Nobody picks in the meantime.",
+    pausadoAtrasoTexto:
+      "The clock stopped on its own: nobody was following the draft for too long. The organizers will resume it shortly.",
+    pausadoSemJogadorTexto:
+      "The clock stopped on its own: the team on the clock has no player that fits its budget. The organizers are sorting it out.",
     encerrado: "Draft finished",
     encerradoTexto: "Rosters are closed. Good luck to everyone.",
 
@@ -131,6 +140,7 @@ export const draft = definir({
     escolher: "PICK",
     escolhendo: "PICKING…",
     caroDemais: "above what you can spend right now",
+    naoFecha: "would leave a roster unable to fill up within budget",
     buscarJogador: "Search by name, rank or role",
     nenhumDisponivel: "Nobody available right now.",
     meuElenco: "MY ROSTER",

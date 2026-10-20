@@ -35,11 +35,15 @@ export async function SiteFrame({ children }: SiteFrameProps) {
   const t = await getMessages();
 
   // Na pré-temporada o menu fica só com o que existe de fato: sem times no ar, as abas da
-  // temporada levariam a páginas vazias. Elas voltam quando lib/fase-do-site.ts virar.
+  // temporada levariam a páginas vazias. Elas voltam quando lib/fase-do-site.ts virar. O
+  // calendário fica, porque as datas da 4ª já estão publicadas.
   const navLabels: NavLabel[] = emPreTemporada()
     ? [
         { href: "/", label: t.comum.navInicio },
         { href: "/inscricao", label: t.comum.navInscricao, destaque: true },
+        // O calendário da 4ª já está decidido (lib/calendario-4a.ts) e a página mostra a
+        // versão planejada enquanto a temporada não tem séries.
+        { href: "/calendario", label: t.comum.navCalendario },
         { href: "/regras", label: t.comum.navRegras },
         { href: "/temporadas", label: t.comum.navTemporadas },
       ]

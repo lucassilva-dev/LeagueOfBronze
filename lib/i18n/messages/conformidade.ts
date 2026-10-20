@@ -31,10 +31,16 @@ export const conformidade = definir({
       "Foto e Riot ID são publicados com autorização do participante, conforme o regulamento. Para correção ou remoção, escreva para",
     consentimentoLink: "Saiba mais no aviso legal",
 
+    // O bloco só aparece com a temporada no ar ENCERRADA, então fala da edição seguinte a
+    // ela — qualquer que seja. Por isso não crava número de edição nem data: `{periodo}`
+    // vem do calendário oficial (lib/calendario-4a.ts) enquanto ele ainda está por vir;
+    // passado ele, vale o texto sem data.
     proximaEdicaoSelo: "Em organização",
-    proximaEdicaoTitulo: "League of Bronze — 4ª Edição",
+    proximaEdicaoTitulo: "League of Bronze — próxima edição",
     proximaEdicaoTexto:
-      "A próxima edição já está sendo montada, com início previsto para o começo de novembro de 2026. A data exata ainda será confirmada — acompanhe por aqui e pelo Discord do grupo.",
+      "A próxima edição já está sendo montada e tem data marcada: {periodo}. O calendário completo está nas Regras — acompanhe por aqui e pelo Discord do grupo.",
+    proximaEdicaoTextoSemData:
+      "A próxima edição já está sendo montada. As datas saem aqui e no Discord do grupo assim que forem definidas.",
     // Rótulos neutros de propósito: as duas páginas dizem sozinhas em que pé estão
     // ("as inscrições ainda não abriram", "o draft ainda não foi montado"). Um botão
     // "FAZER MINHA INSCRIÇÃO" com a janela fechada prometeria o que não entrega.
@@ -64,9 +70,11 @@ export const conformidade = definir({
     consentimentoLink: "Read more in the legal notice",
 
     proximaEdicaoSelo: "Being organised",
-    proximaEdicaoTitulo: "League of Bronze — 4th Edition",
+    proximaEdicaoTitulo: "League of Bronze — next edition",
     proximaEdicaoTexto:
-      "The next edition is already being put together, expected to start in early November 2026. The exact date is still to be confirmed — follow it here and on the group's Discord.",
+      "The next edition is already being put together and has its dates set: {periodo}. The full schedule is in the Rules — follow it here and on the group's Discord.",
+    proximaEdicaoTextoSemData:
+      "The next edition is already being put together. Dates will be announced here and on the group's Discord as soon as they are set.",
     proximaEdicaoInscricao: "SIGN-UP →",
     proximaEdicaoDraft: "LIVE DRAFT →",
 

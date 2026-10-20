@@ -1,11 +1,21 @@
 import Link from "next/link";
 
+import { CalendarioDa4a } from "@/components/calendario-4a";
 import { Eyebrow, GoldTitle, Pill, TeamMark } from "@/components/lob/ui";
 import { PreTemporadaAviso } from "@/components/pre-temporada-aviso";
-import { semTemporadaAoVivo } from "@/lib/fase-do-site";
-import { buildCalendarDays, buildFinalGame } from "@/lib/calendar";
+import {
+  CALENDARIO_4A,
+  calendarioAindaPorVir,
+  calendarioEDestaTemporada,
+  diaDoSlot,
+  horaDoSlot,
+} from "@/lib/calendario-4a";
+import { emPreTemporada, semTemporadaAoVivo } from "@/lib/fase-do-site";
+import { buildCalendarDays, buildFinalGame, buildSemifinalGames, type CalGame } from "@/lib/calendar";
 import { getLocale, getMessages } from "@/lib/i18n/server";
+import type { Messages } from "@/lib/i18n/messages";
 import { getServerDataset } from "@/lib/server-data";
+import { nomeDaTemporada } from "@/lib/i18n/nome-da-temporada";
 
 export const dynamic = "force-dynamic";
 
@@ -21,10 +31,92 @@ function diaDaSemanaEmIngles(dateKey: string, fallback: string) {
     .toUpperCase();
 }
 
+type Textos = Messages["paginasCompeticao"];
+
+/**
+ * O calendário PLANEJADO da 4ª (lib/calendario-4a.ts) aparece enquanto a temporada ao vivo
+ * não tem série nenhuma para mostrar:
+ *  - na pré-temporada com a 3ª ainda no ar e já encerrada (o dataset ao vivo é o dela até
+ *    alguém iniciar a 4ª no painel — mostrar o calendário de julho seria mostrar o passado);
+ *  - entre iniciar a 4ª e criar as séries (sem times, ou com os times do draft e zero séries).
+ * Assim que o painel cria as 15 séries, esta página passa a mostrar as séries de verdade,
+ * com os nomes dos times.
+ *
+ * Só enquanto o calendário oficial ainda está por vir: passado 29/11/2026, a grade da 4ª
+ * com "Time 1…6" não pode reaparecer na pré-temporada da edição seguinte.
+ */
+function mostrarPlanejado(dataset: Parameters<typeof semTemporadaAoVivo>[0] & { tournament: { status: string } }) {
+  if (!calendarioAindaPorVir()) return false;
+  if (dataset.seriesMatches.length === 0) return true;
+  if (semTemporadaAoVivo(dataset)) return true;
+  return emPreTemporada() && dataset.tournament.status === "finished";
+}
+
+function CartaoDaSerie({ game, textos, turnoLabel }: Readonly<{ game: CalGame; textos: Textos; turnoLabel: (turno: string) => string }>) {
+  const played = game.scoreA + game.scoreB > 0;
+  const aWon = game.done && game.winnerId === game.teamA.id;
+  const bWon = game.done && game.winnerId === game.teamB.id;
+  const nameColor = (won: boolean) => (game.done ? (won ? "#f5d79a" : "#7c715e") : "#e9dfcd");
+  const rotulo = game.stage === "SEMIFINAL" ? textos.faseSemifinal.toUpperCase() : textos.calendarioJogo;
+  return (
+    <Link href={`/partidas/${game.id}`} className="lob-card-2 lob-lift" style={{ padding: "16px 18px", textDecoration: "none", display: "block", background: game.done ? "linear-gradient(180deg,#15170f,#0c0d07)" : undefined, borderColor: game.done ? (game.walkover ? "rgba(232,184,120,.42)" : "rgba(95,191,106,.32)") : undefined }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 10.5, letterSpacing: ".08em", color: "#8f8472", marginBottom: 14 }}>
+        <span>{rotulo} {game.n}{game.turno ? ` · ${turnoLabel(game.turno)}` : ""}</span>
+        {game.done ? (
+          game.walkover ? (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 2, background: "rgba(232,184,120,.16)", border: "1px solid rgba(232,184,120,.5)", color: "#e6c592", fontWeight: 700 }}>⚖ {textos.calendarioStatusWo}</span>
+          ) : (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 2, background: "rgba(95,191,106,.16)", border: "1px solid rgba(95,191,106,.5)", color: "#8fe0a0", fontWeight: 700 }}>✓ {textos.calendarioStatusFinalizado}</span>
+          )
+        ) : (
+          // Sem horário definido não se desenha o selo: antes sobrava uma
+          // borda com nada dentro na série ainda sem hora marcada.
+          game.hora ? (
+            <span style={{ padding: "2px 8px", border: "1px solid rgba(201,138,75,.3)", borderRadius: 2, color: "#cfa877" }}>{game.hora}</span>
+          ) : null
+        )}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+          <TeamMark imageUrl={game.teamA.imageUrl} color={game.teamA.color} name={game.teamA.name} size={24} />
+          <span style={{ fontWeight: aWon ? 700 : 600, fontSize: 13.5, color: nameColor(aWon), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{game.teamA.name}</span>
+        </div>
+        <div style={{ textAlign: "center" }}>
+          <div className="lob-display" style={{ fontSize: 22, color: played ? "#f0c88a" : "#6f6656", letterSpacing: ".08em" }}>{played ? `${game.scoreA} – ${game.scoreB}` : "—"}</div>
+          <div style={{ fontSize: 9, letterSpacing: ".10em", color: "#5f5747", marginTop: 2 }}>{game.format === "BO5" ? textos.formatoBo5 : textos.formatoBo3}</div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, justifyContent: "flex-end" }}>
+          <span style={{ fontWeight: bWon ? 700 : 600, fontSize: 13.5, color: nameColor(bWon), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "right" }}>{game.teamB.name}</span>
+          <TeamMark imageUrl={game.teamB.imageUrl} color={game.teamB.color} name={game.teamB.name} size={24} />
+        </div>
+      </div>
+      {game.walkover ? (
+        <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid rgba(201,138,75,.14)", fontSize: 11, lineHeight: 1.45, color: "#cbb892" }}>
+          <span style={{ color: "#e6b356", fontWeight: 700 }}>{textos.calendarioVitoriaWo}</span>
+          {game.walkoverReason ? <> · {game.walkoverReason}</> : null}
+        </div>
+      ) : null}
+    </Link>
+  );
+}
+
+function CabecalhoDoDia({ titulo, detalhe, dourado = false }: Readonly<{ titulo: string; detalhe: string; dourado?: boolean }>) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+        <span className="lob-display" style={{ fontSize: 32, color: "#f2ebdf" }}>{titulo}</span>
+        <span style={{ fontSize: 12, letterSpacing: ".12em", color: "#c98a4b" }}>{detalhe}</span>
+      </div>
+      <div style={{ height: 1, flex: 1, background: `linear-gradient(90deg,${dourado ? "rgba(232,184,120,.5)" : "rgba(201,138,75,.4)"},transparent)` }} />
+    </div>
+  );
+}
+
 export default async function CalendarioPage() {
   const locale = await getLocale();
   const t = await getMessages();
   const textos = t.paginasCompeticao;
+  const tCal = t.calendario4a;
   const turnoLabel = (turno: string) => {
     if (turno === "Matutino") return textos.calendarioTurnoMatutino;
     if (turno === "Vespertino") return textos.calendarioTurnoVespertino;
@@ -32,18 +124,58 @@ export default async function CalendarioPage() {
     return turno.toUpperCase();
   };
   const { dataset } = await getServerDataset();
+
+  if (mostrarPlanejado(dataset)) {
+    return (
+      <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "0 clamp(16px,4vw,24px) 96px" }}>
+        <section className="lob-fade" style={{ padding: "clamp(40px,7vw,56px) 0 20px" }}>
+          <Eyebrow>{t.preTemporada.avisoSobretitulo}</Eyebrow>
+          <GoldTitle style={{ fontSize: "clamp(44px,10vw,120px)", lineHeight: 0.88 }}>{textos.calendarioTitulo}</GoldTitle>
+          <p style={{ maxWidth: 680, fontSize: 16, lineHeight: 1.55, color: "#a99e8b", margin: "0 0 8px" }}>{tCal.intro}</p>
+        </section>
+        <section className="lob-fade">
+          <CalendarioDa4a t={tCal} localeTag={t.compartilhados.localeTag} />
+        </section>
+      </div>
+    );
+  }
+
   if (semTemporadaAoVivo(dataset)) return <PreTemporadaAviso pagina="calendario" />;
+
   const days = buildCalendarDays(dataset);
-  const confrontos = days.reduce((sum, day) => sum + day.games.length, 0);
+  const semifinais = buildSemifinalGames(dataset);
   const finalGame = buildFinalGame(dataset);
+
+  // O calendário oficial completa o que ainda não virou série — as semifinais e a final só
+  // são criadas quando a tabela fecha —, mas só se ele for DESTA temporada. Sem isto, com as
+  // 15 séries criadas, a página dizia "15 séries" (a home diz 18) e os horários de 29/11
+  // sumiam até alguém cadastrar as semifinais.
+  const diasDasSeries = [...days.map((d) => d.dateKey), ...semifinais.map((g) => g.dateKey), ...(finalGame ? [finalGame.dateKey] : [])];
+  const oficial = calendarioEDestaTemporada(diasDasSeries);
+  const semisPrevistas = oficial && semifinais.length === 0 ? CALENDARIO_4A.filter((s) => s.tipo === "semifinal") : [];
+  const confrontos =
+    days.reduce((sum, day) => sum + day.games.length, 0) +
+    semifinais.length +
+    semisPrevistas.length +
+    (finalGame || oficial ? 1 : 0);
   const finalPlayed = finalGame ? finalGame.scoreA + finalGame.scoreB > 0 : false;
   const finalAWon = finalGame ? finalGame.done && finalGame.winnerId === finalGame.teamA.id : false;
   const finalBWon = finalGame ? finalGame.done && finalGame.winnerId === finalGame.teamB.id : false;
 
+  // Sem a final no dataset, o cartão de espera usa a data do calendário oficial (e não
+  // mais "02/08", a final da 3ª que ficou escrita aqui) — só se ele for desta temporada.
+  const slotDaFinal = oficial ? CALENDARIO_4A.find((s) => s.tipo === "final") : undefined;
+  const dataDaFinal = slotDaFinal ? diaDoSlot(slotDaFinal).slice(5).split("-").reverse().join("/") : "";
+  const dataDasSemisPrevistas = semisPrevistas[0] ? diaDoSlot(semisPrevistas[0]).slice(5).split("-").reverse().join("/") : "";
+  const semisPorDia = new Map<string, CalGame[]>();
+  for (const semi of semifinais) semisPorDia.set(semi.dateKey, [...(semisPorDia.get(semi.dateKey) ?? []), semi]);
+
   return (
     <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "0 clamp(16px,4vw,24px) 96px" }}>
       <section className="lob-fade" style={{ padding: "clamp(40px,7vw,56px) 0 20px" }}>
-        <Eyebrow>{textos.calendarioEyebrow}</Eyebrow>
+        <Eyebrow>
+          {textos.calendarioEyebrow.replace("{temporada}", nomeDaTemporada(dataset.tournament.name, t.compartilhados.localeTag))}
+        </Eyebrow>
         <GoldTitle style={{ fontSize: "clamp(44px,10vw,120px)", lineHeight: 0.88 }}>{textos.calendarioTitulo}</GoldTitle>
         <p style={{ maxWidth: 620, fontSize: 16, lineHeight: 1.55, color: "#a99e8b", margin: "0 0 20px" }}>
           {textos.calendarioIntro}
@@ -58,75 +190,48 @@ export default async function CalendarioPage() {
 
       {days.map((day) => (
         <section key={day.dateKey} className="lob-fade" style={{ marginTop: 34 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-              <span className="lob-display" style={{ fontSize: 32, color: "#f2ebdf" }}>{day.dateLabel}</span>
-              <span style={{ fontSize: 12, letterSpacing: ".12em", color: "#c98a4b" }}>
-                {locale === "en" ? diaDaSemanaEmIngles(day.dateKey, day.dia) : day.dia}
-              </span>
-            </div>
-            <div style={{ height: 1, flex: 1, background: "linear-gradient(90deg,rgba(201,138,75,.4),transparent)" }} />
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(330px,1fr))", gap: 12 }}>
-            {day.games.map((game) => {
-              const played = game.scoreA + game.scoreB > 0;
-              const aWon = game.done && game.winnerId === game.teamA.id;
-              const bWon = game.done && game.winnerId === game.teamB.id;
-              const nameColor = (won: boolean) => (game.done ? (won ? "#f5d79a" : "#7c715e") : "#e9dfcd");
-              return (
-              <Link key={game.id} href={`/partidas/${game.id}`} className="lob-card-2 lob-lift" style={{ padding: "16px 18px", textDecoration: "none", display: "block", background: game.done ? "linear-gradient(180deg,#15170f,#0c0d07)" : undefined, borderColor: game.done ? (game.walkover ? "rgba(232,184,120,.42)" : "rgba(95,191,106,.32)") : undefined }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 10.5, letterSpacing: ".08em", color: "#8f8472", marginBottom: 14 }}>
-                  <span>{textos.calendarioJogo} {game.n}{game.turno ? ` · ${turnoLabel(game.turno)}` : ""}</span>
-                  {game.done ? (
-                    game.walkover ? (
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 2, background: "rgba(232,184,120,.16)", border: "1px solid rgba(232,184,120,.5)", color: "#e6c592", fontWeight: 700 }}>⚖ {textos.calendarioStatusWo}</span>
-                    ) : (
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 2, background: "rgba(95,191,106,.16)", border: "1px solid rgba(95,191,106,.5)", color: "#8fe0a0", fontWeight: 700 }}>✓ {textos.calendarioStatusFinalizado}</span>
-                    )
-                  ) : (
-                    // Sem horário definido não se desenha o selo: antes sobrava uma
-                    // borda com nada dentro na série ainda sem hora marcada.
-                    game.hora ? (
-                      <span style={{ padding: "2px 8px", border: "1px solid rgba(201,138,75,.3)", borderRadius: 2, color: "#cfa877" }}>{game.hora}</span>
-                    ) : null
-                  )}
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 10 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                    <TeamMark imageUrl={game.teamA.imageUrl} color={game.teamA.color} name={game.teamA.name} size={24} />
-                    <span style={{ fontWeight: aWon ? 700 : 600, fontSize: 13.5, color: nameColor(aWon), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{game.teamA.name}</span>
-                  </div>
-                  <div style={{ textAlign: "center" }}>
-                    <div className="lob-display" style={{ fontSize: 22, color: played ? "#f0c88a" : "#6f6656", letterSpacing: ".08em" }}>{played ? `${game.scoreA} – ${game.scoreB}` : "—"}</div>
-                    <div style={{ fontSize: 9, letterSpacing: ".10em", color: "#5f5747", marginTop: 2 }}>{game.format === "BO5" ? textos.formatoBo5 : textos.formatoBo3}</div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, justifyContent: "flex-end" }}>
-                    <span style={{ fontWeight: bWon ? 700 : 600, fontSize: 13.5, color: nameColor(bWon), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "right" }}>{game.teamB.name}</span>
-                    <TeamMark imageUrl={game.teamB.imageUrl} color={game.teamB.color} name={game.teamB.name} size={24} />
-                  </div>
-                </div>
-                {game.walkover ? (
-                  <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid rgba(201,138,75,.14)", fontSize: 11, lineHeight: 1.45, color: "#cbb892" }}>
-                    <span style={{ color: "#e6b356", fontWeight: 700 }}>{textos.calendarioVitoriaWo}</span>
-                    {game.walkoverReason ? <> · {game.walkoverReason}</> : null}
-                  </div>
-                ) : null}
-              </Link>
-              );
-            })}
+          <CabecalhoDoDia titulo={day.dateLabel} detalhe={locale === "en" ? diaDaSemanaEmIngles(day.dateKey, day.dia) : day.dia} />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(min(100%,330px),1fr))", gap: 12 }}>
+            {day.games.map((game) => (
+              <CartaoDaSerie key={game.id} game={game} textos={textos} turnoLabel={turnoLabel} />
+            ))}
           </div>
         </section>
       ))}
 
+      {/* SEMIFINAIS — existem a partir da 4ª; antes desta página elas não apareciam. */}
+      {[...semisPorDia.entries()].map(([dateKey, jogos]) => (
+        <section key={`semi-${dateKey}`} className="lob-fade" style={{ marginTop: 40 }}>
+          <CabecalhoDoDia titulo={jogos[0]!.dateLabel} detalhe={`${textos.calendarioSemifinaisTitulo} · ${textos.calendarioSemifinaisDia}`} dourado />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(min(100%,330px),1fr))", gap: 12 }}>
+            {jogos.map((game) => (
+              <CartaoDaSerie key={game.id} game={game} textos={textos} turnoLabel={turnoLabel} />
+            ))}
+          </div>
+        </section>
+      ))}
+
+      {/* SEMIFINAIS PREVISTAS — do calendário oficial, enquanto as séries não existem. */}
+      {semisPrevistas.length > 0 ? (
+        <section className="lob-fade" style={{ marginTop: 40 }}>
+          <CabecalhoDoDia titulo={dataDasSemisPrevistas} detalhe={`${textos.calendarioSemifinaisTitulo} · ${textos.calendarioSemifinaisDia}`} dourado />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(min(100%,330px),1fr))", gap: 12 }}>
+            {semisPrevistas.map((slot) => (
+              <div key={slot.quando} className="lob-card-2" style={{ padding: "16px 18px", borderStyle: "dashed", borderColor: "rgba(232,97,140,.45)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 10.5, letterSpacing: ".08em", color: "#8f8472", marginBottom: 10 }}>
+                  <span>{textos.faseSemifinal.toUpperCase()} {slot.semifinal}</span>
+                  <span style={{ padding: "2px 8px", border: "1px solid rgba(201,138,75,.3)", borderRadius: 2, color: "#cfa877" }}>{horaDoSlot(slot)}</span>
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#f6c6d5" }}>{slot.semifinal === 1 ? tCal.semifinal1 : tCal.semifinal2}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       {/* GRANDE FINAL */}
       <section className="lob-fade" style={{ marginTop: 40 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-            <span className="lob-display" style={{ fontSize: 32, color: "#f2ebdf" }}>{finalGame?.dateLabel ?? "02/08"}</span>
-            <span style={{ fontSize: 12, letterSpacing: ".12em", color: "#c98a4b" }}>{textos.calendarioFinalDia}</span>
-          </div>
-          <div style={{ height: 1, flex: 1, background: "linear-gradient(90deg,rgba(232,184,120,.5),transparent)" }} />
-        </div>
+        <CabecalhoDoDia titulo={finalGame?.dateLabel ?? dataDaFinal} detalhe={textos.calendarioFinalDia} dourado />
         {finalGame ? (
           <Link href={`/partidas/${finalGame.id}`} className="lob-lift" style={{ position: "relative", overflow: "hidden", display: "block", textDecoration: "none", padding: 22, border: "1px solid rgba(232,184,120,.4)", borderRadius: 3, background: "linear-gradient(135deg,#241a0e,#130f08)" }}>
             <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "radial-gradient(500px 220px at 50% -30%,rgba(232,184,120,.16),transparent 70%)" }} />
@@ -156,6 +261,13 @@ export default async function CalendarioPage() {
               <div className="lob-display gold-text" style={{ textAlign: "center", fontSize: "clamp(24px,5vw,40px)" }}>{textos.calendarioVs}</div>
               <div className="lob-display" style={{ textAlign: "left", fontSize: "clamp(16px,3vw,26px)", color: "#e9dfcd" }}>{textos.calendarioFinalSegundo}</div>
             </div>
+            {slotDaFinal ? (
+              <div style={{ position: "relative", display: "flex", justifyContent: "center", marginTop: 16 }}>
+                <span style={{ padding: "6px 13px", background: "linear-gradient(180deg,#f0c88a,#b97e40)", color: "#160f06", fontWeight: 700, fontSize: 11, letterSpacing: ".10em", borderRadius: 2 }}>
+                  {horaDoSlot(slotDaFinal)} · {textos.calendarioFinalMelhorDe5}
+                </span>
+              </div>
+            ) : null}
           </div>
         )}
       </section>

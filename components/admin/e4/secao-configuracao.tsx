@@ -58,6 +58,7 @@ type ChaveNumero =
 type ChaveRascunho =
   | ChaveData
   | ChaveNumero
+  | "max_times"
   | "pct_campeao"
   | "taxa_reais"
   | "chave_pix"
@@ -147,6 +148,9 @@ const NUMEROS = [
 
 const PCT_CAMPEAO = { min: 0, max: 100 } as const;
 
+/** Teto de times: mesmo intervalo do `check` do banco. Em branco = sem teto. */
+const MAX_TIMES = { min: 1, max: 20 } as const;
+
 // ---------------------------------------------------------------- conversões
 
 /**
@@ -235,6 +239,7 @@ function semear(config: EdicaoConfig): Rascunho {
     min_ranqueadas: String(config.min_ranqueadas),
     prazo_pagamento_dias: String(config.prazo_pagamento_dias),
     segundos_por_escolha: String(config.segundos_por_escolha),
+    max_times: config.max_times ? String(config.max_times) : "",
     pct_campeao: String(config.pct_campeao),
     taxa_reais: emReaisCru(config.taxa_centavos),
     chave_pix: config.chave_pix ?? "",
@@ -311,6 +316,15 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar }: 
       if (valor !== config[n.chave]) p[n.chave] = valor;
     }
 
+    // Em branco = sem teto (nulo no banco). Preenchido, tem de ser um inteiro na faixa.
+    if (rascunho.max_times.trim() === "") {
+      if ((config.max_times ?? null) !== null) p.max_times = null;
+    } else {
+      const teto = inteiroNaFaixa(rascunho.max_times, MAX_TIMES.min, MAX_TIMES.max);
+      if (teto === null) erros.push(`Máximo de times: use um inteiro de ${MAX_TIMES.min} a ${MAX_TIMES.max}, ou deixe em branco.`);
+      else if (teto !== (config.max_times ?? null)) p.max_times = teto;
+    }
+
     const pct = inteiroNaFaixa(rascunho.pct_campeao, PCT_CAMPEAO.min, PCT_CAMPEAO.max);
     if (pct === null) erros.push("Fatia do campeão: use um inteiro de 0 a 100.");
     else if (pct !== config.pct_campeao) p.pct_campeao = pct;
@@ -339,8 +353,11 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar }: 
     const porTime = inteiroNaFaixa(rascunho.jogadores_por_time, 1, 10) ?? config.jogadores_por_time;
     const segundos =
       inteiroNaFaixa(rascunho.segundos_por_escolha, 5, 600) ?? config.segundos_por_escolha;
+    const tetoNoCampo =
+      rascunho.max_times.trim() === "" ? null : inteiroNaFaixa(rascunho.max_times, MAX_TIMES.min, MAX_TIMES.max);
+    const maxTimes = rascunho.max_times.trim() === "" ? null : (tetoNoCampo ?? config.max_times ?? null);
     // Mesma conta do painel: todo inscrito que ainda pode jogar, pendente incluso.
-    const { times, sobra } = distribuirTimes(panorama.elegiveis, porTime);
+    const { times, sobra } = distribuirTimes(panorama.elegiveis, porTime, maxTimes);
     // O capitão já está no time antes do draft, então cada time escolhe (jogadores - 1).
     const porCapitao = Math.max(0, porTime - 1);
     return {
@@ -351,10 +368,11 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar }: 
       segundos,
       escolhas: porCapitao * times,
       tempo: porCapitao * times * segundos,
-      escolhasMeta: porCapitao * 10,
-      tempoMeta: porCapitao * 10 * segundos,
+      maxTimes,
+      escolhasLotado: maxTimes === null ? null : porCapitao * maxTimes,
+      tempoLotado: maxTimes === null ? null : porCapitao * maxTimes * segundos,
     };
-  }, [rascunho.jogadores_por_time, rascunho.segundos_por_escolha, config, panorama.elegiveis]);
+  }, [rascunho.jogadores_por_time, rascunho.segundos_por_escolha, rascunho.max_times, config, panorama.elegiveis]);
 
   const premiacao = useMemo(() => {
     const arrecadado = panorama.caixa.arrecadado;
@@ -487,7 +505,11 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar }: 
         <Metric
           label="Inscrições recebidas"
           value={panorama.inscritos}
-          detail="Sem teto nesta edição"
+          detail={
+            projecao.maxTimes === null
+              ? "Sem teto de times"
+              : `${projecao.maxTimes * projecao.porTime} vagas · quem passar vira reserva`
+          }
           small
         />
         <Metric
@@ -572,6 +594,19 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar }: 
             />
           </Field>
         ))}
+        <Field
+          label="Máximo de times"
+          hint="Teto de times da edição (6 na 4ª = 30 vagas; o calendário é de 6). Quem passar das vagas vira sobra/reserva. Em branco = sem teto."
+        >
+          <Input
+            numeric
+            value={rascunho.max_times}
+            onChange={(v) => editar("max_times", v)}
+            placeholder="sem teto"
+            disabled={bloqueado || ocupado}
+            ariaLabel="Máximo de times"
+          />
+        </Field>
       </FieldGrid>
 
       <Card padding="14px 16px" style={{ marginTop: 14 }}>
@@ -592,11 +627,14 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar }: 
           escolhas e <strong style={{ color: C.bronzeLit }}>{duracao(projecao.tempo)}</strong> só de
           relógio de pick.
         </p>
-        <p style={{ margin: "6px 0 0", fontSize: 12.5, color: C.ink3, lineHeight: 1.7, ...tabular }}>
-          Na meta de ~50 pessoas (10 times) seriam {projecao.escolhasMeta} escolhas e{" "}
-          <strong style={{ color: C.warnSoft }}>{duracao(projecao.tempoMeta)}</strong> a{" "}
-          {projecao.segundos}s cada — isso sem contar conversa, atraso e quem não aparece.
-        </p>
+        {projecao.maxTimes !== null && projecao.escolhasLotado !== null && projecao.tempoLotado !== null ? (
+          <p style={{ margin: "6px 0 0", fontSize: 12.5, color: C.ink3, lineHeight: 1.7, ...tabular }}>
+            Com a lotação cheia ({projecao.maxTimes} times, {projecao.maxTimes * projecao.porTime} jogadores) são{" "}
+            {projecao.escolhasLotado} escolhas e{" "}
+            <strong style={{ color: C.warnSoft }}>{duracao(projecao.tempoLotado)}</strong> a {projecao.segundos}s cada —
+            isso sem contar conversa, atraso e quem não aparece.
+          </p>
+        ) : null}
       </Card>
 
       {/* ------------------------------------------------ 4. dinheiro */}

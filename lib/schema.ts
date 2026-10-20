@@ -352,6 +352,17 @@ export const playerSchema = z.object({
   imageUrl: imageUrlField.optional(),
   name: z.string().trim().max(LIMITES.nome).optional(),
   mono: z.boolean().optional(),
+  /**
+   * Capitão do time. Gravado pela virada do draft (lib/draft/virada.ts) no capitão que o
+   * draft sorteou — na 4ª, o de maior elo, de qualquer rota, e nunca da organização.
+   *
+   * Opcional porque as temporadas até a 3ª não têm o campo: para elas o site segue a
+   * regra antiga, capitão = MID (lib/roster.ts). Precisa estar AQUI porque o dataset é
+   * validado em toda leitura e o Zod descarta campo desconhecido em silêncio — sem esta
+   * linha, a marca sumiria na primeira leitura depois da virada. Vale também para os
+   * snapshots arquivados, que usam este mesmo schema.
+   */
+  captain: z.boolean().optional(),
 });
 
 export const playerGameStatsSchema = z.object({

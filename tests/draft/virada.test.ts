@@ -48,11 +48,17 @@ describe("o que atravessa para o dataset público", () => {
     }
   });
 
-  it("cada jogador leva exatamente nick, slug, id, time, rotas e elo", () => {
+  it("cada jogador leva exatamente nick, slug, id, time, rotas e elo — e o capitão, a marca", () => {
     const { players } = datasetDoDraft(draftCompleto());
-    const campos = Object.keys(players[0]!).sort();
+    const base = ["elo", "id", "nick", "role1", "role2", "slug", "teamId"];
 
-    expect(campos).toEqual(["elo", "id", "nick", "role1", "role2", "slug", "teamId"]);
+    // A marca de capitão é o único acréscimo, e só no capitão: sem ela o site voltava a
+    // chamar de capitão todo MID (regra da 3ª). Não é dado pessoal — é o papel no time.
+    for (const p of players) {
+      const campos = Object.keys(p).sort();
+      expect(campos).toEqual(p.captain ? ["captain", ...base].sort() : base);
+    }
+    expect(players.filter((p) => p.captain)).toHaveLength(2);
   });
 
   it("o nome real NÃO vai junto, mesmo havendo campo para ele no dataset", () => {

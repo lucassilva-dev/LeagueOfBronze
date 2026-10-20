@@ -1,17 +1,29 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+import { TIMES_DO_CALENDARIO_4A, seriesDaFaseDePontos } from "@/lib/calendario-4a";
 import { ConflitoDeVersaoError, readDatasetComVersao, saveDataset } from "@/lib/data-store";
-import { iniciarDraft, pausarDraft, retomarDraft } from "@/lib/draft/motor";
+import {
+  alcancarORelogio,
+  aplicarEscolha,
+  iniciarDraft,
+  pausarDraft,
+  podeEscolher,
+  retomarDraft,
+  timeDaVez,
+  vezSemSaida,
+} from "@/lib/draft/motor";
 import { datasetDoDraft, problemasDaVirada } from "@/lib/draft/virada";
 import {
   lerDraftCompleto,
   montarDraftDosAprovados,
   paraPublico,
+  previaDoDraft,
   salvarDraftSeIntacto,
   type MetodoDeCapitao,
 } from "@/lib/draft/store";
 import { registrarAuditoria } from "@/lib/inscricoes/store";
+import { embaralhar, novaSemente } from "@/lib/series/sorteio";
 import { requireAdmin } from "@/lib/security/route-guard";
 import { respostaDeErro } from "@/lib/security/resposta-erro";
 import { lerCorpoPublico } from "@/lib/security/rota-publica";
@@ -19,7 +31,8 @@ import { lerCorpoPublico } from "@/lib/security/rota-publica";
 export const dynamic = "force-dynamic";
 
 /**
- * Condução do draft pela organização: montar, iniciar, pausar, retomar.
+ * Condução do draft pela organização: montar (sortear), iniciar, pausar, retomar,
+ * escolher por um capitão, prever e aplicar a virada, e criar as séries do calendário.
  *
  * Escopo `draft:conduzir` para tudo, separado de `inscricoes:conferir` de propósito —
  * quem confere requisito não precisa poder refazer o sorteio no meio do evento.
@@ -28,7 +41,33 @@ export const dynamic = "force-dynamic";
  * confirmação explícita no corpo, e não apenas o escopo.
  */
 
-const METODOS: MetodoDeCapitao[] = ["mid", "adc", "pior", "voluntarios", "manual"];
+const METODOS: MetodoDeCapitao[] = ["maior_elo", "manual", "mid", "adc", "pior"];
+
+/**
+ * O que a tela do draft no painel precisa: o estado (a mesma visão da transmissão) e a
+ * conferência de antes do sorteio. Nada de contato — só Riot ID, elo, rota e pontos.
+ */
+export async function GET(request: NextRequest) {
+  const guarda = await requireAdmin(request, "draft:conduzir");
+  if (!guarda.ok) return guarda.response;
+
+  try {
+    const [{ estado, revisao }, previa] = await Promise.all([lerDraftCompleto(), previaDoDraft()]);
+    // Leitura não anda o relógio aqui: quem anda é a sondagem pública (/api/draft/estado),
+    // que grava condicionado. O painel mostra o que está gravado.
+    const semSaida = estado ? vezSemSaida(estado) : null;
+    const resposta = NextResponse.json({
+      draft: estado ? paraPublico(estado, revisao) : null,
+      sorteio: estado?.sorteio ?? null,
+      semSaida,
+      previa,
+    });
+    resposta.headers.set("Cache-Control", "no-store, private");
+    return resposta;
+  } catch (error) {
+    return respostaDeErro("api/admin/draft", error, "Não foi possível ler o draft.");
+  }
+}
 
 export async function POST(request: NextRequest) {
   const guarda = await requireAdmin(request, "draft:conduzir");
@@ -42,6 +81,9 @@ export async function POST(request: NextRequest) {
     metodo?: string;
     capitaes?: unknown;
     confirmoDescartar?: unknown;
+    jogadorId?: unknown;
+    timeId?: unknown;
+    escolha?: unknown;
   };
   const autor = guarda.identity.username;
 
@@ -74,10 +116,19 @@ export async function POST(request: NextRequest) {
         const gravou = await salvarDraftSeIntacto(novo, revisao);
         if (!gravou) return conflito();
 
+        // A semente vai para a auditoria também: o estado do draft é sobrescrito no
+        // próximo sorteio, e a auditoria é append-only.
         await registrarAuditoria({
           autor,
           acao: "draft_montado",
-          detalhe: { metodo, times: novo.times.length, escolhas: novo.ordem.length },
+          detalhe: {
+            metodo,
+            times: novo.times.length,
+            escolhas: novo.ordem.length,
+            semente: novo.sorteio?.semente,
+            capitaesAntesDoSorteio: novo.sorteio?.capitaes,
+            ordemSorteada: novo.times.map((t) => ({ time: t.nome, capitao: t.capitaoId })),
+          },
         });
         return NextResponse.json({ ok: true, draft: paraPublico(novo, revisao + 1) });
       }
@@ -99,6 +150,54 @@ export async function POST(request: NextRequest) {
         if (!gravou) return conflito();
 
         await registrarAuditoria({ autor, acao: `draft_${corpo.acao}` });
+        return NextResponse.json({ ok: true, draft: paraPublico(novo, revisao + 1) });
+      }
+
+      case "escolher": {
+        /*
+         * A organização escolhe PELO time da vez.
+         *
+         * Existe para o dia em que o capitão não consegue entrar (conta sem senha, celular
+         * sem bateria, internet caída) e diz no Discord quem quer. Sem isto a única saída
+         * era deixar o cronômetro estourar e o auto-pick pegar o mais barato — o oposto do
+         * que o capitão pediu. O time NÃO vem do corpo: é sempre o da vez, pelo motor.
+         */
+        if (!estado) return NextResponse.json({ error: "Monte o draft primeiro." }, { status: 409 });
+        const jogadorId = typeof corpo.jogadorId === "string" ? corpo.jogadorId : null;
+        if (!jogadorId) return NextResponse.json({ error: "Escolha um jogador." }, { status: 400 });
+
+        const atual = alcancarORelogio(estado, Date.now());
+        const daVez = timeDaVez(atual);
+        if (!daVez) return NextResponse.json({ error: "Não há escolha em andamento." }, { status: 409 });
+
+        // A vez que a pessoa CONFIRMOU na tela tem de ser a vez de agora. Entre o clique e a
+        // chegada do pedido o relógio pode ter virado (o confirm segura a página enquanto as
+        // outras telas fazem o auto-pick andar), e sem esta trava o jogador escolhido para
+        // um time ia parar no time seguinte — sem desfazer.
+        if (corpo.timeId !== daVez || corpo.escolha !== atual.escolhaAtual) {
+          return NextResponse.json(
+            {
+              error: "A vez mudou enquanto você escolhia. Confira o quadro e escolha de novo.",
+              draft: paraPublico(atual, revisao),
+            },
+            { status: 409 },
+          );
+        }
+
+        const veredito = podeEscolher(atual, daVez, jogadorId);
+        if (!veredito.ok) {
+          return NextResponse.json({ error: veredito.motivo, draft: paraPublico(atual, revisao) }, { status: 409 });
+        }
+
+        const novo = aplicarEscolha(atual, daVez, jogadorId, Date.now());
+        const gravou = await salvarDraftSeIntacto(novo, revisao);
+        if (!gravou) return conflito();
+
+        await registrarAuditoria({
+          autor,
+          acao: "draft_escolha_pela_organizacao",
+          detalhe: { timeId: daVez, jogadorId, escolha: atual.escolhaAtual },
+        });
         return NextResponse.json({ ok: true, draft: paraPublico(novo, revisao + 1) });
       }
 
@@ -133,6 +232,19 @@ export async function POST(request: NextRequest) {
             {
               error:
                 "Esta temporada já tem séries registradas. Arquive-a e comece a 4ª Edição antes de aplicar o draft.",
+            },
+            { status: 409 },
+          );
+        }
+
+        // Temporada encerrada não recebe time novo: a 3ª fica "finished" depois de
+        // arquivada, e virar por cima dela gravava os times da 4ª num campeonato fechado
+        // (com o nome e o seasonId da 3ª). O caminho é Torneio → Iniciar a 4ª Edição.
+        if (dataset.tournament.status !== "active") {
+          return NextResponse.json(
+            {
+              error:
+                "A temporada no ar está encerrada. Em Torneio, inicie a 4ª Edição (sem manter times e jogadores) antes de aplicar o draft.",
             },
             { status: 409 },
           );
@@ -184,6 +296,80 @@ export async function POST(request: NextRequest) {
         });
 
         return NextResponse.json({ ok: true, ...resultado });
+      }
+
+      case "calendario": {
+        /*
+         * Sorteia a posição de cada time no calendário da 4ª (Time 1 … Time 6) e cria as
+         * 15 séries da fase de pontos, com data e hora (lib/calendario-4a.ts).
+         *
+         * Só depois da virada, numa temporada aberta e ainda sem nenhuma série — e só com
+         * os times DESTE draft. Sem essa última trava, um clique antes da virada criava o
+         * calendário da 4ª com os times da 3ª.
+         */
+        if (!estado) return NextResponse.json({ error: "Monte e aplique o draft primeiro." }, { status: 409 });
+
+        const { dataset, versao } = await readDatasetComVersao();
+        if (dataset.tournament.status !== "active") {
+          return NextResponse.json(
+            { error: "A temporada no ar está encerrada. Inicie a 4ª Edição em Torneio primeiro." },
+            { status: 409 },
+          );
+        }
+        if (dataset.seriesMatches.length > 0) {
+          return NextResponse.json(
+            {
+              error: `Esta temporada já tem ${dataset.seriesMatches.length} série(s). O calendário só é criado numa temporada sem séries — para refazer, apague as séries no painel de Séries.`,
+            },
+            { status: 409 },
+          );
+        }
+
+        const timesDoDraft = datasetDoDraft(estado).teams.map((t) => t.id).sort();
+        const timesNoAr = dataset.teams.map((t) => t.id);
+        const mesmos =
+          timesNoAr.length === timesDoDraft.length && [...timesNoAr].sort().every((id, i) => id === timesDoDraft[i]);
+        if (!mesmos) {
+          return NextResponse.json(
+            { error: "Os times no ar não são os deste draft. Aplique o draft (virada) antes de criar o calendário." },
+            { status: 409 },
+          );
+        }
+        if (timesNoAr.length !== TIMES_DO_CALENDARIO_4A) {
+          return NextResponse.json(
+            {
+              error: `O calendário da 4ª é de ${TIMES_DO_CALENDARIO_4A} times, e há ${timesNoAr.length} no ar. Crie as séries à mão no painel de Séries.`,
+            },
+            { status: 409 },
+          );
+        }
+
+        const sementeDoSorteio = novaSemente();
+        const posicoes = embaralhar(sementeDoSorteio, "calendario", timesNoAr);
+        const series = seriesDaFaseDePontos(posicoes);
+
+        try {
+          await saveDataset({ ...dataset, seriesMatches: series }, { versaoEsperada: versao });
+        } catch (erro) {
+          if (erro instanceof ConflitoDeVersaoError) {
+            return NextResponse.json(
+              { error: "Alguém salvou o campeonato agora há pouco. Recarregue e tente de novo.", conflict: true },
+              { status: 409 },
+            );
+          }
+          throw erro;
+        }
+
+        const nomePor = new Map(dataset.teams.map((t) => [t.id, t.name]));
+        const resultado = posicoes.map((id, i) => ({ posicao: i + 1, teamId: id, nome: nomePor.get(id) ?? id }));
+
+        await registrarAuditoria({
+          autor,
+          acao: "calendario_sorteado",
+          detalhe: { semente: sementeDoSorteio, entrada: timesNoAr, posicoes: resultado, series: series.length },
+        });
+
+        return NextResponse.json({ ok: true, posicoes: resultado, series: series.length, semente: sementeDoSorteio });
       }
 
       default:

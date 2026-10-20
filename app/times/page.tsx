@@ -5,6 +5,7 @@ import { PreTemporadaAviso } from "@/components/pre-temporada-aviso";
 import { semTemporadaAoVivo } from "@/lib/fase-do-site";
 import { rotaCurto, type PaginasHomeTextos } from "@/lib/i18n/messages/paginas-home";
 import { getMessages } from "@/lib/i18n/server";
+import { nomeDaTemporada } from "@/lib/i18n/nome-da-temporada";
 import { buildDesignTeams, type DesignTeam } from "@/lib/roster";
 import { getServerDataset } from "@/lib/server-data";
 import { calculateStandings } from "@/lib/tournament";
@@ -92,7 +93,7 @@ function TeamCard({
 }
 
 export default async function TimesPage() {
-  const { paginasHome: t } = await getMessages();
+  const { paginasHome: t, compartilhados } = await getMessages();
   const { dataset } = await getServerDataset();
   if (semTemporadaAoVivo(dataset)) return <PreTemporadaAviso pagina="times" />;
   const teams = buildDesignTeams(dataset);
@@ -114,7 +115,9 @@ export default async function TimesPage() {
   return (
     <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "0 clamp(16px,4vw,24px) 96px" }}>
       <section className="lob-fade" style={{ padding: "clamp(40px,7vw,56px) 0 26px" }}>
-        <Eyebrow>{t.edicaoSobretitulo}</Eyebrow>
+        <Eyebrow>
+          {t.edicaoSobretitulo.replace("{temporada}", nomeDaTemporada(dataset.tournament.name, compartilhados.localeTag))}
+        </Eyebrow>
         <GoldTitle style={{ fontSize: "clamp(52px,11vw,138px)", lineHeight: 0.88 }}>{t.timesTitulo}</GoldTitle>
         <p style={{ maxWidth: 560, fontSize: 16, lineHeight: 1.55, color: "#a99e8b", margin: 0 }}>
           {t.timesIntro}

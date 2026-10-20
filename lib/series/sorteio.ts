@@ -62,6 +62,22 @@ export function sortearIndice(semente: string, rotulo: string, tamanho: number):
   throw new Error("Não foi possível sortear sem viés.");
 }
 
+/**
+ * Embaralha uma lista a partir da semente (Fisher–Yates com `sortearIndice`).
+ *
+ * Serve aos sorteios que não são de série: a ordem dos capitães no draft e a posição de
+ * cada time no calendário. Mesma propriedade dos outros: com a semente e a lista de
+ * entrada NA MESMA ORDEM, qualquer pessoa refaz o resultado.
+ */
+export function embaralhar<T>(semente: string, rotulo: string, itens: readonly T[]): T[] {
+  const copia = [...itens];
+  for (let i = copia.length - 1; i > 0; i--) {
+    const j = sortearIndice(semente, `${rotulo}:${i}`, i + 1);
+    [copia[i], copia[j]] = [copia[j]!, copia[i]!];
+  }
+  return copia;
+}
+
 // ---------------------------------------------------------------- lados
 
 /**

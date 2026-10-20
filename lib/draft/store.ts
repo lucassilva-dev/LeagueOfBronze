@@ -4,15 +4,21 @@ import { createSupabaseAdminClient } from "@/lib/data-store";
 import { ErroDeRegra } from "@/lib/security/erros";
 import { identidadeDoTime } from "@/lib/draft/times";
 import {
+  escolhiveisDaVez,
+  estadoFecha,
   impedimentosDoSorteio,
   montarDraft,
   timeDaVez,
   type EstadoDraft,
   type JogadorDoDraft,
+  type MotivoDaPausa,
   type TimeDoDraft,
 } from "@/lib/draft/motor";
-import { lerConfig, listarInscricoes } from "@/lib/inscricoes/store";
-import { distribuirTimes } from "@/lib/inscricoes/schema";
+import { lerConfig, listarInscricoes, type Inscricao } from "@/lib/inscricoes/store";
+import { distribuirTimes, estadoDaJanela, orcamentoSugerido } from "@/lib/inscricoes/schema";
+import { forcaDoElo, rankingDeCapitaes, type CandidatoACapitao } from "@/lib/draft/capitaes";
+import { ORCAMENTO_DA_MONTAGEM } from "@/lib/draft/viabilidade";
+import { embaralhar, novaSemente } from "@/lib/series/sorteio";
 
 /**
  * Persistência do draft.
@@ -60,14 +66,128 @@ export async function salvarDraftSeIntacto(
 
 // ---------------------------------------------------------------- montagem
 
-export type MetodoDeCapitao = "mid" | "adc" | "pior" | "voluntarios" | "manual";
+/**
+ * Como os capitães são escolhidos.
+ *
+ * `maior_elo` é o do regulamento da 4ª: maior elo na solo/duo, qualquer rota, sem
+ * organizador (ver lib/draft/capitaes.ts). `manual` é a saída quando há empate no corte
+ * ou a organização decide outra coisa. `mid`, `adc` e `pior` vêm do design entregue e
+ * continuam aceitos pela rota, mas o painel não os oferece — nenhum cumpre a regra.
+ * (`voluntarios` saiu: o formulário da 4ª não pergunta mais quem quer ser capitão, e o
+ * método nunca encontraria ninguém.)
+ */
+export type MetodoDeCapitao = "maior_elo" | "mid" | "adc" | "pior" | "manual";
+
+/** O elo que vale: o congelado; sem ele, o verificado; sem ele, o declarado. */
+function eloQueVale(i: Pick<Inscricao, "elo_congelado" | "elo_verificado" | "elo_declarado">): string {
+  return i.elo_congelado ?? i.elo_verificado ?? i.elo_declarado;
+}
+
+function candidatoACapitao(i: Inscricao): CandidatoACapitao {
+  return {
+    id: i.id,
+    riotId: i.riot_id,
+    organizador: i.organizador,
+    elo: eloQueVale(i),
+    eloRiot: i.elo_riot ?? null,
+    divisao: i.riot_divisao ?? null,
+    pdl: i.riot_pdl ?? null,
+  };
+}
+
+/** `listarInscricoes` lê `*`; o tipo não declara a conta porque o resto do código não a usa. */
+function temConta(i: Inscricao): boolean {
+  return Boolean((i as Inscricao & { jogador_id?: string | null }).jogador_id);
+}
 
 /**
- * Monta o draft a partir de quem foi aprovado.
+ * Tudo o que a organização precisa ver ANTES de sortear, sem gravar nada.
  *
- * O número de times é DERIVADO (`distribuirTimes`), nunca configurado: com 50
- * aprovados são 10 times, e quem sobra da divisão fica fora do sorteio. É por isso que
- * a organização precisa fechar a lista de aprovados antes de montar.
+ * É a tela de conferência do painel do draft: quantos times, quem joga, se o orçamento
+ * fecha, quem seriam os capitães pela regra — e se algum deles não tem conta de jogador,
+ * o que o impediria de escolher na hora (a escolha é autenticada pela conta).
+ */
+export async function previaDoDraft() {
+  const config = await lerConfig();
+  const inscritos = await listarInscricoes();
+
+  const aprovados = inscritos.filter((i) => i.situacao === "apto" || i.situacao === "sobra");
+  const vaoJogar = inscritos.filter((i) => i.situacao === "apto");
+  const maxTimes = config.max_times ?? null;
+  const { times, vagas } = distribuirTimes(aprovados.length, config.jogadores_por_time, maxTimes);
+
+  const impedimentos = impedimentosDoSorteio({
+    pontosDosQueJogam: vaoJogar.map((i) => i.pontos),
+    vagas,
+    times,
+    orcamentoPorTime: config.orcamento_por_time,
+    totalDeAprovados: aprovados.length,
+  });
+
+  const totalDePontos = vaoJogar.reduce((soma, i) => soma + i.pontos, 0);
+  const ranking = rankingDeCapitaes(vaoJogar.map(candidatoACapitao), times);
+  const porId = new Map(vaoJogar.map((i) => [i.id, i]));
+
+  return {
+    config: {
+      jogadoresPorTime: config.jogadores_por_time,
+      maxTimes,
+      orcamentoPorTime: config.orcamento_por_time,
+      segundosPorEscolha: config.segundos_por_escolha,
+    },
+    times,
+    vagas,
+    aprovados: aprovados.length,
+    aptos: vaoJogar.length,
+    sobra: inscritos.filter((i) => i.situacao === "sobra").length,
+    pendentes: inscritos.filter((i) => i.situacao === "pendente").length,
+    impedimentos,
+    totalDePontos,
+    orcamentoSugerido: times > 0 && vaoJogar.length === vagas ? orcamentoSugerido(totalDePontos, times) : null,
+    // Quem joga, do maior elo para o menor, com os organizadores no fim (não capitaneiam).
+    jogadores: [
+      ...ranking.ranking.map((c) => c.id),
+      ...vaoJogar.filter((i) => i.organizador).map((i) => i.id),
+    ].map((id) => {
+      const i = porId.get(id)!;
+      return {
+        id: i.id,
+        riotId: i.riot_id,
+        elo: eloQueVale(i),
+        forca: forcaDoElo(candidatoACapitao(i)).rotulo,
+        pontos: i.pontos,
+        rota1: i.rota_primaria,
+        rota2: i.rota_secundaria,
+        organizador: i.organizador,
+        temConta: temConta(i),
+      };
+    }),
+    capitaesPelaRegra: ranking.escolhidos,
+    empateNoCorte: ranking.empateNoCorte,
+    faltamCapitaes: ranking.faltam,
+    // O preço que entra no draft é o de agora. Sem congelar, o robô da Riot ainda mexe no
+    // elo de manhã — e a tabela divulgada pode não bater com o draft.
+    semEloCongelado: vaoJogar.filter((i) => !i.elo_congelado).map((i) => i.riot_id),
+    // Inscrição aberta durante o draft cobra taxa de quem não tem mais vaga.
+    inscricoesAbertas: estadoDaJanela(config) === "aberta",
+  };
+}
+
+export type PreviaDoDraft = Awaited<ReturnType<typeof previaDoDraft>>;
+
+/**
+ * Monta o draft a partir de quem foi aprovado — e SORTEIA a ordem.
+ *
+ * O número de times é DERIVADO (`distribuirTimes`), com o teto `max_times` da
+ * Configuração (6 na 4ª Edição). Quem sobra da divisão fica fora do sorteio. É por isso
+ * que a organização precisa fechar a lista de aprovados antes de montar.
+ *
+ * "Um sorteio ao vivo define qual time cada capitão vai capitanear e a ordem de escolha
+ * do draft" (regulamento). Antes a ordem saía da própria lista de capitães — por pontos,
+ * ou pela ordem em que alguém clicou —, então o capitão de maior elo escolhia primeiro
+ * em toda montagem. Agora a lista é embaralhada por uma semente nova (`embaralhar`), e a
+ * semente fica gravada no estado: com ela e a lista de entrada, qualquer pessoa refaz o
+ * sorteio e confere.
  */
 export async function montarDraftDosAprovados(params: {
   metodo: MetodoDeCapitao;
@@ -81,17 +201,20 @@ export async function montarDraftDosAprovados(params: {
   // de fora.
   const aprovados = inscritos.filter((i) => i.situacao === "apto" || i.situacao === "sobra");
   const vaoJogar = inscritos.filter((i) => i.situacao === "apto");
-  const { times: quantosTimes, vagas } = distribuirTimes(aprovados.length, config.jogadores_por_time);
+  const { times: quantosTimes, vagas } = distribuirTimes(
+    aprovados.length,
+    config.jogadores_por_time,
+    config.max_times ?? null,
+  );
 
-  // O elo que vale é o congelado; sem ele, o verificado; sem ele, o declarado. Os
-  // pontos já vêm derivados no banco, então não são recalculados aqui.
+  // Os pontos já vêm derivados no banco, então não são recalculados aqui.
   const pool: JogadorDoDraft[] = vaoJogar.map((i) => ({
     id: i.id,
     riotId: i.riot_id,
     pontos: i.pontos,
     rota1: i.rota_primaria,
     rota2: i.rota_secundaria,
-    elo: i.elo_congelado ?? i.elo_verificado ?? i.elo_declarado,
+    elo: eloQueVale(i),
     timeId: null,
   }));
 
@@ -111,14 +234,26 @@ export async function montarDraftDosAprovados(params: {
 
   const capitaes = escolherCapitaes({
     aprovados: pool,
+    inscritos: vaoJogar,
     rotaPorInscrito: new Map(vaoJogar.map((i) => [i.id, i.rota_primaria])),
-    querCapitao: new Set(vaoJogar.filter((i) => i.quer_capitao).map((i) => i.id)),
     quantos: quantosTimes,
     metodo: params.metodo,
     manuais: params.capitaesManuais ?? [],
   });
 
-  const times: TimeDoDraft[] = capitaes.map((capitaoId, i) => ({
+  // Organizador não capitaneia (regulamento) — nem à mão. Quem marcou à mão um
+  // organizador estava prestes a quebrar a regra publicada na frente do grupo.
+  const organizadores = new Set(vaoJogar.filter((i) => i.organizador).map((i) => i.id));
+  const organizadorCapitao = capitaes.find((id) => organizadores.has(id));
+  if (organizadorCapitao) {
+    const riotId = pool.find((j) => j.id === organizadorCapitao)?.riotId ?? organizadorCapitao;
+    throw new ErroDeRegra(`${riotId} é da organização, e organizador não é capitão nesta edição.`);
+  }
+
+  const semente = novaSemente();
+  const sorteados = embaralhar(semente, "capitaes", capitaes);
+
+  const times: TimeDoDraft[] = sorteados.map((capitaoId, i) => ({
     id: `time-${i + 1}`,
     ...identidadeDoTime(i),
     capitaoId,
@@ -157,32 +292,43 @@ export async function montarDraftDosAprovados(params: {
     }
   }
 
-  return montarDraft({
+  const estado = montarDraft({
     times,
     jogadores: pool,
     jogadoresPorTime: config.jogadores_por_time,
     orcamentoPorTime: config.orcamento_por_time,
     segundosPorEscolha: config.segundos_por_escolha,
   });
+
+  // A conta de verdade, com os preços que existem: sem ela, a checagem acima (1 ponto por
+  // vaga) deixava ir ao ar um draft que travaria no meio — o pool da 4ª começa em 3 pontos.
+  // Depende só de capitães e orçamento, não da ordem sorteada.
+  if (!estadoFecha(estado, ORCAMENTO_DA_MONTAGEM)) {
+    const sugerido = orcamentoSugerido(pool.reduce((soma, j) => soma + j.pontos, 0), quantosTimes);
+    throw new ErroDeRegra(
+      `Com esses capitães e orçamento de ${orcamento} por time, não há como fechar os ${quantosTimes} elencos com os jogadores aprovados. Suba o orçamento em Configuração${sugerido ? ` (a regra dá ${sugerido})` : ""} ou troque os capitães.`,
+    );
+  }
+
+  return { ...estado, sorteio: { semente, capitaes, emISO: new Date().toISOString() } };
 }
 
 /**
  * Quem capitaneia.
  *
- * Os métodos vêm do design e refletem o que a organização já fazia à mão. A ordenação
- * é sempre determinística (desempate por id) para que montar duas vezes com a mesma
- * lista dê o mesmo resultado — num sorteio, "deu diferente e ninguém sabe por quê" é
- * pior do que qualquer critério.
+ * A ordenação é sempre determinística (desempate por id) para que montar duas vezes com
+ * a mesma lista dê os MESMOS capitães — num sorteio, "deu diferente e ninguém sabe por
+ * quê" é pior do que qualquer critério. O que é aleatório é só a ordem, depois daqui.
  */
 function escolherCapitaes(params: {
   aprovados: readonly JogadorDoDraft[];
+  inscritos: readonly Inscricao[];
   rotaPorInscrito: Map<string, string>;
-  querCapitao: Set<string>;
   quantos: number;
   metodo: MetodoDeCapitao;
   manuais: readonly string[];
 }): string[] {
-  const { aprovados, rotaPorInscrito, querCapitao, quantos, metodo, manuais } = params;
+  const { aprovados, inscritos, rotaPorInscrito, quantos, metodo, manuais } = params;
 
   if (metodo === "manual") {
     if (manuais.length !== quantos) {
@@ -204,23 +350,35 @@ function escolherCapitaes(params: {
     return [...manuais];
   }
 
-  const porPontosDesc = [...aprovados].sort((a, b) => b.pontos - a.pontos || a.id.localeCompare(b.id));
-  const porPontosAsc = [...aprovados].sort((a, b) => a.pontos - b.pontos || a.id.localeCompare(b.id));
+  if (metodo === "maior_elo") {
+    const ranking = rankingDeCapitaes(inscritos.map(candidatoACapitao), quantos);
+    if (ranking.faltam > 0) {
+      throw new ErroDeRegra(
+        `Não há aprovados suficientes fora da organização para ${quantos} capitães (faltam ${ranking.faltam}).`,
+      );
+    }
+    if (ranking.empateNoCorte) {
+      throw new ErroDeRegra(
+        `Empate de elo no corte dos capitães: ${ranking.empateNoCorte.join(", ")}. O regulamento não diz como desempatar — decida e marque os ${quantos} capitães à mão.`,
+      );
+    }
+    return ranking.escolhidos;
+  }
+
+  // Os métodos antigos também pulam a organização: a regra de que organizador não é
+  // capitão vale para qualquer método, e o manual é conferido em quem chama.
+  const organizadores = new Set(inscritos.filter((i) => i.organizador).map((i) => i.id));
+  const elegiveis = aprovados.filter((j) => !organizadores.has(j.id));
+  const porPontosDesc = [...elegiveis].sort((a, b) => b.pontos - a.pontos || a.id.localeCompare(b.id));
+  const porPontosAsc = [...elegiveis].sort((a, b) => a.pontos - b.pontos || a.id.localeCompare(b.id));
 
   const candidatos =
     metodo === "pior"
       ? porPontosAsc
-      : metodo === "voluntarios"
-        ? porPontosDesc.filter((j) => querCapitao.has(j.id))
-        : porPontosDesc.filter((j) => rotaPorInscrito.get(j.id) === (metodo === "mid" ? "MID" : "ADC"));
+      : porPontosDesc.filter((j) => rotaPorInscrito.get(j.id) === (metodo === "mid" ? "MID" : "ADC"));
 
   if (candidatos.length < quantos) {
-    const oQue =
-      metodo === "voluntarios"
-        ? "voluntários"
-        : metodo === "pior"
-          ? "aprovados"
-          : `jogadores de ${metodo === "mid" ? "meio" : "atirador"}`;
+    const oQue = metodo === "pior" ? "aprovados" : `jogadores de ${metodo === "mid" ? "meio" : "atirador"}`;
     throw new ErroDeRegra(
       `Não há ${oQue} suficientes: ${candidatos.length} para ${quantos} times. Escolha outro método ou defina à mão.`,
     );
@@ -254,11 +412,47 @@ export type DraftPublico = {
   escolhaAtual: number;
   totalEscolhas: number;
   timeDaVezId: string | null;
+  /**
+   * Ids de quem o time da vez pode escolher agora, pela conta do motor (orçamento E
+   * viabilidade dos elencos de todos). As telas apagam o resto — antes recalculavam com a
+   * fórmula do teto e ofereciam jogador que o servidor recusaria.
+   */
+  escolhiveis: string[];
   prazoISO: string | null;
+  /** Por que está pausado, quando está. */
+  motivoDaPausa: MotivoDaPausa | null;
+  /**
+   * Identifica o sorteio: muda a cada montagem. A transmissão usa como `key` da animação
+   * do sorteio — sem isso, um novo sorteio com a TV aberta trocava os nomes sem girar.
+   * É a semente, que já é pública na conferência do sorteio.
+   */
+  sorteioId: string | null;
   orcamentoPorTime: number;
   jogadoresPorTime: number;
   historico: { escolha: number; timeId: string; riotId: string; automatica: boolean }[];
 };
+
+/**
+ * `escolhiveis` guardado por estado. A conta só muda quando alguém escolhe (ou a fase
+ * muda), mas `paraPublico` roda em TODA sondagem de 2 s de cada tela — TV, capitães,
+ * painel. Sem guardar, cada tela refazia as buscas de viabilidade a cada 2 s.
+ */
+const escolhiveisGuardados = new Map<string, string[]>();
+
+function escolhiveisDoEstado(estado: EstadoDraft, revisao: number): string[] {
+  const livres = estado.jogadores.filter((j) => j.timeId === null).map((j) => j.id).join(",");
+  const chave = [revisao, estado.escolhaAtual, estado.fase, estado.sorteio?.semente ?? "", estado.orcamentoPorTime, livres].join("|");
+  const guardado = escolhiveisGuardados.get(chave);
+  if (guardado) return guardado;
+  const calculado = escolhiveisDaVez(estado);
+  escolhiveisGuardados.set(chave, calculado);
+  // Só os mais recentes importam: o draft anda para a frente.
+  if (escolhiveisGuardados.size > 32) {
+    const maisAntiga = escolhiveisGuardados.keys().next().value;
+    if (maisAntiga !== undefined) escolhiveisGuardados.delete(maisAntiga);
+  }
+  return calculado;
+}
 
 export function paraPublico(estado: EstadoDraft, revisao: number): DraftPublico {
   const nomePor = new Map(estado.jogadores.map((j) => [j.id, j]));
@@ -306,7 +500,10 @@ export function paraPublico(estado: EstadoDraft, revisao: number): DraftPublico 
     // mesma coisa — senão a transmissão anuncia "vez do time X" num draft que ainda não
     // começou, e cada tela nova teria de lembrar de reconferir a fase por conta própria.
     timeDaVezId: timeDaVez(estado),
+    escolhiveis: escolhiveisDoEstado(estado, revisao),
     prazoISO: estado.prazoISO,
+    motivoDaPausa: estado.fase === "pausado" ? (estado.motivoDaPausa ?? null) : null,
+    sorteioId: estado.sorteio?.semente ?? null,
     orcamentoPorTime: estado.orcamentoPorTime,
     jogadoresPorTime: estado.jogadoresPorTime,
     historico: estado.historico.map((e) => ({

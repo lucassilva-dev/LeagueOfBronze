@@ -164,6 +164,7 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
           pool.map((i) => i.pontos),
           jogadoresPorTime,
           config.orcamento_por_time,
+          config.max_times ?? null,
         )
       : null;
 
@@ -206,7 +207,7 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
       rotas,
       escassa,
     };
-  }, [inscritos, jogadoresPorTime, config.orcamento_por_time, configValida]);
+  }, [inscritos, jogadoresPorTime, config.orcamento_por_time, config.max_times, configValida]);
 
   const alvo = analise.aprovados.find((i) => i.id === alvoId) ?? null;
 
@@ -233,7 +234,9 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
    */
   const comPendentes = panorama.pendentes > 0;
   const draftHoje =
-    configValida && comPendentes ? distribuirTimes(analise.aprovados.length, jogadoresPorTime) : null;
+    configValida && comPendentes
+      ? distribuirTimes(analise.aprovados.length, jogadoresPorTime, config.max_times ?? null)
+      : null;
 
   const congelar = async () => {
     const deuCerto = await executar("congelar");
@@ -297,12 +300,12 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
 
       <Card padding="14px 16px" style={{ marginTop: 12, display: "grid", gap: 8 }}>
         <p style={{ margin: 0, fontSize: 13, color: C.ink2, ...tabular }}>
-          times = piso(elegíveis ÷ jogadores por time)
+          times = {config.max_times ? `mín(${config.max_times}, piso(elegíveis ÷ jogadores por time))` : "piso(elegíveis ÷ jogadores por time)"}
           {configValida ? (
             <>
-              {" = piso("}
+              {config.max_times ? ` = mín(${config.max_times}, piso(` : " = piso("}
               {panorama.elegiveis} ÷ {jogadoresPorTime}
-              {") = "}
+              {config.max_times ? ")) = " : ") = "}
               <strong style={{ color: C.bronzeHi, fontFamily: display, fontSize: 16 }}>
                 {panorama.times}
               </strong>
@@ -311,7 +314,13 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
         </p>
 
         {configValida ? (
-          panorama.times === 0 ? (
+          config.max_times && panorama.times >= config.max_times ? (
+            // No teto, "mais N fecham o 7º time" seria mentira: não existe 7º time.
+            <p style={{ margin: 0, fontSize: 12.5, color: C.okSoft }}>
+              Os {config.max_times} times já fecham. Quem entrar a mais vira reserva (sobra) — a
+              organização escolhe quem fica de fora antes do sorteio.
+            </p>
+          ) : panorama.times === 0 ? (
             <p style={{ margin: 0, fontSize: 12.5, color: C.warnSoft }}>
               Nenhum time fecha ainda: faltam {faltamParaFecharTime}{" "}
               {faltamParaFecharTime === 1 ? "inscrito" : "inscritos"} para o primeiro.
@@ -326,9 +335,9 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
         ) : null}
 
         <p style={nota}>
-          Não existe teto de inscrições nesta edição. A meta é chegar a ~50 pessoas, o que daria 10
-          times; enquanto isso, o número de times acompanha os elegíveis — todo inscrito, menos
-          quem foi recusado ou desistiu. Pendente já conta.
+          {config.max_times
+            ? `Esta edição tem teto de ${config.max_times} times (${config.max_times * jogadoresPorTime} vagas): quem passar disso vira reserva (sobra). Até lá, o número de times acompanha os elegíveis — todo inscrito, menos quem foi recusado ou desistiu. Pendente já conta.`
+            : "Sem teto de times: o número de times acompanha os elegíveis — todo inscrito, menos quem foi recusado ou desistiu. Pendente já conta."}
         </p>
 
         {comPendentes ? (

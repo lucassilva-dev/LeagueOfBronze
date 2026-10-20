@@ -56,6 +56,8 @@ export type EdicaoConfig = {
   inicio_campeonato: string | null;
   inscricoes_abertas: boolean;
   jogadores_por_time: number;
+  /** Teto de times (30 jogadores = 6 na 4ª). Nulo = sem teto. Opcional: banco sem a migração. */
+  max_times?: number | null;
   orcamento_por_time: number;
   min_ranqueadas: number;
   dias_no_grupo: number;
@@ -891,7 +893,7 @@ export async function salvarDraft(estado: unknown): Promise<void> {
 export function panorama(
   inscricoes: readonly Inscricao[],
   pagamentos: readonly Pagamento[],
-  config: Pick<EdicaoConfig, "jogadores_por_time">,
+  config: Pick<EdicaoConfig, "jogadores_por_time" | "max_times">,
 ) {
   // "sobra" também é APROVADO — é quem passou na conferência e ficou de fora quando
   // os times fecharam. Contar só os "apto" faria a conta se mover sozinha: ao marcar
@@ -900,7 +902,11 @@ export function panorama(
   // A divisão conta todo mundo que ainda pode jogar — pendente incluso. Só recusado e
   // desistente saem (ver `contaParaTimes`).
   const elegiveis = inscricoes.filter((i) => contaParaTimes(i.situacao));
-  const { times, vagas, sobra } = distribuirTimes(elegiveis.length, config.jogadores_por_time);
+  const { times, vagas, sobra } = distribuirTimes(
+    elegiveis.length,
+    config.jogadores_por_time,
+    config.max_times ?? null,
+  );
 
   return {
     inscritos: inscricoes.length,
@@ -908,7 +914,7 @@ export function panorama(
     aprovados: aprovados.length,
     pendentes: inscricoes.filter((i) => i.situacao === "pendente").length,
     recusados: inscricoes.filter((i) => i.situacao === "recusado").length,
-    // Sem "X de 30": não existe teto nesta edição, o número de times é derivado.
+    // O número de times é derivado, limitado pelo teto `max_times` quando houver.
     times,
     vagas,
     sobra,

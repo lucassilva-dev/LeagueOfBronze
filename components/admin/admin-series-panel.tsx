@@ -26,16 +26,18 @@ import {
   inferGameMvpPlayerId,
   isWalkoverSeries,
 } from "@/lib/tournament";
-import { formatDateLabel } from "@/lib/format";
+import { formatDateLabel, formatSeriesDateLabel } from "@/lib/format";
 import { resolveRole, teamColor } from "@/lib/design";
 import {
+  camposBrasiliaParaIso,
   createBlankGame,
   createBlankSeries,
   createBlankStatsRow,
+  isoParaCamposBrasilia,
   slugifyValue,
   type MutateDraft,
 } from "@/components/admin/shared";
-import { CARD_OPTIONS, CARDS_BY_ID } from "@/lib/cards";
+import { CARD_OPTIONS, CARDS_BY_ID, CARTAS_ATIVAS } from "@/lib/cards";
 import { CHAMPIONS } from "@/lib/champions";
 import {
   Banner,
@@ -127,6 +129,32 @@ function getStageOptionLabel(stage: SeriesStage) {
   if (stage === "SEMIFINAL") return "Semifinal";
   if (stage === "FINAL") return "Final";
   return "Fase regular";
+}
+
+/**
+ * Formato que o regulamento prevê para cada etapa: só a final é MD5.
+ *
+ * Trocar a Etapa só mudava `stage`. Uma série nova nasce MD3 (formato do torneio), então a
+ * FINAL criada no painel ficava MD3 — e com 2x0 o site já declarava campeão no meio de
+ * uma MD5. A etapa agora puxa o formato; o select de formato continua editável depois.
+ */
+export function formatoDaEtapa(stage: SeriesStage): SeriesFormat {
+  return stage === "FINAL" ? "BO5" : "BO3";
+}
+
+/**
+ * Opções do select de cartinha de UMA linha.
+ *
+ * Carta retirada (a INVASÃO DA YUUMI saiu na 4ª) fica desabilitada para ninguém registrá-la
+ * numa série nova — EXCETO a que já está nesta linha: uma série da 3ª que usou a Yuumi tem
+ * de continuar abrindo com o registro certo. Se a opção gravada viesse desabilitada, o
+ * navegador mostraria outra carta selecionada e o histórico pareceria errado.
+ */
+export function opcoesDeCartinha(cardIdDaLinha: string) {
+  return CARD_OPTIONS.map((opcao) => ({
+    ...opcao,
+    disabled: CARDS_BY_ID[opcao.id]?.retirada === true && opcao.id !== cardIdDaLinha,
+  }));
 }
 
 function confirmBrowserAction(message: string) {
@@ -251,13 +279,70 @@ function getEstadosDasLinhas(rows: PlayerGameStats[], idsDoConfronto: Set<string
 
 type AuditoriaSerie = {
   bloqueios: string[];
+  /**
+   * Não travam o salvamento — o servidor aceita —, mas quase sempre são engano que muda
+   * resultado: campeão declarado cedo demais ou pontos a mais na tabela.
+   */
+  avisos: string[];
   estadosPorJogo: EstadoLinha[][];
   jogosComProblema: number[];
   descartaveis: number;
 };
 
-function auditarSerie(series: SeriesMatch, draft: TournamentDataset): AuditoriaSerie {
+function etapaDa(series: SeriesMatch): SeriesStage {
+  return series.stage ?? "REGULAR_SEASON";
+}
+
+/** Mesmo par de times, em qualquer ordem (A x B e B x A são o mesmo confronto). */
+function mesmoConfronto(a: SeriesMatch, b: SeriesMatch) {
+  return (
+    (a.teamAId === b.teamAId && a.teamBId === b.teamBId) ||
+    (a.teamAId === b.teamBId && a.teamBId === b.teamAId)
+  );
+}
+
+/**
+ * Etapa x formato x tabela. Vale também para W.O.: uma série de Fase regular por W.O. soma
+ * pontos do mesmo jeito.
+ */
+function avisosDaEtapa(series: SeriesMatch, draft: TournamentDataset): string[] {
+  const avisos: string[] = [];
+  const etapa = etapaDa(series);
+  const formato = getSeriesFormat(series, draft);
+
+  if (etapa === "FINAL" && formato !== "BO5") {
+    avisos.push(
+      `Final em ${getFormatOptionLabel(formato)}: com 2 vitórias o site já declara o campeão. ` +
+        `A final é MD5 — ajuste o formato da série.`,
+    );
+  }
+  if (etapa === "SEMIFINAL" && formato !== "BO3") {
+    avisos.push(`Semifinal em ${getFormatOptionLabel(formato)}: o regulamento prevê MD3 — ajuste o formato da série.`);
+  }
+
+  // Pontos corridos é um turno só: o mesmo par duas vezes na Fase regular é, quase sempre,
+  // semifinal ou final criada sem trocar a Etapa — e ela entraria na tabela como mais uma
+  // série valendo pontos, mexendo na classificação que define quem vai para a semifinal.
+  if (etapa === "REGULAR_SEASON" && series.teamAId && series.teamBId && series.teamAId !== series.teamBId) {
+    const repetida = draft.seriesMatches.find(
+      (outra) => outra.id !== series.id && etapaDa(outra) === "REGULAR_SEASON" && mesmoConfronto(outra, series),
+    );
+    if (repetida) {
+      const pontos = draft.tournament.seriesPointsRule.win;
+      avisos.push(
+        `${getTeamName(draft, series.teamAId)} x ${getTeamName(draft, series.teamBId)} já tem outra série de ` +
+          `Fase regular (${formatSeriesDateLabel(repetida.date)}). Se esta é semifinal ou final, troque a ` +
+          `Etapa: como Fase regular ela soma ${pontos} ponto(s) na tabela.`,
+      );
+    }
+  }
+
+  return avisos;
+}
+
+export function auditarSerie(series: SeriesMatch, draft: TournamentDataset): AuditoriaSerie {
   const bloqueios: string[] = [];
+  const avisos = avisosDaEtapa(series, draft);
   const estadosPorJogo: EstadoLinha[][] = [];
   const jogosComProblema: number[] = [];
   let descartaveis = 0;
@@ -269,7 +354,7 @@ function auditarSerie(series: SeriesMatch, draft: TournamentDataset): AuditoriaS
   }
 
   if (isWalkoverSeries(series)) {
-    return { bloqueios, estadosPorJogo, jogosComProblema, descartaveis };
+    return { bloqueios, avisos, estadosPorJogo, jogosComProblema, descartaveis };
   }
 
   const maxGames = getSeriesMaxGames(series, draft);
@@ -325,7 +410,7 @@ function auditarSerie(series: SeriesMatch, draft: TournamentDataset): AuditoriaS
     if (temProblema) jogosComProblema.push(gameIndex);
   });
 
-  return { bloqueios, estadosPorJogo, jogosComProblema, descartaveis };
+  return { bloqueios, avisos, estadosPorJogo, jogosComProblema, descartaveis };
 }
 
 // ---------------------------------------------------------------- importação da Riot
@@ -1168,6 +1253,50 @@ export function AdminSeriesPanel({
     });
   };
 
+  /**
+   * Etapa puxa o formato do regulamento (`formatoDaEtapa`). Se o formato novo cortar jogos
+   * já lançados (uma final MD5 com 4 jogos virando semifinal MD3), pergunta antes — mesma
+   * regra do select de formato — e, sem confirmação, nada muda.
+   */
+  const updateSeriesStage = (nextStage: SeriesStage) => {
+    if (!selectedSeries) return;
+    const nextFormat = formatoDaEtapa(nextStage);
+    const nextMaxGames = nextFormat === "BO5" ? 5 : 3;
+
+    if (selectedSeries.games.length > nextMaxGames) {
+      const shouldTrim = confirmBrowserAction(
+        `Trocar a etapa para ${getStageOptionLabel(nextStage)} muda o formato para ${getFormatOptionLabel(nextFormat)} ` +
+          `e remove os jogos excedentes acima de ${nextMaxGames}. Deseja continuar?`,
+      );
+      if (!shouldTrim) return;
+    }
+
+    const formatoMudou = getSeriesFormat(selectedSeries, draft) !== nextFormat;
+    updateSelectedSeries((series) => {
+      series.stage = nextStage;
+      series.format = nextFormat;
+      if (series.games.length > nextMaxGames) {
+        series.games = series.games.slice(0, nextMaxGames);
+      }
+    });
+    if (formatoMudou) {
+      avisar("times", `${getStageOptionLabel(nextStage)}: formato ajustado para ${getFormatOptionLabel(nextFormat)}.`);
+    }
+  };
+
+  /**
+   * Data e horário são dois campos, mas UM texto gravado: cada campo regrava o texto
+   * inteiro com o valor ATUAL do outro, então mexer na data mantém a hora (remarcar para
+   * a reserva de sábado 19:00 não pode perder o horário) e vice-versa.
+   */
+  const updateSeriesDataHora = (data: string, hora: string) => {
+    const novo = camposBrasiliaParaIso(data, hora);
+    if (novo === undefined || novo === selectedSeries?.date) return;
+    updateSelectedSeries((series) => {
+      series.date = novo;
+    });
+  };
+
   /** #2/#26: as linhas saem na ordem das rotas (TOP, SEL, MID, ADC, SUP), time A e depois B. */
   const fillRosterRowsForGame = (gameIndex: number) => {
     if (!selectedSeries) return;
@@ -1304,7 +1433,8 @@ export function AdminSeriesPanel({
   const addCardToSeries = () => {
     updateSelectedSeries((series) => {
       if (!series.cardsUsed) series.cardsUsed = [];
-      series.cardsUsed.push({ teamId: series.teamAId || "", cardId: CARD_OPTIONS[0].id });
+      // A linha nova nasce com uma carta EM VIGOR: retirada só aparece em registro antigo.
+      series.cardsUsed.push({ teamId: series.teamAId || "", cardId: CARTAS_ATIVAS[0].cardId });
     });
     avisar("cartinhas", "Cartinha adicionada.");
   };
@@ -1416,6 +1546,7 @@ export function AdminSeriesPanel({
         const isSelected = selectedSeries?.id === series.id;
         const estadoLabel = getSeriesStateLabel(isWalkover, Boolean(winner));
         const temProblema = (auditorias.get(series.id)?.bloqueios.length ?? 0) > 0;
+        const temAviso = (auditorias.get(series.id)?.avisos.length ?? 0) > 0;
 
         return (
           <button
@@ -1439,6 +1570,7 @@ export function AdminSeriesPanel({
             <div
               style={{
                 display: "flex",
+                flexWrap: "wrap",
                 alignItems: "center",
                 gap: 6,
                 fontSize: 10,
@@ -1448,7 +1580,8 @@ export function AdminSeriesPanel({
                 ...tabular,
               }}
             >
-              <span>{formatDateLabel(series.date)}</span>
+              {/* Com hora quando houver: é por ela que se acha "o jogo das 10:30". */}
+              <span>{formatSeriesDateLabel(series.date)}</span>
               <span aria-hidden>•</span>
               <span>{getSeriesStageLabel(series)}</span>
               <span aria-hidden>•</span>
@@ -1500,6 +1633,11 @@ export function AdminSeriesPanel({
               {temProblema ? (
                 <Chip tone="danger" title="Esta série tem pendências que travam o salvamento">
                   Pendências
+                </Chip>
+              ) : null}
+              {temAviso ? (
+                <Chip tone="warn" title={auditorias.get(series.id)?.avisos[0]}>
+                  Conferir etapa
                 </Chip>
               ) : null}
             </div>
@@ -1912,6 +2050,7 @@ export function AdminSeriesPanel({
   // -------------------------------------------------------------- editor da direita
 
   const placarSelecionado = selectedSeries ? getSeriesScore(selectedSeries, draft) : null;
+  const dataHoraSelecionada = isoParaCamposBrasilia(selectedSeries?.date);
 
   const editor = selectedSeries === null ? (
     <Empty
@@ -1933,6 +2072,7 @@ export function AdminSeriesPanel({
           <div
             style={{
               display: "flex",
+              flexWrap: "wrap",
               gap: 6,
               fontSize: 10,
               letterSpacing: ".16em",
@@ -1944,7 +2084,8 @@ export function AdminSeriesPanel({
             <span aria-hidden>•</span>
             <span>{selectedSeriesFormatLabel}</span>
             <span aria-hidden>•</span>
-            <span style={tabular}>{formatDateLabel(selectedSeries.date)}</span>
+            {/* Com hora quando houver: no domingo da final são três séries no mesmo dia. */}
+            <span style={tabular}>{formatSeriesDateLabel(selectedSeries.date)}</span>
           </div>
           <p
             style={{
@@ -1992,6 +2133,19 @@ export function AdminSeriesPanel({
               {auditoriaSelecionada.bloqueios.length > 6 ? (
                 <li>+ {auditoriaSelecionada.bloqueios.length - 6} pendência(s)</li>
               ) : null}
+            </ul>
+          </Banner>
+        </div>
+      ) : null}
+
+      {/* Não trava o salvamento, mas muda resultado: campeão cedo demais ou pontos a mais. */}
+      {auditoriaSelecionada && auditoriaSelecionada.avisos.length > 0 ? (
+        <div style={{ marginTop: 16 }}>
+          <Banner tone="warn" title="Confira a etapa e o formato desta série">
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {auditoriaSelecionada.avisos.map((texto) => (
+                <li key={texto}>{texto}</li>
+              ))}
             </ul>
           </Banner>
         </div>
@@ -2051,17 +2205,33 @@ export function AdminSeriesPanel({
           </div>
         )}
 
-        <Field label="Data">
-          <Input
-            type="date"
-            value={selectedSeries.date?.slice(0, 10) ?? ""}
-            onChange={(value) =>
-              updateSelectedSeries((series) => {
-                series.date = value;
-              })
-            }
-          />
-        </Field>
+        {/*
+          Data e horário separados, e não um `datetime-local`: aquele campo só aceita data E
+          hora juntas — uma série gravada só com data apareceria inteira em branco, e apagar a
+          hora apagaria a data junto. Aqui a hora em branco é estado válido (grava só a data).
+          Os dois mostram e gravam a hora de BRASÍLIA, seja qual for o fuso do computador.
+        */}
+        <div className="lob-2col">
+          <Field label="Data">
+            <Input
+              type="date"
+              ariaLabel="Data da série"
+              value={dataHoraSelecionada.data}
+              onChange={(value) => updateSeriesDataHora(value, dataHoraSelecionada.hora)}
+              // Sem colorScheme escuro o navegador desenha o seletor nativo em preto sobre preto.
+              style={{ colorScheme: "dark" }}
+            />
+          </Field>
+          <Field label="Horário (Brasília)" hint="Em branco = só a data.">
+            <Input
+              type="time"
+              ariaLabel="Horário da série (Brasília)"
+              value={dataHoraSelecionada.hora}
+              onChange={(value) => updateSeriesDataHora(dataHoraSelecionada.data, value)}
+              style={{ colorScheme: "dark" }}
+            />
+          </Field>
+        </div>
       </div>
 
       <BlockTitle right={<Aviso escopo="times" />}>Confronto</BlockTitle>
@@ -2089,12 +2259,9 @@ export function AdminSeriesPanel({
         </Field>
         <Field label="Etapa">
           <Select
+            ariaLabel="Etapa"
             value={selectedSeries.stage ?? "REGULAR_SEASON"}
-            onChange={(value) =>
-              updateSelectedSeries((series) => {
-                series.stage = value as SeriesStage;
-              })
-            }
+            onChange={(value) => updateSeriesStage(value as SeriesStage)}
           >
             <option value="REGULAR_SEASON">{getStageOptionLabel("REGULAR_SEASON")}</option>
             <option value="SEMIFINAL">{getStageOptionLabel("SEMIFINAL")}</option>
@@ -2103,6 +2270,7 @@ export function AdminSeriesPanel({
         </Field>
         <Field label="Formato da série">
           <Select
+            ariaLabel="Formato da série"
             value={selectedSeriesFormat}
             onChange={(value) => updateSeriesFormat(value as SeriesFormat)}
           >
@@ -2286,8 +2454,8 @@ export function AdminSeriesPanel({
                   value={card.cardId}
                   onChange={(value) => updateCardField(cardIndex, "cardId", value)}
                 >
-                  {CARD_OPTIONS.map((cardDef) => (
-                    <option key={cardDef.id} value={cardDef.id}>
+                  {opcoesDeCartinha(card.cardId).map((cardDef) => (
+                    <option key={cardDef.id} value={cardDef.id} disabled={cardDef.disabled}>
                       {cardDef.title}
                     </option>
                   ))}

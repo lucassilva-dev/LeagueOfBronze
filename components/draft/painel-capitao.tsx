@@ -69,7 +69,10 @@ type DraftPublico = Readonly<{
   escolhaAtual: number;
   totalEscolhas: number;
   timeDaVezId: string | null;
+  /** Quem o time da vez pode escolher agora, pela conta do motor. Opcional: servidor antigo. */
+  escolhiveis?: readonly string[];
   prazoISO: string | null;
+  motivoDaPausa?: "organizacao" | "atraso" | "sem_jogador" | null;
   orcamentoPorTime: number;
   jogadoresPorTime: number;
   historico: readonly Readonly<{
@@ -80,7 +83,14 @@ type DraftPublico = Readonly<{
   }>[];
 }>;
 
-type RespostaEstado = Readonly<{ draft: DraftPublico | null; souCapitaoDe: string | null }>;
+type RespostaEstado = Readonly<{
+  draft: DraftPublico | null;
+  souCapitaoDe: string | null;
+  /** Há sessão de jogador? Opcional: servidor antigo não manda. */
+  logado?: boolean;
+  /** Hora do servidor na resposta — corrige o relógio do aparelho no cronômetro. */
+  agoraServidorISO?: string;
+}>;
 
 type RespostaEscolha = Readonly<{ ok?: boolean; draft?: DraftPublico | null; error?: string }>;
 
@@ -138,6 +148,8 @@ export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
 
   const emVoo = useRef(false);
   const vivo = useRef(false);
+  /** Hora do servidor menos a do aparelho, medida na última sondagem (ms). */
+  const defasagem = useRef(0);
   /**
    * Revisão do estado que está pintado na tela.
    *
@@ -182,6 +194,8 @@ export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
       if (!resposta.ok) throw new Error(String(resposta.status));
       const corpo = (await resposta.json()) as RespostaEstado;
       if (!vivo.current) return;
+      const servidorMs = corpo.agoraServidorISO ? Date.parse(corpo.agoraServidorISO) : Number.NaN;
+      if (Number.isFinite(servidorMs)) defasagem.current = servidorMs - Date.now();
       if (!aceitar(corpo.draft?.revisao)) return;
       setEstado(corpo);
       setSemResposta(false);
@@ -206,8 +220,9 @@ export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
   useEffect(() => {
     // O tempo é fonte EXTERNA: lê-lo durante o render (ou dentro de um useMemo) quebra
     // a pureza que o lint cobra. Entra por timer, sai por estado, e o render só lê.
-    const inicio = setTimeout(() => setAgoraMs(Date.now()), 0);
-    const passo = setInterval(() => setAgoraMs(Date.now()), 250);
+    // Hora do SERVIDOR (relógio do aparelho + a diferença medida na última sondagem).
+    const inicio = setTimeout(() => setAgoraMs(Date.now() + defasagem.current), 0);
+    const passo = setInterval(() => setAgoraMs(Date.now() + defasagem.current), 250);
     return () => {
       clearTimeout(inicio);
       clearInterval(passo);
@@ -234,7 +249,18 @@ export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
   const restante = meuTime ? orcamento - meuTime.gasto : 0;
   // teto = orçamento − gasto − (vagas abertas − 1). Cada vaga que sobrar depois desta
   // precisa de pelo menos 1 ponto, e esse mínimo fica reservado.
-  const teto = vagas > 0 ? restante - (vagas - 1) : 0;
+  const tetoPelaConta = vagas > 0 ? restante - (vagas - 1) : 0;
+  // Na MINHA vez vale a lista do motor, que também confere se os elencos de todo mundo
+  // continuam fechando (o pool da 4ª começa em 3 pontos, e a reserva de 1 ponto por vaga
+  // deixava escolher quem travaria o draft). Fora da vez, a conta simples é só referência.
+  const escolhiveis = useMemo(
+    () => (minhaVez && draft?.escolhiveis ? new Set(draft.escolhiveis) : null),
+    [minhaVez, draft],
+  );
+  const teto =
+    escolhiveis && draft
+      ? draft.disponiveis.filter((j) => escolhiveis.has(j.id)).reduce((m, j) => Math.max(m, j.pontos), 0)
+      : tetoPelaConta;
 
   const msRestantes =
     draft?.prazoISO && agoraMs !== null ? Math.max(0, Date.parse(draft.prazoISO) - agoraMs) : null;
@@ -362,23 +388,27 @@ export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
   }
 
   if (!meuTime) {
-    // O GET devolve `souCapitaoDe: null` tanto para quem não entrou quanto para quem
-    // entrou e não capitaneia. Como a resposta não distingue os dois, a tela mostra as
-    // duas saídas em vez de adivinhar — e nenhuma delas é um formulário de login, que
-    // vive na inscrição.
+    // `souCapitaoDe: null` vale para quem não entrou E para quem entrou numa conta que não
+    // capitaneia; `logado` separa os dois. Logado, o convite para entrar só devolveria a
+    // pessoa a esta mesma tela — então ele some e fica o recado de que a conta não é de
+    // capitão (a saída é o botão "sair" do cabeçalho e entrar na conta certa).
+    const logado = estado?.logado === true;
     return (
       <div className="lob-card lob-fade" style={{ ...CAIXA, display: "grid", gap: 18 }}>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
           {/* O convite é o próprio botão: não há chave de rótulo curto para ele, e
-              repetir a frase como texto e como botão seria ruído. /inscricao é onde se
-              entra — esta tela não inventa um formulário de login paralelo. */}
-          <Link
-            href="/inscricao"
-            className="lob-btn-gold"
-            style={{ padding: "13px 22px", fontSize: 13.5, letterSpacing: ".01em", textAlign: "center" }}
-          >
-            {t.entreParaVer}
-          </Link>
+              repetir a frase como texto e como botão seria ruído. Leva ao /entrar, que
+              devolve o capitão para cá — /inscricao não tem login quando as inscrições
+              estão fechadas, que é justamente o caso no dia do draft. */}
+          {logado ? null : (
+            <Link
+              href="/entrar?volta=/capitao"
+              className="lob-btn-gold"
+              style={{ padding: "13px 22px", fontSize: 13.5, letterSpacing: ".01em", textAlign: "center" }}
+            >
+              {t.entreParaVer}
+            </Link>
+          )}
           <Link href="/draft" className="lob-btn-ghost" style={{ padding: "13px 20px", fontSize: 12 }}>
             {t.verTransmissao}
           </Link>
@@ -400,7 +430,11 @@ export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
     draft.fase === "preparando"
       ? t.preparandoTexto
       : draft.fase === "pausado"
-        ? t.pausadoTexto
+        ? draft.motivoDaPausa === "atraso"
+          ? t.pausadoAtrasoTexto
+          : draft.motivoDaPausa === "sem_jogador"
+            ? t.pausadoSemJogadorTexto
+            : t.pausadoTexto
         : t.encerradoTexto;
 
   const podeClicar = minhaVez && vagas > 0 && escolhendoId === null;
@@ -688,7 +722,9 @@ export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
         ) : (
           <div className="lob-scroll" style={{ display: "grid", gap: 7, maxHeight: 560, overflowY: "auto" }}>
             {lista.map((jogador) => {
-              const caro = jogador.pontos > teto;
+              // Fora do teto, ou dentro dele mas deixaria algum elenco sem fechar.
+              const acimaDoTeto = jogador.pontos > tetoPelaConta;
+              const caro = escolhiveis ? !escolhiveis.has(jogador.id) : acimaDoTeto;
               const habilitado = podeClicar && !caro;
               const rota2 = resolveRole(jogador.rota2);
               return (
@@ -736,7 +772,9 @@ export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
                     }}
                   >
                     {caro ? (
-                      <span style={{ fontSize: 11.5, color: "#f0a79e", maxWidth: "34ch" }}>{t.caroDemais}</span>
+                      <span style={{ fontSize: 11.5, color: "#f0a79e", maxWidth: "34ch" }}>
+                        {acimaDoTeto ? t.caroDemais : t.naoFecha}
+                      </span>
                     ) : null}
                     <span
                       className="lob-display"

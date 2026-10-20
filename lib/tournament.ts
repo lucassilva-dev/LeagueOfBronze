@@ -396,98 +396,106 @@ function compareStandingsBase(a: StandingsRow, b: StandingsRow) {
   return 0;
 }
 
+type CriterioDeDesempate = (x: StandingsRow, y: StandingsRow) => number;
+
 /**
- * Mini-tabela do confronto direto: só as séries ENTRE os times empatados.
+ * Mini-tabela do confronto direto: vitórias e saldo de mapas contando SÓ as séries com
+ * resultado ENTRE os times de `grupo`. Quem não enfrentou ninguém do grupo fica com 0.
  *
- * Vale para grupo de qualquer tamanho. Antes, o confronto direto só era aplicado a
- * empates de exatamente DOIS times; com três ou mais, a ordem saía alfabética e um time
- * que venceu os outros dois podia ficar atrás de quem tem nome no começo do alfabeto —
- * decidindo vaga de final por ordem de nome.
- *
- * Para grupo de dois, isto degenera exatamente no confronto direto de sempre.
+ * `completo` diz se TODOS os pares do grupo têm ao menos uma série com resultado entre si.
  */
-function chaveDoPar(a: string, b: string) {
-  return [a, b].sort().join("|");
-}
-
-function ordenarPorConfrontoDireto(grupo: StandingsRow[], dataset: TournamentDataset) {
-  const doGrupo = new Set(grupo.map((linha) => linha.teamId));
-
-  /** Mini-tabela do grupo: séries e saldo de mapas contando SÓ os jogos entre empatados. */
+function miniTabelaDoConfronto(grupo: readonly StandingsRow[], dataset: TournamentDataset) {
   const mini = new Map(grupo.map((linha) => [linha.teamId, { series: 0, mapas: 0 }]));
-  /** O mesmo, mas por PAR — para quando a mini-tabela do grupo não puder ser usada. */
-  const porPar = new Map<string, Map<string, { series: number; mapas: number }>>();
+  const paresQueJogaram = new Set<string>();
 
   for (const series of getStandingsSeries(dataset)) {
-    if (!doGrupo.has(series.teamAId) || !doGrupo.has(series.teamBId)) continue;
+    const a = mini.get(series.teamAId);
+    const b = mini.get(series.teamBId);
+    if (!a || !b) continue;
 
     const vencedor = getSeriesWinnerTeamId(series, dataset);
     if (!vencedor) continue;
 
     const placar = getSeriesScore(series, dataset);
-    const a = mini.get(series.teamAId);
-    const b = mini.get(series.teamBId);
-    if (!a || !b) continue;
-
-    const ganhouA = vencedor === series.teamAId ? 1 : 0;
-    const ganhouB = vencedor === series.teamBId ? 1 : 0;
     const saldoA = placar.teamAWins - placar.teamBWins;
 
-    a.series += ganhouA;
-    b.series += ganhouB;
+    a.series += vencedor === series.teamAId ? 1 : 0;
+    b.series += vencedor === series.teamBId ? 1 : 0;
     a.mapas += saldoA;
     b.mapas -= saldoA;
-
-    const chave = chaveDoPar(series.teamAId, series.teamBId);
-    const par =
-      porPar.get(chave) ??
-      new Map([
-        [series.teamAId, { series: 0, mapas: 0 }],
-        [series.teamBId, { series: 0, mapas: 0 }],
-      ]);
-    par.get(series.teamAId)!.series += ganhouA;
-    par.get(series.teamBId)!.series += ganhouB;
-    par.get(series.teamAId)!.mapas += saldoA;
-    par.get(series.teamBId)!.mapas -= saldoA;
-    porPar.set(chave, par);
+    paresQueJogaram.add([series.teamAId, series.teamBId].sort().join("|"));
   }
 
-  /*
-   * A MINI-TABELA DO GRUPO só vale quando TODOS os pares se enfrentaram.
-   *
-   * Com cobertura parcial ela compara coisas que não se comparam: quem não jogou contra
-   * ninguém do grupo pontua 0, e 0 é "melhor" que o −1 de quem perdeu um mapa para um
-   * adversário do grupo — colocando na frente justamente quem não tem confronto nenhum.
-   *
-   * Quando ela não vale, o confronto direto ainda decide os pares que EXISTIRAM (ver o
-   * comparador abaixo). Não zeramos o confronto: quem ganhou na cara do outro não pode
-   * ficar atrás dele por causa de um terceiro time que nenhum dos dois enfrentou.
-   *
-   * O par a par não pode formar ciclo aqui: um ciclo de três exige que os três pares
-   * tenham acontecido, que é exatamente o caso de cobertura completa — onde quem decide é
-   * a mini-tabela, que é transitiva por construção.
-   */
-  const grupoCompleto = porPar.size === (grupo.length * (grupo.length - 1)) / 2;
+  const completo = paresQueJogaram.size === (grupo.length * (grupo.length - 1)) / 2;
+  return { mini, completo };
+}
 
-  return [...grupo].sort((x, y) => {
-    // 1º confronto direto.
-    if (grupoCompleto) {
-      const mx = mini.get(x.teamId) ?? { series: 0, mapas: 0 };
-      const my = mini.get(y.teamId) ?? { series: 0, mapas: 0 };
-      if (my.series !== mx.series) return my.series - mx.series;
-      if (my.mapas !== mx.mapas) return my.mapas - mx.mapas;
-    } else {
-      const par = porPar.get(chaveDoPar(x.teamId, y.teamId));
-      const px = par?.get(x.teamId);
-      const py = par?.get(y.teamId);
-      if (px && py) {
-        if (py.series !== px.series) return py.series - px.series;
-        if (py.mapas !== px.mapas) return py.mapas - px.mapas;
-      }
-    }
+/**
+ * Separa o grupo em blocos por UM critério: ordena por ele e junta os vizinhos que ele
+ * não distingue. Um critério só por vez — por isso a ordenação é transitiva.
+ */
+function separarPorCriterio(grupo: readonly StandingsRow[], criterio: CriterioDeDesempate) {
+  const blocos: StandingsRow[][] = [];
+  for (const linha of [...grupo].sort(criterio)) {
+    const bloco = blocos[blocos.length - 1];
+    if (bloco && criterio(bloco[0], linha) === 0) bloco.push(linha);
+    else blocos.push([linha]);
+  }
+  return blocos;
+}
+
+/**
+ * Desempate de um grupo de times iguais em pontos e séries vencidas — de qualquer tamanho.
+ *
+ * Critérios, nesta ordem:
+ *   1º confronto direto, a mini-tabela SÓ entre os empatados: vitórias em séries e saldo
+ *      de mapas entre eles (quem não enfrentou alguém do grupo conta 0);
+ *   2º saldo de mapas geral · 3º mapas ganhos · 4º mapas perdidos;
+ *   por fim o nome, só como ordem estável no lugar do sorteio.
+ *
+ * ⚠ CADA CRITÉRIO É APLICADO AO GRUPO INTEIRO, NUNCA A UM PAR. A versão anterior era um
+ * comparador de sort que, quando faltava uma série no grupo (W.O. duplo, série sem
+ * resultado, ou o simples meio da fase de pontos), decidia pelo confronto os pares que
+ * se enfrentaram e pelo saldo geral os que não se enfrentaram. Isso forma ciclo — A
+ * venceu B, B tem saldo melhor que C, C venceu A: basta que DOIS dos três pares tenham
+ * jogado — e sort com comparador em ciclo devolve uma ordem que depende da ordem de
+ * entrada, que aqui é a dos NOMES. Trocar só o nome dos times trocava o 1º colocado.
+ *
+ * Como funciona: o primeiro critério que distingue alguém separa o grupo em blocos, e
+ * cada bloco que continua empatado RECOMEÇA do confronto direto, com a mini-tabela refeita
+ * só entre os times do bloco — "o confronto direto considera só os jogos entre os
+ * empatados", como diz a regra publicada. O bloco é sempre menor que o grupo, então a
+ * recursão termina. Se o critério não distingue ninguém, passa-se ao seguinte.
+ *
+ * Vitórias e saldo entre os empatados — uma chave só, ou uma depois da outra:
+ *   - TODOS do grupo se enfrentaram: uma chave só (vitórias, e no empate o saldo entre
+ *     eles), a mini-tabela de sempre — cada um jogou contra todos os outros, e o saldo
+ *     compara igual com igual;
+ *   - NEM TODOS se enfrentaram (W.O. duplo, série sem resultado, meio da fase de pontos):
+ *     as vitórias separam ANTES, e o saldo entre eles só fala se elas não distinguirem
+ *     ninguém. Numa chave só, quem perdeu um mapa para um empatado (−1) ficaria atrás de
+ *     quem nem enfrentou o grupo (0), mesmo com saldo geral melhor. Separado, os dois
+ *     empatam em 0 vitórias, o bloco é refeito só entre eles — onde não houve jogo — e o
+ *     saldo geral decide.
+ * A escolha vale para o grupo INTEIRO daquela rodada da recursão (nunca por par), então
+ * continua sendo um critério só aplicado a todos.
+ */
+function ordenarPorConfrontoDireto(grupo: StandingsRow[], dataset: TournamentDataset): StandingsRow[] {
+  if (grupo.length <= 1) return grupo;
+
+  const { mini, completo } = miniTabelaDoConfronto(grupo, dataset);
+  const confronto = (linha: StandingsRow) => mini.get(linha.teamId) ?? { series: 0, mapas: 0 };
+  const vitoriasEntreEles: CriterioDeDesempate = (x, y) => confronto(y).series - confronto(x).series;
+  const saldoEntreEles: CriterioDeDesempate = (x, y) => confronto(y).mapas - confronto(x).mapas;
+
+  const criterios: CriterioDeDesempate[] = [
+    // 1º confronto direto (ver acima por que a forma muda com o grupo completo ou não).
+    ...(completo
+      ? [(x: StandingsRow, y: StandingsRow) => vitoriasEntreEles(x, y) || saldoEntreEles(x, y)]
+      : [vitoriasEntreEles, saldoEntreEles]),
 
     // 2º saldo de mapas geral.
-    if (y.gameDiff !== x.gameDiff) return y.gameDiff - x.gameDiff;
+    (x, y) => y.gameDiff - x.gameDiff,
 
     /*
      * 3º mapas GANHOS, e 4º mapas PERDIDOS.
@@ -501,14 +509,24 @@ function ordenarPorConfrontoDireto(grupo: StandingsRow[], dataset: TournamentDat
      * na prática quer dizer campanha zerada, no começo da temporada, quando ainda não há
      * nada a comparar.
      */
-    if (y.gamesWon !== x.gamesWon) return y.gamesWon - x.gamesWon;
-    if (y.gamesLost !== x.gamesLost) return x.gamesLost - y.gamesLost;
+    (x, y) => y.gamesWon - x.gamesWon,
+    (x, y) => x.gamesLost - y.gamesLost,
 
     // Último caso: nada distingue os times. O desempate de verdade é o SORTEIO, que a
     // organização faz à mão; aqui só se garante uma ordem ESTÁVEL, para a tabela não
     // dançar entre dois carregamentos com os mesmos dados.
-    return x.teamName.localeCompare(y.teamName, "pt-BR");
-  });
+    (x, y) => x.teamName.localeCompare(y.teamName, "pt-BR"),
+  ];
+
+  for (const criterio of criterios) {
+    const blocos = separarPorCriterio(grupo, criterio);
+    if (blocos.length > 1) {
+      return blocos.flatMap((bloco) => ordenarPorConfrontoDireto(bloco, dataset));
+    }
+  }
+
+  // Nem o nome separa (times homônimos): fica a ordem de entrada, que já é estável.
+  return grupo;
 }
 
 /**

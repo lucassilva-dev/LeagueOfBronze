@@ -21,7 +21,7 @@ const pt = {
   regrasSobretitulo: "Regulamento oficial",
   regrasTitulo: "REGRAS",
   regrasSubtitulo:
-    "Regulamento do 4º Campeonato dos Bronzes (League of Bronze, 4ª Edição) — League of Legends 5v5. Atualizado em 05/10/2026.",
+    "Regulamento do 4º Campeonato dos Bronzes (League of Bronze, 4ª Edição) — League of Legends 5v5. Atualizado em 20/10/2026.",
   sumarioRotulo: "Nesta página",
 
   // ---------- app/regras: 1. visão geral ----------
@@ -32,7 +32,7 @@ const pt = {
   fichaModalidadeV: "5v5, Summoner’s Rift",
   fichaPeriodoK: "PERÍODO",
   fichaPeriodoV:
-    "Previsto para novembro, provavelmente na segunda quinzena. As datas serão divulgadas assim que as inscrições forem encerradas.",
+    "De 20 a 29 de novembro, em dois fins de semana. O calendário completo está no fim desta página.",
   fichaFaseK: "FASE DE PONTOS CORRIDOS",
   fichaFaseV: "Todos contra todos, uma vez, em séries MD3 (melhor de 3). Vitória na série = 3 pontos.",
   fichaSemifinaisK: "SEMIFINAIS",
@@ -58,14 +58,14 @@ const pt = {
   inscricaoCampo3: "Elo atual na fila solo/duo.",
   inscricaoCampo4: "Rota primária e rota secundária.",
   inscricaoCampo5:
-    "Disponibilidade por turno (manhã, tarde e/ou noite). As datas só serão divulgadas depois do encerramento das inscrições, e a disponibilidade informada vale como compromisso (regra 9).",
+    "Disponibilidade por turno (manhã, tarde e/ou noite). As datas e os horários estão no calendário, no fim desta página, e a disponibilidade informada vale como compromisso (regra 9).",
   inscricaoCampo6:
     "Aceite do regulamento e ciência do pagamento, autorização de uso de imagem e nick (regra 17) e confirmação dos requisitos das regras 1, 3, 4, 5 e 21.",
   inscricaoNota:
-    "Nick ou Discord repetido bloqueia a inscrição. A disponibilidade vale para o time inteiro: um jogador que só pode à noite leva o time todo para a noite.",
+    "Nick ou Discord repetido bloqueia a inscrição. Os horários são os do calendário oficial, em manhã, tarde e noite, e cada time joga nos horários da posição sorteada para ele: a disponibilidade informada é o compromisso de jogar nesses horários.",
   inscricaoReservasRotulo: "Reservas:",
   inscricaoReservasTexto:
-    "o número de times é inscritos ÷ 5. Quem sobrar vira reserva oficial e pode substituir titulares (regra 6).",
+    "esta edição tem 6 times de 5 jogadores (30 vagas). Quem passar disso vira reserva oficial e pode substituir titulares (regra 6).",
 
   // ---------- app/regras: 3. formação dos times ----------
   formacaoTitulo: "FORMAÇÃO DOS TIMES",
@@ -75,8 +75,7 @@ const pt = {
   capitaes1:
     "Os capitães são os inscritos de maior elo na fila solo/duo, independentemente da rota. O elo da flex não conta.",
   capitaes2: "Os organizadores desta edição jogam, mas não são capitães.",
-  capitaes3:
-    "O número de capitães é igual ao número de times (inscritos ÷ 5; com 40 inscritos, são 8).",
+  capitaes3: "O número de capitães é igual ao número de times: 6 nesta edição.",
   capitaes4:
     "Um sorteio ao vivo define qual time cada capitão vai capitanear e a ordem de escolha do draft.",
   capitaes5:
@@ -114,7 +113,7 @@ const pt = {
   regra8:
     "Passada a tolerância da regra 7, sem 5 jogadores presentes (titulares ou substitutos da regra 6), o jogo é W.O.: vitória 2x0 e 3 pontos para o time completo presente. Se nenhum dos times estiver completo, é W.O. duplo: ninguém pontua e a série não é remarcada.",
   regra9:
-    "Não será aceito trocar os confrontos com outros capitães, nem adiar ou adiantar jogos. A disponibilidade informada na inscrição vale como compromisso: o calendário é montado pela organização após o draft e, depois de publicado, é definitivo.",
+    "Não será aceito trocar os confrontos com outros capitães, nem adiar ou adiantar jogos. A disponibilidade informada na inscrição vale como compromisso, e o calendário publicado (seção Calendário) é definitivo. Só a organização pode realocar uma série, e apenas para o horário de reserva do calendário.",
   regra10:
     "O capitão poderá trocar a lane de dois jogadores na série; porém, os jogadores só poderão retornar à sua lane original após um jogo pós-troca. A troca por cartinha (INVERSÃO DE ROTAS) não conta como a troca desta regra.",
   regra11:
@@ -202,29 +201,8 @@ const pt = {
   premiacaoOrganizadores:
     "Os organizadores desta edição jogam, mas não pagam inscrição e não são capitães.",
 
-  // ---------- app/regras: 7. calendário modelo ----------
-  calendarioTitulo: "CALENDÁRIO MODELO (8 TIMES)",
-  calendarioIntro:
-    "Com 8 times (40 inscritos) são 31 séries: 28 de pontos corridos, 2 semifinais e a final. Com 6 séries por data (3 de manhã e 3 à tarde), cabem em 6 datas, ou 3 fins de semana.",
-  calColData: "Data",
-  calColTurno: "Turno",
-  calColHorarios: "Horários",
-  calColOque: "O que acontece",
-  calDatas1a4: "Datas 1 a 4",
-  calData5: "Data 5",
-  calData6: "Data 6",
-  turnoManha: "Manhã",
-  turnoTarde: "Tarde",
-  turnoNoite: "Noite",
-  calSeries3: "3 séries de pontos corridos",
-  calUltimaSerie:
-    "Última série da fase de pontos (28ª); o restante do turno é reserva técnica para remarcações",
-  calSemis: "Semifinais: 1º x 4º e 2º x 3º",
-  calFinal: "Final em MD5",
-  calendarioNota:
-    "Os confrontos são definidos por sorteio ao vivo após o draft. As datas serão divulgadas assim que as inscrições forem encerradas, e os horários saem depois do draft, cruzando a disponibilidade por turno (manhã, tarde e noite) informada por todos os jogadores de cada time. Cada série MD3 reserva cerca de 90 minutos; a final em MD5 pode passar de 3 horas.",
-  calendarioOutros:
-    "Com outro número de times a conta muda: os pontos corridos têm 10 séries com 5 times, 15 com 6 e 21 com 7.",
+  // ---------- app/regras: 7. calendário (o conteúdo vem de calendario4a) ----------
+  calendarioTitulo: "CALENDÁRIO",
 
   // ---------- app/temporadas: lista ----------
   temporadasBadge: "Histórico",
@@ -337,7 +315,7 @@ export const paginasRegras = definir<ChavesPaginasRegras>({
     regrasSobretitulo: "Official rulebook",
     regrasTitulo: "RULES",
     regrasSubtitulo:
-      "Rulebook of the 4th Campeonato dos Bronzes (League of Bronze, 4th Edition) — League of Legends 5v5. Updated on 5 October 2026.",
+      "Rulebook of the 4th Campeonato dos Bronzes (League of Bronze, 4th Edition) — League of Legends 5v5. Updated on 20 October 2026.",
     sumarioRotulo: "On this page",
 
     // ---------- app/regras: 1. visão geral ----------
@@ -347,8 +325,7 @@ export const paginasRegras = definir<ChavesPaginasRegras>({
     fichaModalidadeK: "MODE",
     fichaModalidadeV: "5v5, Summoner’s Rift",
     fichaPeriodoK: "WHEN",
-    fichaPeriodoV:
-      "Planned for November, most likely in the second half of the month. Dates will be announced as soon as sign-ups close.",
+    fichaPeriodoV: "20 to 29 November, over two weekends. The full schedule is at the bottom of this page.",
     fichaFaseK: "ROUND-ROBIN STAGE",
     fichaFaseV: "Everyone plays everyone once, in Bo3 series (best of 3). Series win = 3 points.",
     fichaSemifinaisK: "SEMIFINALS",
@@ -374,14 +351,14 @@ export const paginasRegras = definir<ChavesPaginasRegras>({
     inscricaoCampo3: "Current solo/duo queue rank.",
     inscricaoCampo4: "Primary and secondary role.",
     inscricaoCampo5:
-      "Availability by session (morning, afternoon and/or evening). Dates will only be announced after sign-ups close, and the availability you give counts as a commitment (rule 9).",
+      "Availability by session (morning, afternoon and/or evening). Dates and times are in the schedule at the bottom of this page, and the availability you give counts as a commitment (rule 9).",
     inscricaoCampo6:
       "Acceptance of the rulebook and acknowledgement of the payment, consent to the use of your image and nickname (rule 17) and confirmation of the requirements in rules 1, 3, 4, 5 and 21.",
     inscricaoNota:
-      "A duplicate Riot ID or Discord blocks the sign-up. Availability applies to the whole team: a player who can only play in the evening takes the whole team to the evening.",
+      "A duplicate Riot ID or Discord blocks the sign-up. Times follow the official schedule, across morning, afternoon and evening, and each team plays at the times of the slot drawn for it: the availability you give is your commitment to play at those times.",
     inscricaoReservasRotulo: "Reserves:",
     inscricaoReservasTexto:
-      "the number of teams is sign-ups ÷ 5. Anyone left over becomes an official reserve and may replace starters (rule 6).",
+      "this edition has 6 teams of 5 players (30 places). Anyone beyond that becomes an official reserve and may replace starters (rule 6).",
 
     // ---------- app/regras: 3. formação dos times ----------
     formacaoTitulo: "TEAM FORMATION",
@@ -391,8 +368,7 @@ export const paginasRegras = definir<ChavesPaginasRegras>({
     capitaes1:
       "The captains are the sign-ups with the highest solo/duo queue rank, regardless of role. Flex rank does not count.",
     capitaes2: "This edition's organisers play, but they are not captains.",
-    capitaes3:
-      "The number of captains equals the number of teams (sign-ups ÷ 5; with 40 sign-ups, that makes 8).",
+    capitaes3: "The number of captains equals the number of teams: 6 in this edition.",
     capitaes4:
       "A live draw decides which team each captain will lead and the pick order of the draft.",
     capitaes5:
@@ -430,7 +406,7 @@ export const paginasRegras = definir<ChavesPaginasRegras>({
     regra8:
       "Once the grace period in rule 7 has passed, a team without 5 players present (starters or rule 6 substitutes) loses by walkover (W.O.): a 2-0 win and 3 points for the complete team that is present. If neither team is complete, it is a double W.O.: nobody scores and the series is not rescheduled.",
     regra9:
-      "Swapping fixtures with other captains, or moving games earlier or later, is not allowed. The availability given at sign-up counts as a commitment: the organisers build the schedule after the draft and, once published, it is final.",
+      "Swapping fixtures with other captains, or moving games earlier or later, is not allowed. The availability given at sign-up counts as a commitment, and the published schedule (Schedule section) is final. Only the organisers may move a series, and only to the schedule's reserve slot.",
     regra10:
       "A captain may swap the lanes of two players during a series; however, the players can only return to their original lane after one game following the swap. A swap caused by a wildcard (ROLE SWAP) does not count as the swap in this rule.",
     regra11:
@@ -517,29 +493,8 @@ export const paginasRegras = definir<ChavesPaginasRegras>({
     premiacaoOrganizadores:
       "This edition's organisers play, but they do not pay the entry fee and are not captains.",
 
-    // ---------- app/regras: 7. calendário modelo ----------
-    calendarioTitulo: "SAMPLE SCHEDULE (8 TEAMS)",
-    calendarioIntro:
-      "With 8 teams (40 sign-ups) there are 31 series: 28 in the round robin, 2 semifinals and the final. At 6 series per date (3 in the morning and 3 in the afternoon), they fit into 6 dates, or 3 weekends.",
-    calColData: "Date",
-    calColTurno: "Session",
-    calColHorarios: "Times",
-    calColOque: "What happens",
-    calDatas1a4: "Dates 1 to 4",
-    calData5: "Date 5",
-    calData6: "Date 6",
-    turnoManha: "Morning",
-    turnoTarde: "Afternoon",
-    turnoNoite: "Evening",
-    calSeries3: "3 round-robin series",
-    calUltimaSerie:
-      "Last series of the points stage (28th); the rest of the session is held in reserve for rescheduling",
-    calSemis: "Semifinals: 1st v 4th and 2nd v 3rd",
-    calFinal: "Bo5 final",
-    calendarioNota:
-      "Fixtures are set by a live draw after the draft. Dates will be announced as soon as sign-ups close, and the times come out after the draft, cross-checking the availability by session (morning, afternoon and evening) given by every player on each team. Each Bo3 series is allotted about 90 minutes; the Bo5 final may run past 3 hours.",
-    calendarioOutros:
-      "With a different number of teams the maths changes: the round robin has 10 series with 5 teams, 15 with 6 and 21 with 7.",
+    // ---------- app/regras: 7. calendário (o conteúdo vem de calendario4a) ----------
+    calendarioTitulo: "SCHEDULE",
 
     // ---------- app/temporadas: lista ----------
     temporadasBadge: "Archive",

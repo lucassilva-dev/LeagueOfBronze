@@ -3,6 +3,9 @@
 // por elo, rota e time. Fonte: design oficial "League of Bronze".
 // ============================================================
 
+import { slugifyValue } from "@/components/admin/shared";
+import { TIMES_DO_DRAFT } from "@/lib/draft/times";
+
 function normalizeKey(value: string) {
   return value
     .normalize("NFD")
@@ -164,8 +167,18 @@ const TEAM_FALLBACK_PALETTE = [
   "#f2e2b3",
 ];
 
+/**
+ * A cor de cada time do DRAFT (CHAMA, ÁUREA…), pelo id que a virada grava — o slug do
+ * nome ("chama", "aurea"). Sem isto, os times da 4ª chegavam ao site com uma cor do hash
+ * e a CHAMA laranja da transmissão virava azul na tabela.
+ */
+const CORES_DO_DRAFT: Record<string, string> = Object.fromEntries(
+  TIMES_DO_DRAFT.map((t) => [slugifyValue(t.nome), t.cor]),
+);
+
 export function teamColor(teamId: string): string {
   if (TEAM_COLORS[teamId]) return TEAM_COLORS[teamId];
+  if (CORES_DO_DRAFT[teamId]) return CORES_DO_DRAFT[teamId];
   let hash = 0;
   for (let i = 0; i < teamId.length; i += 1) hash = (hash * 31 + teamId.charCodeAt(i)) >>> 0;
   return TEAM_FALLBACK_PALETTE[hash % TEAM_FALLBACK_PALETTE.length];

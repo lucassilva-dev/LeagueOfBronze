@@ -30,6 +30,8 @@ export type EdicaoConfig = {
   inicio_campeonato: string | null;
   inscricoes_abertas: boolean;
   jogadores_por_time: number;
+  /** Teto de times (6 na 4ª). Nulo/ausente = sem teto. */
+  max_times?: number | null;
   orcamento_por_time: number;
   min_ranqueadas: number;
   dias_no_grupo: number;

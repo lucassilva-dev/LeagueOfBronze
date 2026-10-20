@@ -4,11 +4,11 @@ import { definir } from "@/lib/i18n/definir";
  * Textos da PRÉ-TEMPORADA — o intervalo entre arquivar uma edição e aplicar o draft da
  * próxima (ver lib/fase-do-site.ts).
  *
- * Regra da casa: nada aqui crava data nem número de times — as datas saem depois que as
- * inscrições fecham e os times dependem de quantos se inscrevem. O formato segue o
- * regulamento da 4ª (pontos corridos em MD3, semifinais e final em MD5). O que é número
- * (taxa, prazo) vem da Configuração da edição e é interpolado pela página: `{valor}`,
- * `{dias}` e `{temporada}`.
+ * As datas da 4ª foram decididas em 2026-10-20 (20 a 29/11, ver lib/calendario-4a.ts) e
+ * o calendário da home vem daquele arquivo, não daqui. O formato segue o regulamento da 4ª
+ * (pontos corridos em MD3, semifinais em MD3 e final em MD5). O que é número (taxa,
+ * prazo) vem da Configuração da edição e é interpolado pela página: `{valor}`, `{dias}` e
+ * `{temporada}`.
  */
 export const preTemporada = definir({
   pt: {
@@ -28,6 +28,9 @@ export const preTemporada = definir({
       "As inscrições da 4ª Edição foram encerradas. Os times saem do draft ao vivo — acompanhe pelo Discord e pelo grupo do WhatsApp.",
     botaoInscrever: "FAZER MINHA INSCRIÇÃO →",
     botaoVerInscricao: "VER A INSCRIÇÃO →",
+    // Só aparece com um draft montado no painel (ver a home da pré-temporada).
+    botaoDraftAoVivo: "DRAFT AO VIVO →",
+    botaoVerDraft: "VER O DRAFT →",
     botaoRegras: "REGRAS",
     botaoTemporadas: "TEMPORADAS",
     pilulaIndividual: "INSCRIÇÃO INDIVIDUAL",
@@ -64,7 +67,7 @@ export const preTemporada = definir({
       "Os inscritos de maior elo são os capitães e montam os times escolhendo jogadores por pontos — o preço de cada um vem do elo.",
     passo5Titulo: "CAMPEONATO",
     passo5Texto:
-      "Pontos corridos em séries MD3, semifinais 1º x 4º e 2º x 3º, e final em MD5. As datas saem quando as inscrições fecharem; os detalhes estão nas Regras.",
+      "6 times. Pontos corridos em séries MD3, semifinais 1º x 4º e 2º x 3º, e final em MD5 — de 20 a 29 de novembro. Os detalhes estão nas Regras.",
 
     // ---------- home · campeão da edição anterior ----------
     campeaoSobretitulo: "CAMPEÃO · {temporada}",
@@ -95,6 +98,8 @@ export const preTemporada = definir({
       "Sign-ups for the 4th Edition are closed. Teams are formed in the live draft — follow along on Discord and in the WhatsApp group.",
     botaoInscrever: "SIGN ME UP →",
     botaoVerInscricao: "SEE SIGN-UP →",
+    botaoDraftAoVivo: "LIVE DRAFT →",
+    botaoVerDraft: "SEE THE DRAFT →",
     botaoRegras: "RULES",
     botaoTemporadas: "SEASONS",
     pilulaIndividual: "INDIVIDUAL SIGN-UP",
@@ -129,7 +134,7 @@ export const preTemporada = definir({
       "The highest-ranked players are the captains, and they build their teams by picking players with points — each player's price comes from their rank.",
     passo5Titulo: "TOURNAMENT",
     passo5Texto:
-      "Round robin in best-of-3 series, semi-finals 1st v 4th and 2nd v 3rd, and a best-of-5 final. Dates come out when sign-ups close; the details are in the Rules.",
+      "6 teams. Round robin in best-of-3 series, semi-finals 1st v 4th and 2nd v 3rd, and a best-of-5 final — from 20 to 29 November. The details are in the Rules.",
 
     campeaoSobretitulo: "CHAMPION · {temporada}",
     campeaoVer: "SEE THE SEASON →",

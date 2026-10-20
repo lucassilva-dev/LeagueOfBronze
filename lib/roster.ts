@@ -34,8 +34,40 @@ export type DesignTeam = {
   total: number;
 };
 
+/**
+ * Quem é o capitão de cada time, quando o dataset diz.
+ *
+ * Até a 3ª Edição a regra era fixa: capitão = MID. Na 4ª, o capitão vem do draft (o de
+ * maior elo, de qualquer rota, e nunca alguém da organização), e a virada grava
+ * `captain: true` nele (lib/draft/virada.ts). As temporadas arquivadas não têm o campo,
+ * e o arquivo delas tem de continuar mostrando o que sempre mostrou.
+ *
+ * A decisão é pelo dataset EXIBIDO inteiro — o ao vivo, ou o snapshot de uma temporada
+ * arquivada, que chega aqui como dataset próprio (snapshotToDataset) — e nunca por
+ * time: se um jogador tem a marca, vale a marca para todos. Misturar as regras faria um
+ * time da 4ª sem marca (criado à mão no painel, por exemplo) ganhar o MID como capitão,
+ * que pode ser justamente alguém da organização.
+ *
+ * Devolve time → id do capitão, ou `null` quando o dataset não tem marca nenhuma (regra
+ * do MID). Um capitão por time: se o painel deixar dois marcados no mesmo time (um
+ * jogador trocado de time, por exemplo), vale o primeiro na ordem do dataset — melhor do
+ * que o site exibir dois capitães.
+ */
+function capitaesMarcados(players: TournamentDataset["players"]): Map<string, string> | null {
+  if (!players.some((player) => player.captain === true)) return null;
+
+  const capitaoDoTime = new Map<string, string>();
+  for (const player of players) {
+    if (player.captain === true && !capitaoDoTime.has(player.teamId)) {
+      capitaoDoTime.set(player.teamId, player.id);
+    }
+  }
+  return capitaoDoTime;
+}
+
 export function buildDesignPlayers(dataset: TournamentDataset): DesignPlayer[] {
   const teamsById = new Map(dataset.teams.map((team) => [team.id, team]));
+  const capitaoDoTime = capitaesMarcados(dataset.players);
   return dataset.players.map((player) => {
     const team = teamsById.get(player.teamId);
     const eloMeta = resolveElo(player.elo);
@@ -48,7 +80,7 @@ export function buildDesignPlayers(dataset: TournamentDataset): DesignPlayer[] {
       name: player.name?.trim() || getDisplayNick(player.nick),
       imageUrl: player.imageUrl,
       mono: Boolean(player.mono),
-      captain: roleMeta.short === "MID",
+      captain: capitaoDoTime ? capitaoDoTime.get(player.teamId) === player.id : roleMeta.short === "MID",
       elo: player.elo,
       eloMeta,
       pts: eloMeta?.pts ?? 0,
@@ -65,11 +97,16 @@ export function buildDesignPlayers(dataset: TournamentDataset): DesignPlayer[] {
 
 export function buildDesignTeams(dataset: TournamentDataset): DesignTeam[] {
   const players = buildDesignPlayers(dataset);
+  const comMarca = capitaesMarcados(dataset.players) !== null;
   return dataset.teams.map((team) => {
     const roster = players
       .filter((player) => player.teamId === team.id)
       .sort((a, b) => a.roleMeta.order - b.roleMeta.order);
-    const captain = roster.find((player) => player.captain) ?? roster[0] ?? null;
+    // Sem MID, a regra antiga caía no primeiro do elenco — e é o que o arquivo da 3ª
+    // sempre mostrou. Com a marca, time sem capitão marcado fica sem capitão: inventar
+    // um (o TOP, que vem primeiro) poderia apontar alguém da organização.
+    const marcado = roster.find((player) => player.captain);
+    const captain = comMarca ? (marcado ?? null) : (marcado ?? roster[0] ?? null);
     const total = roster.reduce((sum, player) => sum + player.pts, 0);
     return {
       id: team.id,

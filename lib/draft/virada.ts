@@ -14,8 +14,9 @@ import type { Player, Team } from "@/lib/schema";
  * para o navegador em toda página, e é exportado em backup.
  *
  * Por isso a conversão é EXPLÍCITA e por campo, nunca um espalhamento. Atravessam
- * quatro coisas — nick, rotas, elo e time — e nada mais. Um `...inscrito` aqui
- * publicaria o contato de cinquenta pessoas de uma vez, sem erro nenhum aparecer.
+ * nick, rotas, elo e time — e, só no capitão, a marca de capitão — e nada mais. Um
+ * `...inscrito` aqui publicaria o contato de cinquenta pessoas de uma vez, sem erro
+ * nenhum aparecer.
  *
  * Função pura de propósito: dá para conferir num teste exatamente o que sai, que é o
  * único jeito honesto de garantir uma regra dessas.
@@ -38,6 +39,12 @@ export function datasetDoDraft(estado: EstadoDraft): ResultadoDaVirada {
 
   const idDoTime = new Map(estado.times.map((t, i) => [t.id, teams[i]!.id]));
 
+  // Capitão → time que ele capitaneia. O site público lia o capitão pela rota (MID, a
+  // regra da 3ª); na 4ª o capitão é o do draft, de qualquer rota, e quem é da
+  // organização nunca é capitão. Sem levar a marca, depois da virada o site mostraria
+  // como capitão todo MID — inclusive um organizador.
+  const timeDoCapitao = new Map(estado.times.map((t) => [t.capitaoId, t.id]));
+
   // Dois jogadores podem ter o mesmo nick com tags diferentes ("Nak4y#BR1" e
   // "Nak4y#JPN"), e o slug vira a URL da página do jogador. Sem desempate, um
   // sobrescreveria a página do outro.
@@ -55,7 +62,7 @@ export function datasetDoDraft(estado: EstadoDraft): ResultadoDaVirada {
       }
       usados.add(slug);
 
-      return {
+      const player: Player = {
         id: slug,
         // O Riot ID inteiro, que é o nome de jogo e já é público em qualquer partida.
         nick: jogador.riotId,
@@ -68,6 +75,14 @@ export function datasetDoDraft(estado: EstadoDraft): ResultadoDaVirada {
         // momento vira "Grão-Mestre" e as telas do site sabem colorir.
         elo: resolveElo(jogador.elo)?.label ?? jogador.elo,
       };
+
+      // Só no capitão, e só `true`: nos outros o campo nem existe, para o JSON que vai a
+      // todo visitante não carregar um `captain: false` por jogador. Exige que ele esteja
+      // no time que capitaneia — o motor já garante, e assim a marca nunca sai em dobro
+      // num time.
+      if (timeDoCapitao.get(jogador.id) === jogador.timeId) player.captain = true;
+
+      return player;
 
       // NÃO ATRAVESSAM, e a ausência é a regra:
       //   email, whatsapp, discord  — contato, nunca é conteúdo de campeonato;

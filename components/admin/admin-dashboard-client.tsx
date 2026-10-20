@@ -20,6 +20,7 @@ import { AdminUsersPanel } from "@/components/admin/admin-users-panel";
 import { TrocarSenha } from "@/components/admin/trocar-senha";
 import { PainelEdicao, type SecaoEdicao } from "@/components/admin/e4/painel-edicao";
 import { SecaoConfiguracao } from "@/components/admin/e4/secao-configuracao";
+import { SecaoDraft } from "@/components/admin/e4/secao-draft";
 import { SecaoInscritos } from "@/components/admin/e4/secao-inscritos";
 import { SecaoPagamentos } from "@/components/admin/e4/secao-pagamentos";
 import { SecaoTimes } from "@/components/admin/e4/secao-times";
@@ -108,6 +109,9 @@ type AdminTabContentProps = Readonly<{
   podeConferir: boolean;
   podeFinanceiro: boolean;
   podeConfigurar: boolean;
+  podeConduzirDraft: boolean;
+  /** O draft gravou o dataset pelo servidor (virada, calendário): recarregar o rascunho. */
+  onDatasetMudouNoServidor: () => void;
 }>;
 
 // ================================================================ erros de API
@@ -538,8 +542,13 @@ function AdminTabContent({
   podeConferir,
   podeFinanceiro,
   podeConfigurar,
+  podeConduzirDraft,
+  onDatasetMudouNoServidor,
 }: AdminTabContentProps) {
   if (activeTab === "users") return <AdminUsersPanel onAlert={onAlert} />;
+  if (activeTab === "e4-draft") {
+    return <SecaoDraft onAlert={onAlert} podeConduzir={podeConduzirDraft} onDatasetMudou={onDatasetMudouNoServidor} />;
+  }
 
   // As quatro seções da 4ª Edição compartilham o mesmo contêiner: ele busca uma vez e
   // entrega os dados prontos. Ficam fora do `switch` abaixo porque nenhuma delas usa
@@ -958,6 +967,27 @@ export function AdminDashboardClient() {
     );
   };
 
+  /**
+   * A virada do draft e o calendário gravam o dataset pelo servidor. O rascunho aberto no
+   * painel ficou para trás — e o próximo "Salvar" cairia em 409 ou, pior, mandaria os times
+   * velhos de volta. Sem nada pendente, adota o do servidor; com trabalho não salvo, avisa
+   * em vez de descartar sozinho.
+   */
+  const recarregarDepoisDoDraft = () => {
+    if (temTrabalhoNaoSalvo) {
+      setMessage("O draft gravou no site. Você tem alterações não salvas aqui: recarregue o rascunho antes de salvar.");
+      return;
+    }
+    runTransitionTask(
+      "recarregar",
+      async () => {
+        await fetchDataset();
+        setConflict(false);
+      },
+      "O draft gravou no site, mas o rascunho não recarregou. Clique em Recarregar.",
+    );
+  };
+
   const reloadDataset = () => {
     if (!confirmarDescarte("Recarregar")) return;
     runTransitionTask(
@@ -1208,6 +1238,12 @@ export function AdminDashboardClient() {
         label: "Times e vagas",
         grupo: "4ª Edição",
         escopos: ["inscricoes:conferir"],
+      },
+      {
+        value: "e4-draft",
+        label: "Draft ao vivo",
+        grupo: "4ª Edição",
+        escopos: ["draft:conduzir"],
       },
       {
         value: "e4-config",
@@ -1617,6 +1653,8 @@ export function AdminDashboardClient() {
           podeConferir={alcanca(["inscricoes:conferir"])}
           podeFinanceiro={alcanca(["inscricoes:financeiro"])}
           podeConfigurar={alcanca(["edicao:configurar"])}
+          podeConduzirDraft={alcanca(["draft:conduzir"])}
+          onDatasetMudouNoServidor={recarregarDepoisDoDraft}
           activeTab={activeTab}
           draft={draft}
           mutateDraft={mutateDraft}

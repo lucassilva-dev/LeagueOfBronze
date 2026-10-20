@@ -12,11 +12,23 @@
  * TODA página, e o projeto já tirou o banco desse caminho uma vez (ver
  * components/sessao-no-cabecalho.tsx) para o site não cair inteiro quando o Supabase pausa.
  *
- * QUANDO TROCAR PARA "temporada" (depois de aplicar o draft da 4ª):
- *   1. a virada já pôs os times e jogadores no dataset ao vivo;
- *   2. os textos da home do campeonato (lib/i18n/messages/paginas-home.ts), do calendário
- *      e o card de desempate da /tabela ainda falam da 3ª — datas, formato, número de
- *      times, "mapas ganhos" — e precisam ser revistos contra o regulamento da 4ª.
+ * QUANDO TROCAR PARA "temporada" (depois de aplicar o draft da 4ª).
+ *
+ * Já resolvido no código (rodada de 2026-10-20):
+ *   - os textos da home do campeonato, de /times, /jogadores e /tabela falam da 4ª sem
+ *     cravar número de edição nem data: o nome vem de `dataset.tournament.name` e as datas
+ *     das séries ou de lib/calendario-4a.ts; a /tabela destaca os 4 que vão às semifinais;
+ *   - as semifinais aparecem no calendário (`buildSemifinalGames` em lib/calendar.ts);
+ *   - as 15 séries da fase de pontos são criadas pelo painel do draft, a partir do
+ *     calendário oficial (lib/calendario-4a.ts).
+ *
+ * O que a ORGANIZAÇÃO ainda precisa fazer, nesta ordem, antes de trocar:
+ *   1. fechar as inscrições na Configuração da edição;
+ *   2. aplicar o draft (a virada põe os times e jogadores no dataset ao vivo);
+ *   3. criar as séries pelo painel do draft (sorteio das posições Time 1…6);
+ *   4. conferir /times e /tabela com o elenco certo — e só então trocar esta constante.
+ * Ainda em aberto: o card de desempate da /tabela (`tabelaInfoDesempateTexto`) depende de
+ * uma decisão pendente da organização.
  */
 import { elencosSaoDaUltimaArquivada } from "@/lib/arquivo";
 

@@ -82,13 +82,25 @@ type DraftPublico = {
   escolhaAtual: number;
   totalEscolhas: number;
   timeDaVezId: string | null;
+  /** Quem o time da vez pode escolher agora, pela conta do motor. Opcional: servidor antigo. */
+  escolhiveis?: string[];
   prazoISO: string | null;
+  motivoDaPausa?: "organizacao" | "atraso" | "sem_jogador" | null;
+  /** Muda a cada sorteio — vira a `key` da animação do sorteio. */
+  sorteioId?: string | null;
   orcamentoPorTime: number;
   jogadoresPorTime: number;
   historico: EntradaHistorico[];
 };
 
-type RespostaEstado = { draft: DraftPublico | null; souCapitaoDe: string | null };
+type RespostaEstado = { draft: DraftPublico | null; souCapitaoDe: string | null; agoraServidorISO?: string };
+
+/**
+ * Hora do servidor menos a do aparelho (ms), medida a cada sondagem. A TV da sala pode
+ * estar com o relógio errado; sem a correção, o cronômetro projetado mostrava 0:00 com
+ * tempo sobrando. Uma variável de módulo basta: a transmissão é uma por página.
+ */
+let defasagemDoServidorMs = 0;
 
 // ---------------------------------------------------------------- tempos do handoff
 
@@ -239,7 +251,9 @@ function useSegundosRestantes(prazoISO: string | null, ativo: boolean): number |
      */
     const alvo = prazoISO && ativo ? new Date(prazoISO).getTime() : null;
     const marcar = () =>
-      setRestante(alvo === null ? null : Math.max(0, Math.ceil((alvo - Date.now()) / 1000)));
+      setRestante(
+        alvo === null ? null : Math.max(0, Math.ceil((alvo - (Date.now() + defasagemDoServidorMs)) / 1000)),
+      );
 
     const primeira = window.setTimeout(marcar, 0);
     const cadencia = alvo === null ? null : window.setInterval(marcar, 250);
@@ -755,7 +769,9 @@ function AoVivo({
               // e o clique voltava erro.
               const teto =
                 daVez.vagas > 0 ? draft.orcamentoPorTime - daVez.gasto - (daVez.vagas - 1) : 0;
-              const cabe = jogador.pontos <= teto;
+              // Com a lista do motor (orçamento + os elencos de todos continuarem fechando),
+              // a TV não oferece à plateia quem o servidor recusaria. Sem ela, a conta antiga.
+              const cabe = draft.escolhiveis ? draft.escolhiveis.includes(jogador.id) : jogador.pontos <= teto;
               return (
                 <div
                   key={jogador.id}
@@ -1107,6 +1123,8 @@ export default function Transmissao({ t }: Readonly<{ t: Rotulos }>) {
         if (!resposta.ok) throw new Error(String(resposta.status));
         const corpo = (await resposta.json()) as RespostaEstado;
         if (!vivo) return;
+        const servidorMs = corpo.agoraServidorISO ? Date.parse(corpo.agoraServidorISO) : Number.NaN;
+        if (Number.isFinite(servidorMs)) defasagemDoServidorMs = servidorMs - Date.now();
         setDraft(corpo.draft);
         setFalhando(false);
       } catch {
@@ -1261,11 +1279,19 @@ export default function Transmissao({ t }: Readonly<{ t: Rotulos }>) {
           <div style={{ ...kicker(D.ouro, ".3em"), fontSize: 20, fontWeight: 700 }}>
             {t.pausado}
           </div>
-          <div style={{ marginTop: 6, fontSize: 14, color: "#f3d69a" }}>{t.pausadoTexto}</div>
+          <div style={{ marginTop: 6, fontSize: 14, color: "#f3d69a" }}>
+            {draft.motivoDaPausa === "atraso"
+              ? t.pausadoAtrasoTexto
+              : draft.motivoDaPausa === "sem_jogador"
+                ? t.pausadoSemJogadorTexto
+                : t.pausadoTexto}
+          </div>
         </div>
       ) : null}
       {draft.fase === "preparando" ? (
-        <Sorteio draft={draft} t={t} nomesParaRolar={nomesParaRolar} />
+        // `key` pela semente: um NOVO sorteio com a TV já na tela remonta a animação. Sem
+        // isso os capitães trocavam de lugar sem girar, e a plateia nem via o re-sorteio.
+        <Sorteio key={draft.sorteioId ?? "sorteio"} draft={draft} t={t} nomesParaRolar={nomesParaRolar} />
       ) : draft.fase === "encerrado" ? (
         <Fim draft={draft} t={t} />
       ) : (

@@ -15,6 +15,8 @@
  *     derivados do elo.
  */
 
+import { elencosFecham } from "@/lib/draft/viabilidade";
+
 // ---------------------------------------------------------------- tipos
 
 export type TimeDoDraft = {
@@ -47,6 +49,12 @@ export type EventoDraft = {
 
 export type FaseDraft = "preparando" | "rodando" | "pausado" | "encerrado";
 
+/**
+ * Por que o draft parou. A transmissão dizia sempre "a organização interrompeu o relógio",
+ * inclusive quando foi o motor que pausou sozinho — e na TV isso vira acusação.
+ */
+export type MotivoDaPausa = "organizacao" | "atraso" | "sem_jogador";
+
 export type EstadoDraft = {
   versao: 1;
   fase: FaseDraft;
@@ -62,6 +70,15 @@ export type EstadoDraft = {
   orcamentoPorTime: number;
   segundosPorEscolha: number;
   historico: EventoDraft[];
+  /**
+   * O sorteio da ordem (quem capitaneia qual time e quem escolhe primeiro): a semente e
+   * a lista de capitães ANTES de embaralhar. Com os dois, `embaralhar(semente,
+   * "capitaes", capitaes)` refaz a ordem de `times` — o sorteio pode ser conferido.
+   * Opcional porque drafts montados antes do sorteio não têm.
+   */
+  sorteio?: { semente: string; capitaes: string[]; emISO: string };
+  /** Só com `fase === "pausado"`. Ausente em estados gravados antes deste campo existir. */
+  motivoDaPausa?: MotivoDaPausa;
 };
 
 export type Recusa = { ok: false; motivo: string };
@@ -166,7 +183,81 @@ export function podeEscolher(
     };
   }
 
+  // O teto acima reserva 1 ponto por vaga; a conta de verdade é com os jogadores que
+  // existem (ver lib/draft/viabilidade.ts). Separa os dois recados: o próprio elenco não
+  // fecharia, ou é OUTRO time que ficaria sem como completar.
+  if (!fechaDepoisDe(estado, timeId, jogador)) {
+    const soEuFecho = elencosFecham([situacaoDoTime(estado, timeId, jogador)], custosRestantes(estado, jogador.id));
+    return {
+      ok: false,
+      motivo:
+        soEuFecho === "nao_fecha"
+          ? `Com ${jogador.riotId} (${jogador.pontos} pts) o seu elenco não fecha: não sobraria jogador barato o bastante para as vagas que faltam. Escolha alguém mais barato.`
+          : `${jogador.riotId} é o que falta para outro time conseguir fechar o elenco dentro do orçamento. Escolha outro jogador.`,
+    };
+  }
+
   return { ok: true };
+}
+
+// ---------------------------------------------------------------- viabilidade
+
+function custosRestantes(estado: EstadoDraft, semJogadorId?: string): number[] {
+  return estado.jogadores.filter((j) => j.timeId === null && j.id !== semJogadorId).map((j) => j.pontos);
+}
+
+/** Vagas e folga de um time, opcionalmente depois de levar `levando`. */
+function situacaoDoTime(estado: EstadoDraft, timeId: string, levando?: JogadorDoDraft) {
+  const vagas = vagasAbertasDoTime(estado, timeId) - (levando ? 1 : 0);
+  const folga = estado.orcamentoPorTime - gastoDoTime(estado, timeId) - (levando ? levando.pontos : 0);
+  return { vagas, folga };
+}
+
+/**
+ * Os elencos ainda fecham depois de `timeId` levar `jogador`?
+ *
+ * "indeterminado" (busca grande demais, edição com muito mais times) conta como "fecha":
+ * é o comportamento de antes, que nunca recusava por isso.
+ */
+function fechaDepoisDe(estado: EstadoDraft, timeId: string, jogador: JogadorDoDraft): boolean {
+  const times = estado.times.map((t) =>
+    t.id === timeId ? situacaoDoTime(estado, t.id, jogador) : situacaoDoTime(estado, t.id),
+  );
+  return elencosFecham(times, custosRestantes(estado, jogador.id)) !== "nao_fecha";
+}
+
+/**
+ * O estado, do jeito que está, ainda fecha todos os elencos?
+ *
+ * Conferido na montagem: um sorteio que já nasce sem saída (capitães caros demais para o
+ * orçamento e para o pool) não pode ir ao ar.
+ */
+export function estadoFecha(estado: EstadoDraft, orcamentoDePassos?: number): boolean {
+  const times = estado.times.map((t) => situacaoDoTime(estado, t.id));
+  return elencosFecham(times, custosRestantes(estado), orcamentoDePassos) !== "nao_fecha";
+}
+
+/**
+ * Quem o time da vez pode escolher AGORA — a lista que as telas usam para apagar o resto.
+ *
+ * Antes cada tela recalculava "cabe" com a fórmula do teto, e mostrava como escolhível um
+ * jogador que o servidor recusaria. Agora a resposta é a do motor. A conta é feita uma vez
+ * por VALOR de pontos (jogadores do mesmo preço dão a mesma resposta), então custa poucas
+ * buscas por sondagem.
+ */
+export function escolhiveisDaVez(estado: EstadoDraft): string[] {
+  const timeId =
+    estado.fase === "rodando" || estado.fase === "pausado" ? estado.ordem[estado.escolhaAtual] : undefined;
+  if (!timeId || vagasAbertasDoTime(estado, timeId) === 0) return [];
+  const teto = tetoDaEscolha(estado, timeId);
+  const porValor = new Map<number, boolean>();
+  return jogadoresDisponiveis(estado)
+    .filter((j) => {
+      if (j.pontos > teto) return false;
+      if (!porValor.has(j.pontos)) porValor.set(j.pontos, fechaDepoisDe(estado, timeId, j));
+      return porValor.get(j.pontos)!;
+    })
+    .map((j) => j.id);
 }
 
 /**
@@ -182,7 +273,9 @@ export function maisBaratoValido(estado: EstadoDraft, timeId: string): JogadorDo
     .filter((j) => j.pontos <= teto)
     .sort((a, b) => a.pontos - b.pontos || a.riotId.localeCompare(b.riotId));
 
-  return candidatos[0] ?? null;
+  // O mais barato quase sempre mantém tudo viável; a checagem existe para o caso em que
+  // ele é justamente o que outro time precisa.
+  return candidatos.find((j) => fechaDepoisDe(estado, timeId, j)) ?? null;
 }
 
 // ---------------------------------------------------------------- transições
@@ -266,7 +359,7 @@ export function avancarPorTempo(estado: EstadoDraft, agoraMs: number): EstadoDra
 
   const escolhido = maisBaratoValido(estado, timeId);
   if (!escolhido) {
-    return { ...estado, fase: "pausado", prazoISO: null };
+    return { ...estado, fase: "pausado", prazoISO: null, motivoDaPausa: "sem_jogador" };
   }
 
   // A escolha automática é datada no instante em que o prazo venceu, não em quando
@@ -295,7 +388,7 @@ export function alcancarORelogio(estado: EstadoDraft, agoraMs: number, maxPassos
   const atrasoMs = agoraMs - Date.parse(estado.prazoISO);
   const limiteMs = ESCOLHAS_DE_ATRASO_ATE_PAUSAR * estado.segundosPorEscolha * 1000;
   if (atrasoMs > limiteMs) {
-    return { ...estado, fase: "pausado", prazoISO: null };
+    return { ...estado, fase: "pausado", prazoISO: null, motivoDaPausa: "atraso" };
   }
 
   let atual = estado;
@@ -423,16 +516,31 @@ export function iniciarDraft(estado: EstadoDraft, agoraMs: number): EstadoDraft 
   }
 
   const novo: EstadoDraft = { ...estado, fase: "rodando", prazoISO: null };
+  delete novo.motivoDaPausa;
   novo.prazoISO = proximoPrazo(novo, agoraMs);
   return novo;
 }
 
 export function pausarDraft(estado: EstadoDraft): EstadoDraft {
   if (estado.fase !== "rodando") return estado;
-  return { ...estado, fase: "pausado", prazoISO: null };
+  return { ...estado, fase: "pausado", prazoISO: null, motivoDaPausa: "organizacao" };
 }
 
 export function retomarDraft(estado: EstadoDraft, agoraMs: number): EstadoDraft {
   if (estado.fase !== "pausado") return estado;
   return iniciarDraft(estado, agoraMs);
+}
+
+/**
+ * Para que um time sem jogador possível volte a andar.
+ *
+ * `avancarPorTempo` PAUSA quando o time da vez não cabe ninguém no teto — e `retomar`
+ * sozinho só reabre o mesmo beco: o prazo vence de novo e pausa de novo. Esta função é
+ * o diagnóstico que o painel mostra: de quem é a vez e qual o teto, para a organização
+ * decidir (subir o orçamento não muda um draft já montado; o caminho é remontar).
+ */
+export function vezSemSaida(estado: EstadoDraft): { timeId: string; teto: number } | null {
+  const timeId = estado.ordem[estado.escolhaAtual];
+  if (!timeId || estado.fase === "encerrado") return null;
+  return maisBaratoValido(estado, timeId) ? null : { timeId, teto: tetoDaEscolha(estado, timeId) };
 }

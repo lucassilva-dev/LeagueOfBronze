@@ -482,3 +482,26 @@ $migracao$;
 
 comment on column public.inscricoes.elo_verificado is
   'O elo que vale antes do congelamento: vindo da Riot (elo_fonte = riot) ou travado pela organizacao (elo_fonte = organizacao).';
+
+-- ---------------------------------------------------------------- teto de times (2026-10-20)
+-- A 4ª Edição fechou em 30 jogadores = 6 times (calendário de 18 séries, 20 a 29/11).
+-- Sem teto, 35 aprovados viravam 7 times e o calendário deixava de fechar. Nulo = sem
+-- teto (o número de times continua derivado). A coluna nasce NULA, como todo parâmetro da
+-- edição: o 6 da 4ª foi gravado à mão em public e lob_teste em 2026-10-20 — num banco novo,
+-- defina em Configuração → "Máximo de times".
+do $teto$
+declare s text;
+begin
+  foreach s in array array['public', 'lob_teste'] loop
+    continue when not exists (select 1 from pg_namespace where nspname = s);
+    execute format($sql$
+      alter table %1$I.edicao_config
+        add column if not exists max_times smallint
+        check (max_times is null or max_times between 1 and 20);
+    $sql$, s);
+  end loop;
+end
+$teto$;
+
+comment on column public.edicao_config.max_times is
+  'Teto de times da edicao. Nulo = sem teto (times = elegiveis / jogadores_por_time). Com teto, quem passa de max_times x jogadores_por_time vira sobra/reserva.';

@@ -1,12 +1,18 @@
 import Link from "next/link";
 
+import { ResumoDoCalendario4a } from "@/components/calendario-4a";
+import { calendarioAindaPorVir } from "@/lib/calendario-4a";
+import type { FaseDraft } from "@/lib/draft/motor";
 import { Eyebrow, GoldTitle, Pill, SectionTitle } from "@/components/lob/ui";
 import { Trailer4a } from "@/components/trailer-4a";
+import { isSupabaseConfigured } from "@/lib/data-store";
+import { lerDraftCompleto } from "@/lib/draft/store";
 import { getMessages } from "@/lib/i18n/server";
 import { estadoDaJanela, type EstadoJanela } from "@/lib/inscricoes/schema";
 import { lerConfigOuNulo } from "@/lib/inscricoes/store";
 import { getServerArchivedSeasons, getServerDataset } from "@/lib/server-data";
 import { getChampionshipResult } from "@/lib/tournament";
+import { nomeDaTemporada } from "@/lib/i18n/nome-da-temporada";
 
 /** `destino` diz para onde o link leva, e decide o rótulo: a série da final ou a temporada. */
 type Campeao = { nome: string; temporada: string; href: string; destino: "final" | "temporada" };
@@ -47,6 +53,29 @@ async function buscarCampeao(): Promise<Campeao | null> {
   };
 }
 
+/**
+ * A fase do draft montado no painel (nula sem draft): decide o botão do draft — "AO VIVO"
+ * enquanto acontece, "VER O DRAFT" depois de encerrado.
+ *
+ * O draft acontece na pré-temporada, e a home não levava a /draft. Botão só com draft
+ * montado: antes disso a página do draft diz apenas que ele ainda não começou.
+ *
+ * Falha de leitura NÃO derruba a home — mesma regra de `buscarCampeao`: sem o banco, o
+ * botão some e a chamada para a inscrição continua de pé. Sem as chaves do Supabase
+ * (desenvolvimento local) nem tenta, pelo mesmo motivo de `lerConfigOuNulo`: o log de erro
+ * virava a tela vermelha do Next a cada carregamento.
+ */
+async function faseDoDraft(): Promise<FaseDraft | null> {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    const { estado } = await lerDraftCompleto();
+    return estado?.fase ?? null;
+  } catch (error) {
+    console.error("[home] leitura do draft falhou; a home segue sem o botão do draft.", error);
+    return null;
+  }
+}
+
 function formatarMoeda(centavos: number, localeTag: string) {
   return new Intl.NumberFormat(localeTag, { style: "currency", currency: "BRL" }).format(centavos / 100);
 }
@@ -61,17 +90,27 @@ const SELO_ESTILO: Record<EstadoJanela, { cor: string; fundo: string; borda: str
 /**
  * Home da PRÉ-TEMPORADA (ver lib/fase-do-site.ts): a porta de entrada da inscrição.
  *
- * Nada aqui crava data, número de times nem formato — isso é decidido com o grupo a cada
- * edição. Os números que aparecem (taxa, prazo) vêm da Configuração da edição.
+ * As datas vêm de lib/calendario-4a.ts (o calendário oficial, decidido em 2026-10-20); os
+ * números de dinheiro e prazo (taxa, dias para pagar) vêm da Configuração da edição.
  */
 export async function HomePreTemporada() {
-  const [mensagens, config, campeao] = await Promise.all([
+  const [mensagens, config, campeao, fase] = await Promise.all([
     getMessages(),
     lerConfigOuNulo(),
     buscarCampeao(),
+    faseDoDraft(),
   ]);
   const t = mensagens.preTemporada;
+  const tCal = mensagens.calendario4a;
   const janela = estadoDaJanela(config);
+  const draftMontado = fase !== null;
+  // "AO VIVO" só enquanto ele está acontecendo (sorteado, rodando ou pausado). Encerrado, o
+  // botão vira "ver o draft" e sai do destaque — prometer ao vivo o que já acabou engana.
+  const draftAoVivo = fase === "preparando" || fase === "rodando" || fase === "pausado";
+  const draftEmDestaque = draftAoVivo && janela !== "aberta";
+  const rotuloDoDraft = draftAoVivo ? t.botaoDraftAoVivo : t.botaoVerDraft;
+  // O resumo das datas é do calendário oficial da 4ª: passado ele, some da home.
+  const calendarioPorVir = calendarioAindaPorVir();
   const valor = config ? formatarMoeda(config.taxa_centavos, mensagens.compartilhados.localeTag) : null;
 
   const selo = {
@@ -135,9 +174,28 @@ export async function HomePreTemporada() {
           {intro}
         </p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 11, marginBottom: 26 }}>
-          <Link href="/inscricao" className="lob-btn-gold" style={{ padding: "16px 28px", fontSize: 14 }}>
+          {/*
+            Com o draft montado, ele é o evento do momento: vem primeiro, em dourado, e a
+            inscrição (já fechada a essa altura) desce para botão comum. Com a janela ainda
+            aberta, a inscrição continua sendo a chamada principal.
+          */}
+          {draftEmDestaque ? (
+            <Link href="/draft" className="lob-btn-gold" style={{ padding: "16px 28px", fontSize: 14 }}>
+              {rotuloDoDraft}
+            </Link>
+          ) : null}
+          <Link
+            href="/inscricao"
+            className={draftEmDestaque ? "lob-btn-ghost" : "lob-btn-gold"}
+            style={{ padding: "16px 28px", fontSize: 14 }}
+          >
             {janela === "aberta" ? t.botaoInscrever : t.botaoVerInscricao}
           </Link>
+          {draftMontado && !draftEmDestaque ? (
+            <Link href="/draft" className="lob-btn-ghost" style={{ padding: "16px 24px", fontSize: 13 }}>
+              {rotuloDoDraft}
+            </Link>
+          ) : null}
           <Link href="/regras" className="lob-btn-ghost" style={{ padding: "16px 24px", fontSize: 13 }}>
             {t.botaoRegras}
           </Link>
@@ -146,6 +204,7 @@ export async function HomePreTemporada() {
           </Link>
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 9 }}>
+          {calendarioPorVir ? <Pill>{tCal.resumoPeriodo}</Pill> : null}
           <Pill>{t.pilulaIndividual}</Pill>
           {valor ? <Pill>{t.pilulaTaxa.replace("{valor}", valor)}</Pill> : null}
           <Pill>{t.pilulaPremio}</Pill>
@@ -168,6 +227,19 @@ export async function HomePreTemporada() {
           </Link>
         </div>
       </section>
+
+      {/* CALENDÁRIO — as datas da 4ª, logo antes do "como funciona" */}
+      {calendarioPorVir ? (
+        <section className="lob-fade" style={{ margin: "18px 0 44px" }}>
+          <div style={{ marginBottom: 10 }}>
+            <SectionTitle>{tCal.resumoTitulo}</SectionTitle>
+          </div>
+          <p style={{ maxWidth: 620, fontSize: 14, lineHeight: 1.55, color: "#a99e8b", margin: "0 0 16px" }}>
+            {tCal.resumoTexto}
+          </p>
+          <ResumoDoCalendario4a t={tCal} localeTag={mensagens.compartilhados.localeTag} />
+        </section>
+      ) : null}
 
       {/* COMO FUNCIONA */}
       <section className="lob-fade" style={{ margin: "18px 0 44px" }}>
@@ -223,7 +295,10 @@ export async function HomePreTemporada() {
             </div>
             <div style={{ flex: "1 1 260px", minWidth: 0 }}>
               <div style={{ fontSize: 11, letterSpacing: ".24em", color: "#e6c592" }}>
-                {t.campeaoSobretitulo.replace("{temporada}", campeao.temporada.toUpperCase())}
+                {t.campeaoSobretitulo.replace(
+                  "{temporada}",
+                  nomeDaTemporada(campeao.temporada, mensagens.compartilhados.localeTag).toUpperCase(),
+                )}
               </div>
               <div
                 className="lob-display gold-text"

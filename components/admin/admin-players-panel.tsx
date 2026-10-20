@@ -10,6 +10,7 @@ import {
   Button,
   C,
   Card,
+  Check,
   Chip,
   Empty,
   Field,
@@ -226,6 +227,7 @@ function serializa(player: Player) {
     player.imageUrl ?? "",
     player.name ?? "",
     player.mono ?? false,
+    player.captain ?? false,
   ]);
 }
 
@@ -382,10 +384,22 @@ export function AdminPlayersPanel({
       elo: form.elo.trim(),
       imageUrl: (form.imageUrl ?? "").trim(),
     };
+    // A marca de capitão (gravada pela virada do draft) é do TIME: quem troca de time não
+    // leva a capitania junto — senão o time novo ficava com dois capitães e o antigo com
+    // nenhum. Para seguir capitão no time novo, é marcar de novo aqui.
+    const trocouDeTime = carregado.teamId !== "" && carregado.teamId !== limpo.teamId;
+    if (trocouDeTime && carregado.captain && limpo.captain) delete limpo.captain;
+    if (!limpo.captain) delete limpo.captain;
     mutateDraft((next) => {
       const indice = next.players.findIndex((player) => player.id === selectedId);
       if (indice >= 0) next.players[indice] = { ...limpo };
       else next.players.push({ ...limpo });
+      // Um capitão por time: marcar este desmarca quem mais estava marcado no mesmo time.
+      if (limpo.captain) {
+        for (const outro of next.players) {
+          if (outro.id !== limpo.id && outro.teamId === limpo.teamId && outro.captain) delete outro.captain;
+        }
+      }
     });
     setForm(limpo);
     setCarregado(limpo);
@@ -764,6 +778,18 @@ export function AdminPlayersPanel({
                     ))}
                     <OpcaoAtual valor={form.role2 ?? ""} conhecido={rota2Conhecida} />
                   </Select>
+                </Field>
+
+                <Field
+                  label="Capitão"
+                  hint="Um por time. Marcar aqui desmarca o capitão anterior do mesmo time. Sem nenhum marcado na temporada, o site usa a regra antiga (o MID)."
+                >
+                  <Check
+                    checked={form.captain === true}
+                    onChange={(v) => setForm((prev) => ({ ...prev, captain: v }))}
+                  >
+                    Capitão do time
+                  </Check>
                 </Field>
 
                 <Field label="Elo">

@@ -3,13 +3,22 @@ import Link from "next/link";
 import { HomePreTemporada } from "@/components/home-pre-temporada";
 import { Eyebrow, GoldTitle, Pill, SectionTitle, TeamMark } from "@/components/lob/ui";
 import { emPreTemporada } from "@/lib/fase-do-site";
-import { buildCalendarDays, buildFinalGame } from "@/lib/calendar";
-import { turnoLabel } from "@/lib/i18n/messages/paginas-home";
+import { buildCalendarDays, buildFinalGame, buildSemifinalGames, type CalDay, type CalGame } from "@/lib/calendar";
+import {
+  CALENDARIO_4A,
+  calendarioEDestaTemporada,
+  diaDoSlot,
+  horaDoSlot,
+  periodoDoCalendarioFuturo,
+  type TipoDoSlot,
+} from "@/lib/calendario-4a";
+import { diaEMes, horaNoIdioma, periodoPorExtenso, turnoLabel } from "@/lib/i18n/messages/paginas-home";
 import { getMessages } from "@/lib/i18n/server";
 import { getDisplayNick } from "@/lib/opgg";
 import { buildDesignPlayers } from "@/lib/roster";
 import { getServerDataset } from "@/lib/server-data";
 import { getChampionshipResult } from "@/lib/tournament";
+import { nomeDaTemporada } from "@/lib/i18n/nome-da-temporada";
 
 export const dynamic = "force-dynamic";
 
@@ -20,12 +29,70 @@ export default async function InicioPage() {
   return <HomeTemporada />;
 }
 
+type PlanoDaTemporada = {
+  /** Dias de jogo ("YYYY-MM-DD", Brasília), sem repetição e em ordem. */
+  dias: string[];
+  series: number;
+  semifinais: number;
+  /** Dia e hora da final: da série, se ela existe; senão, do calendário oficial. */
+  final: { dateKey: string; hora: string } | null;
+};
+
+/**
+ * Dias, séries e a final da temporada no ar: o que está no dataset e, para cada fase que
+ * ainda não tem série (semifinais e final só são criadas quando os confrontos saem da
+ * tabela), o que o calendário oficial reserva para ela.
+ *
+ * A home contava só a fase regular e somava "+1 dia" fixo para a final (a de 02/08): na 4ª,
+ * com as semifinais, saíam 15 confrontos em vez de 18.
+ */
+function planoDaTemporada(
+  dias: readonly CalDay[],
+  semifinais: readonly CalGame[],
+  final: CalGame | null,
+  // O relógio fica fora do corpo do componente (regra de pureza do React), aqui.
+  agora: number = Date.now(),
+): PlanoDaTemporada {
+  const diasDasSeries = [
+    ...dias.map((d) => d.dateKey),
+    ...semifinais.map((g) => g.dateKey),
+    ...(final ? [final.dateKey] : []),
+  ].filter(Boolean);
+  // O calendário oficial completa o que o dataset ainda não tem (a data da final antes de a
+  // série existir, os dias das semifinais) — só quando ele é DESTA temporada.
+  const oficial = calendarioEDestaTemporada(diasDasSeries, agora) ? CALENDARIO_4A : [];
+  const slots = (tipo: TipoDoSlot) => oficial.filter((s) => s.tipo === tipo);
+
+  const regulares = dias.reduce((soma, d) => soma + d.games.length, 0);
+  const faltando = [
+    ...(regulares === 0 ? slots("pontos") : []),
+    ...(semifinais.length === 0 ? slots("semifinal") : []),
+    ...(final ? [] : slots("final")),
+  ];
+  const slotDaFinal = slots("final")[0];
+
+  return {
+    dias: [...new Set([...diasDasSeries, ...faltando.map(diaDoSlot)])].sort(),
+    series: regulares + semifinais.length + (final ? 1 : 0) + faltando.length,
+    semifinais: semifinais.length || slots("semifinal").length,
+    final: final
+      ? { dateKey: final.dateKey, hora: final.hora }
+      : slotDaFinal
+        ? { dateKey: diaDoSlot(slotDaFinal), hora: horaDoSlot(slotDaFinal) }
+        : null,
+  };
+}
+
 async function HomeTemporada() {
-  const { paginasHome: t, conformidade: conf } = await getMessages();
+  const mensagens = await getMessages();
+  const { paginasHome: t, conformidade: conf } = mensagens;
+  const localeTag = mensagens.compartilhados.localeTag;
   const { dataset, indexes } = await getServerDataset();
+  // O nome da edição vem do dataset ("4ª Edição"): os textos não cravam o número.
+  const temporada = nomeDaTemporada(dataset.tournament.name, localeTag).toLocaleUpperCase(localeTag);
 
   const explore = [
-    { href: "/times", label: t.homeExploreTimes, desc: t.homeExploreTimesDesc },
+    { href: "/times", label: t.homeExploreTimes, desc: t.homeExploreTimesDesc.replace("{n}", String(dataset.teams.length)) },
     { href: "/jogadores", label: t.homeExploreJogadores, desc: t.homeExploreJogadoresDesc },
     { href: "/calendario", label: t.homeExploreCalendario, desc: t.homeExploreCalendarioDesc },
     { href: "/tabela", label: t.homeExploreTabela, desc: t.homeExploreTabelaDesc },
@@ -35,10 +102,13 @@ async function HomeTemporada() {
   ];
   const players = buildDesignPlayers(dataset);
   const calDays = buildCalendarDays(dataset);
+  const semifinais = buildSemifinalGames(dataset);
 
   // Campeão (definido quando a Grande Final termina) e a própria série da final.
   const championship = getChampionshipResult(dataset);
   const finalGame = buildFinalGame(dataset);
+  const plano = planoDaTemporada(calDays, semifinais, finalGame);
+  const temSemifinal = plano.semifinais > 0;
   const championTeam = championship ? indexes.teamsById.get(championship.championTeamId) ?? null : null;
   const runnerUpTeam = championship ? indexes.teamsById.get(championship.runnerUpTeamId) ?? null : null;
   const championOnSideA = championship
@@ -55,17 +125,39 @@ async function HomeTemporada() {
     : undefined;
 
   const poolTotal = players.reduce((sum, player) => sum + player.pts, 0);
-  const confrontos = calDays.reduce((sum, day) => sum + day.games.length, 0);
-  const diasDeJogo = calDays.length + 1; // + Grande Final (02/08)
   const abertura = calDays[0];
   const preview = abertura ? abertura.games.slice(0, 3) : [];
 
   const numbers = [
     { v: String(dataset.teams.length), l: t.homeNumTimes },
     { v: String(dataset.players.length), l: t.homeNumJogadores },
-    { v: String(confrontos), l: t.homeNumConfrontos },
-    { v: String(diasDeJogo), l: t.homeNumDias },
+    { v: String(plano.series), l: t.homeNumConfrontos },
+    { v: String(plano.dias.length), l: t.homeNumDias },
   ];
+
+  const primeiroDia = plano.dias[0];
+  const ultimoDia = plano.dias[plano.dias.length - 1];
+  const intro = (primeiroDia && ultimoDia ? t.homeIntro : t.homeIntroSemPeriodo)
+    .replace("{times}", String(dataset.teams.length))
+    .replace("{jogadores}", String(dataset.players.length))
+    .replace("{periodo}", primeiroDia && ultimoDia ? periodoPorExtenso(t, primeiroDia, ultimoDia, localeTag) : "");
+
+  // Pílula da final: dia e hora da série da final; sem ela, os do calendário oficial.
+  const pilulaDaFinal = plano.final
+    ? plano.final.hora
+      ? t.homeFinalData
+          .replace("{data}", diaEMes(plano.final.dateKey, localeTag).toLocaleUpperCase(localeTag))
+          .replace("{hora}", horaNoIdioma(plano.final.dateKey, plano.final.hora, localeTag))
+      : diaEMes(plano.final.dateKey, localeTag).toLocaleUpperCase(localeTag)
+    : null;
+
+  // O bloco "próxima edição" só faz sentido com a temporada no ar já encerrada: durante a
+  // própria 4ª, ele anunciava a 4ª como "em organização".
+  const temporadaEncerrada = dataset.tournament.status === "finished";
+  const proximoPeriodo = temporadaEncerrada ? periodoDoCalendarioFuturo() : null;
+  const textoProximaEdicao = proximoPeriodo
+    ? conf.proximaEdicaoTexto.replace("{periodo}", periodoPorExtenso(t, proximoPeriodo.inicio, proximoPeriodo.fim, localeTag))
+    : conf.proximaEdicaoTextoSemData;
 
   const finalCircle = {
     width: "clamp(76px,14vw,120px)",
@@ -87,12 +179,12 @@ async function HomeTemporada() {
       <section className="lob-fade" style={{ padding: "clamp(48px,8vw,88px) 0 30px" }}>
         <Eyebrow>{t.homeSobretitulo}</Eyebrow>
         <GoldTitle style={{ fontSize: "clamp(52px,11vw,148px)", lineHeight: 1.08, margin: "12px 0 calc(14px - 0.42em)" }}>
-          {t.homeTituloLinha1}
+          {t.homeTituloLinha1.replace("{temporada}", temporada)}
           <br />
-          {t.homeTituloLinha2}
+          {t.homeTituloLinha2.replace("{temporada}", temporada)}
         </GoldTitle>
         <p style={{ maxWidth: 600, fontSize: "clamp(15px,2.2vw,18px)", lineHeight: 1.55, color: "#a99e8b", margin: "0 0 26px" }}>
-          {t.homeIntro}
+          {intro}
         </p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 11, marginBottom: 26 }}>
           <Link href="/times" className="lob-btn-gold" style={{ padding: "14px 24px", fontSize: 13 }}>
@@ -107,6 +199,7 @@ async function HomeTemporada() {
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 9 }}>
           <Pill>{t.homePilulaFase}</Pill>
+          {temSemifinal ? <Pill>{t.homePilulaSemifinais}</Pill> : null}
           <Pill>{t.homePilulaFinal}</Pill>
           <Pill>{t.homePilulaPool.replace("{n}", String(poolTotal))}</Pill>
         </div>
@@ -132,7 +225,7 @@ async function HomeTemporada() {
           >
             <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "radial-gradient(640px 260px at 50% -10%,rgba(232,184,120,.22),transparent 70%)" }} />
             <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 10, fontSize: 11, letterSpacing: ".24em", color: "#e6c592", justifyContent: "center" }}>
-              <span style={{ width: 22, height: 1, background: "#c98a4b" }} />{t.homeCampeaoSobretitulo}
+              <span style={{ width: 22, height: 1, background: "#c98a4b" }} />{t.homeCampeaoSobretitulo.replace("{temporada}", temporada)}
               <span style={{ width: 22, height: 1, background: "#c98a4b" }} />
             </div>
             <div style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", marginTop: 22 }}>
@@ -191,8 +284,8 @@ async function HomeTemporada() {
                   </>
                 ) : (
                   <>
-                    <div className="lob-display" style={finalCircle}>{t.homeFinalPrimeiro}</div>
-                    <div style={finalLabel}>{t.homeFinalPrimeiroLabel}</div>
+                    <div className="lob-display" style={finalCircle}>{temSemifinal ? t.homeFinalSemi1 : t.homeFinalPrimeiro}</div>
+                    <div style={finalLabel}>{temSemifinal ? t.homeFinalSemi1Label : t.homeFinalPrimeiroLabel}</div>
                   </>
                 )}
               </div>
@@ -209,8 +302,8 @@ async function HomeTemporada() {
                   </>
                 ) : (
                   <>
-                    <div className="lob-display" style={finalCircle}>{t.homeFinalSegundo}</div>
-                    <div style={finalLabel}>{t.homeFinalSegundoLabel}</div>
+                    <div className="lob-display" style={finalCircle}>{temSemifinal ? t.homeFinalSemi2 : t.homeFinalSegundo}</div>
+                    <div style={finalLabel}>{temSemifinal ? t.homeFinalSemi2Label : t.homeFinalSegundoLabel}</div>
                   </>
                 )}
               </div>
@@ -219,9 +312,11 @@ async function HomeTemporada() {
               <span style={{ padding: "7px 14px", background: "linear-gradient(180deg,#f0c88a,#b97e40)", color: "#160f06", fontWeight: 700, fontSize: 12, letterSpacing: ".10em", borderRadius: 2 }}>
                 {t.homeFinalMelhorDe5}
               </span>
-              <span style={{ padding: "7px 14px", background: "rgba(10,8,4,.5)", border: "1px solid rgba(201,138,75,.35)", color: "#e6c592", fontSize: 12, letterSpacing: ".10em", borderRadius: 2 }}>
-                {t.homeFinalData}
-              </span>
+              {pilulaDaFinal ? (
+                <span style={{ padding: "7px 14px", background: "rgba(10,8,4,.5)", border: "1px solid rgba(201,138,75,.35)", color: "#e6c592", fontSize: 12, letterSpacing: ".10em", borderRadius: 2 }}>
+                  {pilulaDaFinal}
+                </span>
+              ) : null}
             </div>
           </div>
         )}
@@ -240,61 +335,63 @@ async function HomeTemporada() {
       </section>
 
       {/*
-        PRÓXIMA EDIÇÃO.
+        PRÓXIMA EDIÇÃO — só com a temporada no ar ENCERRADA.
         Com a Grande Final já jogada, o site passava a impressão de projeto encerrado — o que
         pesa contra num pedido de chave de produção. Este bloco mostra que a operação continua.
-        A data é deliberadamente aproximada porque ainda não está fechada: melhor dizer
-        "início de novembro, a confirmar" do que anunciar um dia que pode mudar.
+        Durante a temporada ele não aparece: no ar a 4ª, ele dizia que a 4ª estava "em
+        organização". O texto não crava edição nem data — a data vem do calendário oficial
+        enquanto ele ainda está por vir (ver periodoDoCalendarioFuturo).
       */}
-      <section className="lob-fade" style={{ marginBottom: 44 }}>
-        <div
-          style={{
-            padding: "22px 24px",
-            background:
-              "linear-gradient(120deg,rgba(201,138,75,.10),rgba(201,138,75,.03) 60%,transparent)",
-            border: "1px solid rgba(232,184,120,.28)",
-            borderRadius: 5,
-          }}
-        >
-          <span
+      {temporadaEncerrada ? (
+        <section className="lob-fade" style={{ marginBottom: 44 }}>
+          <div
             style={{
-              display: "inline-block",
-              padding: "4px 10px",
-              borderRadius: 2,
-              background: "linear-gradient(180deg,#f0c88a,#b97e40)",
-              color: "#160f06",
-              fontWeight: 700,
-              fontSize: 10,
-              letterSpacing: ".12em",
+              padding: "22px 24px",
+              background:
+                "linear-gradient(120deg,rgba(201,138,75,.10),rgba(201,138,75,.03) 60%,transparent)",
+              border: "1px solid rgba(232,184,120,.28)",
+              borderRadius: 5,
             }}
           >
-            {conf.proximaEdicaoSelo}
-          </span>
-          <div
-            className="lob-display"
-            style={{ marginTop: 12, fontSize: "clamp(24px,4vw,36px)", lineHeight: 1.05, color: "#f3ece0" }}
-          >
-            {conf.proximaEdicaoTitulo}
+            <span
+              style={{
+                display: "inline-block",
+                padding: "4px 10px",
+                borderRadius: 2,
+                background: "linear-gradient(180deg,#f0c88a,#b97e40)",
+                color: "#160f06",
+                fontWeight: 700,
+                fontSize: 10,
+                letterSpacing: ".12em",
+              }}
+            >
+              {conf.proximaEdicaoSelo}
+            </span>
+            <div
+              className="lob-display"
+              style={{ marginTop: 12, fontSize: "clamp(24px,4vw,36px)", lineHeight: 1.05, color: "#f3ece0" }}
+            >
+              {conf.proximaEdicaoTitulo}
+            </div>
+            <p style={{ margin: "10px 0 0", maxWidth: 620, fontSize: 14, lineHeight: 1.6, color: "#a99e8b" }}>
+              {textoProximaEdicao}
+            </p>
+            {/*
+              Inscrição e draft da próxima edição ficam fora do menu principal de propósito —
+              ele é da temporada que está no ar — e entram aqui, onde a conversa já é sobre a
+              próxima.
+            */}
+            <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
+              <Link className="lob-btn-gold" href="/inscricao">
+                {conf.proximaEdicaoInscricao}
+              </Link>
+              <Link className="lob-btn-ghost" href="/draft">
+                {conf.proximaEdicaoDraft}
+              </Link>
+            </div>
           </div>
-          <p style={{ margin: "10px 0 0", maxWidth: 620, fontSize: 14, lineHeight: 1.6, color: "#a99e8b" }}>
-            {conf.proximaEdicaoTexto}
-          </p>
-          {/*
-            Até aqui a 4ª Edição era um parágrafo sem saída: as páginas existiam mas
-            ninguém as alcançava pelo site. Ficam fora do menu principal de propósito —
-            ele é da temporada que está no ar, a 3ª — e entram aqui, onde a conversa
-            já é sobre a próxima.
-          */}
-          <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
-            <Link className="lob-btn-gold" href="/inscricao">
-              {conf.proximaEdicaoInscricao}
-            </Link>
-            <Link className="lob-btn-ghost" href="/draft">
-              {conf.proximaEdicaoDraft}
-            </Link>
-          </div>
-        </div>
-      </section>
+        </section>
+      ) : null}
 
       {/* EXPLORE */}
       <section className="lob-fade" style={{ marginBottom: 44 }}>

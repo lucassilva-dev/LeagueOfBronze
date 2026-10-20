@@ -5,6 +5,7 @@ import {
   distribuirTimes,
   inscricaoPublicaSchema,
   linhaDeInscricao,
+  orcamentoSugerido,
   pontosDoElo,
   rotaCanonica,
   viabilidadeDeOrcamento,
@@ -214,6 +215,42 @@ describe("número de times sai dos aprovados, não é fixo", () => {
 
   it("gente demais de menos não inventa time incompleto", () => {
     expect(distribuirTimes(4)).toEqual({ times: 0, vagas: 0, sobra: 4 });
+  });
+
+  it("com o teto da 4ª (6 times), 37 aprovados continuam 6 times e 7 viram sobra", () => {
+    // Sem o teto seriam 7 times — e o calendário de 18 séries só fecha com 6.
+    expect(distribuirTimes(37, 5, 6)).toEqual({ times: 6, vagas: 30, sobra: 7 });
+    expect(distribuirTimes(37, 5)).toEqual({ times: 7, vagas: 35, sobra: 2 });
+  });
+
+  it("o teto não inventa time: abaixo dele vale a conta normal", () => {
+    expect(distribuirTimes(28, 5, 6)).toEqual({ times: 5, vagas: 25, sobra: 3 });
+  });
+
+  it("teto nulo, zero ou quebrado = sem teto", () => {
+    expect(distribuirTimes(50, 5, null)).toEqual({ times: 10, vagas: 50, sobra: 0 });
+    expect(distribuirTimes(50, 5, 0)).toEqual({ times: 10, vagas: 50, sobra: 0 });
+    expect(distribuirTimes(50, 5, 2.5)).toEqual({ times: 10, vagas: 50, sobra: 0 });
+  });
+});
+
+describe("orçamento da regra: média por time + 15%, arredondada para cima", () => {
+  it("170 pontos em 6 times: média 28,33 → 32,58 → 33", () => {
+    expect(orcamentoSugerido(170, 6)).toBe(33);
+  });
+
+  it("conta exata não sobe um ponto à toa (200 em 10 times = 20 → 23)", () => {
+    expect(orcamentoSugerido(200, 10)).toBe(23);
+  });
+
+  it("sem times ou sem pontos não sugere nada", () => {
+    expect(orcamentoSugerido(0, 6)).toBeNull();
+    expect(orcamentoSugerido(170, 0)).toBeNull();
+  });
+
+  it("a viabilidade traz a sugestão junto, contando só quem entra", () => {
+    const r = viabilidadeDeOrcamento(Array(32).fill(5), 5, 30, 6);
+    expect(r).toMatchObject({ times: 6, vagas: 30, sobra: 2, total: 150, sugerido: 29 });
   });
 });
 

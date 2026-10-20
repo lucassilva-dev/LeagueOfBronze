@@ -1,4 +1,5 @@
 import type { Locale } from "@/lib/i18n/config";
+import { calendario4a } from "@/lib/i18n/messages/calendario-4a";
 import { comum } from "@/lib/i18n/messages/comum";
 import { compartilhados } from "@/lib/i18n/messages/compartilhados";
 import { conformidade } from "@/lib/i18n/messages/conformidade";
@@ -20,6 +21,7 @@ import { preTemporada } from "@/lib/i18n/messages/pre-temporada";
  */
 export const MESSAGES = {
   pt: {
+    calendario4a: calendario4a.pt,
     comum: comum.pt,
     compartilhados: compartilhados.pt,
     conformidade: conformidade.pt,
@@ -33,6 +35,7 @@ export const MESSAGES = {
     preTemporada: preTemporada.pt,
   },
   en: {
+    calendario4a: calendario4a.en,
     comum: comum.en,
     compartilhados: compartilhados.en,
     conformidade: conformidade.en,

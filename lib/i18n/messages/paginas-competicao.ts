@@ -15,8 +15,12 @@ export const paginasCompeticao = definir({
     // ---------- /tabela ----------
     tabelaEyebrow: "Fase de pontos corridos",
     tabelaTitulo: "TABELA",
+    // `{data}` = dia da primeira série da temporada no ar ("20 de novembro"), vindo do
+    // dataset. Sem série ainda, vale a versão sem data — nada de data cravada aqui.
     tabelaIntro:
-      "Classificação zerada até o apito inicial. As posições se definem a partir da 1ª rodada, em 25 de julho.",
+      "Classificação zerada até o apito inicial. As posições se definem a partir da 1ª rodada, em {data}.",
+    tabelaIntroSemData:
+      "Classificação zerada até o apito inicial. As posições se definem a partir da 1ª rodada.",
 
     tabelaColPosicao: "#",
     tabelaColTime: "TIME",
@@ -36,19 +40,27 @@ export const paginasCompeticao = definir({
       "1º confronto direto · 2º saldo de mapas (SG) · 3º mapas ganhos · 4º sorteio.",
     tabelaInfoClassificacaoTitulo: "CLASSIFICAÇÃO",
     tabelaInfoClassificacaoAntes: "Os ",
-    tabelaInfoClassificacaoDestaque: "2 primeiros",
-    tabelaInfoClassificacaoDepois: " avançam para a Grande Final em MD5.",
+    // `{n}` = `classificadosDaTemporada` de app/tabela/page.tsx, o mesmo número que
+    // pinta as linhas de dourado.
+    tabelaInfoClassificacaoDestaque: "{n} primeiros",
+    tabelaInfoClassificacaoDepois:
+      " avançam às semifinais (1º x 4º e 2º x 3º, em MD3); a Grande Final é em MD5.",
+    // Temporada com final direta (a 3ª): sem semifinal, os 2 primeiros jogam a final.
+    tabelaInfoClassificacaoDepoisFinalDireta: " avançam para a Grande Final em MD5.",
 
     // ---------- /calendario ----------
-    calendarioEyebrow: "League of Bronze — 3ª Edição",
+    // `{temporada}` = nome da temporada no ar (ex.: "4ª Edição").
+    calendarioEyebrow: "League of Bronze — {temporada}",
     calendarioTitulo: "CALENDÁRIO",
     calendarioIntro:
-      "Fase de pontos corridos: todos contra todos, cada confronto em melhor de 3 (MD3). Os dois primeiros da tabela decidem tudo na Grande Final em MD5.",
+      "Fase de pontos corridos: todos contra todos, em séries MD3. Os 4 primeiros vão às semifinais (1º x 4º e 2º x 3º, em MD3), e os vencedores decidem a Grande Final em MD5.",
 
-    calendarioPillMatutino: "MATUTINO · 9h–12h",
-    calendarioPillVespertino: "VESPERTINO · 14h",
-    calendarioPillNoturno: "NOTURNO · 20h–21h30",
-    calendarioPillConfrontos: "CONFRONTOS + FINAL",
+    calendarioPillMatutino: "MATUTINO · ANTES DAS 13H",
+    calendarioPillVespertino: "VESPERTINO · 13H–18H",
+    calendarioPillNoturno: "NOTURNO · A PARTIR DAS 18H",
+    calendarioPillConfrontos: "SÉRIES",
+    calendarioSemifinaisTitulo: "SEMIFINAIS",
+    calendarioSemifinaisDia: "1º x 4º e 2º x 3º · MD3",
 
     calendarioJogo: "JOGO",
     calendarioTurnoMatutino: "MATUTINO",
@@ -61,9 +73,9 @@ export const paginasCompeticao = definir({
 
     calendarioFinalDia: "DOMINGO · GRANDE FINAL",
     calendarioFinalMelhorDe5: "MELHOR DE 5",
-    calendarioFinalConfronto: "1º vs 2º COLOCADO",
-    calendarioFinalPrimeiro: "1º COLOCADO",
-    calendarioFinalSegundo: "2º COLOCADO",
+    calendarioFinalConfronto: "VENCEDORES DAS SEMIFINAIS",
+    calendarioFinalPrimeiro: "VENCEDOR DA SEMI 1",
+    calendarioFinalSegundo: "VENCEDOR DA SEMI 2",
     calendarioVs: "VS",
 
     // ---------- /partidas ----------
@@ -131,7 +143,8 @@ export const paginasCompeticao = definir({
     tabelaEyebrow: "Group stage",
     tabelaTitulo: "STANDINGS",
     tabelaIntro:
-      "Everyone starts from zero until the first whistle. Positions are set from round 1, on July 25.",
+      "Everyone starts from zero until the first whistle. Positions are set from round 1, on {data}.",
+    tabelaIntroSemData: "Everyone starts from zero until the first whistle. Positions are set from round 1.",
 
     tabelaColPosicao: "#",
     tabelaColTime: "TEAM",
@@ -151,19 +164,23 @@ export const paginasCompeticao = definir({
       "1st head-to-head · 2nd game differential (GD) · 3rd games won · 4th coin flip.",
     tabelaInfoClassificacaoTitulo: "QUALIFICATION",
     tabelaInfoClassificacaoAntes: "The ",
-    tabelaInfoClassificacaoDestaque: "top 2",
-    tabelaInfoClassificacaoDepois: " advance to the Grand Final, a Bo5.",
+    tabelaInfoClassificacaoDestaque: "top {n}",
+    tabelaInfoClassificacaoDepois:
+      " advance to the semifinals (1st v 4th and 2nd v 3rd, Bo3); the Grand Final is a Bo5.",
+    tabelaInfoClassificacaoDepoisFinalDireta: " advance to the Grand Final, a Bo5.",
 
     // ---------- /calendario ----------
-    calendarioEyebrow: "League of Bronze — 3rd Edition",
+    calendarioEyebrow: "League of Bronze — {temporada}",
     calendarioTitulo: "SCHEDULE",
     calendarioIntro:
-      "Group stage: round robin, every series played as a best of 3 (Bo3). The top two in the standings settle it all in the Grand Final, a Bo5.",
+      "Group stage: round robin, every series a Bo3. The top 4 go to the semifinals (1st v 4th and 2nd v 3rd, Bo3), and the winners settle it in the Grand Final, a Bo5.",
 
-    calendarioPillMatutino: "MORNING · 9AM–12PM",
-    calendarioPillVespertino: "AFTERNOON · 2PM",
-    calendarioPillNoturno: "EVENING · 8PM–9:30PM",
-    calendarioPillConfrontos: "SERIES + FINAL",
+    calendarioPillMatutino: "MORNING · BEFORE 1PM",
+    calendarioPillVespertino: "AFTERNOON · 1PM–6PM",
+    calendarioPillNoturno: "EVENING · FROM 6PM",
+    calendarioPillConfrontos: "SERIES",
+    calendarioSemifinaisTitulo: "SEMIFINALS",
+    calendarioSemifinaisDia: "1st v 4th and 2nd v 3rd · Bo3",
 
     calendarioJogo: "MATCH",
     calendarioTurnoMatutino: "MORNING",
@@ -176,9 +193,9 @@ export const paginasCompeticao = definir({
 
     calendarioFinalDia: "SUNDAY · GRAND FINAL",
     calendarioFinalMelhorDe5: "BEST OF 5",
-    calendarioFinalConfronto: "1ST vs 2ND SEED",
-    calendarioFinalPrimeiro: "1ST SEED",
-    calendarioFinalSegundo: "2ND SEED",
+    calendarioFinalConfronto: "SEMIFINAL WINNERS",
+    calendarioFinalPrimeiro: "SEMI 1 WINNER",
+    calendarioFinalSegundo: "SEMI 2 WINNER",
     calendarioVs: "VS",
 
     // ---------- /partidas ----------

@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     const { estado, revisao } = await lerDraftCompleto();
 
     if (!estado) {
-      const vazio = NextResponse.json({ draft: null, souCapitaoDe: null });
+      const vazio = NextResponse.json({ draft: null, souCapitaoDe: null, agoraServidorISO: new Date().toISOString() });
       vazio.headers.set("Cache-Control", "no-store");
       return vazio;
     }
@@ -74,7 +74,18 @@ export async function GET(request: NextRequest) {
       if (inscricaoId) souCapitaoDe = timeDoCapitao(estadoFinal, inscricaoId);
     }
 
-    const resposta = NextResponse.json({ draft: paraPublico(estadoFinal, revisaoAtual), souCapitaoDe });
+    // A hora do servidor vai junto: as telas contam o cronômetro com o relógio do aparelho,
+    // e uma TV ou um celular com 20 s de diferença mostrava 0:00 com tempo sobrando (ou o
+    // contrário, e a escolha voltava recusada). Com ela, a tela corrige a própria hora.
+    const resposta = NextResponse.json({
+      draft: paraPublico(estadoFinal, revisaoAtual),
+      souCapitaoDe,
+      // Só um booleano, sem quem é: o /capitao precisa saber se oferece "entrar" ou se diz
+      // "esta conta não capitaneia" — oferecer login a quem já entrou fazia a pessoa voltar
+      // para a mesma tela, em laço.
+      logado: identidade !== null,
+      agoraServidorISO: new Date().toISOString(),
+    });
     resposta.headers.set("Cache-Control", "no-store");
     return resposta;
   } catch (error) {
