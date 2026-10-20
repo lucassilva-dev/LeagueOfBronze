@@ -4,6 +4,7 @@ import { Anton, Chakra_Petch } from "next/font/google";
 import { SiteFrame } from "@/components/site-frame";
 import { htmlLang } from "@/lib/i18n/config";
 import { getLocale } from "@/lib/i18n/server";
+import { SITE_URL } from "@/lib/site-url";
 
 import "./globals.css";
 
@@ -22,13 +23,19 @@ const body = Chakra_Petch({
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
 
+  // A prévia de link (WhatsApp, Discord) usa app/opengraph-image.png; sem a base, o
+  // endereço da imagem sai relativo e alguns apps desistem dela e caem no favicon.
+  const metadataBase = new URL(SITE_URL);
+
   return locale === "en"
     ? {
+        metadataBase,
         title: "League of Bronze · 4th Edition",
         description:
           "League of Bronze — amateur League of Legends tournament. Sign-ups for the 4th Edition, rules and the archive of past seasons.",
       }
     : {
+        metadataBase,
         title: "League of Bronze · 4ª Edição",
         description:
           "League of Bronze — campeonato amador de League of Legends. Inscrição para a 4ª Edição, regulamento e o arquivo das temporadas anteriores.",
