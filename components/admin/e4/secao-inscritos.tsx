@@ -18,13 +18,17 @@ import {
   Button,
   C,
   Card,
+  CartaoLinha,
   Check,
   Chip,
+  ChipFiltro,
+  Elo,
   Empty,
   Field,
   FieldGrid,
   Input,
   Metric,
+  RolagemX,
   ScrollX,
   SectionHead,
   Select,
@@ -33,7 +37,9 @@ import {
   display,
   tabular,
 } from "@/components/admin/ui";
+import { useCompacto } from "@/components/admin/responsivo";
 import { ELO_ORDER, resolveElo, resolveRole } from "@/lib/design";
+import { compararForca, forcaDoElo, type ForcaDoElo } from "@/lib/draft/capitaes";
 import { formatDateTimeLabel } from "@/lib/format";
 import { alertasDoInscrito, type Alerta } from "@/lib/inscricoes/alertas";
 import { LIMITES_INSCRICAO } from "@/lib/inscricoes/passo1";
@@ -250,19 +256,113 @@ function eloExibido(inscrito: Inscrito) {
           : "verificado"
       : "declarado";
   const meta = resolveElo(bruto);
-  return { rotulo: meta?.label ?? bruto, cor: meta?.color ?? C.ink3, origem };
+  return { bruto, rotulo: meta?.label ?? bruto, cor: meta?.color ?? C.ink3, origem };
 }
 
 /** Os elos que não têm divisão (I–IV) na Riot. */
 const SEM_DIVISAO = new Set(["Mestre", "Grão-Mestre", "Desafiante"]);
 
-/** "Ouro II · 45 PDL", do que a Riot mostrou na última consulta. */
-function eloNaRiot(inscrito: Inscrito): string | null {
+/** "II · 45 PDL", da última consulta à Riot — sem o nome do elo, que o emblema já mostra. */
+function divisaoEPdl(inscrito: Inscrito): string | null {
   if (!inscrito.elo_riot) return null;
-  const divisao = inscrito.riot_divisao && !SEM_DIVISAO.has(inscrito.elo_riot) ? ` ${inscrito.riot_divisao}` : "";
-  const pdl = inscrito.riot_pdl !== null && inscrito.riot_pdl !== undefined ? ` · ${inscrito.riot_pdl} PDL` : "";
-  return `${inscrito.elo_riot}${divisao}${pdl}`;
+  const partes: string[] = [];
+  if (inscrito.riot_divisao && !SEM_DIVISAO.has(inscrito.elo_riot)) partes.push(inscrito.riot_divisao);
+  if (inscrito.riot_pdl !== null && inscrito.riot_pdl !== undefined) partes.push(`${inscrito.riot_pdl} PDL`);
+  return partes.length > 0 ? partes.join(" · ") : null;
 }
+
+/** A Riot leu o MESMO degrau do elo em uso? Só aí a divisão e os PDL dela descrevem esse elo. */
+function riotNoMesmoDegrau(inscrito: Inscrito): boolean {
+  const emUso = resolveElo(eloExibido(inscrito).bruto);
+  const naRiot = resolveElo(inscrito.elo_riot);
+  return Boolean(emUso && naRiot && emUso.key === naRiot.key);
+}
+
+/**
+ * Força do elo em uso, para "do maior elo para o menor".
+ *
+ * É a MESMA régua que escolhe os capitães (lib/draft/capitaes.ts): elo, depois divisão,
+ * depois PDL — e divisão e PDL só contam quando a Riot leu o mesmo degrau do elo que vale
+ * (se a organização travou em Ouro e a Riot mostra Platina II, a divisão da Platina não diz
+ * nada sobre o Ouro). Com uma régua só, o topo desta lista é quem o draft vai sortear como
+ * capitão.
+ */
+function forcaDoInscrito(inscrito: Inscrito): ForcaDoElo {
+  return forcaDoElo({
+    elo: eloExibido(inscrito).bruto,
+    eloRiot: inscrito.elo_riot ?? null,
+    divisao: inscrito.riot_divisao ?? null,
+    pdl: inscrito.riot_pdl ?? null,
+  });
+}
+
+/**
+ * O elo do inscrito pelo emblema — o que a organização pediu no lugar do nome escrito.
+ *
+ * Ao lado, miúdo: divisão e PDL (quando a Riot leu o mesmo degrau) e de onde o elo veio.
+ * Se a Riot mostra OUTRO degrau (elo travado ou congelado), a leitura dela aparece embaixo
+ * com o próprio emblema — os dois podem discordar, e a tela não esconde isso.
+ */
+function EloDoInscrito({ inscrito, tamanho = 28 }: Readonly<{ inscrito: Inscrito; tamanho?: number }>) {
+  const elo = eloExibido(inscrito);
+  return (
+    <span style={{ display: "inline-flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
+      <Elo elo={elo.bruto} tamanho={tamanho} detalhe={detalheDoElo(inscrito)} />
+      <LeituraDaRiotDiferente inscrito={inscrito} />
+    </span>
+  );
+}
+
+/** Divisão/PDL (se a Riot leu o mesmo degrau) e a origem: "II · 45 PDL · Riot". */
+function detalheDoElo(inscrito: Inscrito): string {
+  const daRiot = riotNoMesmoDegrau(inscrito) ? divisaoEPdl(inscrito) : null;
+  return [daRiot, eloExibido(inscrito).origem].filter(Boolean).join(" · ");
+}
+
+/** A Riot mostra OUTRO degrau que o elo em uso (travado ou congelado): a leitura dela, com emblema. */
+function LeituraDaRiotDiferente({ inscrito }: Readonly<{ inscrito: Inscrito }>) {
+  if (!inscrito.elo_riot || riotNoMesmoDegrau(inscrito)) return null;
+  const daRiot = divisaoEPdl(inscrito);
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10.5, color: C.ink4 }}>
+      Riot: <Elo elo={inscrito.elo_riot} tamanho={16} />
+      {daRiot ? <span style={tabular}>{daRiot}</span> : null}
+    </span>
+  );
+}
+
+type Ordem = "inscricao" | "elo_desc" | "elo_asc" | "nick";
+
+const ROTULO_ORDEM: Record<Ordem, string> = {
+  inscricao: "Ordem de inscrição",
+  elo_desc: "Elo: do maior para o menor",
+  elo_asc: "Elo: do menor para o maior",
+  nick: "Nick (A–Z)",
+};
+
+/** A ordem escolhida fica no navegador de quem escolheu. Só conveniência: pode sumir sem dano. */
+const CHAVE_ORDEM = "lob:inscritos:ordem";
+
+function lerOrdem(): Ordem {
+  try {
+    const salva = window.localStorage.getItem(CHAVE_ORDEM);
+    return salva && salva in ROTULO_ORDEM ? (salva as Ordem) : "inscricao";
+  } catch {
+    return "inscricao";
+  }
+}
+
+function gravarOrdem(ordem: Ordem) {
+  try {
+    if (ordem === "inscricao") window.localStorage.removeItem(CHAVE_ORDEM);
+    else window.localStorage.setItem(CHAVE_ORDEM, ordem);
+  } catch {
+    // Sem armazenamento (aba anônima, bloqueio): a escolha vale só até fechar.
+  }
+}
+
+/** Do mais forte para o mais fraco: a ordem natural de quem procura os capitães. */
+const ELOS_DO_MAIOR = [...ELO_ORDER].reverse();
 
 /** "há 3 h", "há 2 dias" — o quão velha está a consulta à Riot. */
 function haQuanto(iso: string | null | undefined, agoraMs: number | null): string {
@@ -761,6 +861,7 @@ function GavetaInscrito({
 }: PropsGaveta) {
   const [rascunho, setRascunho] = useState<Rascunho>(RASCUNHO_VAZIO);
   const [aba, setAba] = useState<Aba>("requisitos");
+  const compacto = useCompacto();
   const [saida, setSaida] = useState<Saida | null>(null);
   const [resultado, setResultado] = useState<"salvo" | "falhou" | null>(null);
   const [observacoesAbertas, setObservacoesAbertas] = useState<ReadonlySet<ItemConferencia>>(
@@ -1126,6 +1227,8 @@ function GavetaInscrito({
   const elo = eloExibido(inscrito);
   const rotas = rotasDoInscrito(inscrito);
   const congelado = Boolean(inscrito.elo_congelado);
+  /** Recuo lateral: no celular a gaveta é a tela toda, e 18px de cada lado é largura perdida. */
+  const lateral = compacto ? 14 : 18;
   const opgg = getOpGgSummonerUrlFromNick(inscrito.riot_id);
 
   const abaRequisitos = (
@@ -1221,19 +1324,24 @@ function GavetaInscrito({
                 : `Automático: segue a solo/duo na Riot todo dia${inscrito.elo_riot ? ` (hoje ${inscrito.elo_riot})` : ""}. Escolher um elo trava este inscrito nesse valor.`
           }
         >
-          <Select
-            value={eloVerificado}
-            disabled={bloqueado}
-            onChange={(v) => editarFicha("eloVerificado", v)}
-            ariaLabel="Elo verificado"
-          >
-            <option value="">— automático (Riot) —</option>
-            {ELO_ORDER.map((e) => (
-              <option key={e.key} value={e.label}>
-                {e.label} · {e.pts} pts
-              </option>
-            ))}
-          </Select>
+          {/* O emblema ao lado mostra o elo que vai valer com a escolha atual: o travado, ou
+              o da Riot quando está no automático. */}
+          <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Elo elo={eloVerificado || inscrito.elo_riot || inscrito.elo_declarado} tamanho={34} />
+            <Select
+              value={eloVerificado}
+              disabled={bloqueado}
+              onChange={(v) => editarFicha("eloVerificado", v)}
+              ariaLabel="Elo verificado"
+            >
+              <option value="">— automático (Riot) —</option>
+              {ELO_ORDER.map((e) => (
+                <option key={e.key} value={e.label}>
+                  {e.label} · {e.pts} pts
+                </option>
+              ))}
+            </Select>
+          </span>
         </Field>
 
         {/*
@@ -1344,11 +1452,11 @@ function GavetaInscrito({
 
       <div style={{ marginTop: 16 }}>
         <FieldGrid min={150}>
-          <Metric small label="Elo declarado" value={resolveElo(inscrito.elo_declarado)?.label ?? inscrito.elo_declarado} />
+          <Metric small label="Elo declarado" value={<Elo elo={inscrito.elo_declarado} tamanho={30} mostrarNome />} />
           <Metric
             small
             label="Elo em uso"
-            value={<span style={{ color: elo.cor }}>{elo.rotulo}</span>}
+            value={<Elo elo={elo.bruto} tamanho={30} mostrarNome />}
             detail={elo.origem}
           />
           {/*
@@ -1362,7 +1470,9 @@ function GavetaInscrito({
           <Metric
             small
             label="Na Riot (solo/duo)"
-            value={eloNaRiot(inscrito) ?? "—"}
+            value={
+              inscrito.elo_riot ? <Elo elo={inscrito.elo_riot} tamanho={30} mostrarNome detalhe={divisaoEPdl(inscrito)} /> : "—"
+            }
             detail={inscrito.riot_sincronizado_em ? `consultado em ${quandoCurto(inscrito.riot_sincronizado_em)}` : "ainda não consultado"}
           />
         </FieldGrid>
@@ -1553,7 +1663,15 @@ function GavetaInscrito({
         }}
       >
         {/* ------------------------------------------------ cabeçalho */}
-        <header style={{ padding: "12px 18px 0", background: C.panel, borderBottom: `1px solid ${C.line}` }}>
+        {/* Recuos de área segura: no iPhone a gaveta ocupa a tela inteira e o topo/rodapé
+            ficariam sob o entalhe e a barra de gestos. */}
+        <header
+          style={{
+            padding: `calc(12px + env(safe-area-inset-top)) ${lateral}px 0`,
+            background: C.panel,
+            borderBottom: `1px solid ${C.line}`,
+          }}
+        >
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <Button
               small
@@ -1614,10 +1732,7 @@ function GavetaInscrito({
               ...tabular,
             }}
           >
-            <span>
-              <span style={{ color: elo.cor, fontWeight: 700 }}>{elo.rotulo}</span>
-              <span style={{ color: C.ink4 }}> {elo.origem}</span>
-            </span>
+            <EloDoInscrito inscrito={inscrito} tamanho={30} />
             <span style={{ color: C.ink3 }}>{inscrito.pontos} pts</span>
             <span style={{ color: C.ink3 }} title={rotas.longo}>
               {rotas.curto}
@@ -1637,7 +1752,11 @@ function GavetaInscrito({
             <span style={{ color: C.bronze, letterSpacing: ".12em", textTransform: "uppercase", fontSize: 10 }}>Riot</span>
             {inscrito.riot_sincronizado_em ? (
               <>
-                <span>{eloNaRiot(inscrito) ?? "sem ranque na solo/duo"}</span>
+                {inscrito.elo_riot ? (
+                  <Elo elo={inscrito.elo_riot} tamanho={18} detalhe={divisaoEPdl(inscrito)} />
+                ) : (
+                  <span>sem ranque na solo/duo</span>
+                )}
                 {inscrito.riot_nivel !== null && inscrito.riot_nivel !== undefined ? (
                   <span>nível {inscrito.riot_nivel}</span>
                 ) : null}
@@ -1714,13 +1833,19 @@ function GavetaInscrito({
           id={`${base}-painel`}
           role="tabpanel"
           aria-labelledby={`${base}-aba-${aba}`}
-          style={{ flex: 1, overflowY: "auto", padding: "10px 18px 22px" }}
+          style={{ flex: 1, overflowY: "auto", overscrollBehavior: "contain", padding: `10px ${lateral}px 22px` }}
         >
           {painelDaAba[aba]}
         </div>
 
         {/* ------------------------------------------------ rodapé (sempre à vista) */}
-        <footer style={{ padding: "12px 18px", background: C.panel, borderTop: `1px solid ${C.line2}` }}>
+        <footer
+          style={{
+            padding: `12px ${lateral}px calc(12px + env(safe-area-inset-bottom))`,
+            background: C.panel,
+            borderTop: `1px solid ${C.line2}`,
+          }}
+        >
           {rodape}
         </footer>
       </div>
@@ -1815,8 +1940,27 @@ export function SecaoInscritos({ dados, executar, ocupado, podeConferir, ultimoE
   const [filtroSituacao, setFiltroSituacao] = useState("todos");
   const [soPendencia, setSoPendencia] = useState(false);
   const [soAlerta, setSoAlerta] = useState(false);
+  // Inicializador preguiçoso: a seção só monta no cliente (depois da sessão), então ler o
+  // navegador aqui não diverge do servidor.
+  const [ordem, setOrdemBruta] = useState<Ordem>(lerOrdem);
+  /** Elos marcados no filtro (chave do design system). Vazio = todos. */
+  const [filtroElos, setFiltroElos] = useState<ReadonlySet<string>>(() => new Set());
   const contagemId = useId();
   const agora = useAgora();
+  const compacto = useCompacto();
+
+  const setOrdem = (nova: Ordem) => {
+    setOrdemBruta(nova);
+    gravarOrdem(nova);
+  };
+
+  const alternarElo = (chave: string) =>
+    setFiltroElos((atual) => {
+      const novo = new Set(atual);
+      if (novo.has(chave)) novo.delete(chave);
+      else novo.add(chave);
+      return novo;
+    });
 
   const { config, inscritos, conferencias, pagamentos, panorama } = dados;
   const janelaAberta = estadoDaJanela(config, agora) === "aberta";
@@ -1849,6 +1993,43 @@ export function SecaoInscritos({ dados, executar, ocupado, podeConferir, ultimoE
     return mapa;
   }, [inscritos, pagamentos, porInscrito, config, agora]);
 
+  /**
+   * A lista inteira na ordem escolhida. Tudo o que depende de "quem vem antes/depois"
+   * (tabela, cartões, Anterior/Próximo da gaveta) lê ESTA lista — senão a gaveta pularia
+   * para o vizinho da ordem de inscrição enquanto a tela mostra a ordem por elo.
+   *
+   * A ordenação é estável (Array#sort é estável desde o ES2019): empate de elo mantém a
+   * ordem de inscrição.
+   */
+  const ordenados = useMemo(() => {
+    if (ordem === "inscricao") return inscritos;
+    const lista = [...inscritos];
+    if (ordem === "nick") {
+      lista.sort((a, b) => a.nick.localeCompare(b.nick, "pt-BR", { sensitivity: "base" }));
+      return lista;
+    }
+    const forca = new Map(lista.map((i) => [i.id, forcaDoInscrito(i)]));
+    const sinal = ordem === "elo_desc" ? 1 : -1;
+    lista.sort((a, b) => {
+      const fa = forca.get(a.id)!;
+      const fb = forca.get(b.id)!;
+      // Elo ilegível vai para o FIM nas duas direções: no crescente ele não é "o mais fraco".
+      if (fa.tier < 0 || fb.tier < 0) return fa.tier < 0 && fb.tier < 0 ? 0 : fa.tier < 0 ? 1 : -1;
+      return sinal * compararForca(fa, fb);
+    });
+    return lista;
+  }, [inscritos, ordem]);
+
+  /** Quantos inscritos há em cada elo — os chips do filtro mostram só os elos presentes. */
+  const contagemPorElo = useMemo(() => {
+    const mapa = new Map<string, number>();
+    for (const i of inscritos) {
+      const chave = resolveElo(eloExibido(i).bruto)?.key;
+      if (chave) mapa.set(chave, (mapa.get(chave) ?? 0) + 1);
+    }
+    return mapa;
+  }, [inscritos]);
+
   const visiveis = useMemo(() => {
     const termo = busca.trim().toLowerCase();
 
@@ -1860,16 +2041,17 @@ export function SecaoInscritos({ dados, executar, ocupado, podeConferir, ultimoE
       return ITENS_CONFERENCIA.some((item) => comoEstado(doInscrito?.get(item)?.estado) === "pendente");
     };
 
-    return inscritos.filter((i) => {
+    return ordenados.filter((i) => {
       if (filtroSituacao !== "todos" && i.situacao !== filtroSituacao) return false;
       if (soPendencia && !temPendencia(i.id)) return false;
       if (soAlerta && !alertasPorInscrito.has(i.id)) return false;
+      if (filtroElos.size > 0 && !filtroElos.has(resolveElo(eloExibido(i).bruto)?.key ?? "")) return false;
       if (!termo) return true;
       return [i.nick, i.riot_id, i.discord, i.email, i.nome_real ?? ""].some((campo) =>
         campo.toLowerCase().includes(termo),
       );
     });
-  }, [inscritos, busca, filtroSituacao, soPendencia, soAlerta, porInscrito, alertasPorInscrito]);
+  }, [ordenados, busca, filtroSituacao, soPendencia, soAlerta, filtroElos, porInscrito, alertasPorInscrito]);
 
   // A gaveta busca em TODOS os inscritos, não nos visíveis: mudar um filtro (ou salvar
   // alguém que por isso sai do filtro) não pode fechar a pessoa que está aberta.
@@ -1883,18 +2065,18 @@ export function SecaoInscritos({ dados, executar, ocupado, podeConferir, ultimoE
   const vizinhos = useMemo(() => {
     if (!selecionadoId) return { anterior: null, proximo: null, posicao: null };
     const visivel = new Set(visiveis.map((i) => i.id));
-    const ondeEsta = inscritos.findIndex((i) => i.id === selecionadoId);
+    const ondeEsta = ordenados.findIndex((i) => i.id === selecionadoId);
     const indiceVisivel = visiveis.findIndex((i) => i.id === selecionadoId);
     return {
       anterior:
-        inscritos
+        ordenados
           .slice(0, Math.max(ondeEsta, 0))
           .reverse()
           .find((i) => visivel.has(i.id)) ?? null,
-      proximo: inscritos.slice(ondeEsta + 1).find((i) => visivel.has(i.id)) ?? null,
+      proximo: ordenados.slice(ondeEsta + 1).find((i) => visivel.has(i.id)) ?? null,
       posicao: indiceVisivel >= 0 ? { atual: indiceVisivel + 1, total: visiveis.length } : null,
     };
-  }, [inscritos, visiveis, selecionadoId]);
+  }, [ordenados, visiveis, selecionadoId]);
 
   /**
    * Fecha e devolve o foco à linha de onde a gaveta saiu — quem usa teclado não se perde.
@@ -1950,7 +2132,7 @@ export function SecaoInscritos({ dados, executar, ocupado, podeConferir, ultimoE
         </Banner>
       ) : null}
 
-      <FieldGrid min={140} style={{ marginBottom: 18 }}>
+      <FieldGrid min={compacto ? 100 : 140} style={{ marginBottom: 18 }}>
         <Metric small label="Inscritos" value={panorama.inscritos} />
         <Metric small label="Pendentes" value={panorama.pendentes} />
         <Metric small label="Aprovados" value={panorama.aprovados} />
@@ -1981,7 +2163,7 @@ export function SecaoInscritos({ dados, executar, ocupado, podeConferir, ultimoE
               ariaLabel="Buscar inscrito"
             />
           </Field>
-          <Field label="Situação" style={{ flex: "0 0 160px" }}>
+          <Field label="Situação" style={{ flex: compacto ? "1 1 140px" : "0 0 160px" }}>
             <Select value={filtroSituacao} onChange={setFiltroSituacao} ariaLabel="Filtrar por situação">
               <option value="todos">Todas</option>
               {SITUACOES.map((s) => (
@@ -1991,7 +2173,70 @@ export function SecaoInscritos({ dados, executar, ocupado, podeConferir, ultimoE
               ))}
             </Select>
           </Field>
+          <Field label="Ordenar" style={{ flex: compacto ? "1 1 180px" : "0 0 220px" }}>
+            <Select value={ordem} onChange={(v) => setOrdem(v as Ordem)} ariaLabel="Ordenar inscritos">
+              {(Object.keys(ROTULO_ORDEM) as Ordem[]).map((o) => (
+                <option key={o} value={o}>
+                  {ROTULO_ORDEM[o]}
+                </option>
+              ))}
+            </Select>
+          </Field>
         </Toolbar>
+
+        {/* Filtro por elo pelos emblemas, do mais alto para o mais baixo — só os elos que
+            existem na lista, cada um com quantos são. Marcar vários soma os elos. */}
+        {contagemPorElo.size > 0 ? (
+          <div style={{ marginTop: 12 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                marginBottom: 7,
+                fontSize: 10,
+                letterSpacing: ".16em",
+                textTransform: "uppercase",
+                color: C.bronze,
+              }}
+            >
+              Elo
+              {filtroElos.size > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setFiltroElos(new Set())}
+                  style={{
+                    padding: 0,
+                    border: "none",
+                    background: "none",
+                    fontFamily: "inherit",
+                    fontSize: 11,
+                    letterSpacing: 0,
+                    textTransform: "none",
+                    color: C.bronzeLit,
+                    textDecoration: "underline",
+                    cursor: "pointer",
+                  }}
+                >
+                  limpar
+                </button>
+              ) : null}
+            </div>
+            <RolagemX rotulo="Filtrar por elo" style={compacto ? undefined : { flexWrap: "wrap", overflowX: "visible" }}>
+              {ELOS_DO_MAIOR.filter((meta) => contagemPorElo.has(meta.key)).map((meta) => (
+                <ChipFiltro
+                  key={meta.key}
+                  ativo={filtroElos.has(meta.key)}
+                  onClick={() => alternarElo(meta.key)}
+                  rotulo={`${meta.label}: ${contagemPorElo.get(meta.key)}`}
+                >
+                  <Elo elo={meta.label} tamanho={compacto ? 22 : 18} />
+                  <span style={tabular}>{contagemPorElo.get(meta.key)}</span>
+                </ChipFiltro>
+              ))}
+            </RolagemX>
+          </div>
+        ) : null}
 
         <div style={{ marginTop: 12, display: "flex", gap: "8px 22px", flexWrap: "wrap" }}>
           <Check checked={soPendencia} onChange={setSoPendencia}>
@@ -2012,8 +2257,80 @@ export function SecaoInscritos({ dados, executar, ocupado, podeConferir, ultimoE
 
         {visiveis.length === 0 ? (
           <Empty title="Nenhum inscrito com esses filtros">
-            Limpe a busca ou volte a situação para «todas».
+            Limpe a busca, desmarque os elos ou volte a situação para «todas».
           </Empty>
+        ) : compacto ? (
+          // No celular cada inscrito é um cartão: o emblema do elo à esquerda, a situação à
+          // direita e os seis requisitos numa fileira embaixo. A tabela de 820px obrigava a
+          // rolar de lado para achar a coluna da situação.
+          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+            {visiveis.map((inscrito) => {
+              const aberto = inscrito.id === selecionadoId;
+              const rotas = rotasDoInscrito(inscrito);
+              const doInscrito = porInscrito.get(inscrito.id);
+              const alertas = alertasPorInscrito.get(inscrito.id);
+              return (
+                <li key={inscrito.id}>
+                  <CartaoLinha
+                    idAlvo={`inscrito-${inscrito.id}`}
+                    abreDialogo
+                    selecionado={aberto}
+                    rotuloAlvo={`Abrir a conferência de ${inscrito.nick}#${inscrito.tag}`}
+                    onClick={() => setSelecionadoId(inscrito.id)}
+                    inicio={<Elo elo={eloExibido(inscrito).bruto} tamanho={40} />}
+                    titulo={
+                      <>
+                        {inscrito.nick}
+                        <span style={{ color: C.ink4, fontWeight: 400 }}>#{inscrito.tag}</span>
+                      </>
+                    }
+                    subtitulo={
+                      <>
+                        <span style={{ display: "block", ...tabular }}>{detalheDoElo(inscrito)}</span>
+                        <LeituraDaRiotDiferente inscrito={inscrito} />
+                        <span style={{ display: "block", ...tabular }} title={rotas.longo}>
+                          {rotas.curto} · {inscrito.pontos} pts
+                        </span>
+                      </>
+                    }
+                    fim={
+                      <Chip tone={TOM_SITUACAO[inscrito.situacao]}>{ROTULO_SITUACAO[inscrito.situacao]}</Chip>
+                    }
+                  >
+                    <span style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                      {ITENS_CONFERENCIA.map((item) => {
+                        const estado = comoEstado(doInscrito?.get(item)?.estado);
+                        return (
+                          <Chip
+                            key={item}
+                            tone={TOM_CONFERENCIA[estado]}
+                            title={`${REGRA_DO_ITEM[item].titulo}: ${ROTULO_CONFERENCIA[estado]}`}
+                          >
+                            <b style={{ textTransform: "uppercase" }}>{item}</b> {ABREV_CONFERENCIA[estado]}
+                          </Chip>
+                        );
+                      })}
+                      {inscrito.organizador ? (
+                        <Chip tone="gold" title="Organizador desta edição — não paga inscrição e não é capitão">
+                          org
+                        </Chip>
+                      ) : null}
+                      {turnosDe(inscrito.disponibilidade).length === 0 ? (
+                        <Chip tone="warn" title="Sem disponibilidade informada — preencha na aba Ficha.">
+                          sem turno
+                        </Chip>
+                      ) : null}
+                      {alertas ? (
+                        <Chip tone="warn" title={alertas.map((a) => a.texto).join("\n")}>
+                          ⚠ {alertas.length}
+                        </Chip>
+                      ) : null}
+                    </span>
+                  </CartaoLinha>
+                </li>
+              );
+            })}
+          </ul>
         ) : (
           <ScrollX>
             <table style={{ width: "100%", minWidth: 820, borderCollapse: "collapse" }}>
@@ -2053,7 +2370,6 @@ export function SecaoInscritos({ dados, executar, ocupado, podeConferir, ultimoE
               <tbody>
                 {visiveis.map((inscrito) => {
                   const aberto = inscrito.id === selecionadoId;
-                  const elo = eloExibido(inscrito);
                   const rotas = rotasDoInscrito(inscrito);
                   const doInscrito = porInscrito.get(inscrito.id);
 
@@ -2134,13 +2450,7 @@ export function SecaoInscritos({ dados, executar, ocupado, podeConferir, ultimoE
                       </td>
 
                       <td style={td}>
-                        <span style={{ color: elo.cor }}>{elo.rotulo}</span>
-                        <span style={{ color: C.ink4, fontSize: 10.5 }}> {elo.origem}</span>
-                        {eloNaRiot(inscrito) && elo.origem !== "Riot" ? (
-                          <div style={{ color: C.ink4, fontSize: 10.5 }}>Riot: {eloNaRiot(inscrito)}</div>
-                        ) : eloNaRiot(inscrito) ? (
-                          <div style={{ color: C.ink4, fontSize: 10.5 }}>{eloNaRiot(inscrito)}</div>
-                        ) : null}
+                        <EloDoInscrito inscrito={inscrito} />
                       </td>
 
                       <td style={{ ...td, textAlign: "right", ...tabular }}>{inscrito.pontos}</td>

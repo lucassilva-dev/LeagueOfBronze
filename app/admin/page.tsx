@@ -15,7 +15,16 @@ export const dynamic = "force-dynamic";
  */
 export default function AdminPage() {
   return (
-    <main style={{ minHeight: "100vh" }}>
+    // Respiro nas laterais e teto de largura: antes o painel encostava nas bordas da tela —
+    // no celular os cartões tocavam o vidro, e num monitor largo as linhas iam até o fim.
+    <main
+      style={{
+        minHeight: "100vh",
+        maxWidth: 1520,
+        margin: "0 auto",
+        padding: "16px clamp(12px, 3vw, 28px) 48px",
+      }}
+    >
       <AdminDashboardClient />
     </main>
   );

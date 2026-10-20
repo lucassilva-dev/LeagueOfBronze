@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { UserRoundSearch } from "lucide-react";
 
 import type { Inscrito, PropsSecao } from "@/components/admin/e4/painel-edicao";
+import { useCompacto } from "@/components/admin/responsivo";
 import {
   ActionCard,
   Banner,
@@ -10,8 +12,10 @@ import {
   Button,
   C,
   Card,
+  CartaoLinha,
   Check,
   Chip,
+  Elo,
   Empty,
   Field,
   FieldGrid,
@@ -22,7 +26,8 @@ import {
   display,
   tabular,
 } from "@/components/admin/ui";
-import { ELO_ORDER, resolveElo, resolveRole } from "@/lib/design";
+import { RoleIcon } from "@/components/lob/ui";
+import { ELO_ORDER, resolveElo, resolveRole, type EloMeta } from "@/lib/design";
 import { contaParaTimes, distribuirTimes, viabilidadeDeOrcamento } from "@/lib/inscricoes/schema";
 
 /**
@@ -42,6 +47,12 @@ import { contaParaTimes, distribuirTimes, viabilidadeDeOrcamento } from "@/lib/i
  * - O que é DEFINITIVO (congelar o elo, escolher substituto, a lista de sobra) continua
  *   só com aprovados: congelar o preço de quem nem foi conferido, ou oferecer um pendente
  *   como substituto, seria tratar a previsão como fato.
+ *
+ * No celular a conta é a mesma e o arranjo é de bolso: as quatro tabelas (elos, sobra,
+ * substitutos, rotas) viram listas de cartões com o emblema do elo ou o ícone da rota à
+ * esquerda — tabela de 620px num telefone obrigava a rolar de lado para achar o botão
+ * "Voltar para apto". No monitor as tabelas continuam, só com o emblema no lugar do nome
+ * do elo e o ícone da rota no lugar da bolinha de cor.
  */
 
 // ---------------------------------------------------------------- estilos de tabela
@@ -70,6 +81,16 @@ const tdNum: CSSProperties = { ...td, textAlign: "right", ...tabular };
 
 const nota: CSSProperties = { margin: 0, fontSize: 11.5, lineHeight: 1.65, color: C.ink4 };
 
+/** Lista de cartões do celular — a mesma pilha de `secao-inscritos`. */
+const listaDeCartoes: CSSProperties = {
+  listStyle: "none",
+  margin: 0,
+  padding: 0,
+  display: "flex",
+  flexDirection: "column",
+  gap: 8,
+};
+
 // ---------------------------------------------------------------- apoio
 
 /** Chaves canônicas das rotas. O banco grava JUNG, não SEL — ver `resolveRole`. */
@@ -92,12 +113,9 @@ function porPontosDesc(a: Inscrito, b: Inscrito) {
   return b.pontos - a.pontos || a.nick.localeCompare(b.nick, "pt-BR");
 }
 
+/** Só para o <select> do substituto: opção nativa não mostra imagem, então o nome vai escrito. */
 function rotuloElo(inscrito: Inscrito): string {
   return resolveElo(eloDePreco(inscrito))?.label ?? eloDePreco(inscrito);
-}
-
-function corElo(inscrito: Inscrito): string {
-  return resolveElo(eloDePreco(inscrito))?.color ?? C.ink4;
 }
 
 /** Data-âncora só como informação. Data nula é estado legítimo, nunca um veredicto. */
@@ -109,19 +127,13 @@ function formatarData(iso: string | null): string {
     : quando.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
 }
 
-function Bolinha({ cor }: Readonly<{ cor: string }>) {
-  return (
-    <span
-      aria-hidden
-      style={{ width: 7, height: 7, borderRadius: 999, background: cor, flexShrink: 0 }}
-    />
-  );
-}
-
+/**
+ * O nome do jogador na tabela. A bolinha da cor do elo que ficava aqui saiu: a coluna ao
+ * lado já mostra o emblema, e dois marcadores do mesmo dado só disputavam o olho.
+ */
 function CelulaJogador({ inscrito }: Readonly<{ inscrito: Inscrito }>) {
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-      <Bolinha cor={corElo(inscrito)} />
       <span style={{ color: C.ink, fontWeight: 600 }}>{inscrito.nick}</span>
       <span style={{ color: C.ink4, fontSize: 11.5 }}>#{inscrito.tag}</span>
     </span>
@@ -133,9 +145,165 @@ function CelulaRota({ rota }: Readonly<{ rota: string }>) {
   return <span style={{ color: meta.color, fontSize: 12 }}>{meta.label}</span>;
 }
 
+/**
+ * Rota curta com o ícone oficial tingido (o mesmo do site público), para os cartões do
+ * celular. A secundária sai apagada: é cobertura, não titular — a mesma hierarquia da
+ * conta de escassez lá embaixo.
+ */
+function RotaCurta({ rota, secundaria = false }: Readonly<{ rota: string; secundaria?: boolean }>) {
+  const meta = resolveRole(rota);
+  const cor = secundaria ? C.ink3 : meta.color;
+  return (
+    <span
+      title={`${secundaria ? "Secundária" : "Primária"}: ${meta.label}`}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
+        color: cor,
+        fontWeight: secundaria ? 400 : 600,
+        whiteSpace: "nowrap",
+      }}
+    >
+      <RoleIcon role={rota} size={13} color={cor} />
+      {meta.short}
+    </span>
+  );
+}
+
+/** A barra de proporção da distribuição de elos — a mesma no monitor e no celular. */
+function BarraDeProporcao({ cor, fracao, style }: Readonly<{ cor: string; fracao: number; style?: CSSProperties }>) {
+  return (
+    <span
+      aria-hidden
+      style={{
+        display: "block",
+        height: 6,
+        borderRadius: 2,
+        background: "rgba(0,0,0,.35)",
+        ...style,
+      }}
+    >
+      <span
+        style={{
+          display: "block",
+          height: "100%",
+          width: `${fracao * 100}%`,
+          borderRadius: 2,
+          background: cor,
+        }}
+      />
+    </span>
+  );
+}
+
+/**
+ * Um aprovado em forma de cartão (celular): emblema do elo de preço à esquerda, rotas e
+ * pontos embaixo do nome. O nick fica num nó só dele, como na tabela — é por ele que a
+ * pessoa procura na lista.
+ */
+function CartaoDoAprovado({
+  inscrito,
+  fim,
+  children,
+}: Readonly<{ inscrito: Inscrito; fim?: ReactNode; children?: ReactNode }>) {
+  return (
+    <li>
+      <CartaoLinha
+        inicio={<Elo elo={eloDePreco(inscrito)} tamanho={40} />}
+        titulo={
+          <>
+            <span>{inscrito.nick}</span>
+            <span style={{ color: C.ink4, fontWeight: 400 }}>#{inscrito.tag}</span>
+          </>
+        }
+        subtitulo={
+          <span style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "2px 10px" }}>
+            <RotaCurta rota={inscrito.rota_primaria} />
+            <RotaCurta rota={inscrito.rota_secundaria} secundaria />
+            <span style={tabular}>
+              {inscrito.pontos} {inscrito.pontos === 1 ? "ponto" : "pontos"}
+            </span>
+          </span>
+        }
+        fim={fim}
+      >
+        {children}
+      </CartaoLinha>
+    </li>
+  );
+}
+
+/**
+ * Distribuição de elos no celular: uma linha por elo, emblema · barra · quantas pessoas.
+ * A tabela de cinco colunas não cabia; preço e soma descem para a linha miúda da barra.
+ */
+function DistribuicaoCompacta({
+  linhas,
+  maiorGrupo,
+}: Readonly<{ linhas: readonly { meta: EloMeta; quantidade: number }[]; maiorGrupo: number }>) {
+  return (
+    <Card padding="2px 14px">
+      <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+        {linhas.map(({ meta, quantidade }, indice) => (
+          <li
+            key={meta.key}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "auto minmax(0, 1fr) auto",
+              alignItems: "center",
+              gap: 12,
+              padding: "10px 0",
+              borderTop: indice === 0 ? undefined : "1px solid rgba(201,138,75,.09)",
+            }}
+          >
+            <Elo elo={meta.label} tamanho={36} />
+            <span style={{ minWidth: 0 }}>
+              <BarraDeProporcao cor={meta.color} fracao={maiorGrupo > 0 ? quantidade / maiorGrupo : 0} />
+              <span style={{ display: "block", marginTop: 6, fontSize: 11.5, color: C.ink4, ...tabular }}>
+                {meta.pts} {meta.pts === 1 ? "ponto" : "pontos"} cada · soma {quantidade * meta.pts}
+              </span>
+            </span>
+            <span style={{ textAlign: "right", lineHeight: 1 }}>
+              <span style={{ display: "block", fontFamily: display, fontSize: 22, color: C.bronzeHi, ...tabular }}>
+                {quantidade}
+              </span>
+              <span style={{ fontSize: 9.5, letterSpacing: ".14em", textTransform: "uppercase", color: C.ink4 }}>
+                {quantidade === 1 ? "pessoa" : "pessoas"}
+              </span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
+/** O ícone da rota num quadro do tamanho do emblema de elo, para os cartões alinharem. */
+function QuadroDaRota({ rota }: Readonly<{ rota: string }>) {
+  const meta = resolveRole(rota);
+  return (
+    <span
+      aria-hidden
+      style={{
+        width: 40,
+        height: 40,
+        display: "grid",
+        placeItems: "center",
+        borderRadius: 4,
+        border: `1px solid ${meta.color}55`,
+        background: "rgba(0,0,0,.32)",
+      }}
+    >
+      <RoleIcon role={rota} size={22} color={meta.color} />
+    </span>
+  );
+}
+
 // ---------------------------------------------------------------- seção
 
 export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSecao) {
+  const compacto = useCompacto();
   const { config, inscritos, panorama } = dados;
   const [alvoId, setAlvoId] = useState("");
   const [confirmaCongelar, setConfirmaCongelar] = useState(false);
@@ -438,6 +606,8 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
             <Empty title="Ninguém na conta ainda">
               A distribuição aparece com a primeira inscrição que não foi recusada.
             </Empty>
+          ) : compacto ? (
+            <DistribuicaoCompacta linhas={analise.porElo} maiorGrupo={analise.maiorGrupo} />
           ) : (
             <ScrollX>
               <table style={{ width: "100%", minWidth: 460, borderCollapse: "collapse" }}>
@@ -464,34 +634,16 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
                   {analise.porElo.map(({ meta, quantidade }) => (
                     <tr key={meta.key}>
                       <td style={td}>
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                          <Bolinha cor={meta.color} />
-                          {meta.label}
-                        </span>
+                        <Elo elo={meta.label} tamanho={24} />
                       </td>
                       <td style={tdNum}>{meta.pts}</td>
                       <td style={tdNum}>{quantidade}</td>
                       <td style={{ ...td, width: "100%" }}>
-                        <span
-                          aria-hidden
-                          style={{
-                            display: "block",
-                            height: 6,
-                            minWidth: 80,
-                            borderRadius: 2,
-                            background: "rgba(0,0,0,.35)",
-                          }}
-                        >
-                          <span
-                            style={{
-                              display: "block",
-                              height: "100%",
-                              width: `${analise.maiorGrupo > 0 ? (quantidade / analise.maiorGrupo) * 100 : 0}%`,
-                              borderRadius: 2,
-                              background: meta.color,
-                            }}
-                          />
-                        </span>
+                        <BarraDeProporcao
+                          cor={meta.color}
+                          fracao={analise.maiorGrupo > 0 ? quantidade / analise.maiorGrupo : 0}
+                          style={{ minWidth: 80 }}
+                        />
                       </td>
                       <td style={tdNum}>{quantidade * meta.pts}</td>
                     </tr>
@@ -558,6 +710,24 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
           Quando a organização decidir quem fica de fora, marque a situação na aba Inscritos — aqui
           a lista serve para revisar e desfazer.
         </Empty>
+      ) : compacto ? (
+        // No celular o botão desce para a largura inteira do cartão: na tabela ele era a
+        // última coluna, a que mais se perdia fora da tela.
+        <ul style={listaDeCartoes}>
+          {analise.marcadosSobra.map((i) => (
+            <CartaoDoAprovado key={i.id} inscrito={i}>
+              <Button
+                small
+                fullWidth
+                disabled={!podeConferir || ocupado}
+                title={podeConferir ? "Devolve a situação para apto." : SEM_ESCOPO}
+                onClick={() => mudarSituacao(i, "apto")}
+              >
+                Voltar para apto
+              </Button>
+            </CartaoDoAprovado>
+          ))}
+        </ul>
       ) : (
         <ScrollX>
           <table style={{ width: "100%", minWidth: 620, borderCollapse: "collapse" }}>
@@ -589,7 +759,9 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
                   <td style={{ ...td, width: "100%" }}>
                     <CelulaJogador inscrito={i} />
                   </td>
-                  <td style={{ ...td, color: corElo(i) }}>{rotuloElo(i)}</td>
+                  <td style={td}>
+                    <Elo elo={eloDePreco(i)} tamanho={24} />
+                  </td>
                   <td style={tdNum}>{i.pontos}</td>
                   <td style={td}>
                     <CelulaRota rota={i.rota_primaria} />
@@ -618,7 +790,7 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
 
       <BlockTitle right={<Chip>regra 6</Chip>}>Quem pode substituir</BlockTitle>
 
-      <Card padding="16px 18px" style={{ display: "grid", gap: 12 }}>
+      <Card padding={compacto ? "14px 14px" : "16px 18px"} style={{ display: "grid", gap: 12 }}>
         <p style={{ margin: 0, fontSize: 12.5, color: C.ink3, lineHeight: 1.6 }}>
           O substituto tem de valer o mesmo ou menos em pontos — acima disso, só com aprovação da
           organização. Ele também precisa cumprir as regras 3, 4, 5 e 21, e ninguém é obrigado a
@@ -626,21 +798,32 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
         </p>
 
         <Field label="Jogador a substituir" hint="Só aprovados (apto ou sobra) aparecem na lista.">
-          <Select
-            value={alvoId}
-            onChange={setAlvoId}
-            ariaLabel="Jogador a substituir"
-            disabled={analise.aprovados.length === 0}
-          >
-            <option value="">— escolha um jogador —</option>
-            {[...analise.aprovados]
-              .sort((a, b) => a.nick.localeCompare(b.nick, "pt-BR"))
-              .map((i) => (
-                <option key={i.id} value={i.id}>
-                  {i.nick}#{i.tag} — {rotuloElo(i)} · {i.pontos} pt
-                </option>
-              ))}
-          </Select>
+          {/* A opção nativa não mostra imagem: o elo vai escrito nela, e o emblema de quem
+              foi escolhido aparece ao lado — o mesmo arranjo do campo de elo da ficha. */}
+          <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {alvo ? (
+              <Elo elo={eloDePreco(alvo)} tamanho={34} />
+            ) : (
+              <span aria-hidden style={{ width: 34, display: "grid", placeItems: "center", flexShrink: 0 }}>
+                <UserRoundSearch size={22} color={C.ink4} aria-hidden />
+              </span>
+            )}
+            <Select
+              value={alvoId}
+              onChange={setAlvoId}
+              ariaLabel="Jogador a substituir"
+              disabled={analise.aprovados.length === 0}
+            >
+              <option value="">— escolha um jogador —</option>
+              {[...analise.aprovados]
+                .sort((a, b) => a.nick.localeCompare(b.nick, "pt-BR"))
+                .map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.nick}#{i.tag} — {rotuloElo(i)} · {i.pontos} pt
+                  </option>
+                ))}
+            </Select>
+          </span>
         </Field>
 
         {alvo === null ? (
@@ -655,66 +838,90 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
           </Empty>
         ) : (
           <>
-            <p style={{ margin: 0, fontSize: 12.5, color: C.ink2 }}>
+            <p style={{ margin: 0, fontSize: 12.5, color: C.ink2, lineHeight: 1.7 }}>
               {substitutos.length}{" "}
               {substitutos.length === 1 ? "aprovado pode" : "aprovados podem"} entrar no lugar de{" "}
-              <strong style={{ color: C.bronzeLit }}>{alvo.nick}</strong> — pontos ≤ {alvo.pontos} (
-              {rotuloElo(alvo)}).
+              <strong style={{ color: C.bronzeLit }}>{alvo.nick}</strong> — pontos ≤ {alvo.pontos}{" "}
+              <Elo elo={eloDePreco(alvo)} tamanho={18} />.
             </p>
-            <ScrollX>
-              <table style={{ width: "100%", minWidth: 620, borderCollapse: "collapse" }}>
-                <thead>
-                  <tr>
-                    <th scope="col" style={{ ...th, width: "100%" }}>
-                      Jogador
-                    </th>
-                    <th scope="col" style={th}>
-                      Elo
-                    </th>
-                    <th scope="col" style={{ ...th, textAlign: "right" }}>
-                      Pontos
-                    </th>
-                    <th scope="col" style={th}>
-                      Primária
-                    </th>
-                    <th scope="col" style={th}>
-                      Secundária
-                    </th>
-                    <th scope="col" style={{ ...th, textAlign: "right" }}>
-                      Situação
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {substitutos.map((i) => (
-                    <tr key={i.id}>
-                      <td style={{ ...td, width: "100%" }}>
-                        <CelulaJogador inscrito={i} />
-                      </td>
-                      <td style={{ ...td, color: corElo(i) }}>{rotuloElo(i)}</td>
-                      <td style={tdNum}>{i.pontos}</td>
-                      <td style={td}>
-                        <CelulaRota rota={i.rota_primaria} />
-                      </td>
-                      <td style={td}>
-                        <CelulaRota rota={i.rota_secundaria} />
-                      </td>
-                      <td style={{ ...td, textAlign: "right" }}>
-                        {i.situacao === "sobra" ? (
-                          <Chip tone="ok" title="Aprovado sem vaga — a origem mais provável de um substituto.">
-                            na sobra
-                          </Chip>
-                        ) : (
-                          <Chip tone="neutro" title="Já entra nos times.">
-                            apto
-                          </Chip>
-                        )}
-                      </td>
+            {compacto ? (
+              <ul style={listaDeCartoes}>
+                {substitutos.map((i) => (
+                  <CartaoDoAprovado
+                    key={i.id}
+                    inscrito={i}
+                    fim={
+                      i.situacao === "sobra" ? (
+                        <Chip tone="ok" title="Aprovado sem vaga — a origem mais provável de um substituto.">
+                          na sobra
+                        </Chip>
+                      ) : (
+                        <Chip tone="neutro" title="Já entra nos times.">
+                          apto
+                        </Chip>
+                      )
+                    }
+                  />
+                ))}
+              </ul>
+            ) : (
+              <ScrollX>
+                <table style={{ width: "100%", minWidth: 620, borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr>
+                      <th scope="col" style={{ ...th, width: "100%" }}>
+                        Jogador
+                      </th>
+                      <th scope="col" style={th}>
+                        Elo
+                      </th>
+                      <th scope="col" style={{ ...th, textAlign: "right" }}>
+                        Pontos
+                      </th>
+                      <th scope="col" style={th}>
+                        Primária
+                      </th>
+                      <th scope="col" style={th}>
+                        Secundária
+                      </th>
+                      <th scope="col" style={{ ...th, textAlign: "right" }}>
+                        Situação
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </ScrollX>
+                  </thead>
+                  <tbody>
+                    {substitutos.map((i) => (
+                      <tr key={i.id}>
+                        <td style={{ ...td, width: "100%" }}>
+                          <CelulaJogador inscrito={i} />
+                        </td>
+                        <td style={td}>
+                          <Elo elo={eloDePreco(i)} tamanho={24} />
+                        </td>
+                        <td style={tdNum}>{i.pontos}</td>
+                        <td style={td}>
+                          <CelulaRota rota={i.rota_primaria} />
+                        </td>
+                        <td style={td}>
+                          <CelulaRota rota={i.rota_secundaria} />
+                        </td>
+                        <td style={{ ...td, textAlign: "right" }}>
+                          {i.situacao === "sobra" ? (
+                            <Chip tone="ok" title="Aprovado sem vaga — a origem mais provável de um substituto.">
+                              na sobra
+                            </Chip>
+                          ) : (
+                            <Chip tone="neutro" title="Já entra nos times.">
+                              apto
+                            </Chip>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </ScrollX>
+            )}
           </>
         )}
       </Card>
@@ -731,55 +938,85 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
         Cobertura de rotas
       </BlockTitle>
 
-      <ScrollX>
-        <table style={{ width: "100%", minWidth: 520, borderCollapse: "collapse" }}>
-          <thead>
-            <tr>
-              <th scope="col" style={{ ...th, width: "100%" }}>
-                Rota
-              </th>
-              <th scope="col" style={{ ...th, textAlign: "right" }}>
-                Primária
-              </th>
-              <th scope="col" style={{ ...th, textAlign: "right" }}>
-                Secundária
-              </th>
-              <th scope="col" style={{ ...th, textAlign: "right" }}>
-                Precisa
-              </th>
-              <th scope="col" style={{ ...th, textAlign: "right" }}>
-                Falta
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {analise.rotas.map(({ meta, primaria, secundaria }) => {
-              const falta = Math.max(0, panorama.times - primaria);
-              return (
-                <tr key={meta.key}>
-                  <td style={{ ...td, width: "100%" }}>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                      <Bolinha cor={meta.color} />
-                      {meta.label}
+      {compacto ? (
+        <ul style={listaDeCartoes}>
+          {analise.rotas.map(({ meta, primaria, secundaria }) => {
+            const falta = Math.max(0, panorama.times - primaria);
+            return (
+              <li key={meta.key}>
+                <CartaoLinha
+                  inicio={<QuadroDaRota rota={meta.key} />}
+                  titulo={meta.label}
+                  subtitulo={
+                    <span style={tabular}>
+                      {primaria} {primaria === 1 ? "primária" : "primárias"} · {secundaria}{" "}
+                      {secundaria === 1 ? "secundária" : "secundárias"}
+                      {panorama.times > 0 ? ` · precisa ${panorama.times}` : ""}
                     </span>
-                  </td>
-                  <td style={{ ...tdNum, color: C.ink }}>{primaria}</td>
-                  <td style={tdNum}>{secundaria}</td>
-                  <td style={tdNum}>{panorama.times > 0 ? panorama.times : "—"}</td>
-                  <td
-                    style={{
-                      ...tdNum,
-                      color: panorama.times === 0 ? C.ink4 : falta > 0 ? C.dangerSoft : C.okSoft,
-                    }}
-                  >
-                    {panorama.times === 0 ? "—" : falta > 0 ? falta : "ok"}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </ScrollX>
+                  }
+                  fim={
+                    panorama.times === 0 ? null : falta > 0 ? (
+                      <Chip tone="danger">falta {falta}</Chip>
+                    ) : (
+                      <Chip tone="ok">ok</Chip>
+                    )
+                  }
+                />
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <ScrollX>
+          <table style={{ width: "100%", minWidth: 520, borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th scope="col" style={{ ...th, width: "100%" }}>
+                  Rota
+                </th>
+                <th scope="col" style={{ ...th, textAlign: "right" }}>
+                  Primária
+                </th>
+                <th scope="col" style={{ ...th, textAlign: "right" }}>
+                  Secundária
+                </th>
+                <th scope="col" style={{ ...th, textAlign: "right" }}>
+                  Precisa
+                </th>
+                <th scope="col" style={{ ...th, textAlign: "right" }}>
+                  Falta
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {analise.rotas.map(({ meta, primaria, secundaria }) => {
+                const falta = Math.max(0, panorama.times - primaria);
+                return (
+                  <tr key={meta.key}>
+                    <td style={{ ...td, width: "100%" }}>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                        <RoleIcon role={meta.key} size={15} color={meta.color} />
+                        {meta.label}
+                      </span>
+                    </td>
+                    <td style={{ ...tdNum, color: C.ink }}>{primaria}</td>
+                    <td style={tdNum}>{secundaria}</td>
+                    <td style={tdNum}>{panorama.times > 0 ? panorama.times : "—"}</td>
+                    <td
+                      style={{
+                        ...tdNum,
+                        color: panorama.times === 0 ? C.ink4 : falta > 0 ? C.dangerSoft : C.okSoft,
+                      }}
+                    >
+                      {panorama.times === 0 ? "—" : falta > 0 ? falta : "ok"}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </ScrollX>
+      )}
 
       <Card padding="14px 16px" style={{ marginTop: 12, display: "grid", gap: 8 }}>
         <p style={{ margin: 0, fontSize: 12.5, color: C.ink2 }}>
@@ -873,6 +1110,7 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
             <div>
               <Button
                 tone="danger"
+                fullWidth={compacto}
                 disabled={
                   !podeConferir || ocupado || !confirmaCongelar || analise.eloIlegivelAprovado.length > 0
                 }

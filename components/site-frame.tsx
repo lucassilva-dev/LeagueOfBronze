@@ -151,7 +151,9 @@ export async function SiteFrame({ children }: SiteFrameProps) {
           </div>
         ) : null}
 
+        {/* O id é lido pelo painel da organização para a barra fixa dele parar logo abaixo. */}
         <header
+          id="lob-cabecalho"
           style={{
             position: "sticky",
             top: 0,

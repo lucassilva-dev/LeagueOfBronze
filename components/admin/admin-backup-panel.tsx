@@ -7,8 +7,10 @@ import {
   type ChangeEvent,
   type CSSProperties,
 } from "react";
+import { ArrowDown, ArrowRight } from "lucide-react";
 
 import type { TournamentDataset } from "@/lib/schema";
+import { useCompacto } from "@/components/admin/responsivo";
 import {
   ActionCard,
   Banner,
@@ -166,11 +168,39 @@ function useResumoAtual(importing: boolean) {
 
 const CELULA: CSSProperties = { padding: "5px 16px 5px 0", fontSize: 12.5 };
 
+/** No celular, dois botões de uma fileira dividem a largura em vez de ficarem encolhidos à esquerda. */
+const DIVIDE_A_LINHA: CSSProperties = { flex: "1 1 140px" };
+
+/** Texto só para leitor de tela — o ícone ao lado diz o mesmo para quem enxerga. */
+const SO_PARA_LEITOR: CSSProperties = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  overflow: "hidden",
+  clip: "rect(0 0 0 0)",
+  whiteSpace: "nowrap",
+};
+
+/**
+ * A seta de "o arquivo tem MENOS que hoje" — era o caractere "↓" colado no número, que o
+ * leitor de tela lia como "seta para baixo" sem dizer de quê. Agora é ícone, e o sentido
+ * vai por extenso para quem não o vê.
+ */
+function MarcaDePerda() {
+  return (
+    <>
+      <ArrowDown size={13} aria-hidden style={{ flexShrink: 0, marginLeft: 4, verticalAlign: "-2px" }} />
+      <span style={SO_PARA_LEITOR}> (menos que hoje)</span>
+    </>
+  );
+}
+
 /** Prévia da troca: o que existe hoje contra o que o arquivo traz. */
 function Comparacao({
   atual,
   arquivo,
 }: Readonly<{ atual: ResumoDataset | null; arquivo: ResumoDataset }>) {
+  const compacto = useCompacto();
   const linhas: ReadonlyArray<{ campo: string; hoje: string; novo: string; perda?: boolean }> = [
     {
       campo: "Nome",
@@ -222,52 +252,118 @@ function Comparacao({
       >
         O que vai entrar no lugar do que existe hoje
       </div>
-      <div style={{ padding: "8px 12px 10px" }}>
-        <ScrollX>
-          <table style={{ borderCollapse: "collapse", minWidth: 380 }}>
-            <thead>
-              <tr>
-                {["Campo", "Hoje (gravado)", "No arquivo"].map((coluna) => (
-                  <th
-                    key={coluna}
+      {compacto ? (
+        // No celular a tabela de 380px pedia rolagem de lado dentro de um cartão de 290 — e a
+        // coluna que importa ("No arquivo") era justamente a que ficava escondida. Aqui cada
+        // campo vira uma linha: hoje → no arquivo, com a perda em vermelho.
+        <div style={{ padding: "8px 12px 6px" }}>
+          <p
+            aria-hidden
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              margin: "0 0 2px",
+              fontSize: 10.5,
+              color: C.ink4,
+            }}
+          >
+            Hoje (gravado) <ArrowRight size={12} aria-hidden /> No arquivo
+          </p>
+          <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+            {linhas.map((linha, indice) => (
+              <li
+                key={linha.campo}
+                style={{
+                  padding: "9px 0",
+                  borderTop: indice === 0 ? undefined : "1px solid rgba(201,138,75,.09)",
+                }}
+              >
+                <div style={{ fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: C.ink4 }}>
+                  {linha.campo}
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    flexWrap: "wrap",
+                    marginTop: 4,
+                    minWidth: 0,
+                    ...tabular,
+                  }}
+                >
+                  <span style={{ fontSize: 13, color: C.ink3, overflowWrap: "anywhere", minWidth: 0 }}>
+                    <span style={SO_PARA_LEITOR}>Hoje (gravado): </span>
+                    {linha.hoje}
+                  </span>
+                  <ArrowRight size={14} aria-hidden color={C.ink4} style={{ flexShrink: 0 }} />
+                  <span
                     style={{
-                      ...CELULA,
-                      textAlign: "left",
-                      fontSize: 10,
-                      letterSpacing: ".14em",
-                      textTransform: "uppercase",
-                      color: C.ink4,
-                      fontWeight: 600,
-                    }}
-                  >
-                    {coluna}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {linhas.map((linha) => (
-                <tr key={linha.campo}>
-                  <td style={{ ...CELULA, color: C.ink3 }}>{linha.campo}</td>
-                  <td style={{ ...CELULA, color: C.ink2, ...tabular }}>{linha.hoje}</td>
-                  <td
-                    style={{
-                      ...CELULA,
-                      paddingRight: 0,
-                      fontWeight: 600,
+                      fontSize: 14,
+                      fontWeight: 700,
                       color: linha.perda ? C.dangerSoft : C.ink,
-                      ...tabular,
+                      overflowWrap: "anywhere",
+                      minWidth: 0,
                     }}
                   >
+                    <span style={SO_PARA_LEITOR}>No arquivo: </span>
                     {linha.novo}
-                    {linha.perda ? " ↓" : ""}
-                  </td>
+                    {linha.perda ? <MarcaDePerda /> : null}
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <div style={{ padding: "8px 12px 10px" }}>
+          <ScrollX>
+            <table style={{ borderCollapse: "collapse", minWidth: 380 }}>
+              <thead>
+                <tr>
+                  {["Campo", "Hoje (gravado)", "No arquivo"].map((coluna) => (
+                    <th
+                      key={coluna}
+                      style={{
+                        ...CELULA,
+                        textAlign: "left",
+                        fontSize: 10,
+                        letterSpacing: ".14em",
+                        textTransform: "uppercase",
+                        color: C.ink4,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {coluna}
+                    </th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </ScrollX>
-      </div>
+              </thead>
+              <tbody>
+                {linhas.map((linha) => (
+                  <tr key={linha.campo}>
+                    <td style={{ ...CELULA, color: C.ink3 }}>{linha.campo}</td>
+                    <td style={{ ...CELULA, color: C.ink2, ...tabular }}>{linha.hoje}</td>
+                    <td
+                      style={{
+                        ...CELULA,
+                        paddingRight: 0,
+                        fontWeight: 600,
+                        color: linha.perda ? C.dangerSoft : C.ink,
+                        ...tabular,
+                      }}
+                    >
+                      {linha.novo}
+                      {linha.perda ? <MarcaDePerda /> : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </ScrollX>
+        </div>
+      )}
     </div>
   );
 }
@@ -294,6 +390,7 @@ export function AdminBackupPanel({
   onImportFile,
   importing,
 }: AdminBackupPanelProps) {
+  const compacto = useCompacto();
   const ocupado = Boolean(importing);
   const { estado, recarregar } = useResumoAtual(ocupado);
   const atual = estado.situacao === "ok" ? estado.resumo : null;
@@ -403,12 +500,14 @@ export function AdminBackupPanel({
         <BotaoExportarBackup>Exportar backup agora</BotaoExportarBackup>
       </ActionCard>
 
+      {/* No celular, uma coluna fixa: o mínimo de 330px por cartão é maior que a tela de
+          360px menos as margens, e a página inteira passava a rolar de lado. */}
       <div
         style={{
           display: "grid",
           gap: 16,
           alignItems: "start",
-          gridTemplateColumns: "repeat(auto-fit, minmax(330px, 1fr))",
+          gridTemplateColumns: compacto ? "minmax(0, 1fr)" : "repeat(auto-fit, minmax(330px, 1fr))",
         }}
       >
         <ActionCard
@@ -429,7 +528,11 @@ export function AdminBackupPanel({
           />
 
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Button onClick={() => inputArquivo.current?.click()} disabled={ocupado}>
+            <Button
+              onClick={() => inputArquivo.current?.click()}
+              disabled={ocupado}
+              style={compacto ? DIVIDE_A_LINHA : undefined}
+            >
               {arquivoEscolhido ? "Trocar arquivo" : "Escolher arquivo"}
             </Button>
             {arquivoEscolhido ? (
@@ -441,6 +544,7 @@ export function AdminBackupPanel({
                   setConfirmaArquivo(false);
                 }}
                 disabled={ocupado}
+                style={compacto ? DIVIDE_A_LINHA : undefined}
               >
                 Descartar seleção
               </Button>
@@ -474,6 +578,7 @@ export function AdminBackupPanel({
               <div>
                 <Button
                   tone="danger"
+                  fullWidth={compacto}
                   onClick={() => {
                     void importarArquivo();
                   }}
@@ -497,7 +602,9 @@ export function AdminBackupPanel({
             <Textarea
               value={texto}
               mono
-              rows={10}
+              // No celular a fonte sobe para 16px (sem zoom do iPhone): 10 linhas dela
+              // tomavam a tela inteira e escondiam os botões de conferir.
+              rows={compacto ? 7 : 10}
               disabled={ocupado}
               placeholder="Cole aqui um backup válido do campeonato em JSON..."
               onChange={(valor) => {
@@ -511,7 +618,11 @@ export function AdminBackupPanel({
           </Field>
 
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Button onClick={conferirTexto} disabled={ocupado || !texto.trim()}>
+            <Button
+              onClick={conferirTexto}
+              disabled={ocupado || !texto.trim()}
+              style={compacto ? { flex: "1 1 200px" } : undefined}
+            >
               Conferir antes de importar
             </Button>
             <Button
@@ -522,6 +633,7 @@ export function AdminBackupPanel({
                 setConfirmaTexto(false);
               }}
               disabled={ocupado || !texto}
+              style={compacto ? { flex: "1 1 auto" } : undefined}
             >
               Limpar
             </Button>
@@ -547,6 +659,7 @@ export function AdminBackupPanel({
               <div>
                 <Button
                   tone="danger"
+                  fullWidth={compacto}
                   onClick={() => {
                     void importarTexto();
                   }}

@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import type { CSSProperties } from "react";
-import { Download, LogOut, RefreshCcw, Save } from "lucide-react";
+import type { ReactNode } from "react";
+import { Check, ChevronUp, Download, LayoutGrid, Lock, LogOut, RefreshCcw, Save } from "lucide-react";
 
 import type { SeriesFormat, TournamentDataset } from "@/lib/schema";
 import { applyAutoGameMvpsToDataset, calculateStandings } from "@/lib/tournament";
@@ -30,9 +30,10 @@ import {
   C,
   Card,
   Chip,
+  ContextoIconeDaSecao,
   Field,
+  Folha,
   Input,
-  ScrollX,
   baixarBackupDoServidor,
   display,
   tabular,
@@ -43,6 +44,9 @@ import {
   type AdminTab,
   type MutateDraft,
 } from "@/components/admin/shared";
+import { ICONE_DA_SECAO } from "@/components/admin/icones-admin";
+import { ModoCompacto, useCompacto, useLarguraCompacta } from "@/components/admin/responsivo";
+import { SeloHex } from "@/components/lob/icones";
 
 type StartTournamentPayload = Readonly<{
   name: string;
@@ -208,37 +212,51 @@ function resumirMudancas(changes: readonly DatasetChange[]) {
 
 // ================================================================ peças visuais
 
-/** Marca da organização: losango bronze com "LB" — o mesmo losango do site público. */
+/**
+ * Marca da organização: o emblema do campeonato, o mesmo do cabeçalho do site. Antes era um
+ * losango com "LB" — genérico, e de outra linguagem visual que o resto do site já largou.
+ */
 function MarcaLB({ size = 44 }: Readonly<{ size?: number }>) {
   return (
-    <span
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/logo.png"
+      alt=""
       aria-hidden
+      width={size}
+      height={size}
       style={{
         width: size,
         height: size,
         flexShrink: 0,
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        transform: "rotate(45deg)",
-        background: `linear-gradient(150deg, ${C.bronzeHi}, ${C.bronzeDeep})`,
-        borderRadius: 3,
+        objectFit: "contain",
+        borderRadius: Math.round(size * 0.14),
+        filter: "drop-shadow(0 0 12px rgba(232,184,120,.35))",
       }}
-    >
-      <span
-        style={{
-          transform: "rotate(-45deg)",
-          fontFamily: display,
-          fontSize: size * 0.4,
-          letterSpacing: ".04em",
-          color: "#160f06",
-        }}
-      >
-        LB
-      </span>
-    </span>
+    />
   );
 }
+
+/**
+ * Altura de um elemento, acompanhando mudanças (texto que quebra, janela que encolhe).
+ *
+ * Existe para as barras fixas do painel pararem DEBAIXO do cabeçalho do site, que também é
+ * fixo: com `top: 0` a barra de comando se escondia atrás dele assim que a página rolava.
+ */
+function useAltura(alvo: HTMLElement | null | (() => HTMLElement | null)) {
+  const [altura, setAltura] = useState(0);
+  useEffect(() => {
+    const el = typeof alvo === "function" ? alvo() : alvo;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    // O observador mede uma vez ao começar a observar e de novo a cada mudança.
+    const observador = new ResizeObserver(() => setAltura(el.getBoundingClientRect().height));
+    observador.observe(el);
+    return () => observador.disconnect();
+  }, [alvo]);
+  return altura;
+}
+
+const cabecalhoDoSite = () => document.getElementById("lob-cabecalho");
 
 /**
  * Contador regressivo do bloqueio por tentativas. Sem ele o 429 dizia "tente mais tarde"
@@ -442,14 +460,11 @@ type ItemTrilhoProps = Readonly<{
   ativo: boolean;
   alcanca: boolean;
   motivoBloqueio: string;
-  horizontal: boolean;
   onClick: () => void;
 }>;
 
-function ItemTrilho({ secao, ativo, alcanca, motivoBloqueio, horizontal, onClick }: ItemTrilhoProps) {
-  const marcaAtiva: CSSProperties = horizontal
-    ? { borderBottom: `2px solid ${ativo ? C.bronzeHi : "transparent"}` }
-    : { borderLeft: `2px solid ${ativo ? C.bronzeHi : "transparent"}` };
+function ItemTrilho({ secao, ativo, alcanca, motivoBloqueio, onClick }: ItemTrilhoProps) {
+  const Desenho = ICONE_DA_SECAO[secao.value];
 
   return (
     <button
@@ -462,13 +477,14 @@ function ItemTrilho({ secao, ativo, alcanca, motivoBloqueio, horizontal, onClick
       style={{
         display: "flex",
         alignItems: "center",
-        gap: 8,
-        width: horizontal ? "auto" : "100%",
+        gap: 9,
+        width: "100%",
         whiteSpace: "nowrap",
-        padding: horizontal ? "9px 12px" : "9px 10px",
-        background: ativo ? "rgba(201,138,75,.12)" : "transparent",
+        padding: "8px 10px",
+        background: ativo ? "linear-gradient(90deg, rgba(201,138,75,.18), rgba(201,138,75,.04))" : "transparent",
         color: ativo ? C.ink : C.ink3,
         border: "1px solid transparent",
+        borderLeft: `2px solid ${ativo ? C.bronzeHi : "transparent"}`,
         borderRadius: 3,
         fontFamily: "inherit",
         fontSize: 12.5,
@@ -477,20 +493,16 @@ function ItemTrilho({ secao, ativo, alcanca, motivoBloqueio, horizontal, onClick
         textAlign: "left",
         cursor: "pointer",
         opacity: alcanca ? 1 : 0.45,
-        ...marcaAtiva,
       }}
     >
-      {/* Losango: a seção ativa não se distingue só pela cor. */}
-      <span
+      {/* O desenho da seção no lugar do losango genérico. A ativa ganha o dourado E o
+          fundo: não se distingue só pela cor. */}
+      <Desenho
+        size={16}
+        strokeWidth={ativo ? 2.2 : 1.8}
+        color={ativo ? C.bronzeHi : C.ink4}
+        style={{ flexShrink: 0 }}
         aria-hidden
-        style={{
-          width: 6,
-          height: 6,
-          flexShrink: 0,
-          transform: "rotate(45deg)",
-          background: ativo ? C.bronzeHi : "transparent",
-          border: ativo ? "none" : `1px solid ${C.line2}`,
-        }}
       />
       {/*
         `minWidth: 0` sozinho deixa o texto ENCOLHER, mas não o impede de transbordar:
@@ -515,12 +527,311 @@ function ItemTrilho({ secao, ativo, alcanca, motivoBloqueio, horizontal, onClick
       {secao.nota ? (
         <span style={{ fontSize: 10.5, color: C.ink4, flexShrink: 0 }}>{secao.nota}</span>
       ) : null}
-      {alcanca ? null : (
-        <span aria-hidden style={{ fontSize: 10.5, color: C.ink4 }}>
-          ○
+      {alcanca ? null : <Lock size={12} aria-hidden color={C.ink4} style={{ flexShrink: 0 }} />}
+    </button>
+  );
+}
+
+// ================================================================ celular
+
+type DocaProps = Readonly<{
+  secao: Secao | undefined;
+  sujo: boolean;
+  totalMudancas: number;
+  salvando: boolean;
+  isBusy: boolean;
+  onAbrirSecoes: () => void;
+  onSalvar: () => void;
+  seletorAberto: boolean;
+}>;
+
+/**
+ * Doca do celular: fica presa embaixo, no alcance do polegar.
+ *
+ * Duas coisas só, as que se usa o tempo todo: trocar de seção e salvar. No monitor elas
+ * moram no trilho e na barra de comando; no celular a barra empilhava quatro fileiras de
+ * botões no topo e o trilho virava uma faixa com barra de rolagem.
+ */
+function DocaCompacta({ secao, sujo, totalMudancas, salvando, isBusy, onAbrirSecoes, onSalvar, seletorAberto }: DocaProps) {
+  const Desenho = secao ? ICONE_DA_SECAO[secao.value] : LayoutGrid;
+  return (
+    <div
+      style={{
+        position: "fixed",
+        left: 0,
+        right: 0,
+        bottom: 0,
+        // Mesma camada da barra de comando (30): abaixo do cabeçalho e das folhas.
+        zIndex: 30,
+        display: "flex",
+        alignItems: "stretch",
+        gap: 10,
+        padding: "10px 12px calc(10px + env(safe-area-inset-bottom))",
+        background: "linear-gradient(180deg, rgba(23,17,10,.97), rgba(12,8,4,.99))",
+        borderTop: `1px solid ${C.line2}`,
+        boxShadow: "0 -12px 30px rgba(0,0,0,.55)",
+      }}
+    >
+      <button
+        type="button"
+        onClick={onAbrirSecoes}
+        aria-haspopup="dialog"
+        aria-expanded={seletorAberto}
+        aria-label={`Seções do painel. Aberta: ${secao?.label ?? "nenhuma"}`}
+        className="adm-toque"
+        style={{
+          flex: 1,
+          minWidth: 0,
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "6px 10px 6px 8px",
+          minHeight: 50,
+          border: `1px solid ${C.line2}`,
+          borderRadius: 6,
+          background: "rgba(201,138,75,.07)",
+          color: C.ink,
+          fontFamily: "inherit",
+          textAlign: "left",
+          cursor: "pointer",
+        }}
+      >
+        <SeloHex icone={Desenho} tamanho={34} ativo />
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: "block", fontSize: 9.5, letterSpacing: ".2em", textTransform: "uppercase", color: C.bronze }}>
+            {secao?.grupo ?? "Seções"}
+          </span>
+          <span
+            style={{
+              display: "block",
+              fontSize: 14,
+              fontWeight: 700,
+              color: C.ink,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {secao?.label ?? "Escolher seção"}
+          </span>
+        </span>
+        <ChevronUp size={18} aria-hidden color={C.ink3} style={{ flexShrink: 0 }} />
+      </button>
+
+      {sujo ? (
+        <button
+          type="button"
+          onClick={onSalvar}
+          disabled={isBusy}
+          className="adm-toque"
+          aria-label={`Salvar ${totalMudancas} alteração(ões)`}
+          style={{
+            position: "relative",
+            flexShrink: 0,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "0 16px",
+            minHeight: 50,
+            border: "1px solid transparent",
+            borderRadius: 6,
+            background: `linear-gradient(180deg, ${C.bronzeHi}, ${C.bronzeDeep})`,
+            color: "#160f06",
+            fontFamily: "inherit",
+            fontWeight: 800,
+            fontSize: 13.5,
+            letterSpacing: ".04em",
+            cursor: isBusy ? "not-allowed" : "pointer",
+            opacity: isBusy ? 0.6 : 1,
+          }}
+        >
+          <Save size={17} aria-hidden />
+          {salvando ? "Salvando..." : "Salvar"}
+          {salvando ? null : (
+            <span
+              aria-hidden
+              style={{
+                position: "absolute",
+                top: -7,
+                right: -6,
+                minWidth: 20,
+                height: 20,
+                padding: "0 5px",
+                display: "grid",
+                placeItems: "center",
+                borderRadius: 999,
+                background: C.warn,
+                color: "#1a1006",
+                fontSize: 11,
+                fontWeight: 800,
+                border: "2px solid #120c06",
+                ...tabular,
+              }}
+            >
+              {totalMudancas}
+            </span>
+          )}
+        </button>
+      ) : (
+        // Sem alteração não há o que salvar: em vez de um botão desligado, o estado.
+        <span
+          role="status"
+          style={{
+            flexShrink: 0,
+            display: "flex",
+            alignItems: "center",
+            gap: 7,
+            padding: "0 14px",
+            minHeight: 50,
+            border: "1px solid rgba(70,214,200,.35)",
+            borderRadius: 6,
+            background: "rgba(70,214,200,.08)",
+            color: C.okSoft,
+            fontSize: 12.5,
+            fontWeight: 700,
+          }}
+        >
+          <Check size={16} aria-hidden />
+          Salvo
         </span>
       )}
-    </button>
+    </div>
+  );
+}
+
+type SeletorProps = Readonly<{
+  aberto: boolean;
+  onFechar: () => void;
+  grupos: [string, Secao[]][];
+  ativa: AdminTab;
+  alcanca: (escopos: readonly Scope[]) => boolean;
+  onEscolher: (destino: AdminTab) => void;
+  conta: ReactNode;
+  acoes: ReactNode;
+}>;
+
+/**
+ * Todas as seções numa folha, em grade de selos — o mesmo desenho do trilho do monitor,
+ * maior e com alvo de dedo. A conta e as ações raras (recarregar, exportar, sair) moram no
+ * fim da folha: estão a um toque, mas não ocupam a tela de trabalho.
+ */
+function SeletorDeSecoes({ aberto, onFechar, grupos, ativa, alcanca, onEscolher, conta, acoes }: SeletorProps) {
+  return (
+    <Folha aberta={aberto} onFechar={onFechar} titulo="Seções do painel" icone={LayoutGrid} rotuloFechar="Fechar seções">
+      <nav aria-label="Seções do painel">
+        {grupos.map(([nomeDoGrupo, itensDoGrupo]) => (
+          <section key={nomeDoGrupo} style={{ marginBottom: 18 }}>
+            <h3
+              style={{
+                margin: "0 0 9px",
+                fontSize: 10,
+                fontWeight: 600,
+                letterSpacing: ".22em",
+                textTransform: "uppercase",
+                color: C.bronze,
+              }}
+            >
+              {nomeDoGrupo}
+            </h3>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 8 }}>
+              {itensDoGrupo.map((secao) => {
+                const ehAtiva = secao.value === ativa;
+                const pode = alcanca(secao.escopos);
+                return (
+                  <button
+                    key={secao.value}
+                    type="button"
+                    onClick={() => onEscolher(secao.value)}
+                    aria-current={ehAtiva ? "page" : undefined}
+                    className="adm-toque"
+                    style={{
+                      position: "relative",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 8,
+                      minHeight: 96,
+                      padding: "12px 6px 10px",
+                      borderRadius: 6,
+                      border: `1px solid ${ehAtiva ? C.bronze : C.line}`,
+                      background: ehAtiva
+                        ? "linear-gradient(180deg, rgba(201,138,75,.20), rgba(201,138,75,.06))"
+                        : "rgba(0,0,0,.26)",
+                      color: pode ? C.ink : C.ink4,
+                      fontFamily: "inherit",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <SeloHex icone={ICONE_DA_SECAO[secao.value]} tamanho={38} ativo={ehAtiva} />
+                    <span style={{ fontSize: 12.5, fontWeight: ehAtiva ? 700 : 600, lineHeight: 1.2, textAlign: "center" }}>
+                      {secao.label}
+                    </span>
+                    {typeof secao.contagem === "number" || secao.nota ? (
+                      <span style={{ fontSize: 10.5, color: C.ink4, lineHeight: 1.2, ...tabular }}>
+                        {typeof secao.contagem === "number" ? secao.contagem : secao.nota}
+                      </span>
+                    ) : null}
+                    {pode ? null : (
+                      <span
+                        title="Sem permissão: abre em modo de leitura"
+                        style={{ position: "absolute", top: 7, right: 7, display: "flex" }}
+                      >
+                        <Lock size={13} aria-label="sem permissão, só leitura" color={C.ink4} />
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        ))}
+      </nav>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "4px 0 14px" }}>{acoes}</div>
+      {conta}
+    </Folha>
+  );
+}
+
+/**
+ * Aviso que flutua acima da doca, no celular.
+ *
+ * Quem salva pela doca está, em geral, rolado lá embaixo — e o aviso de verdade (o
+ * `Banner`, que é região viva para o leitor de tela) nasce no TOPO do conteúdo, fora da
+ * vista. Este é só o eco visual dele: tocar leva até o aviso completo. Por isso é
+ * `aria-hidden` — o leitor de tela já ouviu o original.
+ */
+function AvisoFlutuante({ tom, texto, onTocar }: Readonly<{ tom: "ok" | "erro"; texto: string; onTocar: () => void }>) {
+  const cor = tom === "ok" ? C.ok : C.danger;
+  return (
+    <div
+      aria-hidden
+      onClick={onTocar}
+      className="adm-folha-baixo"
+      style={{
+        position: "fixed",
+        left: 12,
+        right: 12,
+        bottom: "calc(84px + env(safe-area-inset-bottom))",
+        zIndex: 31,
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "11px 14px",
+        borderRadius: 6,
+        border: `1px solid ${cor}88`,
+        background: tom === "ok" ? "rgba(10,30,28,.96)" : "rgba(40,12,10,.96)",
+        boxShadow: "0 10px 28px rgba(0,0,0,.55)",
+        color: C.ink,
+        fontSize: 13,
+        lineHeight: 1.4,
+        cursor: "pointer",
+      }}
+    >
+      <span style={{ width: 3, alignSelf: "stretch", borderRadius: 2, background: cor, flexShrink: 0 }} />
+      <span style={{ flex: 1, minWidth: 0 }}>{texto}</span>
+      <span style={{ fontSize: 10.5, color: C.ink4, flexShrink: 0 }}>ver ↑</span>
+    </div>
   );
 }
 
@@ -615,7 +926,22 @@ function AdminTabContent({
 
 // ================================================================ painel
 
+/**
+ * O painel decide UMA vez se está no celular e passa a resposta para baixo por contexto:
+ * botões, campos e listas de todas as seções leem `useCompacto()` em vez de cada um medir
+ * a janela.
+ */
 export function AdminDashboardClient() {
+  const compacto = useLarguraCompacta();
+  return (
+    <ModoCompacto ativo={compacto}>
+      <PainelDoAdmin />
+    </ModoCompacto>
+  );
+}
+
+function PainelDoAdmin() {
+  const compacto = useCompacto();
   const [session, setSession] = useState<SessionResponse | null>(null);
   const [draft, setDraft] = useState<TournamentDataset | null>(null);
   /**
@@ -654,26 +980,32 @@ export function AdminDashboardClient() {
   const [tarefa, setTarefa] = useState<Tarefa>(null);
   /** Alguém gravou por cima enquanto este rascunho estava aberto (resposta 409). */
   const [conflict, setConflict] = useState(false);
-  const [estreito, setEstreito] = useState(false);
+  /** Folha de seções do celular aberta. */
+  const [seletorAberto, setSeletorAberto] = useState(false);
+  /** Texto do aviso flutuante que a pessoa já dispensou (ou que já expirou). */
+  const [avisoDispensado, setAvisoDispensado] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  // A barra só existe depois de a sessão e o campeonato carregarem: ref por estado, para a
+  // medição começar quando ela aparece.
+  const [barraEl, setBarraEl] = useState<HTMLDivElement | null>(null);
+  const alturaDoCabecalho = useAltura(cabecalhoDoSite);
+  const alturaDaBarra = useAltura(barraEl);
 
-  // Abaixo de 900px o trilho vira faixa horizontal (mesmo padrão do main-nav do site).
-  useEffect(() => {
-    const aoRedimensionar = () => setEstreito(window.innerWidth < 900);
-    aoRedimensionar();
-    window.addEventListener("resize", aoRedimensionar);
-    return () => window.removeEventListener("resize", aoRedimensionar);
-  }, []);
-
+  // Toda tentativa nova zera o "já dispensado" do eco do celular. A dispensa é guardada pelo
+  // TEXTO: sem zerar, o mesmo erro numa segunda tentativa (ou o mesmo "Salvo... Líder atual"
+  // de dois salvamentos seguidos) não aparecia acima da doca — quem salvou lá embaixo ficava
+  // sem saber que falhou de novo.
   const clearAlerts = () => {
     setMessage(null);
     setError(null);
     setFaltando([]);
     setEsperaSegundos(null);
+    setAvisoDispensado(null);
   };
 
   const registrarErro = (erro: unknown, fallback: string) => {
     setMessage(null);
+    setAvisoDispensado(null);
     if (erro instanceof ApiError) {
       setError(erro.message);
       setFaltando(erro.status === 403 ? erro.missing : []);
@@ -834,16 +1166,45 @@ export function AdminDashboardClient() {
    * seção e o formulário some. `beforeunload` não cobre navegação interna, e o `sujo` do
    * rascunho não enxerga a ficha.
    */
+  /** Devolve se trocou — no celular, a folha de seções só fecha quando a troca aconteceu. */
   const trocarDeSecao = (destino: AdminTab) => {
-    if (destino === activeTab) return;
+    if (destino === activeTab) return true;
     if (formularioSujo) {
       const seguir = window.confirm(
         "Você preencheu uma ficha e ainda não aplicou ao rascunho. Trocar de seção vai descartá-la. Continuar?",
       );
-      if (!seguir) return;
+      if (!seguir) return false;
     }
     setActiveTab(destino);
+    return true;
   };
+
+  // ------------------------------------------------------------ celular
+
+  /*
+   * A doca é `fixed` e cobriria o fim da página — o rodapé do site, onde mora o aviso
+   * obrigatório da Riot. O respiro vai no <body>, depois do rodapé, e só enquanto a doca
+   * existe.
+   */
+  const temDoca = compacto && Boolean(session?.authorized && draft);
+  useEffect(() => {
+    if (!temDoca) return;
+    const antes = document.body.style.paddingBottom;
+    document.body.style.paddingBottom = "calc(78px + env(safe-area-inset-bottom))";
+    return () => {
+      document.body.style.paddingBottom = antes;
+    };
+  }, [temDoca]);
+
+  /** O eco do aviso acima da doca: confirmação some sozinha; erro fica até a pessoa tocar. */
+  const textoDoAviso = conflict ? "Alguém salvou antes de você — veja as opções no topo." : (error ?? message);
+  const tomDoAviso: "ok" | "erro" = conflict || error ? "erro" : "ok";
+  const mostrarAviso = compacto && Boolean(textoDoAviso) && textoDoAviso !== avisoDispensado;
+  useEffect(() => {
+    if (!mostrarAviso || tomDoAviso !== "ok" || !textoDoAviso) return;
+    const id = setTimeout(() => setAvisoDispensado(textoDoAviso), 4500);
+    return () => clearTimeout(id);
+  }, [mostrarAviso, tomDoAviso, textoDoAviso]);
 
   const confirmarDescarte = (acao: string) => {
     if (!temTrabalhoNaoSalvo) return true;
@@ -1400,11 +1761,49 @@ export function AdminDashboardClient() {
 
   // ------------------------------------------------------------ barra de comando
 
+  const resumo = resumirMudancas(changes);
+
+  // Só a VIRADA de estado é anunciada. Se a contagem inteira fosse região viva, o leitor de
+  // tela falaria a cada tecla digitada num campo. Existe uma vez só, nos dois arranjos.
+  const anuncioDoRascunho = (
+    <span
+      role="status"
+      style={{
+        position: "absolute",
+        width: 1,
+        height: 1,
+        overflow: "hidden",
+        clipPath: "inset(50%)",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {sujo ? "Rascunho com alterações não salvas." : "Rascunho salvo."}
+    </span>
+  );
+
+  const chipDoRascunho = sujo ? (
+    <Chip tone="warn" title={resumo.join(" · ")}>
+      {changes.length === 1 ? "1 alteração não salva" : `${changes.length} alterações não salvas`}
+    </Chip>
+  ) : (
+    <Chip tone="ok">Tudo salvo</Chip>
+  );
+
+  const chipSemPermissao =
+    escoposPendentesSemPermissao.length > 0 ? (
+      <Chip tone="danger" title={`Sem permissão para: ${escoposPendentesSemPermissao.map(scopeLabel).join(", ")}`}>
+        sem permissão para parte das mudanças
+      </Chip>
+    ) : null;
+
   const barra = (
     <div
+      ref={setBarraEl}
       style={{
         position: "sticky",
-        top: 0,
+        // Logo abaixo do cabeçalho do site, que também é fixo. Com `top: 0` a barra parava
+        // atrás dele e sumia assim que a página rolava.
+        top: alturaDoCabecalho,
         // 30, abaixo do cabeçalho do site (40). Estavam empatadas em 40, e o empate
         // se resolvia pela ordem do DOM: esta barra vinha depois e cobria o menu da
         // conta. Ver a escala em components/site-frame.tsx.
@@ -1423,7 +1822,7 @@ export function AdminDashboardClient() {
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}>
-        <MarcaLB size={30} />
+        <MarcaLB size={34} />
         <div style={{ minWidth: 0 }}>
           <div style={{ fontFamily: display, fontSize: 15, lineHeight: 1.1, color: C.ink }}>
             Painel da organização
@@ -1446,43 +1845,10 @@ export function AdminDashboardClient() {
 
       {/* Estado do rascunho: a peça central. Antes NADA indicava alteração pendente. */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", minWidth: 0 }}>
-        {/* Só a VIRADA de estado é anunciada. Se a contagem inteira fosse região viva, o
-            leitor de tela falaria a cada tecla digitada num campo. */}
-        <span
-          role="status"
-          style={{
-            position: "absolute",
-            width: 1,
-            height: 1,
-            overflow: "hidden",
-            clipPath: "inset(50%)",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {sujo ? "Rascunho com alterações não salvas." : "Rascunho salvo."}
-        </span>
-        {sujo ? (
-          <Chip tone="warn" title={resumirMudancas(changes).join(" · ")}>
-            {changes.length === 1
-              ? "1 alteração não salva"
-              : `${changes.length} alterações não salvas`}
-          </Chip>
-        ) : (
-          <Chip tone="ok">Tudo salvo</Chip>
-        )}
-        {sujo && !estreito ? (
-          <span style={{ fontSize: 11, color: C.ink4, ...tabular }}>
-            {resumirMudancas(changes).slice(0, 3).join(" · ")}
-          </span>
-        ) : null}
-        {escoposPendentesSemPermissao.length > 0 ? (
-          <Chip
-            tone="danger"
-            title={`Sem permissão para: ${escoposPendentesSemPermissao.map(scopeLabel).join(", ")}`}
-          >
-            sem permissão para parte das mudanças
-          </Chip>
-        ) : null}
+        {anuncioDoRascunho}
+        {chipDoRascunho}
+        {sujo ? <span style={{ fontSize: 11, color: C.ink4, ...tabular }}>{resumo.slice(0, 3).join(" · ")}</span> : null}
+        {chipSemPermissao}
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -1518,44 +1884,35 @@ export function AdminDashboardClient() {
 
   // ------------------------------------------------------------ trilho
 
-  const itens = (horizontal: boolean) =>
-    grupos.map(([nomeDoGrupo, itensDoGrupo]) => (
+  const trilho = grupos.map(([nomeDoGrupo, itensDoGrupo]) => (
+    <div key={nomeDoGrupo} style={{ marginBottom: 14 }}>
       <div
-        key={nomeDoGrupo}
-        style={
-          horizontal
-            ? { display: "flex", alignItems: "center", gap: 2 }
-            : { marginBottom: 14 }
-        }
+        style={{
+          fontSize: 9.5,
+          letterSpacing: ".2em",
+          textTransform: "uppercase",
+          color: C.ink4,
+          padding: "0 0 6px 10px",
+          whiteSpace: "nowrap",
+        }}
       >
-        <div
-          style={{
-            fontSize: 9.5,
-            letterSpacing: ".2em",
-            textTransform: "uppercase",
-            color: C.ink4,
-            padding: horizontal ? "0 8px 0 4px" : "0 0 6px 10px",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {nomeDoGrupo}
-        </div>
-        {itensDoGrupo.map((secao) => (
-          <ItemTrilho
-            key={secao.value}
-            secao={secao}
-            ativo={activeTab === secao.value}
-            alcanca={alcanca(secao.escopos)}
-            motivoBloqueio={motivoBloqueio(secao)}
-            horizontal={horizontal}
-            onClick={() => trocarDeSecao(secao.value)}
-          />
-        ))}
+        {nomeDoGrupo}
       </div>
-    ));
+      {itensDoGrupo.map((secao) => (
+        <ItemTrilho
+          key={secao.value}
+          secao={secao}
+          ativo={activeTab === secao.value}
+          alcanca={alcanca(secao.escopos)}
+          motivoBloqueio={motivoBloqueio(secao)}
+          onClick={() => trocarDeSecao(secao.value)}
+        />
+      ))}
+    </div>
+  ));
 
   const cartaoDaConta = session.user ? (
-    <Card padding="12px 12px 13px" style={{ marginTop: estreito ? 14 : 6 }}>
+    <Card padding="12px 12px 13px" style={{ marginTop: compacto ? 0 : 6 }}>
       <div style={{ fontSize: 9.5, letterSpacing: ".18em", textTransform: "uppercase", color: C.ink4 }}>
         Conectado como
       </div>
@@ -1646,65 +2003,186 @@ export function AdminDashboardClient() {
       ) : null}
 
       <section role="region" aria-label={secaoAtiva?.label ?? "Conteúdo do painel"}>
-        <AdminTabContent
-          aplicarDoServidor={aplicarDoServidor}
-          onVersaoDoServidor={sincronizarVersaoDoServidor}
-          onFormularioSujo={setFormularioSujo}
-          podeConferir={alcanca(["inscricoes:conferir"])}
-          podeFinanceiro={alcanca(["inscricoes:financeiro"])}
-          podeConfigurar={alcanca(["edicao:configurar"])}
-          podeConduzirDraft={alcanca(["draft:conduzir"])}
-          onDatasetMudouNoServidor={recarregarDepoisDoDraft}
-          activeTab={activeTab}
-          draft={draft}
-          mutateDraft={mutateDraft}
-          isBusy={isBusy}
-          onImportFile={handleImportFile}
-          onImportText={handleImportText}
-          onEndTournament={endTournament}
-          onStartTournament={startTournament}
-          onAlert={(kind, text) => {
-            clearAlerts();
-            if (kind === "ok") setMessage(text);
-            else setError(text);
-          }}
-        />
+        {/* O selo da seção vai por contexto: o cabeçalho de cada seção o desenha sozinho. */}
+        <ContextoIconeDaSecao.Provider value={ICONE_DA_SECAO[activeTab]}>
+          <AdminTabContent
+            aplicarDoServidor={aplicarDoServidor}
+            onVersaoDoServidor={sincronizarVersaoDoServidor}
+            onFormularioSujo={setFormularioSujo}
+            podeConferir={alcanca(["inscricoes:conferir"])}
+            podeFinanceiro={alcanca(["inscricoes:financeiro"])}
+            podeConfigurar={alcanca(["edicao:configurar"])}
+            podeConduzirDraft={alcanca(["draft:conduzir"])}
+            onDatasetMudouNoServidor={recarregarDepoisDoDraft}
+            activeTab={activeTab}
+            draft={draft}
+            mutateDraft={mutateDraft}
+            isBusy={isBusy}
+            onImportFile={handleImportFile}
+            onImportText={handleImportText}
+            onEndTournament={endTournament}
+            onStartTournament={startTournament}
+            onAlert={(kind, text) => {
+              clearAlerts();
+              if (kind === "ok") setMessage(text);
+              else setError(text);
+            }}
+          />
+        </ContextoIconeDaSecao.Provider>
       </section>
     </div>
   );
 
-  if (estreito) {
+  // ------------------------------------------------------------ celular
+
+  if (compacto) {
+    /** Ações raras, no fim da folha de seções. Fecham a folha antes: podem pedir confirmação. */
+    const acoesDaConta = (
+      <>
+        <Button
+          small
+          disabled={isBusy}
+          onClick={() => {
+            setSeletorAberto(false);
+            reloadDataset();
+          }}
+        >
+          <RefreshCcw size={14} aria-hidden />
+          {getReloadButtonLabel(tarefa === "recarregar", isSupabaseProvider)}
+        </Button>
+        {alcanca(["dataset:export"]) ? (
+          <Button small onClick={exportarBackup} disabled={isBusy} title="Baixa o JSON do campeonato">
+            <Download size={14} aria-hidden />
+            {tarefa === "exportar" ? "Baixando..." : "Exportar"}
+          </Button>
+        ) : null}
+        <Button
+          small
+          disabled={isBusy}
+          onClick={() => {
+            setSeletorAberto(false);
+            logout();
+          }}
+        >
+          <LogOut size={14} aria-hidden />
+          {tarefa === "sair" ? "Saindo..." : "Sair"}
+        </Button>
+      </>
+    );
+
     return (
       <div>
-        {barra}
-        <nav aria-label="Seções do painel" style={{ marginBottom: 14 }}>
-          <ScrollX>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-                paddingBottom: 4,
-                borderBottom: `1px solid ${C.line}`,
-                width: "max-content",
-              }}
-            >
-              {itens(true)}
+        {/* Cabeçalho do painel no celular: rola junto com a página. Fixos, só o cabeçalho
+            do site em cima e a doca embaixo — três barras presas comiam um terço da tela. */}
+        <div
+          style={{
+            marginBottom: 14,
+            padding: "12px 14px",
+            background: "linear-gradient(180deg, #17110a, #100b06)",
+            border: `1px solid ${C.line}`,
+            borderRadius: 6,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+            <MarcaLB size={38} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: display, fontSize: 16, lineHeight: 1.1, color: C.ink }}>
+                Painel da organização
+              </div>
+              <div
+                style={{
+                  marginTop: 2,
+                  fontSize: 10,
+                  letterSpacing: ".14em",
+                  textTransform: "uppercase",
+                  color: C.bronze,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {draft.tournament.name}
+              </div>
             </div>
-          </ScrollX>
-        </nav>
-        {cartaoDaConta}
-        <div style={{ marginTop: 14 }}>{conteudo}</div>
+            {anuncioDoRascunho}
+            {chipDoRascunho}
+          </div>
+          {sujo ? (
+            <p style={{ margin: "9px 0 0", fontSize: 11.5, lineHeight: 1.5, color: C.ink3, ...tabular }}>
+              {resumo.slice(0, 3).join(" · ")}
+            </p>
+          ) : null}
+          {chipSemPermissao ? <div style={{ marginTop: 8 }}>{chipSemPermissao}</div> : null}
+        </div>
+
+        {conteudo}
+
+        <DocaCompacta
+          secao={secaoAtiva}
+          sujo={sujo}
+          totalMudancas={changes.length}
+          salvando={tarefa === "salvar"}
+          isBusy={isBusy}
+          seletorAberto={seletorAberto}
+          onAbrirSecoes={() => setSeletorAberto(true)}
+          onSalvar={() => saveDraft()}
+        />
+
+        <SeletorDeSecoes
+          aberto={seletorAberto}
+          onFechar={() => setSeletorAberto(false)}
+          grupos={grupos}
+          ativa={activeTab}
+          alcanca={alcanca}
+          onEscolher={(destino) => {
+            if (!trocarDeSecao(destino)) return;
+            setSeletorAberto(false);
+            // Depois que a folha solta a rolagem do <body>.
+            requestAnimationFrame(() => window.scrollTo({ top: 0 }));
+          }}
+          conta={cartaoDaConta}
+          acoes={acoesDaConta}
+        />
+
+        {mostrarAviso && textoDoAviso ? (
+          <AvisoFlutuante
+            tom={tomDoAviso}
+            texto={textoDoAviso}
+            onTocar={() => {
+              setAvisoDispensado(textoDoAviso);
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+          />
+        ) : null}
       </div>
     );
   }
 
+  // ------------------------------------------------------------ monitor
+
+  const topoDoTrilho = Math.round(alturaDoCabecalho + alturaDaBarra + 14);
+
   return (
     <div>
       {barra}
-      <div style={{ display: "grid", gridTemplateColumns: "216px 1fr", gap: 22, alignItems: "start" }}>
-        <div style={{ position: "sticky", top: 78 }}>
-          <nav aria-label="Seções do painel">{itens(false)}</nav>
+      {/* 236px: o desenho de cada seção ocupa mais que o losango de antes, e com 216 o
+          rótulo "Configuração" era cortado pela nota ao lado. */}
+      <div style={{ display: "grid", gridTemplateColumns: "236px 1fr", gap: 22, alignItems: "start" }}>
+        {/* O trilho acompanha a rolagem logo abaixo da barra. Num monitor baixo ele é mais
+            alto que a janela — então rola por dentro, em vez de cortar a conta lá embaixo. */}
+        <div
+          style={{
+            position: "sticky",
+            top: topoDoTrilho,
+            maxHeight: `calc(100vh - ${topoDoTrilho + 12}px)`,
+            overflowY: "auto",
+            overscrollBehavior: "contain",
+            scrollbarWidth: "thin",
+            scrollbarColor: `${C.line2} transparent`,
+            paddingBottom: 4,
+          }}
+        >
+          <nav aria-label="Seções do painel">{trilho}</nav>
           {cartaoDaConta}
         </div>
         <div style={{ minWidth: 0 }}>{conteudo}</div>

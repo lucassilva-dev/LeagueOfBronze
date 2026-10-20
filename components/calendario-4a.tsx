@@ -1,6 +1,8 @@
+import { CalendarSync, Dices, Hourglass, Medal } from "lucide-react";
 import Link from "next/link";
 import type { CSSProperties } from "react";
 
+import type { Icone } from "@/components/lob/icones";
 import {
   diasDoCalendario4a,
   horaDoSlot,
@@ -176,9 +178,23 @@ export function CalendarioDa4a({
       ))}
       {comNotas ? (
         <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 6 }}>
-          {[t.notaPosicoes, t.notaAtraso, t.notaReserva, t.notaSemis].map((nota) => (
+          {/*
+            Cada nota com o desenho do que ela avisa, no lugar do losango genérico: o sorteio
+            das posições (dados), o jogo que espera o anterior acabar (ampulheta), a reserva
+            para remarcar (calendário com setas) e as semifinais (medalha — a mesma de
+            /regras; o troféu fica para a final). Mesma cor e mesmo peso do losango de antes.
+          */}
+          {(
+            [
+              [t.notaPosicoes, Dices],
+              [t.notaAtraso, Hourglass],
+              [t.notaReserva, CalendarSync],
+              [t.notaSemis, Medal],
+            ] as const satisfies readonly (readonly [string, Icone])[]
+          ).map(([nota, Desenho]) => (
             <li key={nota} style={{ display: "flex", gap: 9, fontSize: 13, lineHeight: 1.55, color: "#8f8472" }}>
-              <span aria-hidden style={{ color: "#c98a4b", flexShrink: 0 }}>◆</span>
+              {/* 13px × 1,55 ≈ 20px de linha: 3px em cima centra o ícone de 14px na 1ª linha. */}
+              <Desenho size={14} color="#c98a4b" aria-hidden style={{ flexShrink: 0, marginTop: 3 }} />
               <span>{nota}</span>
             </li>
           ))}

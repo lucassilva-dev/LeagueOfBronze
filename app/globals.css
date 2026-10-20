@@ -311,6 +311,104 @@ a:hover {
   }
 }
 
+/* ============================================================
+   Painel no celular (components/admin/ui.tsx e o shell do painel).
+   Mesmas regras de sempre: animação só de transform, sem fill-mode
+   — se não rodar, a peça já está no lugar.
+   ============================================================ */
+@keyframes admFolhaSobe {
+  from {
+    transform: translateY(28px);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes admFolhaEntraDoLado {
+  from {
+    transform: translateX(32px);
+  }
+  to {
+    transform: none;
+  }
+}
+.adm-folha-baixo {
+  animation: admFolhaSobe 0.2s ease-out;
+}
+.adm-folha-lado {
+  animation: admFolhaEntraDoLado 0.18s ease-out;
+}
+
+/* Cartão de linha: o botão do título se estica por cima do cartão inteiro, então o toque
+   em qualquer ponto abre — e o foco do teclado desenha o anel em volta do cartão todo. */
+.adm-cartao__alvo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+}
+.adm-cartao__alvo:focus-visible {
+  outline: none;
+}
+.adm-cartao__alvo:focus-visible::after {
+  outline: 2px solid #f0c88a;
+  outline-offset: 2px;
+}
+.adm-cartao--toque::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  pointer-events: none;
+  transition: background-color 0.12s ease;
+}
+.adm-cartao--toque:hover::before {
+  background-color: rgba(201, 138, 75, 0.07);
+}
+.adm-cartao--toque:active {
+  transform: scale(0.992);
+}
+
+/* Fileira de chips que rola de lado: a barra de rolagem não aparece (o conteúdo cortado
+   na borda já diz que há mais). */
+.adm-rolagem-x {
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.adm-rolagem-x::-webkit-scrollbar {
+  display: none;
+}
+
+/* Item da doca e do seletor de seções: o toque responde com um afundar leve. */
+.adm-toque:active {
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .adm-folha-baixo,
+  .adm-folha-lado {
+    animation: none;
+  }
+  .adm-cartao--toque::before {
+    transition: none;
+  }
+  .adm-cartao--toque:active,
+  .adm-toque:active {
+    transform: none;
+  }
+}
+
+/* Cabeçalho do site no celular: com a sessão aberta, o nome da conta empurrava o menu
+   para fora da tela. Abaixo de 520px fica só a inicial — o nome segue no aria-label. */
+@media (max-width: 520px) {
+  .lob-sessao-nome {
+    display: none;
+  }
+  .lob-sessao-botao {
+    padding: 5px !important;
+  }
+}
+
 .gold-text {
   background: linear-gradient(180deg, #f6d6a2, #dc9f57 46%, #a5692f);
   -webkit-background-clip: text;

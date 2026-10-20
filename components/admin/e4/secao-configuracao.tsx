@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { Save, TriangleAlert } from "lucide-react";
 
 import type { EdicaoConfig, PropsSecao } from "@/components/admin/e4/painel-edicao";
+import { useCompacto } from "@/components/admin/responsivo";
 import {
   ActionCard,
   Banner,
@@ -36,6 +38,12 @@ import { distribuirTimes, estadoDaJanela } from "@/lib/inscricoes/schema";
  * 2. O RESTO É UM RASCUNHO ÚNICO, salvo de uma vez só com o diff contra `dados.config`.
  *    Mandar campo por campo geraria uma linha de auditoria por tecla e faria o servidor
  *    recalcular o panorama seis vezes seguidas.
+ *
+ * No celular o formulário já cai em uma coluna sozinho (as grades são `auto-fit`); o que
+ * muda é o alcance do «Salvar». Ele mora no FIM de um formulário de dezesseis campos, e quem
+ * mexe numa data lá em cima teria de rolar a tela inteira para salvar — então, enquanto há
+ * rascunho, uma barra presa logo acima da doca leva o mesmo botão (mesmo diff, mesmas
+ * travas). Ela some quando o bloco «Salvar» de verdade aparece na tela.
  */
 
 // ---------------------------------------------------------------- forma do rascunho
@@ -272,6 +280,32 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar }: 
   const [rascunho, setRascunho] = useState<Rascunho>(semente);
   const [confirmandoAbertura, setConfirmandoAbertura] = useState(false);
 
+  const compacto = useCompacto();
+  const idSalvar = useId();
+  const blocoSalvar = useRef<HTMLDivElement>(null);
+  /** O bloco «Salvar» do fim está na tela? Enquanto estiver, a barra presa sai do caminho. */
+  const [salvarAVista, setSalvarAVista] = useState(false);
+
+  /*
+   * Vigia o bloco «Salvar» só no celular. O setState mora no retorno do observador, não no
+   * corpo do efeito — é assíncrono, então não cai na regra react-hooks/set-state-in-effect.
+   * Sem `IntersectionObserver` (navegador velho, jsdom) a barra simplesmente fica — dois
+   * botões de salvar na tela é menos grave do que nenhum à mão.
+   */
+  useEffect(() => {
+    if (!compacto) return;
+    const alvo = blocoSalvar.current;
+    if (!alvo || typeof IntersectionObserver === "undefined") return;
+    const vigia = new IntersectionObserver(
+      ([registro]) => setSalvarAVista(Boolean(registro?.isIntersecting)),
+      // "À vista" é acima da doca e da própria barra — uns 150px do pé da tela. Sem a
+      // margem, o bloco contava como visível estando escondido atrás das duas.
+      { rootMargin: "0px 0px -150px 0px" },
+    );
+    vigia.observe(alvo);
+    return () => vigia.disconnect();
+  }, [compacto]);
+
   if (semeadoDe !== semente) {
     setSemeadoDe(semente);
     setRascunho(semente);
@@ -346,6 +380,24 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar }: 
 
   const alterado = Object.keys(corpo).length > 0;
   const podeSalvar = alterado && problemas.length === 0 && !bloqueado && !ocupado;
+  const camposAlterados = Object.keys(corpo).length;
+
+  /** O mesmo envio para o botão do fim e para a barra do celular: um diff só, uma regra só. */
+  const salvarConfig = () => void executar("config", corpo);
+  const tituloDoSalvar =
+    semEscopo ??
+    (problemas.length > 0
+      ? "Há campo fora da faixa aceita."
+      : alterado
+        ? `Envia ${camposAlterados} campo(s) alterado(s).`
+        : "Nada mudou desde o último salvamento.");
+
+  // Campo inválido também mostra a barra: o diff pode estar vazio (o número errado não
+  // entra nele) e mesmo assim há trabalho pendente que a pessoa precisa achar.
+  const mostrarBarra = compacto && !bloqueado && (alterado || problemas.length > 0) && !salvarAVista;
+
+  /** Leva ao bloco «Salvar», onde a lista do que corrigir está escrita por extenso. */
+  const irParaSalvar = () => document.getElementById(idSalvar)?.scrollIntoView({ block: "center" });
 
   // Projeção feita com o valor QUE ESTÁ NO CAMPO, e não com o salvo: é assim que dá para
   // ver o efeito de mudar "jogadores por time" antes de confirmar.
@@ -445,9 +497,12 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar }: 
             : "Com as inscrições fechadas, /inscricao mostra a página de espera e o servidor recusa o envio. Ao abrir, o formulário fica público na hora."
         }
       >
+        {/* No celular os botões ocupam a largura do cartão e empilham: "Confirmar abertura?"
+            ao lado de "Cancelar" não cabia em meia tela e quebrava em duas linhas. */}
         {abertas ? (
           <Toolbar>
             <Button
+              fullWidth={compacto}
               onClick={() => void alternarInscricoes(false)}
               disabled={bloqueado || ocupado}
               title={semEscopo}
@@ -461,19 +516,21 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar }: 
               <>
                 <Button
                   tone="gold"
+                  fullWidth={compacto}
                   onClick={() => void alternarInscricoes(true)}
                   disabled={bloqueado || ocupado}
                   title={semEscopo}
                 >
                   Confirmar abertura?
                 </Button>
-                <Button onClick={() => setConfirmandoAbertura(false)} disabled={ocupado}>
+                <Button fullWidth={compacto} onClick={() => setConfirmandoAbertura(false)} disabled={ocupado}>
                   Cancelar
                 </Button>
               </>
             ) : (
               <Button
                 tone="gold"
+                fullWidth={compacto}
                 onClick={() => setConfirmandoAbertura(true)}
                 disabled={bloqueado || ocupado}
                 title={semEscopo}
@@ -690,7 +747,9 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar }: 
         </Field>
       </FieldGrid>
 
-      <FieldGrid min={165} style={{ marginTop: 14 }}>
+      {/* 165px no monitor; no celular duas colunas de 165 não cabiam em 360px e os quatro
+          valores empilhavam um por linha. */}
+      <FieldGrid min={compacto ? 130 : 165} style={{ marginTop: 14 }}>
         <Metric
           label="Arrecadado"
           value={emReais(premiacao.arrecadado)}
@@ -720,45 +779,126 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar }: 
 
       {/* ------------------------------------------------ 5. salvar */}
 
-      <BlockTitle right={alterado ? <Chip tone="warn">alterações não salvas</Chip> : undefined}>
-        Salvar
-      </BlockTitle>
+      <div ref={blocoSalvar} id={idSalvar}>
+        <BlockTitle right={alterado ? <Chip tone="warn">alterações não salvas</Chip> : undefined}>
+          Salvar
+        </BlockTitle>
 
-      {problemas.length > 0 ? (
-        <Banner tone="warn" title="Corrija antes de salvar">
-          <ul style={{ margin: 0, paddingLeft: 18 }}>
-            {problemas.map((texto) => (
-              <li key={texto}>{texto}</li>
-            ))}
-          </ul>
-        </Banner>
-      ) : null}
+        {problemas.length > 0 ? (
+          <Banner tone="warn" title="Corrija antes de salvar">
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {problemas.map((texto) => (
+                <li key={texto}>{texto}</li>
+              ))}
+            </ul>
+          </Banner>
+        ) : null}
 
-      <Toolbar>
-        <Button
-          tone="gold"
-          onClick={() => void executar("config", corpo)}
-          disabled={!podeSalvar}
-          title={
-            semEscopo ??
-            (problemas.length > 0
-              ? "Há campo fora da faixa aceita."
-              : alterado
-                ? `Envia ${Object.keys(corpo).length} campo(s) alterado(s).`
-                : "Nada mudou desde o último salvamento.")
-          }
+        {compacto ? (
+          // No celular: «Descartar» à esquerda e o salvar, maior, à direita — onde o polegar
+          // de quem segura com a mão direita já está. A explicação desce para baixo deles.
+          <div style={{ display: "grid", gap: 8 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 2fr)", gap: 8 }}>
+              <Button fullWidth onClick={() => setRascunho(semente)} disabled={!alterado || ocupado}>
+                Descartar
+              </Button>
+              <Button tone="gold" fullWidth onClick={salvarConfig} disabled={!podeSalvar} title={tituloDoSalvar}>
+                {ocupado ? "Salvando..." : "Salvar alterações"}
+              </Button>
+            </div>
+            <span style={{ fontSize: 11.5, lineHeight: 1.5, color: C.ink4 }}>
+              {alterado
+                ? `${camposAlterados} campo(s) para enviar. Abrir e fechar inscrições é ação à parte, lá em cima.`
+                : "Nada para enviar."}
+            </span>
+          </div>
+        ) : (
+          <Toolbar>
+            <Button tone="gold" onClick={salvarConfig} disabled={!podeSalvar} title={tituloDoSalvar}>
+              {ocupado ? "Salvando..." : "Salvar alterações"}
+            </Button>
+            <Button onClick={() => setRascunho(semente)} disabled={!alterado || ocupado}>
+              Descartar
+            </Button>
+            <span style={{ fontSize: 11.5, color: C.ink4 }}>
+              {alterado
+                ? `${camposAlterados} campo(s) para enviar. Abrir e fechar inscrições é ação à parte, lá em cima.`
+                : "Nada para enviar."}
+            </span>
+          </Toolbar>
+        )}
+      </div>
+
+      {/*
+       * A barra presa do celular. `fixed`, e não `sticky`: `sticky` gruda no ancestral com
+       * overflow mais próximo, e o invólucro do site tem `overflow-x: hidden` — a barra
+       * poderia ficar grudada num contêiner que não rola. `fixed` só exige que nenhum
+       * ancestral tenha `transform`, a mesma condição de que a doca já depende.
+       *
+       * Fica logo acima da doca (78px + área segura, o mesmo respiro que o shell dá ao
+       * <body> por causa dela) e embaixo das folhas e do aviso flutuante: um erro de
+       * salvamento, quando aparece, cobre a barra — e é ele que a pessoa precisa ler.
+       * Sem «Descartar» aqui de propósito: ele não pergunta nada, e colado no salvar um
+       * toque torto jogaria fora o formulário inteiro.
+       */}
+      {mostrarBarra ? (
+        <div
+          role="group"
+          aria-label="Alterações da configuração"
+          style={{
+            position: "fixed",
+            left: 12,
+            right: 12,
+            bottom: "calc(78px + env(safe-area-inset-bottom))",
+            zIndex: 29,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "8px 8px 8px 14px",
+            borderRadius: 6,
+            border: `1px solid ${problemas.length > 0 ? "rgba(224,163,58,.45)" : C.line2}`,
+            background: "linear-gradient(180deg, rgba(30,22,13,.98), rgba(14,10,5,.98))",
+            boxShadow: "0 12px 32px rgba(0,0,0,.6)",
+          }}
         >
-          {ocupado ? "Salvando..." : "Salvar alterações"}
-        </Button>
-        <Button onClick={() => setRascunho(semente)} disabled={!alterado || ocupado}>
-          Descartar
-        </Button>
-        <span style={{ fontSize: 11.5, color: C.ink4 }}>
-          {alterado
-            ? `${Object.keys(corpo).length} campo(s) para enviar. Abrir e fechar inscrições é ação à parte, lá em cima.`
-            : "Nada para enviar."}
-        </span>
-      </Toolbar>
+          {problemas.length > 0 ? (
+            <button
+              type="button"
+              onClick={irParaSalvar}
+              style={{
+                flex: 1,
+                minWidth: 0,
+                minHeight: 44,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: 0,
+                border: "none",
+                background: "none",
+                color: C.warnSoft,
+                fontFamily: "inherit",
+                fontSize: 12.5,
+                lineHeight: 1.35,
+                textAlign: "left",
+                cursor: "pointer",
+              }}
+            >
+              <TriangleAlert size={17} aria-hidden style={{ flexShrink: 0 }} />
+              <span>
+                Corrija {problemas.length} {problemas.length === 1 ? "campo" : "campos"} — ver onde
+              </span>
+            </button>
+          ) : (
+            <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, lineHeight: 1.35, color: C.ink2, ...tabular }}>
+              {camposAlterados} campo(s) alterado(s), ainda não salvo(s)
+            </span>
+          )}
+          <Button tone="gold" onClick={salvarConfig} disabled={!podeSalvar} title={tituloDoSalvar}>
+            <Save size={16} aria-hidden />
+            {ocupado ? "Salvando..." : "Salvar"}
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

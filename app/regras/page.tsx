@@ -1,8 +1,52 @@
+import {
+  ArrowLeftRight,
+  BadgeCheck,
+  CalendarCheck,
+  CalendarClock,
+  CalendarDays,
+  CalendarRange,
+  Camera,
+  ClipboardPen,
+  Coins,
+  Crown,
+  Dices,
+  FileCheck,
+  FilePen,
+  Flag,
+  Gamepad2,
+  Gavel,
+  Handshake,
+  Headphones,
+  Hourglass,
+  IdCard,
+  Link2,
+  ListOrdered,
+  Medal,
+  MousePointerClick,
+  Repeat,
+  Scale,
+  ScrollText,
+  Shuffle,
+  SunMoon,
+  Swords,
+  Target,
+  Timer,
+  Trophy,
+  // Ícone de marca, marcado como obsoleto no lucide (sai na v1.0; o projeto está preso
+  // na 0.x). Fica porque o texto diz "Twitch" com todas as letras — se um dia sumir, o
+  // tsc acusa aqui e a troca é por MonitorPlay.
+  Twitch,
+  UserCheck,
+  UserX,
+  UsersRound,
+  WifiOff,
+} from "lucide-react";
 import Link from "next/link";
-import { Fragment, type CSSProperties, type ReactNode } from "react";
+import { Fragment, type ComponentProps, type CSSProperties, type ReactNode } from "react";
 
 import { CalendarioDa4a } from "@/components/calendario-4a";
-import { Eyebrow, GoldTitle, SectionTitle } from "@/components/lob/ui";
+import { IconeCarta, IconeCartas, SeloHex, type Icone, type PropsDoIcone } from "@/components/lob/icones";
+import { EloCrest, Eyebrow, GoldTitle, RoleIcon, SectionTitle } from "@/components/lob/ui";
 import { CARTAS_ATIVAS, type CardDef } from "@/lib/cards";
 import { getMessages } from "@/lib/i18n/server";
 import { lerConfigOuNulo } from "@/lib/inscricoes/store";
@@ -32,6 +76,12 @@ export const dynamic = "force-dynamic";
  * inscrição e o caixa usam — publicar aqui um valor digitado à mão é como a página e o
  * caixa começam a discordar. Sem configuração (banco fora do ar, ambiente sem chave), a
  * página continua de pé e o texto sai sem os números.
+ *
+ * Identidade: nenhum losango genérico. Cada título, ficha, item e regra leva o desenho do
+ * que trata, dentro do selo hexagonal de bronze (components/lob/icones.tsx) — o mesmo do
+ * painel. Elo é o emblema oficial, rota é o ícone oficial de posição. Tudo aqui continua
+ * Server Component, sem estado: o que se adapta ao celular são as grades `auto-fill` com
+ * `min(100%, …)`, que viram uma coluna só em 360px sem estourar a largura.
  */
 
 const TWITCH = [
@@ -50,6 +100,142 @@ const ESTILO_LINK: CSSProperties = {
 const MARGEM_ANCORA = 92;
 
 const TEXTO: CSSProperties = { margin: 0, fontSize: 14, lineHeight: 1.65, color: "#b3a690" };
+
+type TomDoSelo = NonNullable<ComponentProps<typeof SeloHex>["tom"]>;
+
+/** Cor do desenho solto (fora do selo) em cada tom — a mesma do glifo dentro do selo. */
+const COR_DO_TOM: Record<TomDoSelo, string> = { bronze: "#e6c592", ouro: "#ffd98a", teal: "#7fe6db" };
+
+// ---------------------------------------------------------------- seções
+
+type IdDaSecao =
+  | "visao-geral"
+  | "inscricao"
+  | "formacao"
+  | "regras-gerais"
+  | "cartinhas"
+  | "pontuacao"
+  | "premiacao"
+  | "calendario";
+
+/**
+ * O desenho de cada seção — o mesmo no título e no atalho do sumário, num lugar só para
+ * os dois nunca divergirem. O id é a âncora que a inscrição e o painel linkam: não mude.
+ * Premiação é o único selo em ouro: é o que o campeão leva.
+ */
+const SECOES: Record<IdDaSecao, { icone: Icone; tom?: TomDoSelo }> = {
+  "visao-geral": { icone: ScrollText },
+  inscricao: { icone: ClipboardPen },
+  formacao: { icone: UsersRound },
+  "regras-gerais": { icone: Gavel },
+  cartinhas: { icone: IconeCarta },
+  pontuacao: { icone: Medal },
+  premiacao: { icone: Trophy, tom: "ouro" },
+  calendario: { icone: CalendarDays },
+};
+
+// ---------------------------------------------------------------- desenhos que não são do lucide
+
+/**
+ * A rota no formato de ícone de selo: o ícone oficial de posição (máscara tingível), que é
+ * o que "rota" significa para quem joga — uma estrada do lucide diria outra coisa. Aceita
+ * as props de um ícone para o SeloHex tingir e posicionar como faz com os outros.
+ */
+function IconeDaRota({ size = 24, color = "currentColor", style }: PropsDoIcone) {
+  const lado = typeof size === "number" ? size : 24;
+  return (
+    <span aria-hidden style={{ ...style, display: "inline-flex" }}>
+      <RoleIcon role="MID" size={Math.round(lado * 1.15)} color={color} />
+    </span>
+  );
+}
+
+/**
+ * Emblema oficial de um elo no lugar do selo, do mesmo tamanho dele. Não vai DENTRO do
+ * hexágono: lá ele sairia com 13px, ilegível — o emblema já é uma moldura por si.
+ *
+ * aria-hidden: é ilustração. O texto do item já diz "elo"; o nome do emblema de exemplo
+ * ("Esmeralda") lido antes dele só confundiria quem usa leitor de tela.
+ */
+function EmblemaDoElo({ elo, tamanho }: Readonly<{ elo: string; tamanho: number }>) {
+  return (
+    <span
+      aria-hidden
+      style={{
+        width: tamanho,
+        height: Math.round(tamanho * 0.866),
+        flexShrink: 0,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <EloCrest elo={elo} size={tamanho + 6} title={false} />
+    </span>
+  );
+}
+
+/** Mesmo recorte do SeloHex (components/lob/icones.tsx): hexágono de topo reto. */
+const HEXAGONO = "polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%)";
+
+/**
+ * Selo hexagonal com número ou letra — o passo do draft e a letra da cartinha.
+ *
+ * Peça local: o SeloHex só aceita desenho, e aqui o conteúdo é texto. Repete a moldura de
+ * bronze dele (borda em degradê, fundo escuro com brilho no topo) para os dois parecerem a
+ * mesma família lado a lado.
+ *
+ * Não é aria-hidden: as listas usam `list-style: none`, e sem marcador o leitor de tela
+ * perderia o número — que é justamente como o regulamento é citado.
+ */
+function SeloLetra({ children, tamanho = 28 }: Readonly<{ children: ReactNode; tamanho?: number }>) {
+  return (
+    <span
+      style={{
+        position: "relative",
+        display: "inline-grid",
+        placeItems: "center",
+        width: tamanho,
+        height: Math.round(tamanho * 0.866),
+        flexShrink: 0,
+        filter: "drop-shadow(0 3px 8px rgba(0,0,0,.55))",
+      }}
+    >
+      <span
+        aria-hidden
+        style={{
+          position: "absolute",
+          inset: 0,
+          clipPath: HEXAGONO,
+          background: "linear-gradient(160deg,#f6d6a2 0%,#c98a4b 45%,#6e4520 100%)",
+        }}
+      />
+      <span
+        aria-hidden
+        style={{
+          position: "absolute",
+          inset: tamanho >= 40 ? 2 : 1.6,
+          clipPath: HEXAGONO,
+          background:
+            "radial-gradient(120% 70% at 50% 0%,rgba(240,200,138,.20),transparent 60%),linear-gradient(180deg,#22180d 0%,#120c06 100%)",
+        }}
+      />
+      <span
+        style={{
+          position: "relative",
+          fontFamily: "var(--font-display)",
+          fontSize: Math.round(tamanho * 0.46),
+          lineHeight: 1,
+          color: "#f0c88a",
+        }}
+      >
+        {children}
+      </span>
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------- utilidades de texto
 
 /**
  * Troca os marcadores `{nome}` de um texto traduzido por nós React (links, valores).
@@ -71,72 +257,67 @@ function formatarPercentual(valor: number, localeTag: string) {
   return new Intl.NumberFormat(localeTag, { style: "percent", maximumFractionDigits: 1 }).format(valor / 100);
 }
 
-function Secao({
-  id,
-  titulo,
-  children,
-}: Readonly<{ id: string; titulo: string; children: ReactNode }>) {
+// ---------------------------------------------------------------- blocos da página
+
+function Secao({ id, titulo, children }: Readonly<{ id: IdDaSecao; titulo: string; children: ReactNode }>) {
+  const { icone, tom } = SECOES[id];
   return (
     <section id={id} className="lob-fade" style={{ marginTop: 46, scrollMarginTop: MARGEM_ANCORA }}>
       <div style={{ marginBottom: 14 }}>
-        <SectionTitle size={23}>{titulo}</SectionTitle>
+        <SectionTitle size={23} icone={icone} tom={tom}>
+          {titulo}
+        </SectionTitle>
       </div>
       {children}
     </section>
   );
 }
 
-function Marcadores({ itens }: Readonly<{ itens: ReactNode[] }>) {
+/** Tamanho do selo dos itens de lista: o hexágono (24px de altura) acompanha a 1ª linha. */
+const SELO_DO_ITEM = 28;
+
+/**
+ * Item de lista: o texto e o que o marca — um desenho (vai no selo) ou uma marca pronta
+ * (o emblema do elo, que é moldura por si).
+ */
+type ItemMarcado = { texto: ReactNode } & ({ icone: Icone } | { marca: ReactNode });
+
+/**
+ * Lista com o desenho de cada item no lugar do bullet: quem bate o olho acha "o elo", "a
+ * disponibilidade", "o sorteio" sem ler a lista inteira.
+ */
+function Marcadores({ itens }: Readonly<{ itens: ItemMarcado[] }>) {
   return (
-    <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+    <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 12 }}>
       {itens.map((item, i) => (
-        <li key={i} style={{ display: "flex", gap: 9, fontSize: 13.5, lineHeight: 1.55, color: "#b3a690" }}>
-          <span aria-hidden style={{ color: "#c98a4b", flexShrink: 0 }}>
-            ◆
-          </span>
-          <span>{item}</span>
+        <li
+          key={i}
+          style={{ display: "flex", alignItems: "flex-start", gap: 12, fontSize: 13.5, lineHeight: 1.55, color: "#b3a690" }}
+        >
+          {"icone" in item ? <SeloHex icone={item.icone} tamanho={SELO_DO_ITEM} /> : item.marca}
+          {/* 13,5px × 1,55 ≈ 21px de linha contra 24px de selo: 2px em cima alinham os dois. */}
+          <span style={{ minWidth: 0, paddingTop: 2 }}>{item.texto}</span>
         </li>
       ))}
     </ul>
   );
 }
 
-/**
- * Selo quadrado com número ou letra, usado nas regras, no draft e nas cartinhas.
- *
- * Não é aria-hidden: as listas usam `list-style: none`, e sem marcador o leitor de tela
- * perderia o número da regra — que é justamente como o regulamento é citado.
- */
-function Selo({ children, tamanho = 26 }: Readonly<{ children: ReactNode; tamanho?: number }>) {
-  return (
-    <span
-      style={{
-        flexShrink: 0,
-        width: tamanho,
-        height: tamanho,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        borderRadius: 3,
-        background: "rgba(201,138,75,.13)",
-        color: "#e6c592",
-        fontFamily: "var(--font-display)",
-        fontSize: tamanho > 26 ? 16 : 14,
-      }}
-    >
-      {children}
-    </span>
-  );
-}
-
-function Rotulo({ children, cor = "#c98a4b" }: Readonly<{ children: ReactNode; cor?: string }>) {
+function Rotulo({
+  children,
+  cor = "#c98a4b",
+  icone: Desenho,
+}: Readonly<{ children: ReactNode; cor?: string; icone?: Icone }>) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "22px 0 8px" }}>
+      {Desenho ? <Desenho size={16} color={cor} aria-hidden style={{ flexShrink: 0 }} /> : null}
       <span style={{ fontSize: 11, letterSpacing: ".14em", color: cor }}>{children}</span>
       <div style={{ height: 1, flex: 1, minWidth: 24, background: `linear-gradient(90deg,${cor}59,transparent)` }} />
     </div>
   );
 }
+
+// ---------------------------------------------------------------- página
 
 export default async function RegrasPage() {
   const [mensagens, config] = await Promise.all([getMessages(), lerConfigOuNulo()]);
@@ -168,7 +349,7 @@ export default async function RegrasPage() {
     </a>
   ));
 
-  const SUMARIO = [
+  const SUMARIO: { id: IdDaSecao; rotulo: string }[] = [
     { id: "visao-geral", rotulo: t.visaoGeralTitulo },
     { id: "inscricao", rotulo: t.inscricaoTitulo },
     { id: "formacao", rotulo: t.formacaoTitulo },
@@ -179,16 +360,18 @@ export default async function RegrasPage() {
     { id: "calendario", rotulo: t.calendarioTitulo },
   ];
 
-  const FICHA: { k: string; v: ReactNode }[] = [
-    { k: t.fichaModalidadeK, v: t.fichaModalidadeV },
-    { k: t.fichaPeriodoK, v: t.fichaPeriodoV },
-    { k: t.fichaFaseK, v: t.fichaFaseV },
-    { k: t.fichaSemifinaisK, v: t.fichaSemifinaisV },
-    { k: t.fichaFinalK, v: t.fichaFinalV },
-    { k: t.fichaInscricaoK, v: interpolar(t.fichaInscricaoV, { link: linkInscricao }) },
-    { k: t.fichaTransmissaoK, v: interpolar(t.fichaTransmissaoV, { canal1, canal2 }) },
+  // A final é o único selo em ouro da ficha, como a Premiação entre as seções.
+  const FICHA: { k: string; v: ReactNode; icone: Icone; tom?: TomDoSelo }[] = [
+    { k: t.fichaModalidadeK, v: t.fichaModalidadeV, icone: Gamepad2 },
+    { k: t.fichaPeriodoK, v: t.fichaPeriodoV, icone: CalendarRange },
+    { k: t.fichaFaseK, v: t.fichaFaseV, icone: Swords },
+    { k: t.fichaSemifinaisK, v: t.fichaSemifinaisV, icone: Medal },
+    { k: t.fichaFinalK, v: t.fichaFinalV, icone: Trophy, tom: "ouro" },
+    { k: t.fichaInscricaoK, v: interpolar(t.fichaInscricaoV, { link: linkInscricao }), icone: ClipboardPen },
+    { k: t.fichaTransmissaoK, v: interpolar(t.fichaTransmissaoV, { canal1, canal2 }), icone: Twitch },
     {
       k: t.fichaValorK,
+      icone: Coins,
       v: taxa ? (
         <b className="lob-display" style={{ fontSize: 20, fontWeight: 400, color: "#e6c592" }}>
           {taxa}
@@ -199,24 +382,54 @@ export default async function RegrasPage() {
     },
   ];
 
-  const CAMPOS = [
-    t.inscricaoCampo1,
-    t.inscricaoCampo2,
-    t.inscricaoCampo3,
-    t.inscricaoCampo4,
-    t.inscricaoCampo5,
-    t.inscricaoCampo6,
+  // Na ordem do formulário. O elo é o emblema oficial (Esmeralda de exemplo) e a rota é o
+  // ícone oficial de posição: são os símbolos que o jogador já reconhece do jogo.
+  const CAMPOS: ItemMarcado[] = [
+    { texto: t.inscricaoCampo1, icone: IdCard },
+    { texto: t.inscricaoCampo2, icone: Gamepad2 },
+    { texto: t.inscricaoCampo3, marca: <EmblemaDoElo elo="ESMERALDA" tamanho={SELO_DO_ITEM} /> },
+    { texto: t.inscricaoCampo4, icone: IconeDaRota },
+    { texto: t.inscricaoCampo5, icone: SunMoon },
+    { texto: t.inscricaoCampo6, icone: FileCheck },
   ];
 
-  const CAPITAES = [t.capitaes1, t.capitaes2, t.capitaes3, t.capitaes4, t.capitaes5];
+  // O 1º item é "maior elo": vai o emblema de um elo alto, e não a coroa — a coroa já está
+  // no título do cartão, e repetida no item de cima não diria nada de novo.
+  const CAPITAES: ItemMarcado[] = [
+    { texto: t.capitaes1, marca: <EmblemaDoElo elo="MESTRE" tamanho={SELO_DO_ITEM} /> },
+    { texto: t.capitaes2, icone: UserX },
+    { texto: t.capitaes3, icone: UsersRound },
+    { texto: t.capitaes4, icone: Dices },
+    { texto: t.capitaes5, icone: Gamepad2 },
+  ];
 
   const DRAFT = [t.draft1, t.draft2, t.draft3, t.draft4, t.draft5, t.draft6];
 
   // A ordem é o número da regra: o índice + 1 vira o id "regra-N" que a inscrição linka.
-  const REGRAS = [
-    t.regra1, t.regra2, t.regra3, t.regra4, t.regra5, t.regra6, t.regra7, t.regra8,
-    t.regra9, t.regra10, t.regra11, t.regra12, t.regra13, t.regra14, t.regra15, t.regra16,
-    t.regra17, t.regra18, t.regra19, t.regra20, t.regra21, t.regra22,
+  // Ao lado, o desenho do que cada regra trata.
+  const REGRAS: [string, Icone][] = [
+    [t.regra1, UsersRound], //      quem pode jogar: o grupo
+    [t.regra2, Crown], //           capitães montam o time
+    [t.regra3, Swords], //          MD5 da solo/duo feita
+    [t.regra4, CalendarClock], //   5 partidas nos 10 dias antes
+    [t.regra5, UserX], //           smurf não
+    [t.regra6, Repeat], //          substituições
+    [t.regra7, Timer], //           tolerância de 10 minutos
+    [t.regra8, Flag], //            W.O.
+    [t.regra9, CalendarCheck], //   calendário definitivo
+    [t.regra10, ArrowLeftRight], // troca de lane
+    [t.regra11, UserCheck], //      check-in
+    [t.regra12, BadgeCheck], //     conta verificada
+    [t.regra13, Dices], //          lado por sorteio
+    [t.regra14, Handshake], //      fair play
+    [t.regra15, WifiOff], //        queda de conexão
+    [t.regra16, Camera], //         print do resultado
+    [t.regra17, Twitch], //         transmissão
+    [t.regra18, FilePen], //        alteração de regras
+    [t.regra19, Scale], //          desempate
+    [t.regra20, Headphones], //     voz obrigatória
+    [t.regra21, Link2], //          Riot vinculada ao Discord
+    [t.regra22, Coins], //          pagamento
   ];
   const trocasDasRegras = {
     secao: (
@@ -225,6 +438,12 @@ export default async function RegrasPage() {
       </a>
     ),
   };
+
+  const CARTAS_GERAIS: ItemMarcado[] = [
+    { texto: t.cartasRegra1, icone: IconeCarta },
+    { texto: t.cartasRegra2, icone: MousePointerClick },
+    { texto: t.cartasRegra3, icone: Gavel },
+  ];
 
   // Efeito de cada carta no texto do regulamento da 4ª. Carta nova sem texto aqui cai na
   // descrição da vitrine (/cartas), e só depois na do lib.
@@ -249,13 +468,24 @@ export default async function RegrasPage() {
   }));
   const duplas = CARTAS_ATIVAS.filter((c) => c.dupla);
 
-  const PONTUACAO = [
-    { k: t.pontuacaoFaseK, v: t.pontuacaoFaseV },
-    { k: t.pontuacaoDesempateK, v: interpolar(t.pontuacaoDesempateV, { regra: linkRegra(19, t.pontuacaoDesempateLink) }) },
-    { k: t.pontuacaoSemisK, v: t.pontuacaoSemisV },
-    { k: t.pontuacaoFinalK, v: t.pontuacaoFinalV },
-    { k: t.pontuacaoSeriesK, v: t.pontuacaoSeriesV },
-  ];
+  const PONTUACAO: ItemMarcado[] = [
+    { k: t.pontuacaoFaseK, v: t.pontuacaoFaseV, icone: Swords },
+    {
+      k: t.pontuacaoDesempateK,
+      v: interpolar(t.pontuacaoDesempateV, { regra: linkRegra(19, t.pontuacaoDesempateLink) }),
+      icone: Scale,
+    },
+    { k: t.pontuacaoSemisK, v: t.pontuacaoSemisV, icone: Medal },
+    { k: t.pontuacaoFinalK, v: t.pontuacaoFinalV, icone: Trophy },
+    { k: t.pontuacaoSeriesK, v: t.pontuacaoSeriesV, icone: Target },
+  ].map(({ k, v, icone }) => ({
+    icone,
+    texto: (
+      <>
+        <b style={{ color: "#e2d6c0" }}>{k}</b> {v}
+      </>
+    ),
+  }));
 
   return (
     <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "0 clamp(16px,4vw,24px) 96px" }}>
@@ -267,19 +497,31 @@ export default async function RegrasPage() {
         </p>
       </section>
 
-      {/* Atalhos para as seções: o regulamento é longo e é lido aos pedaços. */}
+      {/*
+        Atalhos para as seções: o regulamento é longo e é lido aos pedaços. Cada atalho leva
+        o desenho do título da seção, para quem desce a página reconhecer onde chegou. 40px
+        de altura: no celular é alvo de dedo, não de mouse.
+      */}
       <nav aria-label={t.sumarioRotulo} className="lob-fade" style={{ marginBottom: 6 }}>
         <div style={{ fontSize: 10.5, letterSpacing: ".14em", color: "#8f8472", textTransform: "uppercase", marginBottom: 8 }}>
           {t.sumarioRotulo}
         </div>
         <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexWrap: "wrap", gap: 8 }}>
-          {SUMARIO.map((s) => (
-            <li key={s.id}>
-              <a href={`#${s.id}`} className="lob-pill" style={{ textDecoration: "none" }}>
-                {s.rotulo}
-              </a>
-            </li>
-          ))}
+          {SUMARIO.map((s) => {
+            const { icone: Desenho, tom = "bronze" } = SECOES[s.id];
+            return (
+              <li key={s.id}>
+                <a
+                  href={`#${s.id}`}
+                  className="lob-pill"
+                  style={{ textDecoration: "none", minHeight: 40, padding: "0 14px" }}
+                >
+                  <Desenho size={15} color={COR_DO_TOM[tom]} aria-hidden style={{ flexShrink: 0 }} />
+                  {s.rotulo}
+                </a>
+              </li>
+            );
+          })}
         </ul>
       </nav>
 
@@ -300,7 +542,9 @@ export default async function RegrasPage() {
           }}
         >
           <div style={{ marginBottom: 10 }}>
-            <SectionTitle size={17}>{conf.formatoVariaTitulo}</SectionTitle>
+            <SectionTitle size={17} icone={Shuffle}>
+              {conf.formatoVariaTitulo}
+            </SectionTitle>
           </div>
           <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.65, color: "#b3a690" }}>
             {conf.formatoVariaTexto}
@@ -319,9 +563,16 @@ export default async function RegrasPage() {
         <p style={{ ...TEXTO, maxWidth: 820, marginBottom: 14 }}>{t.visaoGeralIntro}</p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(min(100%,240px),1fr))", gap: 12 }}>
           {FICHA.map((f) => (
-            <div key={f.k} className="lob-card-2" style={{ padding: "15px 16px" }}>
-              <div style={{ fontSize: 10.5, letterSpacing: ".12em", color: "#c98a4b", marginBottom: 7 }}>{f.k}</div>
-              <div style={{ fontSize: 14, color: "#e9dfcd", lineHeight: 1.45 }}>{f.v}</div>
+            <div
+              key={f.k}
+              className="lob-card-2"
+              style={{ display: "flex", alignItems: "flex-start", gap: 13, padding: "15px 16px" }}
+            >
+              <SeloHex icone={f.icone} tom={f.tom} tamanho={36} />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 10.5, letterSpacing: ".12em", color: "#c98a4b", marginBottom: 7 }}>{f.k}</div>
+                <div style={{ fontSize: 14, color: "#e9dfcd", lineHeight: 1.45 }}>{f.v}</div>
+              </div>
             </div>
           ))}
         </div>
@@ -339,7 +590,7 @@ export default async function RegrasPage() {
           })}
         </p>
         <div className="lob-card-2" style={{ padding: 20, marginTop: 16 }}>
-          <div style={{ fontSize: 11, letterSpacing: ".14em", color: "#c98a4b", marginBottom: 12 }}>
+          <div style={{ fontSize: 11, letterSpacing: ".14em", color: "#c98a4b", marginBottom: 14 }}>
             {t.inscricaoCamposTitulo}
           </div>
           <Marcadores itens={CAMPOS} />
@@ -358,19 +609,26 @@ export default async function RegrasPage() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,320px),1fr))", gap: 16, alignItems: "start" }}>
           <div className="lob-card-2" style={{ padding: 20 }}>
             <div style={{ marginBottom: 14 }}>
-              <SectionTitle size={18}>{t.capitaesTitulo}</SectionTitle>
+              <SectionTitle size={18} icone={Crown}>
+                {t.capitaesTitulo}
+              </SectionTitle>
             </div>
             <Marcadores itens={CAPITAES} />
           </div>
           <div className="lob-card-2" style={{ padding: 20 }}>
             <div style={{ marginBottom: 14 }}>
-              <SectionTitle size={18}>{t.draftTitulo}</SectionTitle>
+              <SectionTitle size={18} icone={ListOrdered}>
+                {t.draftTitulo}
+              </SectionTitle>
             </div>
-            <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+            <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 12 }}>
               {DRAFT.map((item, i) => (
-                <li key={item} style={{ display: "flex", gap: 11, fontSize: 13.5, lineHeight: 1.55, color: "#b3a690" }}>
-                  <Selo tamanho={22}>{i + 1}</Selo>
-                  <span>{item}</span>
+                <li
+                  key={item}
+                  style={{ display: "flex", alignItems: "flex-start", gap: 12, fontSize: 13.5, lineHeight: 1.55, color: "#b3a690" }}
+                >
+                  <SeloLetra tamanho={SELO_DO_ITEM}>{i + 1}</SeloLetra>
+                  <span style={{ minWidth: 0, paddingTop: 2 }}>{item}</span>
                 </li>
               ))}
             </ol>
@@ -380,11 +638,14 @@ export default async function RegrasPage() {
         {/*
           No lugar da grade "Valores por elo" da 3ª: a tabela da 4ª só existe depois que a
           lista de inscritos fechar. Publicar os pontos antigos aqui faria parecer que eles
-          valem para esta edição.
+          valem para esta edição. A ampulheta diz "ainda vai sair" antes de a pessoa ler.
         */}
         <div
           role="note"
           style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 14,
             marginTop: 16,
             padding: "16px 20px",
             background: "rgba(201,138,75,.06)",
@@ -392,11 +653,14 @@ export default async function RegrasPage() {
             borderRadius: 4,
           }}
         >
-          <p style={{ ...TEXTO, fontSize: 13.5 }}>
-            <b style={{ color: "#e6c592" }}>{t.tabelaValoresRotulo}</b> {t.tabelaValoresTexto}
-          </p>
-          {/* Deixa explícito que isto é moeda de draft, não ranqueamento alternativo. */}
-          <p style={{ margin: "10px 0 0", fontSize: 12, lineHeight: 1.55, color: "#7d7263" }}>{conf.eloAviso}</p>
+          <SeloHex icone={Hourglass} tamanho={32} />
+          <div style={{ minWidth: 0 }}>
+            <p style={{ ...TEXTO, fontSize: 13.5 }}>
+              <b style={{ color: "#e6c592" }}>{t.tabelaValoresRotulo}</b> {t.tabelaValoresTexto}
+            </p>
+            {/* Deixa explícito que isto é moeda de draft, não ranqueamento alternativo. */}
+            <p style={{ margin: "10px 0 0", fontSize: 12, lineHeight: 1.55, color: "#7d7263" }}>{conf.eloAviso}</p>
+          </div>
         </div>
       </Secao>
 
@@ -405,26 +669,45 @@ export default async function RegrasPage() {
         {/*
           Lista em colunas (não em grade): a leitura desce a coluna 1 → 22, que é a ordem de
           um regulamento numerado. Cada item tem id="regra-N" — a inscrição linka direto.
+
+          O número vai ESCRITO ("REGRA 7"), não aria-hidden e não só dentro do selo: é como o
+          regulamento é citado, e o leitor de tela precisa ouvir. O selo leva o desenho do
+          assunto, para achar "a do W.O." ou "a do desempate" sem saber o número.
         */}
         <ol style={{ listStyle: "none", margin: 0, padding: 0, columnWidth: 340, columnGap: 12 }}>
-          {REGRAS.map((regra, i) => (
+          {REGRAS.map(([regra, icone], i) => (
             <li
               key={i}
               id={`regra-${i + 1}`}
               className="lob-card-2"
               style={{
                 display: "flex",
-                gap: 12,
-                padding: "13px 15px",
+                alignItems: "flex-start",
+                gap: 13,
+                padding: "14px 15px",
                 marginBottom: 10,
                 breakInside: "avoid",
                 scrollMarginTop: MARGEM_ANCORA,
               }}
             >
-              <Selo>{i + 1}</Selo>
-              <span style={{ fontSize: 13.5, lineHeight: 1.55, color: "#b3a690" }}>
-                {interpolar(regra, trocasDasRegras)}
-              </span>
+              <SeloHex icone={icone} tamanho={34} />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".16em", color: "#c98a4b", lineHeight: 1.2, marginBottom: 5 }}>
+                  {interpolar(t.regraRotulo, {
+                    n: (
+                      <span
+                        className="lob-display"
+                        style={{ fontSize: 17, fontWeight: 400, letterSpacing: ".02em", color: "#f0c88a" }}
+                      >
+                        {i + 1}
+                      </span>
+                    ),
+                  })}
+                </div>
+                <div style={{ fontSize: 13.5, lineHeight: 1.55, color: "#b3a690" }}>
+                  {interpolar(regra, trocasDasRegras)}
+                </div>
+              </div>
             </li>
           ))}
         </ol>
@@ -433,21 +716,24 @@ export default async function RegrasPage() {
       {/* ---------------------------------------------------------- 5. CARTINHAS SURPRESA */}
       <Secao id="cartinhas" titulo={t.cartasTitulo}>
         <div className="lob-card-2" style={{ padding: "18px 20px" }}>
-          <p style={{ ...TEXTO, marginBottom: 12 }}>{t.cartasIntro}</p>
-          <Marcadores itens={[t.cartasRegra1, t.cartasRegra2, t.cartasRegra3]} />
+          <p style={{ ...TEXTO, marginBottom: 14 }}>{t.cartasIntro}</p>
+          <Marcadores itens={CARTAS_GERAIS} />
         </div>
 
-        <Rotulo>{t.cartasIndividuaisLabel}</Rotulo>
+        <Rotulo icone={IconeCarta}>{t.cartasIndividuaisLabel}</Rotulo>
         <p style={{ margin: "0 0 10px", fontSize: 13, lineHeight: 1.55, color: "#8f8472" }}>{t.cartasIndividuaisTexto}</p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(min(100%,320px),1fr))", gap: 10 }}>
           {individuais.map(({ carta, letra }) => {
             const { nome, efeito } = textoDaCarta(carta);
             return (
-              <div key={carta.id} className="lob-card-2" style={{ display: "flex", gap: 13, padding: "14px 15px" }}>
-                <Selo tamanho={30}>{letra}</Selo>
-                <div>
-                  <div className="lob-display" style={{ fontSize: 15, color: "#f2ebdf", marginBottom: 4 }}>
-                    {nome}
+              <div key={carta.id} className="lob-card-2" style={{ display: "flex", alignItems: "flex-start", gap: 13, padding: "14px 15px" }}>
+                <SeloLetra tamanho={38}>{letra}</SeloLetra>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 4 }}>
+                    <IconeCarta size={15} color="#e6c592" style={{ flexShrink: 0 }} />
+                    <span className="lob-display" style={{ fontSize: 15, color: "#f2ebdf" }}>
+                      {nome}
+                    </span>
                   </div>
                   <div style={{ fontSize: 13, lineHeight: 1.5, color: "#a99e8b" }}>{efeito}</div>
                 </div>
@@ -456,7 +742,9 @@ export default async function RegrasPage() {
           })}
         </div>
 
-        <Rotulo cor="#57d8cb">{t.cartasDuplasLabel}</Rotulo>
+        <Rotulo cor="#57d8cb" icone={IconeCartas}>
+          {t.cartasDuplasLabel}
+        </Rotulo>
         <p style={{ margin: "0 0 10px", fontSize: 13, lineHeight: 1.55, color: "#8f8472" }}>{t.cartasDuplasTexto}</p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(min(100%,320px),1fr))", gap: 10 }}>
           {duplas.map((carta) => {
@@ -466,6 +754,7 @@ export default async function RegrasPage() {
                 key={carta.id}
                 style={{
                   display: "flex",
+                  alignItems: "flex-start",
                   gap: 13,
                   padding: "14px 15px",
                   background: "linear-gradient(180deg,#16211e,#0f1615)",
@@ -473,13 +762,9 @@ export default async function RegrasPage() {
                   borderRadius: 3,
                 }}
               >
-                <span
-                  aria-hidden
-                  style={{ flexShrink: 0, width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 3, background: "rgba(87,216,203,.14)", color: "#7fe6db", fontSize: 13 }}
-                >
-                  ◆◆
-                </span>
-                <div>
+                {/* As duas cartas no selo verde-água: a dupla afeta os dois times. */}
+                <SeloHex icone={IconeCartas} tom="teal" tamanho={38} />
+                <div style={{ minWidth: 0 }}>
                   <div className="lob-display" style={{ fontSize: 15, color: "#eafaf7", marginBottom: 4 }}>{nome}</div>
                   <div style={{ fontSize: 13, lineHeight: 1.5, color: "#9fc4bd" }}>{efeito}</div>
                 </div>
@@ -497,27 +782,28 @@ export default async function RegrasPage() {
       <Secao id="pontuacao" titulo={t.pontuacaoTitulo}>
         <div style={{ padding: 20, background: "rgba(201,138,75,.05)", border: "1px solid rgba(201,138,75,.16)", borderRadius: 3 }}>
           <p style={{ ...TEXTO, marginBottom: 14 }}>{t.pontuacaoIntro}</p>
-          <Marcadores
-            itens={PONTUACAO.map((p) => (
-              <Fragment key={p.k}>
-                <b style={{ color: "#e2d6c0" }}>{p.k}</b> {p.v}
-              </Fragment>
-            ))}
-          />
+          <Marcadores itens={PONTUACAO} />
         </div>
       </Secao>
 
       {/* ---------------------------------------------------------- PREMIAÇÃO (decisão de 05/10/2026) */}
       <Secao id="premiacao" titulo={t.premiacaoTitulo}>
         {premio ? (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(min(100%,200px),1fr))", gap: 12, marginBottom: 14, maxWidth: 520 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(min(100%,220px),1fr))", gap: 12, marginBottom: 14, maxWidth: 560 }}>
             {[
-              { k: t.premiacaoCampeaoK, v: premio.campeao },
-              { k: t.premiacaoViceK, v: premio.vice },
+              { k: t.premiacaoCampeaoK, v: premio.campeao, icone: Trophy, tom: "ouro" as const },
+              { k: t.premiacaoViceK, v: premio.vice, icone: Medal, tom: "bronze" as const },
             ].map((p) => (
-              <div key={p.k} className="lob-card-2" style={{ padding: "15px 16px" }}>
-                <div style={{ fontSize: 10.5, letterSpacing: ".12em", color: "#c98a4b", marginBottom: 6 }}>{p.k}</div>
-                <div className="lob-display" style={{ fontSize: 30, lineHeight: 1, color: "#e6c592" }}>{p.v}</div>
+              <div
+                key={p.k}
+                className="lob-card-2"
+                style={{ display: "flex", alignItems: "center", gap: 14, padding: "15px 16px" }}
+              >
+                <SeloHex icone={p.icone} tom={p.tom} tamanho={44} />
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 10.5, letterSpacing: ".12em", color: "#c98a4b", marginBottom: 6 }}>{p.k}</div>
+                  <div className="lob-display" style={{ fontSize: 30, lineHeight: 1, color: "#e6c592" }}>{p.v}</div>
+                </div>
               </div>
             ))}
           </div>

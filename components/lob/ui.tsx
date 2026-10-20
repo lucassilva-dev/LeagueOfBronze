@@ -1,5 +1,6 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { ComponentProps, CSSProperties, ReactNode } from "react";
 
+import { SeloHex, type Icone } from "@/components/lob/icones";
 import { eloSvgUrl, resolveElo, resolveRole, roleIconUrl } from "@/lib/design";
 
 // Rótulo pequeno com traço (eyebrow) usado no topo das seções/heros.
@@ -85,17 +86,38 @@ export function GoldTitleEmDuasLinhas({
   );
 }
 
-// Título de seção: losango + Anton.
+/**
+ * Título de seção: losango + Anton.
+ *
+ * Com `icone`, o selo hexagonal de bronze (com o desenho do que a seção trata) entra no
+ * lugar do losango — e aí `tom` escolhe o metal do selo, não `color`. Sem `icone` o título
+ * sai exatamente como sempre saiu: as outras páginas que usam o losango não mudam.
+ *
+ * O selo acompanha o tamanho do título (1,5× a fonte, nunca menor que 26px), para o de
+ * uma subseção não ficar do tamanho do de uma seção.
+ */
 export function SectionTitle({
   children,
   color = "#c98a4b",
   size = 25,
-}: Readonly<{ children: ReactNode; color?: string; size?: number }>) {
+  icone,
+  tom,
+}: Readonly<{
+  children: ReactNode;
+  color?: string;
+  size?: number;
+  icone?: Icone;
+  tom?: ComponentProps<typeof SeloHex>["tom"];
+}>) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-      <span
-        style={{ width: 12, height: 12, background: color, transform: "rotate(45deg)", flexShrink: 0 }}
-      />
+      {icone ? (
+        <SeloHex icone={icone} tom={tom} tamanho={Math.max(26, Math.round(size * 1.5))} />
+      ) : (
+        <span
+          style={{ width: 12, height: 12, background: color, transform: "rotate(45deg)", flexShrink: 0 }}
+        />
+      )}
       <h2 className="lob-display" style={{ fontSize: size, color: "#f2ebdf", margin: 0 }}>
         {children}
       </h2>

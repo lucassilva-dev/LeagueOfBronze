@@ -1,18 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { Plus, Trash2, Undo2 } from "lucide-react";
 
 import type { Team, TournamentDataset } from "@/lib/schema";
 import { createBlankTeam, slugifyValue, type MutateDraft } from "@/components/admin/shared";
+import { ICONE_DA_SECAO } from "@/components/admin/icones-admin";
+import { useCompacto } from "@/components/admin/responsivo";
 import { teamColor } from "@/lib/design";
 import {
   Banner,
   Button,
   C,
   Card,
+  CartaoLinha,
   Chip,
   Empty,
   Field,
+  Folha,
   Input,
   SectionHead,
   display,
@@ -31,6 +36,11 @@ import {
  *   avisa quando o rascunho muda por fora (recarregamento) em vez de sobrescrever calado.
  * - Excluir mostra o ESTRAGO real (séries, jogos, linhas de estatística, jogadores) antes de
  *   confirmar, porque a operação é em cascata e não tem desfazer.
+ *
+ * No celular, a lista fica na página e o formulário abre numa folha de tela cheia, com as
+ * ações presas no rodapé — lado a lado não cabe, e empilhado o "Salvar" ia parar duas telas
+ * abaixo da lista. Fechar a folha é sair do editor: com edição pendente, pergunta antes,
+ * exatamente como trocar de time pergunta no monitor.
  */
 
 // ---------------------------------------------------------------- regras de imagem
@@ -123,6 +133,37 @@ function Escudo({
   );
 }
 
+/**
+ * Texto que só o leitor de tela lê — o nome dos botões de ícone do rodapé do celular. O
+ * `title` sozinho não basta: no toque ele nunca aparece.
+ */
+const soParaLeitor: CSSProperties = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: "hidden",
+  clip: "rect(0 0 0 0)",
+  whiteSpace: "nowrap",
+  border: 0,
+};
+
+/** Botão de ícone do rodapé: 46px de largura, o mesmo alvo de dedo dos botões com texto. */
+function BotaoDeIcone({
+  rotulo,
+  tone,
+  onClick,
+  children,
+}: Readonly<{ rotulo: string; tone?: "ghost" | "danger"; onClick: () => void; children: ReactNode }>) {
+  return (
+    <Button tone={tone} title={rotulo} onClick={onClick} style={{ flexShrink: 0, padding: "0 13px" }}>
+      {children}
+      <span style={soParaLeitor}>{rotulo}</span>
+    </Button>
+  );
+}
+
 // ---------------------------------------------------------------- impacto da exclusão
 
 type Impacto = Readonly<{
@@ -176,6 +217,7 @@ export function AdminTeamsPanel({
   /** Avisa que há formulário preenchido e ainda não aplicado ao rascunho. */
   onSujoChange?: (sujo: boolean) => void;
 }>) {
+  const compacto = useCompacto();
   const [selectedId, setSelectedId] = useState<string | null>(draft.teams[0]?.id ?? null);
   // O time em branco vive em estado (e não num useMemo) para que o ID gerado não mude a cada
   // renderização — se mudasse, o formulário se acharia "desatualizado" sozinho.
@@ -186,11 +228,18 @@ export function AdminTeamsPanel({
   const [pendente, setPendente] = useState<{ id: string | null } | null>(null);
   const [desatualizado, setDesatualizado] = useState(false);
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
+  // Só no celular: a folha do editor está aberta, e o "fechar" pediu confirmação.
+  const [editorAberto, setEditorAberto] = useState(false);
+  const [confirmandoFechar, setConfirmandoFechar] = useState(false);
+  const refExclusao = useRef<HTMLDivElement>(null);
 
   const salvo = draft.teams.find((team) => team.id === selectedId) ?? null;
   const base = salvo ?? branco;
   const editando = Boolean(salvo);
   const sujo = serializa(form) !== serializa(carregado);
+  // Derivado, e não só o estado: se a edição deixou de existir (ex.: "Recarregar do
+  // rascunho" dentro da folha), não há mais o que perguntar.
+  const perguntandoFechar = confirmandoFechar && sujo;
 
   /*
    * Avisa o painel principal que existe formulário preenchido e ainda NÃO aplicado.
@@ -268,6 +317,51 @@ export function AdminTeamsPanel({
     trocar(id);
   }
 
+  // ------------------------------------------------ folha do celular
+
+  /**
+   * Abre o editor na folha. Tocar no time que JÁ está carregado só reabre: não é troca, e
+   * passar por `pedirTroca` ali descartaria (ou perguntaria sobre) a própria edição.
+   * Com edição pendente noutro time, a pergunta de troca aparece dentro da folha.
+   */
+  function abrirEditor(id: string | null) {
+    if (id === null || id !== selectedId) pedirTroca(id);
+    setConfirmandoFechar(false);
+    setEditorAberto(true);
+  }
+
+  function fecharEditor() {
+    setEditorAberto(false);
+    setConfirmandoFechar(false);
+    setConfirmandoExclusao(false);
+    setPendente(null);
+  }
+
+  /** Esc, toque no fundo e o X chegam aqui. Com edição pendente, a folha pergunta antes. */
+  function pedirFechar() {
+    if (sujo) {
+      setConfirmandoFechar(true);
+      return;
+    }
+    fecharEditor();
+  }
+
+  function descartarEFechar() {
+    carregar(base, selectedId);
+    fecharEditor();
+  }
+
+  /**
+   * No celular o aviso do estrago nasce no fim do formulário, fora da vista de quem tocou
+   * na lixeira do rodapé: a folha rola até ele.
+   */
+  function pedirExclusao() {
+    setConfirmandoExclusao(true);
+    if (compacto) {
+      requestAnimationFrame(() => refExclusao.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" }));
+    }
+  }
+
   const slugDuplicado =
     form.slug.trim().length > 0 &&
     draft.teams.some((team) => team.id !== form.id && team.slug === form.slug.trim());
@@ -313,10 +407,337 @@ export function AdminTeamsPanel({
     const novo = createBlankTeam();
     setBranco(novo);
     carregar(novo, null);
+    // No celular a folha fecha: o time não existe mais, e um "Criar time" vazio no lugar
+    // dele pareceria que a exclusão não aconteceu.
+    setEditorAberto(false);
   }
 
   const impacto = salvo ? medirImpacto(draft, salvo.id) : null;
   const corAtual = teamColor(form.id);
+
+  // ------------------------------------------------ peças do desenho
+
+  const avisoPendente = pendente ? (
+    <Banner
+      tone="warn"
+      title="Você tem alterações não salvas neste formulário"
+      actions={
+        <>
+          <Button tone="danger" small onClick={() => trocar(pendente.id)}>
+            Descartar e trocar
+          </Button>
+          <Button small onClick={() => setPendente(null)}>
+            Continuar editando
+          </Button>
+        </>
+      }
+    >
+      Trocar de time agora joga fora o que foi digitado em{" "}
+      <strong style={{ color: C.ink2 }}>{carregado.name || "time novo"}</strong>.
+    </Banner>
+  ) : null;
+
+  const avisoDesatualizado = desatualizado ? (
+    <Banner
+      tone="warn"
+      title="O rascunho mudou fora deste formulário"
+      actions={
+        <>
+          <Button small onClick={() => carregar(base, selectedId)}>
+            Recarregar do rascunho
+          </Button>
+          <Button small onClick={() => setDesatualizado(false)}>
+            Manter minha edição
+          </Button>
+        </>
+      }
+    >
+      Os dados deste time foram recarregados ou importados. Salvar agora grava por cima da
+      versão nova.
+    </Banner>
+  ) : null;
+
+  const cabecalhoDaLista = (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "baseline",
+        justifyContent: "space-between",
+        gap: 10,
+        marginBottom: compacto ? 10 : 12,
+      }}
+    >
+      <h3 style={{ fontFamily: display, fontSize: 16, color: C.bronze, margin: 0 }}>
+        Times cadastrados
+      </h3>
+      <span style={{ fontSize: 11, color: C.ink4, ...tabular }}>{ordenados.length}</span>
+    </div>
+  );
+
+  const listaVazia = (
+    <Empty
+      title="Nenhum time cadastrado"
+      action={
+        <Button tone="gold" small onClick={() => (compacto ? abrirEditor(null) : pedirTroca(null))}>
+          Criar o primeiro time
+        </Button>
+      }
+    >
+      Os times são a base de tudo: jogadores, séries e classificação apontam para eles.
+    </Empty>
+  );
+
+  /**
+   * Os campos do formulário — os mesmos no monitor e na folha do celular. Lá, as ações
+   * moram no rodapé fixo da folha; aqui, no fim do formulário.
+   */
+  const campos = (
+    <div style={{ display: "grid", gap: 13 }}>
+      {/* Correção #12: ID só de leitura. */}
+      <Field
+        label="ID (gerado automaticamente)"
+        hint="É a chave usada por séries, jogadores e classificação. Trocá-la deixaria todo o histórico apontando para um time que não existe mais."
+      >
+        {/* readOnly (e não disabled) para o valor continuar selecionável e copiável. No
+            celular, 16px: o iPhone dá zoom ao focar campo menor, mesmo só de leitura. */}
+        <input
+          value={form.id}
+          readOnly
+          onFocus={(event) => event.currentTarget.select()}
+          style={{
+            width: "100%",
+            padding: compacto ? "11px 12px" : "9px 11px",
+            minHeight: compacto ? 44 : undefined,
+            fontFamily: "inherit",
+            fontSize: compacto ? 16 : 13,
+            color: C.ink3,
+            background: "rgba(0,0,0,.24)",
+            border: `1px dashed ${C.line}`,
+            borderRadius: 3,
+            cursor: "default",
+            ...tabular,
+          }}
+        />
+      </Field>
+
+      <Field label="Nome">
+        <Input
+          value={form.name}
+          onChange={(v) => setForm((prev) => ({ ...prev, name: v }))}
+          placeholder="Vanguarda de Ferro"
+        />
+      </Field>
+
+      <Field
+        label="Slug"
+        hint={
+          slugDuplicado
+            ? "Este slug já pertence a outro time — dois times com o mesmo slug brigam pela mesma página."
+            : "Aparece no endereço da página do time."
+        }
+      >
+        <div style={{ display: "flex", gap: 8 }}>
+          <Input
+            value={form.slug}
+            onChange={(v) => setForm((prev) => ({ ...prev, slug: v }))}
+            placeholder="vanguarda-de-ferro"
+            style={
+              slugDuplicado
+                ? { border: `1px solid ${C.danger}`, ...tabular }
+                : tabular
+            }
+          />
+          <Button
+            small
+            onClick={() => setForm((prev) => ({ ...prev, slug: slugifyValue(prev.name) }))}
+            style={{ flexShrink: 0 }}
+          >
+            Gerar do nome
+          </Button>
+        </div>
+      </Field>
+
+      {/* Correção #23: placeholder e dica ensinam o caminho que o servidor ACEITA. */}
+      <Field
+        label="Escudo (caminho da imagem)"
+        hint={imagemInvalida ? `Caminho recusado. ${DICA_IMAGEM}` : DICA_IMAGEM}
+      >
+        <Input
+          value={form.imageUrl ?? ""}
+          onChange={(v) => setForm((prev) => ({ ...prev, imageUrl: v }))}
+          placeholder="/teams/vanguarda-de-ferro.png"
+          style={imagemInvalida ? { border: `1px solid ${C.danger}` } : undefined}
+        />
+      </Field>
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          padding: "11px 12px",
+          borderRadius: 3,
+          border: `1px solid ${C.line}`,
+          background: "rgba(0,0,0,.2)",
+        }}
+      >
+        <Escudo
+          name={form.name || "?"}
+          imageUrl={imagemInvalida ? undefined : form.imageUrl}
+          cor={corAtual}
+          size={44}
+        />
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 11.5, color: C.ink3 }}>
+            Prévia do escudo (sem imagem, valem as iniciais).
+          </div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 7,
+              marginTop: 6,
+              fontSize: 11,
+              color: C.ink4,
+            }}
+          >
+            <span
+              aria-hidden
+              style={{
+                width: 12,
+                height: 12,
+                borderRadius: 2,
+                background: corAtual,
+                flexShrink: 0,
+              }}
+            />
+            Cor do time no site: <span style={tabular}>{corAtual}</span>
+          </div>
+        </div>
+      </div>
+
+      {problemas.length > 0 ? (
+        <Banner tone="warn" title="Falta ajustar antes de salvar">
+          {problemas.join(" · ")}
+        </Banner>
+      ) : null}
+
+      {/* Correção #7: exclusão em cascata só depois de ver o estrago. O invólucro só existe
+          junto com o aviso: vazio, ele contaria como mais uma linha na grade (e mais um vão). */}
+      {confirmandoExclusao && salvo && impacto ? (
+        <div ref={refExclusao}>
+          <Banner
+            tone="danger"
+            title={`Excluir “${salvo.name}” apaga também o histórico dele`}
+            actions={
+              <>
+                <Button tone="danger" small onClick={() => excluir(salvo.id)}>
+                  Excluir definitivamente
+                </Button>
+                <Button small onClick={() => setConfirmandoExclusao(false)}>
+                  Cancelar
+                </Button>
+              </>
+            }
+          >
+            <span style={tabular}>
+              {impacto.jogadores} jogador{impacto.jogadores === 1 ? "" : "es"} ·{" "}
+              {impacto.series} série{impacto.series === 1 ? "" : "s"} · {impacto.jogos} jogo
+              {impacto.jogos === 1 ? "" : "s"} · {impacto.linhas} linha
+              {impacto.linhas === 1 ? "" : "s"} de estatística ·{" "}
+              {impacto.classificacao} linha{impacto.classificacao === 1 ? "" : "s"} da
+              classificação inicial
+            </span>
+            <br />
+            Some tudo de uma vez e <strong style={{ color: C.dangerSoft }}>não há como
+            desfazer</strong> — só restaurando um backup.
+            {/*
+              O histórico de sorteios é append-only e o servidor recusa removê-lo de
+              quem não é o responsável pelo campeonato. Sem este aviso, a exclusão
+              era aceita na tela e só falhava lá na frente, na hora de salvar — com o
+              time já apagado do rascunho e sem desfazer.
+            */}
+            {impacto.sorteios > 0 ? (
+              <>
+                <br />
+                <strong style={{ color: C.dangerSoft }}>
+                  Inclui {impacto.sorteios} registro{impacto.sorteios === 1 ? "" : "s"} de
+                  sorteio
+                </strong>{" "}
+                (com a semente que permite conferir cada resultado). Só o responsável pelo
+                campeonato consegue salvar uma remoção dessas.
+              </>
+            ) : null}
+          </Banner>
+        </div>
+      ) : null}
+
+      {compacto ? null : (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 2 }}>
+          <Button type="submit" tone="gold" disabled={problemas.length > 0}>
+            Salvar no rascunho
+          </Button>
+          {sujo ? (
+            <Button onClick={() => carregar(base, selectedId)}>Desfazer alterações</Button>
+          ) : null}
+          {editando && !confirmandoExclusao ? (
+            <Button tone="danger" onClick={() => setConfirmandoExclusao(true)}>
+              Excluir time
+            </Button>
+          ) : null}
+        </div>
+      )}
+
+      <p style={{ margin: 0, fontSize: 11.5, color: C.ink4, lineHeight: 1.6 }}>
+        Salvar altera apenas o rascunho. Nada vai para o site antes de publicar.
+      </p>
+    </div>
+  );
+
+  const estadoDoFormulario = sujo ? (
+    <Chip tone="warn">Não salvo</Chip>
+  ) : (
+    <Chip tone="ok">Em dia com o rascunho</Chip>
+  );
+
+  /**
+   * Rodapé fixo da folha: o "Salvar" sempre à vista do polegar. Excluir e desfazer viram
+   * ícones ao lado (com nome para o leitor de tela) para tudo caber numa fileira só.
+   * Pedindo para fechar com edição pendente, o rodapé vira a pergunta — é a parte da folha
+   * que está sempre na tela, ao contrário de um aviso no topo do formulário rolado.
+   */
+  const rodapeDaFolha = perguntandoFechar ? (
+    <div style={{ width: "100%", display: "grid", gap: 10 }}>
+      <p role="alert" style={{ margin: 0, fontSize: 12.5, lineHeight: 1.5, color: C.warnSoft }}>
+        Fechar agora joga fora o que foi digitado em{" "}
+        <strong style={{ color: C.ink }}>{carregado.name || "time novo"}</strong>.
+      </p>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        <Button tone="danger" onClick={descartarEFechar} style={{ flex: "1 1 auto" }}>
+          Descartar
+        </Button>
+        <Button onClick={() => setConfirmandoFechar(false)} style={{ flex: "1 1 auto" }}>
+          Continuar editando
+        </Button>
+      </div>
+    </div>
+  ) : (
+    <div style={{ width: "100%", display: "flex", gap: 8 }}>
+      {editando && !confirmandoExclusao ? (
+        <BotaoDeIcone rotulo="Excluir time" tone="danger" onClick={pedirExclusao}>
+          <Trash2 size={18} aria-hidden />
+        </BotaoDeIcone>
+      ) : null}
+      {sujo ? (
+        <BotaoDeIcone rotulo="Desfazer alterações" onClick={() => carregar(base, selectedId)}>
+          <Undo2 size={18} aria-hidden />
+        </BotaoDeIcone>
+      ) : null}
+      <Button tone="gold" onClick={salvar} disabled={problemas.length > 0} style={{ flex: 1, minWidth: 0 }}>
+        Salvar no rascunho
+      </Button>
+    </div>
+  );
 
   return (
     <section>
@@ -325,384 +746,214 @@ export function AdminTeamsPanel({
         title="Times"
         description="Escolha um time na lista para editar. O ID é gerado uma única vez e amarra todo o histórico — por isso não pode ser trocado aqui."
         actions={
-          <Button tone="gold" onClick={() => pedirTroca(null)}>
-            Novo time
-          </Button>
+          compacto ? (
+            <Button tone="gold" fullWidth onClick={() => abrirEditor(null)}>
+              <Plus size={17} aria-hidden />
+              Novo time
+            </Button>
+          ) : (
+            <Button tone="gold" onClick={() => pedirTroca(null)}>
+              Novo time
+            </Button>
+          )
         }
       />
 
-      {pendente ? (
-        <Banner
-          tone="warn"
-          title="Você tem alterações não salvas neste formulário"
-          actions={
-            <>
-              <Button tone="danger" small onClick={() => trocar(pendente.id)}>
-                Descartar e trocar
-              </Button>
-              <Button small onClick={() => setPendente(null)}>
-                Continuar editando
-              </Button>
-            </>
-          }
-        >
-          Trocar de time agora joga fora o que foi digitado em{" "}
-          <strong style={{ color: C.ink2 }}>{carregado.name || "time novo"}</strong>.
-        </Banner>
-      ) : null}
-
-      {desatualizado ? (
-        <Banner
-          tone="warn"
-          title="O rascunho mudou fora deste formulário"
-          actions={
-            <>
-              <Button small onClick={() => carregar(base, selectedId)}>
-                Recarregar do rascunho
-              </Button>
-              <Button small onClick={() => setDesatualizado(false)}>
-                Manter minha edição
-              </Button>
-            </>
-          }
-        >
-          Os dados deste time foram recarregados ou importados. Salvar agora grava por cima da
-          versão nova.
-        </Banner>
-      ) : null}
-
-      <div
-        style={{
-          display: "grid",
-          gap: 18,
-          gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-          alignItems: "start",
-        }}
-      >
-        {/* ------------------------------------------------ lista */}
-        <Card padding="16px 16px 18px">
-          <div
-            style={{
-              display: "flex",
-              alignItems: "baseline",
-              justifyContent: "space-between",
-              gap: 10,
-              marginBottom: 12,
-            }}
-          >
-            <h3 style={{ fontFamily: display, fontSize: 16, color: C.bronze, margin: 0 }}>
-              Times cadastrados
-            </h3>
-            <span style={{ fontSize: 11, color: C.ink4, ...tabular }}>{ordenados.length}</span>
-          </div>
-
+      {compacto ? (
+        // ------------------------------------------------ celular: lista na página
+        <>
+          {cabecalhoDaLista}
           {ordenados.length === 0 ? (
-            <Empty
-              title="Nenhum time cadastrado"
-              action={
-                <Button tone="gold" small onClick={() => pedirTroca(null)}>
-                  Criar o primeiro time
-                </Button>
-              }
-            >
-              Os times são a base de tudo: jogadores, séries e classificação apontam para eles.
-            </Empty>
+            listaVazia
           ) : (
-            <div
-              style={{
-                display: "grid",
-                gap: 6,
-                maxHeight: 520,
-                overflowY: "auto",
-                paddingRight: 4,
-              }}
-            >
+            <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 8 }}>
               {ordenados.map((team) => {
                 const ativo = selectedId === team.id;
                 const cor = teamColor(team.id);
                 const elenco = draft.players.filter((p) => p.teamId === team.id).length;
                 return (
-                  <button
-                    key={team.id}
-                    type="button"
-                    aria-current={ativo ? "true" : undefined}
-                    onClick={() => pedirTroca(team.id)}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 11,
-                      width: "100%",
-                      textAlign: "left",
-                      padding: "9px 11px",
-                      borderRadius: 3,
-                      fontFamily: "inherit",
-                      cursor: "pointer",
-                      border: `1px solid ${ativo ? C.line2 : C.line}`,
-                      borderLeft: `3px solid ${ativo ? cor : "transparent"}`,
-                      background: ativo ? "rgba(201,138,75,.12)" : "rgba(0,0,0,.24)",
-                    }}
-                  >
-                    <Escudo name={team.name} imageUrl={team.imageUrl} cor={cor} />
-                    <span style={{ minWidth: 0, flex: 1 }}>
-                      <span
-                        style={{
-                          display: "block",
-                          fontFamily: display,
-                          fontSize: 15,
-                          color: ativo ? C.bronzeHi : C.ink,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {team.name || "(sem nome)"}
-                      </span>
-                      <span
-                        style={{
-                          display: "block",
-                          fontSize: 11,
-                          color: C.ink4,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                          ...tabular,
-                        }}
-                      >
-                        /{team.slug} · {elenco} jogador{elenco === 1 ? "" : "es"}
-                      </span>
-                    </span>
-                    {sujo && ativo ? <Chip tone="warn">não salvo</Chip> : null}
-                  </button>
+                  <li key={team.id}>
+                    <CartaoLinha
+                      idAlvo={`time-${team.id}`}
+                      abreDialogo
+                      selecionado={editorAberto && ativo}
+                      destaque={cor}
+                      rotuloAlvo={`Editar ${team.name || "time sem nome"}`}
+                      onClick={() => abrirEditor(team.id)}
+                      inicio={<Escudo name={team.name} imageUrl={team.imageUrl} cor={cor} size={40} />}
+                      titulo={team.name || "(sem nome)"}
+                      subtitulo={
+                        <span style={tabular}>
+                          /{team.slug} · {elenco} jogador{elenco === 1 ? "" : "es"}
+                        </span>
+                      }
+                      fim={sujo && ativo ? <Chip tone="warn">não salvo</Chip> : undefined}
+                    />
+                  </li>
                 );
               })}
-            </div>
+            </ul>
           )}
-        </Card>
 
-        {/* ------------------------------------------------ formulário */}
-        <Card padding="16px 16px 18px">
-          <form
-            // Correção #43: Enter dentro de qualquer campo salva, como em qualquer formulário.
-            onSubmit={(event) => {
-              event.preventDefault();
-              salvar();
-            }}
+          <Folha
+            aberta={editorAberto}
+            cheia
+            titulo={editando ? "Editar time" : "Criar time"}
+            subtitulo={
+              <span style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                {editando && carregado.name ? <span>{carregado.name}</span> : null}
+                {estadoDoFormulario}
+              </span>
+            }
+            icone={ICONE_DA_SECAO.teams}
+            onFechar={pedirFechar}
+            rotuloFechar="Fechar o editor"
+            rodape={rodapeDaFolha}
           >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 10,
-                marginBottom: 14,
+            {avisoPendente}
+            {avisoDesatualizado}
+            <form
+              // Correção #43: Enter dentro de qualquer campo salva, como em qualquer formulário.
+              onSubmit={(event) => {
+                event.preventDefault();
+                salvar();
               }}
             >
-              <h3 style={{ fontFamily: display, fontSize: 16, color: C.bronze, margin: 0 }}>
-                {editando ? "Editar time" : "Criar time"}
-              </h3>
-              {sujo ? (
-                <Chip tone="warn">Não salvo</Chip>
+              {campos}
+              {/* O "Salvar" de verdade mora no rodapé, fora do <form>. Sem um botão de envio
+                  aqui dentro, o Enter do teclado (o "Ir" do celular) não enviaria nada:
+                  formulário com mais de um campo só envia sozinho se tiver um. */}
+              <button
+                type="submit"
+                tabIndex={-1}
+                aria-hidden
+                disabled={problemas.length > 0}
+                style={soParaLeitor}
+              />
+            </form>
+          </Folha>
+        </>
+      ) : (
+        <>
+          {avisoPendente}
+          {avisoDesatualizado}
+
+          <div
+            style={{
+              display: "grid",
+              gap: 18,
+              gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+              alignItems: "start",
+            }}
+          >
+            {/* ------------------------------------------------ lista */}
+            <Card padding="16px 16px 18px">
+              {cabecalhoDaLista}
+
+              {ordenados.length === 0 ? (
+                listaVazia
               ) : (
-                <Chip tone="ok">Em dia com o rascunho</Chip>
-              )}
-            </div>
-
-            <div style={{ display: "grid", gap: 13 }}>
-              {/* Correção #12: ID só de leitura. */}
-              <Field
-                label="ID (gerado automaticamente)"
-                hint="É a chave usada por séries, jogadores e classificação. Trocá-la deixaria todo o histórico apontando para um time que não existe mais."
-              >
-                {/* readOnly (e não disabled) para o valor continuar selecionável e copiável. */}
-                <input
-                  value={form.id}
-                  readOnly
-                  onFocus={(event) => event.currentTarget.select()}
+                <div
                   style={{
-                    width: "100%",
-                    padding: "9px 11px",
-                    fontFamily: "inherit",
-                    fontSize: 13,
-                    color: C.ink3,
-                    background: "rgba(0,0,0,.24)",
-                    border: `1px dashed ${C.line}`,
-                    borderRadius: 3,
-                    cursor: "default",
-                    ...tabular,
+                    display: "grid",
+                    gap: 6,
+                    maxHeight: 520,
+                    overflowY: "auto",
+                    paddingRight: 4,
                   }}
-                />
-              </Field>
-
-              <Field label="Nome">
-                <Input
-                  value={form.name}
-                  onChange={(v) => setForm((prev) => ({ ...prev, name: v }))}
-                  placeholder="Vanguarda de Ferro"
-                />
-              </Field>
-
-              <Field
-                label="Slug"
-                hint={
-                  slugDuplicado
-                    ? "Este slug já pertence a outro time — dois times com o mesmo slug brigam pela mesma página."
-                    : "Aparece no endereço da página do time."
-                }
-              >
-                <div style={{ display: "flex", gap: 8 }}>
-                  <Input
-                    value={form.slug}
-                    onChange={(v) => setForm((prev) => ({ ...prev, slug: v }))}
-                    placeholder="vanguarda-de-ferro"
-                    style={
-                      slugDuplicado
-                        ? { border: `1px solid ${C.danger}`, ...tabular }
-                        : tabular
-                    }
-                  />
-                  <Button
-                    small
-                    onClick={() => setForm((prev) => ({ ...prev, slug: slugifyValue(prev.name) }))}
-                    style={{ flexShrink: 0 }}
-                  >
-                    Gerar do nome
-                  </Button>
+                >
+                  {ordenados.map((team) => {
+                    const ativo = selectedId === team.id;
+                    const cor = teamColor(team.id);
+                    const elenco = draft.players.filter((p) => p.teamId === team.id).length;
+                    return (
+                      <button
+                        key={team.id}
+                        type="button"
+                        aria-current={ativo ? "true" : undefined}
+                        onClick={() => pedirTroca(team.id)}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 11,
+                          width: "100%",
+                          textAlign: "left",
+                          padding: "9px 11px",
+                          borderRadius: 3,
+                          fontFamily: "inherit",
+                          cursor: "pointer",
+                          border: `1px solid ${ativo ? C.line2 : C.line}`,
+                          borderLeft: `3px solid ${ativo ? cor : "transparent"}`,
+                          background: ativo ? "rgba(201,138,75,.12)" : "rgba(0,0,0,.24)",
+                        }}
+                      >
+                        <Escudo name={team.name} imageUrl={team.imageUrl} cor={cor} />
+                        <span style={{ minWidth: 0, flex: 1 }}>
+                          <span
+                            style={{
+                              display: "block",
+                              fontFamily: display,
+                              fontSize: 15,
+                              color: ativo ? C.bronzeHi : C.ink,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {team.name || "(sem nome)"}
+                          </span>
+                          <span
+                            style={{
+                              display: "block",
+                              fontSize: 11,
+                              color: C.ink4,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                              ...tabular,
+                            }}
+                          >
+                            /{team.slug} · {elenco} jogador{elenco === 1 ? "" : "es"}
+                          </span>
+                        </span>
+                        {sujo && ativo ? <Chip tone="warn">não salvo</Chip> : null}
+                      </button>
+                    );
+                  })}
                 </div>
-              </Field>
+              )}
+            </Card>
 
-              {/* Correção #23: placeholder e dica ensinam o caminho que o servidor ACEITA. */}
-              <Field
-                label="Escudo (caminho da imagem)"
-                hint={imagemInvalida ? `Caminho recusado. ${DICA_IMAGEM}` : DICA_IMAGEM}
-              >
-                <Input
-                  value={form.imageUrl ?? ""}
-                  onChange={(v) => setForm((prev) => ({ ...prev, imageUrl: v }))}
-                  placeholder="/teams/vanguarda-de-ferro.png"
-                  style={imagemInvalida ? { border: `1px solid ${C.danger}` } : undefined}
-                />
-              </Field>
-
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: "11px 12px",
-                  borderRadius: 3,
-                  border: `1px solid ${C.line}`,
-                  background: "rgba(0,0,0,.2)",
+            {/* ------------------------------------------------ formulário */}
+            <Card padding="16px 16px 18px">
+              <form
+                // Correção #43: Enter dentro de qualquer campo salva, como em qualquer formulário.
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  salvar();
                 }}
               >
-                <Escudo
-                  name={form.name || "?"}
-                  imageUrl={imagemInvalida ? undefined : form.imageUrl}
-                  cor={corAtual}
-                  size={44}
-                />
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 11.5, color: C.ink3 }}>
-                    Prévia do escudo (sem imagem, valem as iniciais).
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 7,
-                      marginTop: 6,
-                      fontSize: 11,
-                      color: C.ink4,
-                    }}
-                  >
-                    <span
-                      aria-hidden
-                      style={{
-                        width: 12,
-                        height: 12,
-                        borderRadius: 2,
-                        background: corAtual,
-                        flexShrink: 0,
-                      }}
-                    />
-                    Cor do time no site: <span style={tabular}>{corAtual}</span>
-                  </div>
-                </div>
-              </div>
-
-              {problemas.length > 0 ? (
-                <Banner tone="warn" title="Falta ajustar antes de salvar">
-                  {problemas.join(" · ")}
-                </Banner>
-              ) : null}
-
-              {/* Correção #7: exclusão em cascata só depois de ver o estrago. */}
-              {confirmandoExclusao && salvo && impacto ? (
-                <Banner
-                  tone="danger"
-                  title={`Excluir “${salvo.name}” apaga também o histórico dele`}
-                  actions={
-                    <>
-                      <Button tone="danger" small onClick={() => excluir(salvo.id)}>
-                        Excluir definitivamente
-                      </Button>
-                      <Button small onClick={() => setConfirmandoExclusao(false)}>
-                        Cancelar
-                      </Button>
-                    </>
-                  }
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 10,
+                    marginBottom: 14,
+                  }}
                 >
-                  <span style={tabular}>
-                    {impacto.jogadores} jogador{impacto.jogadores === 1 ? "" : "es"} ·{" "}
-                    {impacto.series} série{impacto.series === 1 ? "" : "s"} · {impacto.jogos} jogo
-                    {impacto.jogos === 1 ? "" : "s"} · {impacto.linhas} linha
-                    {impacto.linhas === 1 ? "" : "s"} de estatística ·{" "}
-                    {impacto.classificacao} linha{impacto.classificacao === 1 ? "" : "s"} da
-                    classificação inicial
-                  </span>
-                  <br />
-                  Some tudo de uma vez e <strong style={{ color: C.dangerSoft }}>não há como
-                  desfazer</strong> — só restaurando um backup.
-                  {/*
-                    O histórico de sorteios é append-only e o servidor recusa removê-lo de
-                    quem não é o responsável pelo campeonato. Sem este aviso, a exclusão
-                    era aceita na tela e só falhava lá na frente, na hora de salvar — com o
-                    time já apagado do rascunho e sem desfazer.
-                  */}
-                  {impacto.sorteios > 0 ? (
-                    <>
-                      <br />
-                      <strong style={{ color: C.dangerSoft }}>
-                        Inclui {impacto.sorteios} registro{impacto.sorteios === 1 ? "" : "s"} de
-                        sorteio
-                      </strong>{" "}
-                      (com a semente que permite conferir cada resultado). Só o responsável pelo
-                      campeonato consegue salvar uma remoção dessas.
-                    </>
-                  ) : null}
-                </Banner>
-              ) : null}
+                  <h3 style={{ fontFamily: display, fontSize: 16, color: C.bronze, margin: 0 }}>
+                    {editando ? "Editar time" : "Criar time"}
+                  </h3>
+                  {estadoDoFormulario}
+                </div>
 
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 2 }}>
-                <Button type="submit" tone="gold" disabled={problemas.length > 0}>
-                  Salvar no rascunho
-                </Button>
-                {sujo ? (
-                  <Button onClick={() => carregar(base, selectedId)}>Desfazer alterações</Button>
-                ) : null}
-                {editando && !confirmandoExclusao ? (
-                  <Button tone="danger" onClick={() => setConfirmandoExclusao(true)}>
-                    Excluir time
-                  </Button>
-                ) : null}
-              </div>
-
-              <p style={{ margin: 0, fontSize: 11.5, color: C.ink4, lineHeight: 1.6 }}>
-                Salvar altera apenas o rascunho. Nada vai para o site antes de publicar.
-              </p>
-            </div>
-          </form>
-        </Card>
-      </div>
+                {campos}
+              </form>
+            </Card>
+          </div>
+        </>
+      )}
     </section>
   );
 }

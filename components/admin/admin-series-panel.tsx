@@ -1,9 +1,32 @@
 "use client";
 
 import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { SorteioAoVivo } from "@/components/admin/sorteio-ao-vivo";
-import { AlertTriangle, Pencil, Plus, Trash2 } from "lucide-react";
+import { useCompacto } from "@/components/admin/responsivo";
+import { IconeCarta, IconeCartas, SeloHex, type Icone } from "@/components/lob/icones";
+import { RoleIcon, TeamMark } from "@/components/lob/ui";
+import {
+  AlertTriangle,
+  Ban,
+  CalendarClock,
+  Check,
+  ChevronDown,
+  CloudDownload,
+  Crown,
+  Dices,
+  Flag,
+  Link2,
+  Pencil,
+  Plus,
+  Shield,
+  Swords,
+  Trash2,
+  Trophy,
+  UserRound,
+  UsersRound,
+} from "lucide-react";
 
 import type {
   CardId,
@@ -27,7 +50,7 @@ import {
   isWalkoverSeries,
 } from "@/lib/tournament";
 import { formatDateLabel, formatSeriesDateLabel } from "@/lib/format";
-import { resolveRole, teamColor } from "@/lib/design";
+import { resolveRole, roleIconUrl, teamColor } from "@/lib/design";
 import {
   camposBrasiliaParaIso,
   createBlankGame,
@@ -37,7 +60,7 @@ import {
   slugifyValue,
   type MutateDraft,
 } from "@/components/admin/shared";
-import { CARD_OPTIONS, CARDS_BY_ID, CARTAS_ATIVAS } from "@/lib/cards";
+import { CARD_OPTIONS, CARDS_BY_ID, CARTAS_ATIVAS, isDuplaCard } from "@/lib/cards";
 import { CHAMPIONS } from "@/lib/champions";
 import {
   Banner,
@@ -45,10 +68,14 @@ import {
   Button,
   C,
   Card,
+  CartaoLinha,
   Chip,
+  ChipFiltro,
   Empty,
   Field,
+  Folha,
   Input,
+  RolagemX,
   ScrollX,
   SectionHead,
   Select,
@@ -65,6 +92,19 @@ import {
  *
  * O trabalho real acontece na grade de K/D/A, então ela ganhou cabeçalho de coluna visível,
  * números tabulares e o KDA calculado ao lado — dá para conferir o print sem sair do teclado.
+ *
+ * NO CELULAR (`useCompacto()`) o arranjo é outro, porque é lá que o resultado é lançado entre
+ * uma rodada e outra:
+ *  - a lista vira cartões de placar (logo, nome e vitórias de cada time, um embaixo do outro),
+ *    com filtro de "em andamento" para achar o jogo que acabou de terminar;
+ *  - o editor abre numa folha de tela cheia, com Excluir e Concluir presos no rodapé;
+ *  - a grade de K/D/A — 620px que obrigavam a rolar de lado — vira um cartão por jogador,
+ *    com abates, mortes e assistências lado a lado e o teclado numérico;
+ *  - o vencedor do jogo é tocado num dos dois escudos, em vez de escolhido num select;
+ *  - os jogos vêm antes dos dados da série: data, ID e W.O. mudam pouco, o placar muda a cada
+ *    rodada. Só a série ainda sem os dois times abre com o Confronto em cima.
+ * Toda a lógica (confirmações, auditoria, limpeza de linhas em branco) é a mesma dos dois
+ * arranjos — muda só onde cada coisa fica.
  */
 
 // ---------------------------------------------------------------- layout
@@ -75,6 +115,10 @@ import {
  */
 const CSS_PAINEL = `
 .lob-series *:focus-visible{outline:2px solid ${C.bronzeHi};outline-offset:2px;border-radius:2px}
+/* O cartão da lista do celular já desenha o anel em volta do cartão INTEIRO (globals.css). A
+   regra de cima vem depois e empata em especificidade: sem esta, um segundo anel cercava só o
+   título, por dentro do primeiro. */
+.lob-series .adm-cartao__alvo:focus-visible{outline:none}
 .lob-series-grid{display:grid;gap:16px;grid-template-columns:268px minmax(0,1fr);align-items:start}
 .lob-series-lista{max-height:calc(100vh - 250px);min-height:180px;overflow-y:auto;overflow-x:hidden}
 .lob-2col{display:grid;gap:12px;grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -764,6 +808,9 @@ function applyRiotMatchToSeriesGame({
  */
 let serieLembrada: string | null = null;
 
+/** Invólucro do botão "Sortear ao vivo" no celular — para devolver o foco a ele (ver `sorteioAoVivo`). */
+const ID_SORTEIO_COMPACTO = "lob-series-sortear-compacto";
+
 /** Cabeçalho de coluna da grade (sigla curta + nome por extenso no title). */
 function ColunaTitulo({
   children,
@@ -786,16 +833,28 @@ function ColunaTitulo({
   );
 }
 
-/** Botão só de ícone: o nome acessível vem do texto escondido, não de um aria-label solto. */
+/**
+ * Botão só de ícone: o nome acessível vem do texto escondido, não de um aria-label solto.
+ * No celular vira um quadrado de 44px — a lixeira de 32px ao lado de um campo era alvo
+ * fácil de errar com o polegar, e errar aqui apaga uma linha digitada.
+ */
 function BotaoIcone({
   onClick,
   label,
   disabled,
   tone = "ghost",
 }: Readonly<{ onClick: () => void; label: string; disabled?: boolean; tone?: "ghost" | "danger" }>) {
+  const compacto = useCompacto();
   return (
-    <Button tone={tone} small onClick={onClick} disabled={disabled} title={label} style={{ padding: "7px 8px" }}>
-      <Trash2 size={14} aria-hidden />
+    <Button
+      tone={tone}
+      small
+      onClick={onClick}
+      disabled={disabled}
+      title={label}
+      style={compacto ? { padding: 0, width: 44, minHeight: 44, flexShrink: 0 } : { padding: "7px 8px" }}
+    >
+      <Trash2 size={compacto ? 17 : 14} aria-hidden />
       <span style={soLeitores}>{label}</span>
     </Button>
   );
@@ -803,7 +862,8 @@ function BotaoIcone({
 
 /**
  * Campo de campeão com sugestões do datalist. Fica local (e não em ui.tsx) porque o `Input`
- * do kit não carrega `list` — e só esta tela precisa disso. O visual é o mesmo do kit.
+ * do kit não carrega `list` — e só esta tela precisa disso. O visual é o mesmo do kit,
+ * inclusive no celular: 16px de fonte para o iPhone não dar zoom ao focar.
  */
 function InputCampeao({
   value,
@@ -811,6 +871,7 @@ function InputCampeao({
   ariaLabel,
   placeholder,
 }: Readonly<{ value: string; onChange: (v: string) => void; ariaLabel: string; placeholder: string }>) {
+  const compacto = useCompacto();
   return (
     <input
       aria-label={ariaLabel}
@@ -818,18 +879,260 @@ function InputCampeao({
       list="champions-datalist"
       value={value}
       onChange={(event) => onChange(event.target.value)}
+      // Nome de campeão não é palavra do dicionário: o corretor do celular trocava "Zed" por "Zé".
+      autoCorrect={compacto ? "off" : undefined}
+      autoCapitalize={compacto ? "words" : undefined}
+      spellCheck={compacto ? false : undefined}
       style={{
         width: "100%",
         minWidth: 0,
-        padding: "9px 11px",
+        padding: compacto ? "11px 12px" : "9px 11px",
+        minHeight: compacto ? 44 : undefined,
         fontFamily: "inherit",
-        fontSize: 13,
+        fontSize: compacto ? 16 : 13,
         color: C.ink,
         background: "rgba(0,0,0,.34)",
         border: `1px solid ${C.line}`,
         borderRadius: 3,
       }}
     />
+  );
+}
+
+// ---------------------------------------------------------------- peças do celular
+
+type Time = TournamentDataset["teams"][number];
+
+/** Rótulo miúdo em caixa-alta — o mesmo desenho do rótulo do `Field`, para campo que não é <label>. */
+const rotuloMiudo: CSSProperties = {
+  display: "block",
+  fontSize: 10,
+  letterSpacing: ".16em",
+  textTransform: "uppercase",
+  color: C.bronze,
+  marginBottom: 6,
+};
+
+/**
+ * Logo do time (ou o losango da cor dele, quando não há logo). Time ainda não escolhido sai
+ * como um escudo tracejado: o lugar fica marcado sem fingir que já existe um time ali.
+ * Decorativo — o nome do time está sempre escrito ao lado.
+ */
+function MarcaDoTime({ time, tamanho = 24 }: Readonly<{ time?: Time | null; tamanho?: number }>) {
+  if (!time) {
+    return (
+      <span
+        aria-hidden
+        style={{
+          width: tamanho,
+          height: tamanho,
+          display: "inline-grid",
+          placeItems: "center",
+          flexShrink: 0,
+          color: C.ink4,
+          border: `1px dashed ${C.line2}`,
+          borderRadius: 4,
+        }}
+      >
+        <Shield size={Math.round(tamanho * 0.55)} aria-hidden />
+      </span>
+    );
+  }
+  return <TeamMark imageUrl={time.imageUrl} color={teamColor(time.id)} size={tamanho} />;
+}
+
+/**
+ * Retorno de ação no celular. O do monitor é um chip de uma linha só (`nowrap`); a 360px um
+ * texto como "ID alterado — o link público só muda depois de salvar" estourava a página.
+ */
+function AvisoEmLinha({ texto, tom }: Readonly<{ texto: string; tom: "ok" | "warn" }>) {
+  return (
+    <p
+      role="status"
+      style={{
+        width: "100%",
+        margin: 0,
+        padding: "8px 10px",
+        borderRadius: 3,
+        fontSize: 12.5,
+        lineHeight: 1.45,
+        border: `1px solid ${tom === "ok" ? "rgba(70,214,200,.40)" : "rgba(224,163,58,.45)"}`,
+        background: tom === "ok" ? "rgba(70,214,200,.09)" : "rgba(224,163,58,.10)",
+        color: tom === "ok" ? C.okSoft : C.warnSoft,
+      }}
+    >
+      {texto}
+    </p>
+  );
+}
+
+/**
+ * Título de bloco do editor no celular. O `BlockTitle` do kit põe as ações na mesma linha
+ * do título, sem quebra — com dois botões e um aviso, a linha passava de 360px. Aqui o
+ * aviso e as ações descem para baixo do título, e o selo hexagonal diz do que é o bloco
+ * antes da leitura (espadas = jogos, cartas = cartinhas, calendário = data).
+ */
+function TituloCompacto({
+  children,
+  icone,
+  aviso,
+  acoes,
+}: Readonly<{ children: ReactNode; icone?: Icone; aviso?: ReactNode; acoes?: ReactNode }>) {
+  return (
+    <div style={{ margin: "28px 0 12px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        {icone ? <SeloHex icone={icone} tamanho={30} /> : null}
+        <h3 style={{ fontFamily: display, fontSize: 18, lineHeight: 1.15, color: C.bronze, margin: 0 }}>{children}</h3>
+        <div style={{ flex: 1, height: 1, background: `linear-gradient(90deg, ${C.line2}, transparent)` }} />
+      </div>
+      {aviso ? <div style={{ marginTop: 10 }}>{aviso}</div> : null}
+      {acoes ? <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>{acoes}</div> : null}
+    </div>
+  );
+}
+
+/** Subtítulo dentro do cartão de um jogo (jogadores, bans), com o ícone do que é. */
+function SubtituloDoJogo({
+  icone: Desenho,
+  children,
+  contagem,
+}: Readonly<{ icone: Icone; children: ReactNode; contagem?: string }>) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "20px 0 10px" }}>
+      <Desenho size={16} aria-hidden style={{ color: C.bronze, flexShrink: 0 }} />
+      <h5 style={{ margin: 0, fontFamily: display, fontSize: 15.5, lineHeight: 1.2, color: C.bronze }}>{children}</h5>
+      {contagem ? (
+        <span style={{ marginLeft: "auto", fontSize: 11.5, color: C.ink4, ...tabular }}>{contagem}</span>
+      ) : null}
+    </div>
+  );
+}
+
+/** Retorno da importação da Riot — o mesmo parágrafo nos dois arranjos. */
+function AvisoDaRiot({ status }: Readonly<{ status: RiotImportStatus }>) {
+  return (
+    <p
+      role={status.kind === "error" ? "alert" : "status"}
+      style={{
+        margin: "10px 0 0",
+        padding: "8px 10px",
+        borderRadius: 3,
+        fontSize: 12,
+        lineHeight: 1.5,
+        border: `1px solid ${status.kind === "error" ? "rgba(212,87,74,.45)" : "rgba(70,214,200,.40)"}`,
+        background: status.kind === "error" ? "rgba(212,87,74,.10)" : "rgba(70,214,200,.09)",
+        color: status.kind === "error" ? C.dangerSoft : C.okSoft,
+      }}
+    >
+      {status.text}
+    </p>
+  );
+}
+
+/**
+ * O placar da série em duas linhas, como no fim de partida: logo, nome e vitórias de cada
+ * time. Quem venceu fica aceso, quem perdeu apaga um tom — dá para ler a lista inteira sem
+ * abrir nenhuma série.
+ */
+function LinhasDoPlacar({
+  linhas,
+}: Readonly<{ linhas: ReadonlyArray<{ chave: string; time?: Time; nome: string; vitorias: number; estado: "venceu" | "perdeu" | "aberto" }> }>) {
+  return (
+    <span style={{ display: "grid", gap: 6 }}>
+      {linhas.map((linha) => (
+        <span
+          key={linha.chave}
+          style={{ display: "grid", gridTemplateColumns: "26px minmax(0,1fr) auto", alignItems: "center", gap: 9 }}
+        >
+          <MarcaDoTime time={linha.time} tamanho={26} />
+          <span
+            style={{
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              fontWeight: linha.estado === "venceu" ? 700 : 600,
+              color: linha.estado === "venceu" ? C.ink : linha.estado === "perdeu" ? C.ink3 : C.ink2,
+            }}
+          >
+            {linha.nome}
+          </span>
+          <span
+            style={{
+              fontFamily: display,
+              fontSize: 21,
+              lineHeight: 1,
+              minWidth: 14,
+              textAlign: "right",
+              color: linha.estado === "venceu" ? C.bronzeHi : C.ink3,
+              ...tabular,
+            }}
+          >
+            {linha.vitorias}
+          </span>
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** Topo do editor no celular: os dois escudos e o placar grande entre eles. */
+function PlacarDaSerie({
+  timeA,
+  timeB,
+  nomeA,
+  nomeB,
+  vitoriasA,
+  vitoriasB,
+}: Readonly<{
+  timeA?: Time;
+  timeB?: Time;
+  nomeA: string;
+  nomeB: string;
+  vitoriasA: number;
+  vitoriasB: number;
+}>) {
+  const lado = (time: Time | undefined, nome: string) => (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 7, minWidth: 0 }}>
+      <MarcaDoTime time={time} tamanho={44} />
+      <span
+        style={{
+          fontSize: 12.5,
+          fontWeight: 700,
+          lineHeight: 1.25,
+          color: C.ink2,
+          textAlign: "center",
+          overflowWrap: "anywhere",
+        }}
+      >
+        {nome}
+      </span>
+    </div>
+  );
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "minmax(0,1fr) auto minmax(0,1fr)",
+        alignItems: "center",
+        gap: 10,
+        padding: "16px 12px 14px",
+        border: `1px solid ${C.line}`,
+        borderRadius: 6,
+        background: "radial-gradient(120% 90% at 50% 0%, rgba(201,138,75,.12), rgba(0,0,0,.24) 70%)",
+      }}
+    >
+      {lado(timeA, nomeA)}
+      <div
+        aria-label={`Placar ${vitoriasA} a ${vitoriasB}`}
+        role="img"
+        style={{ fontFamily: display, fontSize: 38, lineHeight: 1, color: C.bronzeHi, ...tabular }}
+      >
+        {vitoriasA}
+        <span style={{ color: C.ink4, margin: "0 6px" }}>–</span>
+        {vitoriasB}
+      </div>
+      {lado(timeB, nomeB)}
+    </div>
   );
 }
 
@@ -870,6 +1173,7 @@ export function AdminSeriesPanel({
   // `cardsUsed` e não fica velho, sem precisar da recarga que abria `window.confirm`
   // no meio da cerimônia — e salvar depois não cai na trava de versão (409).
   const [sorteioAberto, setSorteioAberto] = useState(false);
+  const compacto = useCompacto();
   const sortedSeries = useMemo(
     () =>
       draft.seriesMatches
@@ -888,6 +1192,20 @@ export function AdminSeriesPanel({
   const [aviso, setAviso] = useState<{ id: number; escopo: string; texto: string; tom: "ok" | "warn" } | null>(
     null,
   );
+  // ---- só do celular
+  /** Filtro da lista de cartões: entre uma rodada e outra o que se procura é a série em andamento. */
+  const [filtroCompacto, setFiltroCompacto] = useState<"todas" | "abertas" | "pendencias">("todas");
+  /** Caixa "Importar da Riot" de cada jogo, recolhida por padrão (chave = `serie:jogo`). */
+  const [riotAbertos, setRiotAbertos] = useState<Record<string, boolean>>({});
+  /**
+   * Série aberta sem os dois times começa pelo Confronto; as outras, pelos jogos. Decidido
+   * na ABERTURA e não a cada render: se dependesse dos times, escolher o Time B jogaria o
+   * bloco que a pessoa acabou de usar para o fim da folha, debaixo do dedo dela.
+   */
+  const [confrontoNoTopo, setConfrontoNoTopo] = useState(() => {
+    const lembrada = draft.seriesMatches.find((series) => series.id === serieLembrada);
+    return Boolean(lembrada) && (!lembrada?.teamAId || !lembrada?.teamBId);
+  });
 
   useEffect(() => {
     if (!selectedId) return;
@@ -917,8 +1235,13 @@ export function AdminSeriesPanel({
     setAviso({ id: Date.now(), escopo, texto, tom });
   };
 
+  /** O retorno daquele escopo no celular, ou nada — para o bloco não reservar espaço vazio. */
+  const avisoCompacto = (escopo: string) =>
+    aviso && aviso.escopo === escopo ? <AvisoEmLinha texto={aviso.texto} tom={aviso.tom} /> : null;
+
   const Aviso = ({ escopo }: Readonly<{ escopo: string }>) => {
     if (!aviso || aviso.escopo !== escopo) return null;
+    if (compacto) return avisoCompacto(escopo);
     return (
       <span role="status" style={{ display: "inline-flex" }}>
         <Chip tone={aviso.tom === "ok" ? "ok" : "warn"}>{aviso.texto}</Chip>
@@ -982,6 +1305,9 @@ export function AdminSeriesPanel({
       Object.fromEntries(Object.entries(prev).filter(([key]) => !key.startsWith(prefix))),
     );
     setRiotImportingGameKey((prev) => (prev?.startsWith(prefix) ? null : prev));
+    // As caixas abertas no celular também são por índice de jogo: deslocados, elas valeriam
+    // para o jogo errado.
+    setRiotAbertos((prev) => Object.fromEntries(Object.entries(prev).filter(([key]) => !key.startsWith(prefix))));
   };
 
   /** Remove as linhas totalmente em branco de uma série (#3). Devolve quantas saíram. */
@@ -1022,6 +1348,8 @@ export function AdminSeriesPanel({
    */
   const selecionarSerie = (seriesId: string) => {
     if (selectedId && selectedId !== seriesId) limparLinhasVazias(selectedId);
+    const alvo = draft.seriesMatches.find((series) => series.id === seriesId);
+    setConfrontoNoTopo(!alvo?.teamAId || !alvo?.teamBId);
     setSelectedId(seriesId);
   };
 
@@ -1031,8 +1359,23 @@ export function AdminSeriesPanel({
       next.seriesMatches.push(series);
     });
     if (selectedId) limparLinhasVazias(selectedId);
+    setConfrontoNoTopo(true);
     setSelectedId(series.id);
     avisar("topo", "Série criada. Escolha os dois times para começar.");
+  };
+
+  /**
+   * Fechar a folha do celular é o mesmo que, no monitor, sair da série escolhendo outra: as
+   * linhas em branco dela vão embora (derrubariam o salvamento do painel inteiro). Não há
+   * rascunho próprio a confirmar — cada campo já escreve direto no rascunho do painel.
+   * O aviso diz quantas saíram, porque ali ninguém viu a limpeza acontecer.
+   */
+  const fecharEditorCompacto = () => {
+    const descartadas = selectedId ? limparLinhasVazias(selectedId) : 0;
+    setSelectedId(null);
+    if (descartadas > 0) {
+      avisar("topo", `${descartadas} linha(s) em branco descartada(s) ao fechar a série.`, "warn");
+    }
   };
 
   const deleteSeries = (seriesId: string) => {
@@ -1646,6 +1989,132 @@ export function AdminSeriesPanel({
       })
     );
 
+  // -------------------------------------------------------------- lista no celular
+
+  const timeDe = (teamId: string) => draft.teams.find((team) => team.id === teamId);
+  /** Nome do time daquele lado, ou "Time A"/"Time B" enquanto ninguém foi escolhido. */
+  const nomeOuVaga = (teamId: string, vaga: string) => (teamId ? getTeamName(draft, teamId) : vaga);
+
+  /** Em andamento = nem vencedor nem W.O.: é a série que espera o resultado da rodada. */
+  const estaEmAndamento = (series: SeriesMatch) =>
+    !isWalkoverSeries(series) && !getSeriesWinnerTeamId(series, draft);
+  const totalEmAndamento = sortedSeries.filter(estaEmAndamento).length;
+
+  let seriesDoFiltro = sortedSeries;
+  if (filtroCompacto === "abertas") seriesDoFiltro = sortedSeries.filter(estaEmAndamento);
+  else if (filtroCompacto === "pendencias") seriesDoFiltro = seriesComProblema;
+
+  const textoSemSeriesNoFiltro =
+    filtroCompacto === "abertas"
+      ? "Nenhuma série em andamento: todas têm vencedor ou W.O."
+      : "Nenhuma série com pendência.";
+
+  /**
+   * A lista no celular: um cartão de placar por série, a mesma ordem do monitor (mais
+   * recente primeiro). O cartão inteiro abre a série na folha; o nome acessível do toque
+   * diz o confronto, o placar e o estado de uma vez, para quem navega por leitor de tela.
+   */
+  const listaCompacta = compacto ? (
+    <section aria-label="Séries do campeonato">
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+        <h3 style={{ fontFamily: display, fontSize: 17, color: C.bronze, margin: 0 }}>Todas as séries</h3>
+        <div style={{ flex: 1, height: 1, background: `linear-gradient(90deg, ${C.line2}, transparent)` }} />
+        <span style={{ fontSize: 11.5, color: C.ink4, ...tabular }}>{sortedSeries.length}</span>
+      </div>
+
+      {sortedSeries.length > 0 ? (
+        <RolagemX rotulo="Filtrar séries" style={{ marginBottom: 12 }}>
+          <ChipFiltro ativo={filtroCompacto === "todas"} onClick={() => setFiltroCompacto("todas")}>
+            Todas <span style={tabular}>{sortedSeries.length}</span>
+          </ChipFiltro>
+          <ChipFiltro ativo={filtroCompacto === "abertas"} onClick={() => setFiltroCompacto("abertas")}>
+            <Swords size={14} aria-hidden /> Em andamento <span style={tabular}>{totalEmAndamento}</span>
+          </ChipFiltro>
+          <ChipFiltro ativo={filtroCompacto === "pendencias"} onClick={() => setFiltroCompacto("pendencias")}>
+            <AlertTriangle size={14} aria-hidden /> Com pendência <span style={tabular}>{seriesComProblema.length}</span>
+          </ChipFiltro>
+        </RolagemX>
+      ) : null}
+
+      {sortedSeries.length === 0 ? (
+        <LinhaVazia>Nenhuma série cadastrada. Comece por &quot;Nova série&quot;.</LinhaVazia>
+      ) : seriesDoFiltro.length === 0 ? (
+        <LinhaVazia>{textoSemSeriesNoFiltro}</LinhaVazia>
+      ) : (
+        <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+          {seriesDoFiltro.map((series) => {
+            const score = getSeriesScore(series, draft);
+            const winner = getSeriesWinnerTeamId(series, draft);
+            const isWalkover = isWalkoverSeries(series);
+            const nomeA = nomeOuVaga(series.teamAId, "Time A");
+            const nomeB = nomeOuVaga(series.teamBId, "Time B");
+            const estadoLabel = getSeriesStateLabel(isWalkover, Boolean(winner));
+            const auditoria = auditorias.get(series.id);
+            const temProblema = (auditoria?.bloqueios.length ?? 0) > 0;
+            const temAviso = (auditoria?.avisos.length ?? 0) > 0;
+            const estadoDoLado = (teamId: string): "venceu" | "perdeu" | "aberto" => {
+              if (!winner) return "aberto";
+              return winner === teamId ? "venceu" : "perdeu";
+            };
+
+            return (
+              <li key={series.id}>
+                <CartaoLinha
+                  abreDialogo
+                  selecionado={selectedSeries?.id === series.id}
+                  destaque={temProblema ? C.danger : temAviso ? C.warn : undefined}
+                  rotuloAlvo={`Abrir a série ${nomeA} x ${nomeB}, ${score.teamAWins} a ${score.teamBWins}, ${estadoLabel}`}
+                  onClick={() => selecionarSerie(series.id)}
+                  titulo={
+                    <LinhasDoPlacar
+                      linhas={[
+                        {
+                          chave: `a-${series.teamAId}`,
+                          time: timeDe(series.teamAId),
+                          nome: nomeA,
+                          vitorias: score.teamAWins,
+                          estado: estadoDoLado(series.teamAId),
+                        },
+                        {
+                          chave: `b-${series.teamBId}`,
+                          time: timeDe(series.teamBId),
+                          nome: nomeB,
+                          vitorias: score.teamBWins,
+                          estado: estadoDoLado(series.teamBId),
+                        },
+                      ]}
+                    />
+                  }
+                  subtitulo={
+                    // Com hora quando houver: é por ela que se acha "o jogo das 10:30".
+                    <span style={tabular}>
+                      {formatSeriesDateLabel(series.date)} · {getSeriesStageLabel(series)} ·{" "}
+                      {getSeriesFormatLabel(series, draft)}
+                    </span>
+                  }
+                >
+                  <span style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                    <Chip tone={isWalkover ? "warn" : winner ? "ok" : "neutro"}>{estadoLabel}</Chip>
+                    {temProblema ? (
+                      <Chip tone="danger" title="Esta série tem pendências que travam o salvamento">
+                        <AlertTriangle size={11} aria-hidden /> Pendências
+                      </Chip>
+                    ) : null}
+                    {temAviso ? (
+                      <Chip tone="warn" title={auditoria?.avisos[0]}>
+                        Conferir etapa
+                      </Chip>
+                    ) : null}
+                  </span>
+                </CartaoLinha>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  ) : null;
+
   // -------------------------------------------------------------- jogos da série
 
   const renderStatsRow = (
@@ -1830,23 +2299,7 @@ export function AdminSeriesPanel({
             </Button>
           </div>
 
-          {riotImportStatus ? (
-            <p
-              role={riotImportStatus.kind === "error" ? "alert" : "status"}
-              style={{
-                margin: "10px 0 0",
-                padding: "8px 10px",
-                borderRadius: 3,
-                fontSize: 12,
-                lineHeight: 1.5,
-                border: `1px solid ${riotImportStatus.kind === "error" ? "rgba(212,87,74,.45)" : "rgba(70,214,200,.40)"}`,
-                background: riotImportStatus.kind === "error" ? "rgba(212,87,74,.10)" : "rgba(70,214,200,.09)",
-                color: riotImportStatus.kind === "error" ? C.dangerSoft : C.okSoft,
-              }}
-            >
-              {riotImportStatus.text}
-            </p>
-          ) : null}
+          {riotImportStatus ? <AvisoDaRiot status={riotImportStatus} /> : null}
         </div>
 
         <div className="lob-3col" style={{ marginTop: 12 }}>
@@ -2027,6 +2480,489 @@ export function AdminSeriesPanel({
     );
   };
 
+  // -------------------------------------------------------------- jogos no celular
+
+  /**
+   * Uma linha de K/D/A no celular: um cartão por jogador. Em cima quem é (ícone da rota +
+   * jogador + lixeira), no meio o campeão, embaixo abates, mortes e assistências lado a
+   * lado com o KDA calculado — a mesma leitura do print, de cima para baixo, com o teclado
+   * numérico. A faixa à esquerda é a cor do time do jogador: dá para ver de relance que os
+   * cinco primeiros são de um lado e os cinco últimos do outro.
+   *
+   * O motivo do problema, que no monitor fica no `title` (mouse por cima), aqui aparece
+   * escrito: no celular não existe passar o mouse.
+   */
+  const renderStatsCartao = (
+    gameIndex: number,
+    row: PlayerGameStats,
+    rowIndex: number,
+    estado: EstadoLinha,
+  ) => {
+    const problema = estado === "incompleta" || estado === "repetida" || estado === "forasteira";
+    const corBorda = problema ? "rgba(212,87,74,.55)" : estado === "vazia" ? "rgba(224,163,58,.40)" : C.line;
+    const kda = getKda(row.kills, row.deaths, row.assists);
+    const jogador = draft.players.find((player) => player.id === row.playerId) ?? null;
+    const rota = jogador ? resolveRole(jogador.role1) : null;
+
+    const motivo =
+      estado === "incompleta"
+        ? "Falta o jogador ou o campeão."
+        : estado === "repetida"
+          ? "Este jogador já está em outra linha deste jogo."
+          : estado === "forasteira"
+            ? "Jogador não pertence a nenhum dos dois times da série."
+            : estado === "vazia"
+              ? "Linha em branco — será descartada."
+              : null;
+
+    const campoNumero = (rotulo: string, nomeLongo: string, campo: "kills" | "deaths" | "assists") => (
+      <Field label={rotulo}>
+        <Input
+          numeric
+          ariaLabel={`${nomeLongo} da linha ${rowIndex + 1}`}
+          value={row[campo]}
+          onChange={(value) => updateStatsRowField(gameIndex, rowIndex, campo, soDigitos(value))}
+        />
+      </Field>
+    );
+
+    return (
+      <div
+        key={`g${gameIndex}-r${rowIndex}`}
+        style={{
+          padding: "10px 10px 12px 12px",
+          border: `1px solid ${corBorda}`,
+          borderRadius: 4,
+          background: problema ? "rgba(212,87,74,.06)" : "rgba(0,0,0,.20)",
+          boxShadow: jogador ? `inset 3px 0 0 ${teamColor(jogador.teamId)}` : undefined,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span
+            aria-hidden
+            title={rota?.label}
+            style={{
+              width: 34,
+              height: 34,
+              flexShrink: 0,
+              display: "grid",
+              placeItems: "center",
+              borderRadius: 4,
+              border: `1px solid ${C.line}`,
+              background: "rgba(0,0,0,.30)",
+            }}
+          >
+            {rota && roleIconUrl(rota) ? (
+              <RoleIcon role={jogador?.role1} size={19} color={rota.color} />
+            ) : (
+              <UserRound size={17} aria-hidden style={{ color: C.ink4 }} />
+            )}
+          </span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <Select
+              ariaLabel={`Jogador da linha ${rowIndex + 1}`}
+              value={row.playerId}
+              onChange={(value) => updateStatsRowField(gameIndex, rowIndex, "playerId", value)}
+            >
+              <option value="">Jogador…</option>
+              {currentRosters.combined.map((player) => (
+                <option key={player.id} value={player.id}>
+                  {rotuloJogador(draft, player)}
+                </option>
+              ))}
+              {row.playerId && !currentRosters.combined.some((player) => player.id === row.playerId) ? (
+                <option value={row.playerId}>{row.playerId} (fora da série)</option>
+              ) : null}
+            </Select>
+          </div>
+          <BotaoIcone
+            label={`Remover a linha ${rowIndex + 1}`}
+            onClick={() => removeStatsRowFromGame(gameIndex, rowIndex)}
+          />
+        </div>
+
+        <div style={{ marginTop: 8 }}>
+          <InputCampeao
+            ariaLabel={`Campeão da linha ${rowIndex + 1}`}
+            placeholder="Campeão"
+            value={row.champion ?? ""}
+            onChange={(valor) => updateStatsRowField(gameIndex, rowIndex, "champion", valor)}
+          />
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, minmax(0,1fr)) 50px",
+            gap: 8,
+            marginTop: 10,
+            alignItems: "end",
+          }}
+        >
+          {campoNumero("Abates", "Abates", "kills")}
+          {campoNumero("Mortes", "Mortes", "deaths")}
+          {campoNumero("Assist.", "Assistências", "assists")}
+          <div title="KDA calculado: (abates + assistências) ÷ mortes">
+            <span style={{ ...rotuloMiudo, textAlign: "center" }}>KDA</span>
+            <span
+              style={{
+                display: "grid",
+                placeItems: "center",
+                minHeight: 44,
+                fontSize: 14,
+                fontWeight: 700,
+                color: estado === "vazia" ? C.ink4 : C.okSoft,
+                ...tabular,
+              }}
+            >
+              {kda.toFixed(2)}
+            </span>
+          </div>
+        </div>
+
+        {motivo ? (
+          <p
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 6,
+              margin: "9px 0 0",
+              fontSize: 12,
+              lineHeight: 1.45,
+              color: problema ? C.dangerSoft : C.warnSoft,
+            }}
+          >
+            <AlertTriangle size={14} aria-hidden style={{ flexShrink: 0, marginTop: 1 }} />
+            {motivo}
+          </p>
+        ) : null}
+      </div>
+    );
+  };
+
+  /**
+   * Um jogo no celular, na ordem em que o resultado é conferido: quem venceu, quanto durou,
+   * os dez jogadores e, por último, os bans. A importação da Riot fica recolhida — partida
+   * personalizada não tem ID público, então na prática ela quase nunca é usada, e aberta
+   * empurrava os jogadores para baixo em todo jogo.
+   */
+  const renderGameCompacto = (game: SeriesMatch["games"][number], gameIndex: number) => {
+    if (!selectedSeries) return null;
+
+    const numero = gameIndex + 1;
+    const riotImportKey = getGameImportKey(selectedSeries.id, gameIndex);
+    const riotImportStatus = riotImportStatusByGame[riotImportKey];
+    const riotMatchId = riotMatchIdsByGame[riotImportKey] ?? "";
+    const isImportingRiot = riotImportingGameKey === riotImportKey;
+    const importAberto =
+      riotAbertos[riotImportKey] ?? Boolean(riotMatchId.trim() || riotImportStatus || isImportingRiot);
+    const autoMvpDisplay = getAutoMvpDisplay(game, currentRosters.combined);
+    const estados =
+      auditoriaSelecionada?.estadosPorJogo[gameIndex] ??
+      game.statsByPlayer.map((): EstadoLinha => "ok");
+    const jogoComProblema = auditoriaSelecionada?.jogosComProblema.includes(gameIndex) ?? false;
+    const linhasOk = estados.filter((estado) => estado === "ok").length;
+    const temOsDoisTimes = Boolean(selectedSeries.teamAId && selectedSeries.teamBId);
+    // O id da série é slug (letras, números, hífen): serve de pedaço de id do DOM.
+    const idVencedor = `serie-${selectedSeries.id}-jogo-${numero}-vencedor`;
+    const idImportacao = `serie-${selectedSeries.id}-jogo-${numero}-riot`;
+    const bans = game.bans ?? [];
+
+    return (
+      <Card
+        key={`${selectedSeries.id}-game-${gameIndex}`}
+        padding={12}
+        style={{ minWidth: 0, marginTop: 12, borderColor: jogoComProblema ? "rgba(212,87,74,.45)" : C.line }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <h4 style={{ fontFamily: display, fontSize: 19, color: C.ink, margin: 0 }}>Jogo {numero}</h4>
+          {jogoComProblema ? <Chip tone="danger">Pendências</Chip> : null}
+          {/* O destrutivo fica na ponta oposta e sem rótulo grande (#8). */}
+          <span style={{ marginLeft: "auto" }}>
+            <BotaoIcone tone="danger" label={`Remover o Jogo ${numero}`} onClick={() => removerJogo(gameIndex)} />
+          </span>
+        </div>
+
+        {/*
+          Vencedor em dois botões grandes com o escudo de cada time, no lugar do select: é o
+          campo mais tocado do jogo, e o select abria a roleta do sistema para escolher entre
+          dois nomes. Tocar no que já está marcado não desmarca (toque duplo acidental apagaria
+          o resultado); para isso há o "Desmarcar".
+        */}
+        <div style={{ marginTop: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <span id={idVencedor} style={{ ...rotuloMiudo, marginBottom: 0 }}>
+              Quem venceu
+            </span>
+            {game.winnerTeamId ? (
+              <span style={{ marginLeft: "auto" }}>
+                <Button tone="ghost" small onClick={() => updateGameWinner(gameIndex, "")}>
+                  Desmarcar
+                </Button>
+              </span>
+            ) : null}
+          </div>
+          {temOsDoisTimes ? (
+            <div
+              role="group"
+              aria-labelledby={idVencedor}
+              style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}
+            >
+              {[selectedSeries.teamAId, selectedSeries.teamBId].map((teamId, lado) => {
+                const venceu = game.winnerTeamId === teamId;
+                return (
+                  <button
+                    key={`${lado}-${teamId}`}
+                    type="button"
+                    aria-pressed={venceu}
+                    className="adm-toque"
+                    onClick={() => {
+                      if (!venceu) updateGameWinner(gameIndex, teamId);
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      minWidth: 0,
+                      minHeight: 54,
+                      padding: "8px 10px",
+                      borderRadius: 4,
+                      border: `1px solid ${venceu ? "transparent" : game.winnerTeamId ? C.line : "rgba(224,163,58,.45)"}`,
+                      background: venceu
+                        ? `linear-gradient(180deg, ${C.bronzeHi}, ${C.bronzeDeep})`
+                        : "rgba(0,0,0,.26)",
+                      boxShadow: `inset 3px 0 0 ${teamColor(teamId)}`,
+                      color: venceu ? "#160f06" : C.ink2,
+                      fontFamily: "inherit",
+                      fontSize: 13.5,
+                      fontWeight: venceu ? 800 : 600,
+                      textAlign: "left",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <MarcaDoTime time={timeDe(teamId)} tamanho={26} />
+                    {/* Até duas linhas: meio botão tem ~70px de texto, e "Capangas do Moto Moto"
+                        cortado em reticências virava "Capangas…" — dois times assim ficavam iguais. */}
+                    <span
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        lineHeight: 1.2,
+                        overflow: "hidden",
+                        overflowWrap: "anywhere",
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical",
+                      }}
+                    >
+                      {getTeamName(draft, teamId)}
+                    </span>
+                    {venceu ? <Trophy size={16} aria-hidden style={{ flexShrink: 0 }} /> : null}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <LinhaVazia>Escolha os dois times no Confronto para marcar o vencedor.</LinhaVazia>
+          )}
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "minmax(0,1fr) minmax(0,1.35fr)",
+            gap: 10,
+            marginTop: 14,
+            alignItems: "start",
+          }}
+        >
+          <Field label="Duração (min)">
+            <Input numeric value={game.durationMin ?? ""} onChange={(value) => updateGameDuration(gameIndex, value)} />
+          </Field>
+          <div title="Maior KDA; desempate por abates, assistências e menos mortes.">
+            <span style={rotuloMiudo}>MVP (automático)</span>
+            <div
+              style={{
+                ...caixaLeitura,
+                display: "flex",
+                alignItems: "center",
+                gap: 7,
+                minHeight: 44,
+                wordBreak: "normal",
+                overflowWrap: "anywhere",
+              }}
+            >
+              <Crown
+                size={16}
+                aria-hidden
+                style={{ flexShrink: 0, color: autoMvpDisplay.muted ? C.ink4 : C.bronzeHi }}
+              />
+              <span style={{ minWidth: 0, color: autoMvpDisplay.muted ? C.ink4 : C.ink }}>{autoMvpDisplay.text}</span>
+            </div>
+          </div>
+        </div>
+
+        <div
+          style={{
+            marginTop: 12,
+            border: `1px solid ${C.line}`,
+            borderRadius: 4,
+            background: "rgba(0,0,0,.18)",
+          }}
+        >
+          <button
+            type="button"
+            aria-expanded={importAberto}
+            aria-controls={idImportacao}
+            onClick={() => setRiotAbertos((prev) => ({ ...prev, [riotImportKey]: !importAberto }))}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 9,
+              width: "100%",
+              minHeight: 46,
+              padding: "0 12px",
+              border: "none",
+              background: "none",
+              color: C.ink2,
+              fontFamily: "inherit",
+              fontSize: 13,
+              textAlign: "left",
+              cursor: "pointer",
+            }}
+          >
+            <CloudDownload size={17} aria-hidden style={{ flexShrink: 0, color: C.bronze }} />
+            <span style={{ flex: 1, minWidth: 0 }}>Importar da Riot pelo ID da partida</span>
+            <ChevronDown
+              size={17}
+              aria-hidden
+              style={{ flexShrink: 0, color: C.ink4, transform: importAberto ? "rotate(180deg)" : undefined }}
+            />
+          </button>
+          {importAberto ? (
+            <div id={idImportacao} style={{ padding: "2px 12px 12px" }}>
+              <Field
+                label="ID da partida no LoL (Riot)"
+                hint="Preenche vencedor, duração, campeões e K/D/A. O MVP sai do maior KDA."
+              >
+                <Input
+                  placeholder="Ex.: BR1_3210692404"
+                  value={riotMatchId}
+                  onChange={(value) => setRiotMatchIdForGame(selectedSeries.id, gameIndex, value)}
+                />
+              </Field>
+              <div style={{ marginTop: 10 }}>
+                <Button
+                  tone="ghost"
+                  fullWidth
+                  disabled={isImportingRiot || !riotMatchId.trim() || !temOsDoisTimes}
+                  onClick={() => void importGameFromRiot(gameIndex)}
+                >
+                  {isImportingRiot ? "Importando…" : "Importar da Riot"}
+                </Button>
+              </div>
+              {riotImportStatus ? <AvisoDaRiot status={riotImportStatus} /> : null}
+            </div>
+          ) : null}
+        </div>
+
+        <SubtituloDoJogo icone={UsersRound} contagem={`${linhasOk}/${game.statsByPlayer.length} ok`}>
+          Estatísticas por jogador
+        </SubtituloDoJogo>
+        {avisoCompacto(`jogo:${gameIndex}`) ? (
+          <div style={{ marginBottom: 10 }}>{avisoCompacto(`jogo:${gameIndex}`)}</div>
+        ) : null}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+          <Button
+            // Jogo sem linha nenhuma: trazer o elenco é o primeiro passo, então ele acende.
+            tone={game.statsByPlayer.length === 0 ? "gold" : "ghost"}
+            small
+            onClick={() => fillRosterRowsForGame(gameIndex)}
+            style={{ flex: "1 1 auto" }}
+          >
+            <UsersRound size={15} aria-hidden /> Preencher elenco
+          </Button>
+          <Button tone="ghost" small onClick={() => addStatsRowToGame(gameIndex)} style={{ flex: "0 0 auto" }}>
+            <Plus size={15} aria-hidden /> Linha
+          </Button>
+        </div>
+
+        <div onWheelCapture={bloquearRoda} style={{ display: "grid", gap: 8 }}>
+          {game.statsByPlayer.length === 0 ? (
+            <LinhaVazia>
+              Nenhuma linha ainda. &quot;Preencher elenco&quot; traz os 10 jogadores na ordem das rotas.
+            </LinhaVazia>
+          ) : (
+            game.statsByPlayer.map((row, rowIndex) =>
+              renderStatsCartao(gameIndex, row, rowIndex, estados[rowIndex] ?? "ok"),
+            )
+          )}
+        </div>
+
+        {selectedSeries.teamAId || selectedSeries.teamBId ? (
+          <>
+            <SubtituloDoJogo icone={Ban} contagem={bans.length > 0 ? String(bans.length) : undefined}>
+              Campeões banidos
+            </SubtituloDoJogo>
+            {avisoCompacto(`bans:${gameIndex}`) ? (
+              <div style={{ marginBottom: 10 }}>{avisoCompacto(`bans:${gameIndex}`)}</div>
+            ) : null}
+            <div style={{ display: "grid", gap: 8 }}>
+              {bans.length === 0 ? (
+                <LinhaVazia>Nenhum ban registrado neste jogo.</LinhaVazia>
+              ) : (
+                bans.map((ban, banIndex) => (
+                  <div
+                    key={`g${gameIndex}-ban${banIndex}`}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "minmax(0,1fr) auto",
+                      gap: 8,
+                      padding: 10,
+                      border: `1px solid ${C.line}`,
+                      borderRadius: 4,
+                      background: "rgba(0,0,0,.20)",
+                      boxShadow: ban.teamId ? `inset 3px 0 0 ${teamColor(ban.teamId)}` : undefined,
+                    }}
+                  >
+                    <Select
+                      ariaLabel={`Time do ban ${banIndex + 1}`}
+                      value={ban.teamId}
+                      onChange={(value) => updateBanField(gameIndex, banIndex, "teamId", value)}
+                    >
+                      <option value="">Time</option>
+                      {selectedSeries.teamAId ? (
+                        <option value={selectedSeries.teamAId}>{getTeamName(draft, selectedSeries.teamAId)}</option>
+                      ) : null}
+                      {selectedSeries.teamBId ? (
+                        <option value={selectedSeries.teamBId}>{getTeamName(draft, selectedSeries.teamBId)}</option>
+                      ) : null}
+                    </Select>
+                    <BotaoIcone
+                      label={`Remover o ban ${banIndex + 1}`}
+                      onClick={() => removeBanFromGame(gameIndex, banIndex)}
+                    />
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <InputCampeao
+                        ariaLabel={`Campeão banido ${banIndex + 1}`}
+                        placeholder="Campeão banido"
+                        value={ban.championName}
+                        onChange={(valor) => updateBanField(gameIndex, banIndex, "championName", valor)}
+                      />
+                    </div>
+                  </div>
+                ))
+              )}
+              <Button tone="ghost" small fullWidth onClick={() => addBanToGame(gameIndex)}>
+                <Plus size={15} aria-hidden /> Ban
+              </Button>
+            </div>
+          </>
+        ) : null}
+      </Card>
+    );
+  };
+
   let conteudoDosJogos: ReactNode = null;
   if (selectedSeries) {
     if (selectedSeriesIsWalkover) {
@@ -2041,9 +2977,15 @@ export function AdminSeriesPanel({
         </LinhaVazia>
       );
     } else if (selectedSeries.games.length === 0) {
-      conteudoDosJogos = <LinhaVazia>Nenhum jogo nesta série. Use &quot;Adicionar jogo&quot;.</LinhaVazia>;
+      conteudoDosJogos = compacto ? (
+        <LinhaVazia>Nenhum jogo nesta série. Toque em &quot;Adicionar jogo&quot; logo abaixo.</LinhaVazia>
+      ) : (
+        <LinhaVazia>Nenhum jogo nesta série. Use &quot;Adicionar jogo&quot;.</LinhaVazia>
+      );
     } else {
-      conteudoDosJogos = selectedSeries.games.map((game, gameIndex) => renderGame(game, gameIndex));
+      conteudoDosJogos = selectedSeries.games.map((game, gameIndex) =>
+        compacto ? renderGameCompacto(game, gameIndex) : renderGame(game, gameIndex),
+      );
     }
   }
 
@@ -2051,6 +2993,328 @@ export function AdminSeriesPanel({
 
   const placarSelecionado = selectedSeries ? getSeriesScore(selectedSeries, draft) : null;
   const dataHoraSelecionada = isoParaCamposBrasilia(selectedSeries?.date);
+
+  /*
+   * Blocos que os dois arranjos usam IGUAIS: o monitor os põe na ordem de sempre, o celular
+   * na ordem de quem lança resultado. Um bloco só por campo garante que confirmação, aviso e
+   * validação não divergem entre o editor ao lado da lista e o da folha.
+   */
+
+  const bannersDaSerie = auditoriaSelecionada ? (
+    <>
+      {auditoriaSelecionada.bloqueios.length > 0 ? (
+        <div style={{ marginTop: 16 }}>
+          <Banner tone="danger" title="Esta série ainda não pode ser salva">
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {auditoriaSelecionada.bloqueios.slice(0, 6).map((texto) => (
+                <li key={texto}>{texto}</li>
+              ))}
+              {auditoriaSelecionada.bloqueios.length > 6 ? (
+                <li>+ {auditoriaSelecionada.bloqueios.length - 6} pendência(s)</li>
+              ) : null}
+            </ul>
+          </Banner>
+        </div>
+      ) : null}
+
+      {/* Não trava o salvamento, mas muda resultado: campeão cedo demais ou pontos a mais. */}
+      {auditoriaSelecionada.avisos.length > 0 ? (
+        <div style={{ marginTop: 16 }}>
+          <Banner tone="warn" title="Confira a etapa e o formato desta série">
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {auditoriaSelecionada.avisos.map((texto) => (
+                <li key={texto}>{texto}</li>
+              ))}
+            </ul>
+          </Banner>
+        </div>
+      ) : null}
+    </>
+  ) : null;
+
+  const blocoIdentidade = selectedSeries ? (
+    renomeandoId ? (
+      <div>
+        <Field
+          label="Novo ID da série"
+          hint={`Link público: /partidas/${slugifyValue(idRascunho) || "…"}`}
+        >
+          <Input value={idRascunho} onChange={setIdRascunho} />
+        </Field>
+        {erroId ? (
+          <p role="alert" style={{ margin: "6px 0 0", fontSize: 11.5, color: C.dangerSoft }}>
+            {erroId}
+          </p>
+        ) : null}
+        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+          <Button tone="gold" small onClick={aplicarRenomeacao}>
+            Aplicar novo ID
+          </Button>
+          <Button
+            tone="ghost"
+            small
+            onClick={() => {
+              setRenomeandoId(false);
+              setErroId(null);
+            }}
+          >
+            Cancelar
+          </Button>
+        </div>
+      </div>
+    ) : (
+      <div>
+        {/* #5: o ID é a URL pública, então não se edita por acidente. */}
+        <Field label="ID da série (vira o link público)" hint={`/partidas/${selectedSeries.id}`}>
+          <div style={caixaLeitura}>{selectedSeries.id}</div>
+        </Field>
+        <div style={{ marginTop: 8 }}>
+          <Button
+            tone="ghost"
+            small
+            onClick={() => {
+              setIdRascunho(selectedSeries.id);
+              setErroId(null);
+              setRenomeandoId(true);
+            }}
+          >
+            <Pencil size={14} aria-hidden /> Renomear ID…
+          </Button>
+        </div>
+      </div>
+    )
+  ) : null;
+
+  /*
+    Data e horário separados, e não um `datetime-local`: aquele campo só aceita data E
+    hora juntas — uma série gravada só com data apareceria inteira em branco, e apagar a
+    hora apagaria a data junto. Aqui a hora em branco é estado válido (grava só a data).
+    Os dois mostram e gravam a hora de BRASÍLIA, seja qual for o fuso do computador.
+  */
+  const camposDataHora = selectedSeries ? (
+    <div className="lob-2col">
+      <Field label="Data">
+        <Input
+          type="date"
+          ariaLabel="Data da série"
+          value={dataHoraSelecionada.data}
+          onChange={(value) => updateSeriesDataHora(value, dataHoraSelecionada.hora)}
+          // Sem colorScheme escuro o navegador desenha o seletor nativo em preto sobre preto.
+          style={{ colorScheme: "dark" }}
+        />
+      </Field>
+      <Field label="Horário (Brasília)" hint="Em branco = só a data.">
+        <Input
+          type="time"
+          ariaLabel="Horário da série (Brasília)"
+          value={dataHoraSelecionada.hora}
+          onChange={(value) => updateSeriesDataHora(dataHoraSelecionada.data, value)}
+          style={{ colorScheme: "dark" }}
+        />
+      </Field>
+    </div>
+  ) : null;
+
+  /**
+   * No celular o escudo do time escolhido aparece ao lado do select — o select nativo não
+   * mostra imagem, e é pelo escudo que se confere de relance se o confronto está certo.
+   */
+  const comEscudo = (teamId: string, controle: ReactNode) =>
+    compacto ? (
+      <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <MarcaDoTime time={timeDe(teamId)} tamanho={34} />
+        <span style={{ flex: 1, minWidth: 0 }}>{controle}</span>
+      </span>
+    ) : (
+      controle
+    );
+
+  const camposConfronto = selectedSeries ? (
+    <div className="lob-2col">
+      <Field label="Time A">
+        {comEscudo(
+          selectedSeries.teamAId,
+          <Select value={selectedSeries.teamAId} onChange={(value) => trocarTimeDaSerie("A", value)}>
+            <option value="">Selecione</option>
+            {draft.teams.map((team) => (
+              <option key={team.id} value={team.id}>
+                {team.name}
+              </option>
+            ))}
+          </Select>,
+        )}
+      </Field>
+      <Field label="Time B">
+        {comEscudo(
+          selectedSeries.teamBId,
+          <Select value={selectedSeries.teamBId} onChange={(value) => trocarTimeDaSerie("B", value)}>
+            <option value="">Selecione</option>
+            {draft.teams.map((team) => (
+              <option key={team.id} value={team.id}>
+                {team.name}
+              </option>
+            ))}
+          </Select>,
+        )}
+      </Field>
+      <Field label="Etapa">
+        <Select
+          ariaLabel="Etapa"
+          value={selectedSeries.stage ?? "REGULAR_SEASON"}
+          onChange={(value) => updateSeriesStage(value as SeriesStage)}
+        >
+          <option value="REGULAR_SEASON">{getStageOptionLabel("REGULAR_SEASON")}</option>
+          <option value="SEMIFINAL">{getStageOptionLabel("SEMIFINAL")}</option>
+          <option value="FINAL">{getStageOptionLabel("FINAL")}</option>
+        </Select>
+      </Field>
+      <Field label="Formato da série">
+        <Select
+          ariaLabel="Formato da série"
+          value={selectedSeriesFormat}
+          onChange={(value) => updateSeriesFormat(value as SeriesFormat)}
+        >
+          <option value="BO3">{getFormatOptionLabel("BO3")}</option>
+          <option value="BO5">{getFormatOptionLabel("BO5")}</option>
+        </Select>
+      </Field>
+    </div>
+  ) : null;
+
+  const camposWo = selectedSeries ? (
+    <>
+      <p style={{ margin: "0 0 12px", fontSize: 12, color: C.ink4 }}>
+        Use quando a série não foi jogada: o placar vira {selectedSeriesTargetWins}-0 automático, sem stats
+        de jogadores.
+      </p>
+      <div className="lob-2col">
+        <Field label="Situação da série">
+          <Select
+            value={selectedSeries.walkoverWinnerTeamId ?? ""}
+            onChange={(value) => updateWalkoverWinner(value)}
+          >
+            <option value="">Série jogada normalmente</option>
+            {selectedSeries.teamAId ? (
+              <option value={selectedSeries.teamAId}>
+                W.O. para {getTeamName(draft, selectedSeries.teamAId)}
+              </option>
+            ) : null}
+            {selectedSeries.teamBId ? (
+              <option value={selectedSeries.teamBId}>
+                W.O. para {getTeamName(draft, selectedSeries.teamBId)}
+              </option>
+            ) : null}
+          </Select>
+        </Field>
+        <Field label="Observação do W.O. (opcional)">
+          <Input
+            disabled={!selectedSeriesIsWalkover}
+            placeholder="Ex.: time não compareceu no horário"
+            value={selectedSeries.walkoverReason ?? ""}
+            onChange={(value) =>
+              updateSelectedSeries((series) => {
+                series.walkoverReason = value;
+              })
+            }
+          />
+        </Field>
+      </div>
+    </>
+  ) : null;
+
+  /**
+   * A cerimônia do sorteio. No monitor ela continua dentro do editor, onde sempre esteve.
+   * No celular ela vai para o <body> por portal, FORA da folha: dentro, o Esc chegava
+   * primeiro à folha — que fechava a série e desmontava a cerimônia no meio do giro — e o
+   * z-index dela ficava preso ao da folha. Fechada a cerimônia, o foco volta ao botão que a
+   * abriu, senão quem usa teclado cairia no topo da página, atrás da folha.
+   */
+  const sorteioAoVivo = selectedSeries ? (
+    <SorteioAoVivo
+      aberto={sorteioAberto}
+      onFechar={() => {
+        setSorteioAberto(false);
+        if (compacto) {
+          requestAnimationFrame(() =>
+            document.querySelector<HTMLButtonElement>(`#${ID_SORTEIO_COMPACTO} button`)?.focus(),
+          );
+        }
+      }}
+      serieId={selectedSeries.id}
+      teamAId={selectedSeries.teamAId}
+      teamBId={selectedSeries.teamBId}
+      nomeDoTime={(id) => getTeamName(draft, id)}
+      corDoTime={(id) => teamColor(id)}
+      blueSideTeamId={selectedSeries.blueSideTeamId}
+      cardsUsed={selectedSeries.cardsUsed}
+      podeLados
+      podeCartas
+      onSorteado={({ tipo, blueSideTeamId, cardsUsed, versao, versaoLida, sorteios }) => {
+        // Aplica no rascunho exatamente o que o servidor gravou, sem recarregar:
+        // a recarga abre `window.confirm` quando há edição pendente e congelava a
+        // roda na tela projetada — e, se passasse direto, descartaria em silêncio
+        // o que o organizador estivesse editando.
+        // A versão é atributo da LINHA no banco, não do documento — quem guarda é o
+        // painel principal. Aqui só se repassa o que a rota informou.
+        onVersaoDoServidor(versaoLida, versao);
+
+        aplicarDoServidor((next) => {
+          const serie = next.seriesMatches.find((row) => row.id === selectedSeries.id);
+          if (!serie) return;
+
+          /*
+           * O HISTÓRICO acompanha nos DOIS tipos — lados e carta acrescentam registro.
+           *
+           * Os avisos de excluir/renomear série (e o de excluir time, que arrasta as
+           * séries dele) leem `sorteios` DAQUI para prever a recusa do servidor. Sem
+           * sincronizar, um sorteio feito nesta mesma sessão não aparecia no rascunho e
+           * os avisos ficavam mudos justamente no dia de jogo: a pessoa excluía a série
+           * achando que não havia histórico e só descobria no 403, com a série já fora
+           * do rascunho e sem desfazer.
+           *
+           * Copia a lista inteira em vez de acrescentar, para não divergir de um
+           * rascunho atrasado. O campo continua sendo propriedade do servidor: o PUT o
+           * reancora a partir do que está gravado.
+           */
+          if (Array.isArray(sorteios)) {
+            serie.sorteios = sorteios as NonNullable<SeriesMatch["sorteios"]>;
+          }
+
+          /*
+           * Só o campo que ESTE sorteio mexeu.
+           *
+           * A rota responde sempre com os dois campos, inclusive o que ela não tocou —
+           * num sorteio de LADOS ela devolve o `cardsUsed` que estava no servidor. Como
+           * as cartinhas também são editáveis à mão neste painel e só chegam ao servidor
+           * no "Salvar", espelhar os dois apagava do rascunho, sem aviso e sem desfazer,
+           * as linhas que o organizador tinha acabado de montar. O caminho antigo
+           * (recarregar tudo) ao menos PERGUNTAVA antes de descartar.
+           */
+          if (tipo === "lados") {
+            if (blueSideTeamId) serie.blueSideTeamId = blueSideTeamId;
+            else delete serie.blueSideTeamId;
+          } else {
+            // `cardsUsed` chega da rede com `cardId` solto como string. Conferir contra
+            // as cartas conhecidas antes de gravar evita enfiar no rascunho um id que o
+            // schema recusaria depois, na hora de salvar.
+            const validas = cardsUsed.flatMap((uso) =>
+              uso.cardId in CARDS_BY_ID ? [{ ...uso, cardId: uso.cardId as CardId }] : [],
+            );
+            /*
+             * Lista vazia sobre campo AUSENTE tem de continuar ausente.
+             *
+             * `[]` e `undefined` são diferentes para o diff de autorização: gravar `[]`
+             * onde o servidor não tem o campo cria uma mudança `series:cards` fantasma, e
+             * quem tem só `series:sides` levava 403 ao salvar por um campo que nunca
+             * tocou — sem outra saída além da recarga que descarta o rascunho.
+             */
+            if (validas.length === 0 && serie.cardsUsed === undefined) delete serie.cardsUsed;
+            else serie.cardsUsed = validas;
+          }
+        });
+      }}
+    />
+  ) : null;
 
   const editor = selectedSeries === null ? (
     <Empty
@@ -2123,200 +3387,21 @@ export function AdminSeriesPanel({
         </Button>
       </div>
 
-      {auditoriaSelecionada && auditoriaSelecionada.bloqueios.length > 0 ? (
-        <div style={{ marginTop: 16 }}>
-          <Banner tone="danger" title="Esta série ainda não pode ser salva">
-            <ul style={{ margin: 0, paddingLeft: 18 }}>
-              {auditoriaSelecionada.bloqueios.slice(0, 6).map((texto) => (
-                <li key={texto}>{texto}</li>
-              ))}
-              {auditoriaSelecionada.bloqueios.length > 6 ? (
-                <li>+ {auditoriaSelecionada.bloqueios.length - 6} pendência(s)</li>
-              ) : null}
-            </ul>
-          </Banner>
-        </div>
-      ) : null}
-
-      {/* Não trava o salvamento, mas muda resultado: campeão cedo demais ou pontos a mais. */}
-      {auditoriaSelecionada && auditoriaSelecionada.avisos.length > 0 ? (
-        <div style={{ marginTop: 16 }}>
-          <Banner tone="warn" title="Confira a etapa e o formato desta série">
-            <ul style={{ margin: 0, paddingLeft: 18 }}>
-              {auditoriaSelecionada.avisos.map((texto) => (
-                <li key={texto}>{texto}</li>
-              ))}
-            </ul>
-          </Banner>
-        </div>
-      ) : null}
+      {bannersDaSerie}
 
       <BlockTitle right={<Aviso escopo="identidade" />}>Identificação</BlockTitle>
 
       <div className="lob-2col">
-        {renomeandoId ? (
-          <div>
-            <Field
-              label="Novo ID da série"
-              hint={`Link público: /partidas/${slugifyValue(idRascunho) || "…"}`}
-            >
-              <Input value={idRascunho} onChange={setIdRascunho} />
-            </Field>
-            {erroId ? (
-              <p role="alert" style={{ margin: "6px 0 0", fontSize: 11.5, color: C.dangerSoft }}>
-                {erroId}
-              </p>
-            ) : null}
-            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <Button tone="gold" small onClick={aplicarRenomeacao}>
-                Aplicar novo ID
-              </Button>
-              <Button
-                tone="ghost"
-                small
-                onClick={() => {
-                  setRenomeandoId(false);
-                  setErroId(null);
-                }}
-              >
-                Cancelar
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div>
-            {/* #5: o ID é a URL pública, então não se edita por acidente. */}
-            <Field label="ID da série (vira o link público)" hint={`/partidas/${selectedSeries.id}`}>
-              <div style={caixaLeitura}>{selectedSeries.id}</div>
-            </Field>
-            <div style={{ marginTop: 8 }}>
-              <Button
-                tone="ghost"
-                small
-                onClick={() => {
-                  setIdRascunho(selectedSeries.id);
-                  setErroId(null);
-                  setRenomeandoId(true);
-                }}
-              >
-                <Pencil size={14} aria-hidden /> Renomear ID…
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/*
-          Data e horário separados, e não um `datetime-local`: aquele campo só aceita data E
-          hora juntas — uma série gravada só com data apareceria inteira em branco, e apagar a
-          hora apagaria a data junto. Aqui a hora em branco é estado válido (grava só a data).
-          Os dois mostram e gravam a hora de BRASÍLIA, seja qual for o fuso do computador.
-        */}
-        <div className="lob-2col">
-          <Field label="Data">
-            <Input
-              type="date"
-              ariaLabel="Data da série"
-              value={dataHoraSelecionada.data}
-              onChange={(value) => updateSeriesDataHora(value, dataHoraSelecionada.hora)}
-              // Sem colorScheme escuro o navegador desenha o seletor nativo em preto sobre preto.
-              style={{ colorScheme: "dark" }}
-            />
-          </Field>
-          <Field label="Horário (Brasília)" hint="Em branco = só a data.">
-            <Input
-              type="time"
-              ariaLabel="Horário da série (Brasília)"
-              value={dataHoraSelecionada.hora}
-              onChange={(value) => updateSeriesDataHora(dataHoraSelecionada.data, value)}
-              style={{ colorScheme: "dark" }}
-            />
-          </Field>
-        </div>
+        {blocoIdentidade}
+        {camposDataHora}
       </div>
 
       <BlockTitle right={<Aviso escopo="times" />}>Confronto</BlockTitle>
 
-      <div className="lob-2col">
-        <Field label="Time A">
-          <Select value={selectedSeries.teamAId} onChange={(value) => trocarTimeDaSerie("A", value)}>
-            <option value="">Selecione</option>
-            {draft.teams.map((team) => (
-              <option key={team.id} value={team.id}>
-                {team.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Time B">
-          <Select value={selectedSeries.teamBId} onChange={(value) => trocarTimeDaSerie("B", value)}>
-            <option value="">Selecione</option>
-            {draft.teams.map((team) => (
-              <option key={team.id} value={team.id}>
-                {team.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Etapa">
-          <Select
-            ariaLabel="Etapa"
-            value={selectedSeries.stage ?? "REGULAR_SEASON"}
-            onChange={(value) => updateSeriesStage(value as SeriesStage)}
-          >
-            <option value="REGULAR_SEASON">{getStageOptionLabel("REGULAR_SEASON")}</option>
-            <option value="SEMIFINAL">{getStageOptionLabel("SEMIFINAL")}</option>
-            <option value="FINAL">{getStageOptionLabel("FINAL")}</option>
-          </Select>
-        </Field>
-        <Field label="Formato da série">
-          <Select
-            ariaLabel="Formato da série"
-            value={selectedSeriesFormat}
-            onChange={(value) => updateSeriesFormat(value as SeriesFormat)}
-          >
-            <option value="BO3">{getFormatOptionLabel("BO3")}</option>
-            <option value="BO5">{getFormatOptionLabel("BO5")}</option>
-          </Select>
-        </Field>
-      </div>
+      {camposConfronto}
 
       <BlockTitle>Resultado por W.O.</BlockTitle>
-      <p style={{ margin: "0 0 12px", fontSize: 12, color: C.ink4 }}>
-        Use quando a série não foi jogada: o placar vira {selectedSeriesTargetWins}-0 automático, sem stats
-        de jogadores.
-      </p>
-      <div className="lob-2col">
-        <Field label="Situação da série">
-          <Select
-            value={selectedSeries.walkoverWinnerTeamId ?? ""}
-            onChange={(value) => updateWalkoverWinner(value)}
-          >
-            <option value="">Série jogada normalmente</option>
-            {selectedSeries.teamAId ? (
-              <option value={selectedSeries.teamAId}>
-                W.O. para {getTeamName(draft, selectedSeries.teamAId)}
-              </option>
-            ) : null}
-            {selectedSeries.teamBId ? (
-              <option value={selectedSeries.teamBId}>
-                W.O. para {getTeamName(draft, selectedSeries.teamBId)}
-              </option>
-            ) : null}
-          </Select>
-        </Field>
-        <Field label="Observação do W.O. (opcional)">
-          <Input
-            disabled={!selectedSeriesIsWalkover}
-            placeholder="Ex.: time não compareceu no horário"
-            value={selectedSeries.walkoverReason ?? ""}
-            onChange={(value) =>
-              updateSelectedSeries((series) => {
-                series.walkoverReason = value;
-              })
-            }
-          />
-        </Field>
-      </div>
+      {camposWo}
 
       <BlockTitle
         right={
@@ -2339,83 +3424,7 @@ export function AdminSeriesPanel({
         Cartinhas da série
       </BlockTitle>
 
-      <SorteioAoVivo
-        aberto={sorteioAberto}
-        onFechar={() => setSorteioAberto(false)}
-        serieId={selectedSeries.id}
-        teamAId={selectedSeries.teamAId}
-        teamBId={selectedSeries.teamBId}
-        nomeDoTime={(id) => getTeamName(draft, id)}
-        corDoTime={(id) => teamColor(id)}
-        blueSideTeamId={selectedSeries.blueSideTeamId}
-        cardsUsed={selectedSeries.cardsUsed}
-        podeLados
-        podeCartas
-        onSorteado={({ tipo, blueSideTeamId, cardsUsed, versao, versaoLida, sorteios }) => {
-          // Aplica no rascunho exatamente o que o servidor gravou, sem recarregar:
-          // a recarga abre `window.confirm` quando há edição pendente e congelava a
-          // roda na tela projetada — e, se passasse direto, descartaria em silêncio
-          // o que o organizador estivesse editando.
-          // A versão é atributo da LINHA no banco, não do documento — quem guarda é o
-          // painel principal. Aqui só se repassa o que a rota informou.
-          onVersaoDoServidor(versaoLida, versao);
-
-          aplicarDoServidor((next) => {
-            const serie = next.seriesMatches.find((row) => row.id === selectedSeries.id);
-            if (!serie) return;
-
-            /*
-             * O HISTÓRICO acompanha nos DOIS tipos — lados e carta acrescentam registro.
-             *
-             * Os avisos de excluir/renomear série (e o de excluir time, que arrasta as
-             * séries dele) leem `sorteios` DAQUI para prever a recusa do servidor. Sem
-             * sincronizar, um sorteio feito nesta mesma sessão não aparecia no rascunho e
-             * os avisos ficavam mudos justamente no dia de jogo: a pessoa excluía a série
-             * achando que não havia histórico e só descobria no 403, com a série já fora
-             * do rascunho e sem desfazer.
-             *
-             * Copia a lista inteira em vez de acrescentar, para não divergir de um
-             * rascunho atrasado. O campo continua sendo propriedade do servidor: o PUT o
-             * reancora a partir do que está gravado.
-             */
-            if (Array.isArray(sorteios)) {
-              serie.sorteios = sorteios as NonNullable<SeriesMatch["sorteios"]>;
-            }
-
-            /*
-             * Só o campo que ESTE sorteio mexeu.
-             *
-             * A rota responde sempre com os dois campos, inclusive o que ela não tocou —
-             * num sorteio de LADOS ela devolve o `cardsUsed` que estava no servidor. Como
-             * as cartinhas também são editáveis à mão neste painel e só chegam ao servidor
-             * no "Salvar", espelhar os dois apagava do rascunho, sem aviso e sem desfazer,
-             * as linhas que o organizador tinha acabado de montar. O caminho antigo
-             * (recarregar tudo) ao menos PERGUNTAVA antes de descartar.
-             */
-            if (tipo === "lados") {
-              if (blueSideTeamId) serie.blueSideTeamId = blueSideTeamId;
-              else delete serie.blueSideTeamId;
-            } else {
-              // `cardsUsed` chega da rede com `cardId` solto como string. Conferir contra
-              // as cartas conhecidas antes de gravar evita enfiar no rascunho um id que o
-              // schema recusaria depois, na hora de salvar.
-              const validas = cardsUsed.flatMap((uso) =>
-                uso.cardId in CARDS_BY_ID ? [{ ...uso, cardId: uso.cardId as CardId }] : [],
-              );
-              /*
-               * Lista vazia sobre campo AUSENTE tem de continuar ausente.
-               *
-               * `[]` e `undefined` são diferentes para o diff de autorização: gravar `[]`
-               * onde o servidor não tem o campo cria uma mudança `series:cards` fantasma, e
-               * quem tem só `series:sides` levava 403 ao salvar por um campo que nunca
-               * tocou — sem outra saída além da recarga que descarta o rascunho.
-               */
-              if (validas.length === 0 && serie.cardsUsed === undefined) delete serie.cardsUsed;
-              else serie.cardsUsed = validas;
-            }
-          });
-        }}
-      />
+      {sorteioAoVivo}
 
       {(selectedSeries.cardsUsed ?? []).length === 0 ? (
         <LinhaVazia>Nenhuma cartinha registrada nesta série.</LinhaVazia>
@@ -2503,6 +3512,201 @@ export function AdminSeriesPanel({
     </Card>
   );
 
+  // -------------------------------------------------------------- editor no celular
+
+  /** "Alfa x Beta" — ou "Nova série" enquanto nenhum time foi escolhido. */
+  const tituloDaFolha = selectedSeries
+    ? selectedSeries.teamAId || selectedSeries.teamBId
+      ? `${nomeOuVaga(selectedSeries.teamAId, "Time A")} x ${nomeOuVaga(selectedSeries.teamBId, "Time B")}`
+      : "Nova série"
+    : "";
+
+  const blocoConfrontoCompacto = selectedSeries ? (
+    <>
+      <TituloCompacto icone={Shield} aviso={avisoCompacto("times")}>
+        Confronto
+      </TituloCompacto>
+      {camposConfronto}
+    </>
+  ) : null;
+
+  let cartinhasCompactas: ReactNode = null;
+  if (compacto && selectedSeries) {
+    const cartinhas = selectedSeries.cardsUsed ?? [];
+    cartinhasCompactas =
+      cartinhas.length === 0 ? (
+        <LinhaVazia>Nenhuma cartinha registrada nesta série.</LinhaVazia>
+      ) : (
+        <div style={{ display: "grid", gap: 8 }}>
+          {cartinhas.map((card, cardIndex) => {
+            // A dupla vale para os dois times: o desenho das duas cartas diz isso sem texto.
+            const dupla = card.dupla === true || isDuplaCard(card.cardId);
+            const Desenho = dupla ? IconeCartas : IconeCarta;
+            return (
+              <div
+                key={`card-${cardIndex}`}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "auto minmax(0,1fr) auto",
+                  gap: 10,
+                  alignItems: "center",
+                  padding: 10,
+                  border: `1px solid ${C.line}`,
+                  borderRadius: 4,
+                  background: "rgba(0,0,0,.20)",
+                  boxShadow: card.teamId ? `inset 3px 0 0 ${teamColor(card.teamId)}` : undefined,
+                }}
+              >
+                <span
+                  title={dupla ? "Cartinha dupla: vale para os dois times" : "Cartinha de um time"}
+                  style={{ display: "grid", placeItems: "center", color: C.bronzeHi }}
+                >
+                  <Desenho size={26} aria-hidden />
+                </span>
+                <div style={{ display: "grid", gap: 8, minWidth: 0 }}>
+                  <Select
+                    ariaLabel={`Time da cartinha ${cardIndex + 1}`}
+                    value={card.teamId}
+                    onChange={(value) => updateCardField(cardIndex, "teamId", value)}
+                  >
+                    <option value="">Time</option>
+                    {selectedSeries.teamAId ? (
+                      <option value={selectedSeries.teamAId}>{getTeamName(draft, selectedSeries.teamAId)}</option>
+                    ) : null}
+                    {selectedSeries.teamBId ? (
+                      <option value={selectedSeries.teamBId}>{getTeamName(draft, selectedSeries.teamBId)}</option>
+                    ) : null}
+                  </Select>
+                  <Select
+                    ariaLabel={`Cartinha ${cardIndex + 1}`}
+                    value={card.cardId}
+                    onChange={(value) => updateCardField(cardIndex, "cardId", value)}
+                  >
+                    {opcoesDeCartinha(card.cardId).map((cardDef) => (
+                      <option key={cardDef.id} value={cardDef.id} disabled={cardDef.disabled}>
+                        {cardDef.title}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <BotaoIcone
+                  label={`Remover a cartinha ${cardIndex + 1}`}
+                  onClick={() => removeCardFromSeries(cardIndex)}
+                />
+              </div>
+            );
+          })}
+        </div>
+      );
+  }
+
+  const serieCompleta = selectedSeries ? selectedSeries.games.length >= selectedSeriesMaxGames : false;
+
+  const editorCompacto =
+    compacto && selectedSeries ? (
+    // A folha vai para o <body>: a classe traz junto o anel de foco e as grades do painel.
+    <div className="lob-series">
+      <PlacarDaSerie
+        timeA={timeDe(selectedSeries.teamAId)}
+        timeB={timeDe(selectedSeries.teamBId)}
+        nomeA={nomeOuVaga(selectedSeries.teamAId, "Time A")}
+        nomeB={nomeOuVaga(selectedSeries.teamBId, "Time B")}
+        vitoriasA={placarSelecionado?.teamAWins ?? 0}
+        vitoriasB={placarSelecionado?.teamBWins ?? 0}
+      />
+      <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap", justifyContent: "center" }}>
+        <Chip
+          tone={selectedSeriesIsWalkover ? "warn" : getSeriesWinnerTeamId(selectedSeries, draft) ? "ok" : "neutro"}
+        >
+          {getSeriesStateLabel(selectedSeriesIsWalkover, Boolean(getSeriesWinnerTeamId(selectedSeries, draft)))}
+        </Chip>
+        <Chip tone="neutro">
+          {selectedSeries.games.length}/{selectedSeriesMaxGames} jogos
+        </Chip>
+      </div>
+
+      {bannersDaSerie}
+
+      {confrontoNoTopo ? blocoConfrontoCompacto : null}
+
+      <TituloCompacto icone={Swords}>Jogos da série</TituloCompacto>
+      <p style={{ margin: "0 0 4px", fontSize: 12.5, lineHeight: 1.5, color: C.ink4 }}>
+        {getGamesSectionDescription(
+          selectedSeriesIsWalkover,
+          selectedSeriesFormatLabel,
+          selectedSeriesMaxGames,
+          selectedSeriesTargetWins,
+        )}
+      </p>
+      <div>{conteudoDosJogos}</div>
+      {/* O retorno de adicionar/remover jogo fica junto do botão, que é onde o dedo está. */}
+      {avisoCompacto("jogos") ? <div style={{ marginTop: 12 }}>{avisoCompacto("jogos")}</div> : null}
+      {selectedSeriesIsWalkover ? null : (
+        <div style={{ marginTop: 12 }}>
+          <Button tone="gold" fullWidth disabled={serieCompleta} onClick={adicionarJogo}>
+            <Plus size={17} aria-hidden />
+            {serieCompleta
+              ? `${selectedSeriesFormatLabel} completa: ${selectedSeriesMaxGames} jogos`
+              : `Adicionar jogo ${selectedSeries.games.length + 1}`}
+          </Button>
+        </div>
+      )}
+
+      <TituloCompacto
+        icone={IconeCartas}
+        aviso={avisoCompacto("cartinhas")}
+        acoes={
+          <>
+            {/* O id é do invólucro: o `Button` do kit não repassa id, e o foco volta para cá. */}
+            <span id={ID_SORTEIO_COMPACTO} style={{ display: "flex", flex: "1 1 auto" }}>
+              <Button tone="gold" small fullWidth onClick={() => setSorteioAberto(true)}>
+                <Dices size={15} aria-hidden /> Sortear ao vivo
+              </Button>
+            </span>
+            <Button tone="ghost" small onClick={addCardToSeries} style={{ flex: "1 1 auto" }}>
+              <Plus size={15} aria-hidden /> Cartinha
+            </Button>
+          </>
+        }
+      >
+        Cartinhas da série
+      </TituloCompacto>
+      {cartinhasCompactas}
+
+      {confrontoNoTopo ? null : blocoConfrontoCompacto}
+
+      <TituloCompacto icone={CalendarClock}>Data e horário</TituloCompacto>
+      {camposDataHora}
+
+      <TituloCompacto icone={Flag}>Resultado por W.O.</TituloCompacto>
+      {camposWo}
+
+      <TituloCompacto icone={Link2} aviso={avisoCompacto("identidade")}>
+        Identificação
+      </TituloCompacto>
+      {blocoIdentidade}
+    </div>
+  ) : null;
+
+  /**
+   * Rodapé fixo da folha: o destrutivo à esquerda, pequeno; o Concluir ocupa o resto, no
+   * alcance do polegar. A nota existe porque a folha cobre a barra de baixo, onde fica o
+   * Salvar — sem ela, "Concluir" parecia gravar no site.
+   */
+  const rodapeCompacto = selectedSeries ? (
+    <>
+      <p style={{ flexBasis: "100%", margin: 0, fontSize: 11, lineHeight: 1.4, color: C.ink4 }}>
+        Cada mudança já está no rascunho. Para publicar, conclua e toque em Salvar.
+      </p>
+      <Button tone="danger" onClick={confirmDeleteSelectedSeries}>
+        <Trash2 size={16} aria-hidden /> Excluir série
+      </Button>
+      <Button tone="gold" onClick={fecharEditorCompacto} style={{ flex: "1 1 auto" }}>
+        <Check size={17} aria-hidden /> Concluir
+      </Button>
+    </>
+  ) : null;
+
   // -------------------------------------------------------------- render
 
   return (
@@ -2521,7 +3725,7 @@ export function AdminSeriesPanel({
         actions={
           <>
             <Aviso escopo="topo" />
-            <Button tone="gold" onClick={createSeries}>
+            <Button tone="gold" onClick={createSeries} fullWidth={compacto}>
               <Plus size={15} aria-hidden /> Nova série
             </Button>
           </>
@@ -2584,23 +3788,52 @@ export function AdminSeriesPanel({
         </Banner>
       ) : null}
 
-      <div className="lob-series-grid">
-        <Card padding={12} style={{ minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-            <h3 style={{ fontFamily: display, fontSize: 15, color: C.bronze, margin: 0 }}>
-              Todas as séries
-            </h3>
-            <span style={{ fontSize: 11, color: C.ink4, marginLeft: "auto", ...tabular }}>
-              {sortedSeries.length}
-            </span>
-          </div>
-          <div className="lob-series-lista" style={{ display: "grid", gap: 6, paddingRight: 4 }}>
-            {listaDeSeries}
-          </div>
-        </Card>
+      {compacto ? (
+        <>
+          {listaCompacta}
 
-        <div style={{ minWidth: 0 }}>{editor}</div>
-      </div>
+          <Folha
+            aberta={selectedSeries !== null}
+            cheia
+            icone={Swords}
+            titulo={tituloDaFolha}
+            subtitulo={
+              selectedSeries ? (
+                <span style={tabular}>
+                  {getSeriesStageLabel(selectedSeries)} · {selectedSeriesFormatLabel} ·{" "}
+                  {formatSeriesDateLabel(selectedSeries.date)}
+                </span>
+              ) : undefined
+            }
+            onFechar={fecharEditorCompacto}
+            rotuloFechar="Fechar a série"
+            rodape={rodapeCompacto}
+          >
+            {editorCompacto}
+          </Folha>
+
+          {/* Fora da folha e por cima dela — ver o comentário de `sorteioAoVivo`. */}
+          {sorteioAoVivo && typeof document !== "undefined" ? createPortal(sorteioAoVivo, document.body) : null}
+        </>
+      ) : (
+        <div className="lob-series-grid">
+          <Card padding={12} style={{ minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <h3 style={{ fontFamily: display, fontSize: 15, color: C.bronze, margin: 0 }}>
+                Todas as séries
+              </h3>
+              <span style={{ fontSize: 11, color: C.ink4, marginLeft: "auto", ...tabular }}>
+                {sortedSeries.length}
+              </span>
+            </div>
+            <div className="lob-series-lista" style={{ display: "grid", gap: 6, paddingRight: 4 }}>
+              {listaDeSeries}
+            </div>
+          </Card>
+
+          <div style={{ minWidth: 0 }}>{editor}</div>
+        </div>
+      )}
     </div>
   );
 }

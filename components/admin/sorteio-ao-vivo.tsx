@@ -1,9 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent as KeyboardEventReact,
+  type ReactNode,
+} from "react";
+import { createPortal } from "react-dom";
+import { ArrowLeftRight, Dices, Undo2, X } from "lucide-react";
 
 import { CARDS_BY_ID, baralhoDoSorteio, isDuplaCard, letraDaCarta, type CardDef } from "@/lib/cards";
 import type { CardId } from "@/lib/schema";
+import { useCompacto } from "@/components/admin/responsivo";
+import { IconeCarta, IconeCartas, type Icone } from "@/components/lob/icones";
 import {
   Banner,
   Button,
@@ -36,6 +48,17 @@ import {
  *
  * ⚠ NENHUMA ANIMAÇÃO DE OPACIDADE. Já apagou o conteúdo deste site quatro vezes. Tudo o que
  * se move aqui se move por `transform`.
+ *
+ * NO CELULAR (`useCompacto()`) a cerimônia vira uma tela de aplicativo: barra fina em cima
+ * com o confronto e o X, o meio rola, e os botões de sortear ficam presos EMBAIXO, onde o
+ * polegar alcança sem a pessoa trocar a mão que segura o telefone. A roda mede a largura
+ * da tela em vez de 420px fixos — com o tamanho fixo ela estourava a página e, presa pelo
+ * `maxWidth`, virava uma elipse. No monitor o arranjo é o de sempre.
+ *
+ * A tela vai para o <body> por portal. No celular o editor de série (onde mora o botão que
+ * abre a cerimônia) é uma folha em tela cheia; dentro dela, o Esc daqui subia até a folha e
+ * fechava o EDITOR no lugar do sorteio, e o Tab saía da cerimônia para os campos escondidos
+ * atrás. Por isso o palco trata Esc e Tab ele mesmo e não deixa os dois subirem.
  */
 
 type Props = Readonly<{
@@ -137,41 +160,103 @@ type ItemDaRoda = Readonly<{
  *
  * Os rótulos giram JUNTO com a roda e nascem virados para fora (`rotate(θ)`); assim, quando a
  * fatia vencedora chega ao ponteiro, o rótulo dela está exatamente na horizontal.
+ *
+ * `fluido` (celular): a roda ocupa a largura disponível até `tamanho` e se mantém redonda
+ * por `aspect-ratio`. Antes, com largura e altura fixas e `maxWidth: 100%`, a largura
+ * encolhia e a altura não — a roda virava elipse e o freio parava "fora" do ponteiro. Tudo o
+ * que dependia do tamanho em pixels (ponteiro, largura dos rótulos) passa a ser proporção.
  */
 function Roda({
   itens,
   giro,
   transicao,
   tamanho,
+  fluido = false,
 }: Readonly<{
   itens: readonly ItemDaRoda[];
   giro: number;
   transicao: string;
   tamanho: number;
+  fluido?: boolean;
 }>) {
   const passo = 360 / Math.max(1, itens.length);
+  const doisItens = itens.length <= 2;
 
   const fatias = itens
     .map((item, i) => `${item.cor} ${(i * passo).toFixed(3)}deg ${((i + 1) * passo).toFixed(3)}deg`)
     .join(", ");
   const separadores = `repeating-conic-gradient(from 0deg, rgba(8,5,2,.9) 0deg .7deg, rgba(0,0,0,0) .7deg ${passo.toFixed(3)}deg)`;
 
-  return (
+  const caixa: CSSProperties = fluido
+    ? { position: "relative", width: "100%", maxWidth: tamanho, aspectRatio: "1 / 1", flexShrink: 0 }
+    : { position: "relative", width: tamanho, height: tamanho, flexShrink: 0, maxWidth: "100%" };
+
+  const anel = `0 0 0 3px ${C.line2}, 0 0 0 9px rgba(11,8,4,.9), 0 0 70px rgba(201,138,75,.20)`;
+  const sombraInterna = "inset 0 0 60px rgba(0,0,0,.45)";
+
+  const disco = (
     <div
-      aria-hidden
       style={{
-        position: "relative",
-        width: tamanho,
-        height: tamanho,
-        flexShrink: 0,
-        maxWidth: "100%",
+        position: "absolute",
+        inset: 0,
+        borderRadius: "50%",
+        background: `${separadores}, conic-gradient(from 0deg, ${fatias})`,
+        boxShadow: fluido ? sombraInterna : `${anel}, ${sombraInterna}`,
+        transform: `rotate(${giro}deg)`,
+        transition: transicao,
+        willChange: "transform",
       }}
     >
+      {itens.map((item, i) => {
+        const meio = i * passo + passo / 2;
+        const raio = doisItens ? 0.28 : 0.33;
+        const rad = (meio * Math.PI) / 180;
+        const largura = doisItens ? 0.34 : 0.3;
+        return (
+          <div
+            key={item.chave}
+            style={{
+              position: "absolute",
+              left: `${50 + raio * 100 * Math.sin(rad)}%`,
+              top: `${50 - raio * 100 * Math.cos(rad)}%`,
+              width: fluido ? `${largura * 100}%` : tamanho * largura,
+              transform: `translate(-50%, -50%) rotate(${meio}deg)`,
+              textAlign: "center",
+              color: "#160f06",
+              textShadow: "0 1px 0 rgba(255,255,255,.28)",
+              pointerEvents: "none",
+            }}
+          >
+            {/* No celular o nome do time encolhe com a roda: a 20px, "Capangas do Motomoto"
+                num terço de uma roda de 330px quebrava em quatro linhas. */}
+            <div
+              style={{
+                fontFamily: display,
+                fontSize: doisItens ? (fluido ? "clamp(14px, 4.6vw, 20px)" : 20) : 15,
+                lineHeight: 1.05,
+                overflowWrap: "anywhere",
+              }}
+            >
+              {item.rotulo}
+            </div>
+            {item.nota ? (
+              <div style={{ fontSize: 10, letterSpacing: ".14em", fontWeight: 700, marginTop: 3 }}>
+                {item.nota}
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  return (
+    <div aria-hidden style={caixa}>
       {/* Ponteiro: fixo no topo, apontando para dentro. Nunca gira. */}
       <div
         style={{
           position: "absolute",
-          top: -Math.round(tamanho * 0.045),
+          top: fluido ? "-4.5%" : -Math.round(tamanho * 0.045),
           left: "50%",
           marginLeft: -12,
           width: 0,
@@ -184,56 +269,21 @@ function Roda({
         }}
       />
 
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          borderRadius: "50%",
-          background: `${separadores}, conic-gradient(from 0deg, ${fatias})`,
-          boxShadow: `0 0 0 3px ${C.line2}, 0 0 0 9px rgba(11,8,4,.9), 0 0 70px rgba(201,138,75,.20), inset 0 0 60px rgba(0,0,0,.45)`,
-          transform: `rotate(${giro}deg)`,
-          transition: transicao,
-          willChange: "transform",
-        }}
-      >
-        {itens.map((item, i) => {
-          const meio = i * passo + passo / 2;
-          const raio = itens.length <= 2 ? 0.28 : 0.33;
-          const rad = (meio * Math.PI) / 180;
-          return (
-            <div
-              key={item.chave}
-              style={{
-                position: "absolute",
-                left: `${50 + raio * 100 * Math.sin(rad)}%`,
-                top: `${50 - raio * 100 * Math.cos(rad)}%`,
-                width: itens.length <= 2 ? tamanho * 0.34 : tamanho * 0.3,
-                transform: `translate(-50%, -50%) rotate(${meio}deg)`,
-                textAlign: "center",
-                color: "#160f06",
-                textShadow: "0 1px 0 rgba(255,255,255,.28)",
-                pointerEvents: "none",
-              }}
-            >
-              <div
-                style={{
-                  fontFamily: display,
-                  fontSize: itens.length <= 2 ? 20 : 15,
-                  lineHeight: 1.05,
-                  overflowWrap: "anywhere",
-                }}
-              >
-                {item.rotulo}
-              </div>
-              {item.nota ? (
-                <div style={{ fontSize: 10, letterSpacing: ".14em", fontWeight: 700, marginTop: 3 }}>
-                  {item.nota}
-                </div>
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
+      {fluido ? (
+        /*
+         * No celular o disco gira DENTRO de uma moldura redonda que corta o que sai dela.
+         *
+         * O disco é um círculo pintado numa caixa quadrada; a 45° a caixa girada fica 1,41x
+         * mais larga que ela mesma, e caixa transformada conta como transbordo — com a roda
+         * na largura da tela, a cerimônia rolava de lado no meio do giro. A moldura não gira:
+         * o anel e o brilho (que são simétricos, girar não muda nada neles) moram nela.
+         */
+        <div style={{ position: "absolute", inset: 0, borderRadius: "50%", overflow: "hidden", boxShadow: anel }}>
+          {disco}
+        </div>
+      ) : (
+        disco
+      )}
 
       {/* Cubo: cobre o encontro das fatias, que sempre fica sujo no centro. */}
       <div
@@ -262,14 +312,15 @@ function PainelDeLado({
   nome,
   cor,
   azul,
-}: Readonly<{ nome: string; cor: string; azul: boolean }>) {
+  compacto = false,
+}: Readonly<{ nome: string; cor: string; azul: boolean; compacto?: boolean }>) {
   const corDoLado = azul ? cor : VERMELHO;
   return (
     <div
       style={{
         flex: "1 1 240px",
         minWidth: 0,
-        padding: "22px 20px",
+        padding: compacto ? "16px 14px" : "22px 20px",
         borderRadius: 6,
         border: `2px solid ${corDoLado}`,
         background: `linear-gradient(180deg, ${corDoLado}22, rgba(11,8,4,.7))`,
@@ -291,13 +342,15 @@ function PainelDeLado({
       >
         {azul ? "LADO AZUL" : "LADO VERMELHO"}
       </div>
+      {/* `4.4vw` foi medido para o monitor: num celular de 360 dava o piso de 26px. Lá a
+          largura do painel é a da tela, então o nome pode crescer até 7vw. */}
       <div
         style={{
           fontFamily: display,
-          fontSize: "clamp(26px,4.4vw,46px)",
+          fontSize: compacto ? "clamp(24px,7vw,34px)" : "clamp(26px,4.4vw,46px)",
           lineHeight: 1.05,
           color: C.ink,
-          marginTop: 12,
+          marginTop: compacto ? 10 : 12,
           overflowWrap: "anywhere",
         }}
       >
@@ -325,30 +378,37 @@ function CartaRevelada({
   onArteQuebrada,
   letras,
   campeoes,
+  compacto = false,
 }: Readonly<{
   carta: CardDef;
   arteQuebrada: boolean;
   onArteQuebrada: () => void;
   letras: readonly string[];
   campeoes: number | null;
+  compacto?: boolean;
 }>) {
+  // No celular a carta é uma coluna: arte centralizada em cima, regra embaixo. Com o `wrap`
+  // do monitor a arte ocupava a largura inteira e empurrava a regra — que é o que a plateia
+  // precisa ler — para uma segunda tela.
   return (
     <div
       style={{
         display: "flex",
-        gap: 22,
-        flexWrap: "wrap",
-        alignItems: "flex-start",
+        flexDirection: compacto ? "column" : undefined,
+        gap: compacto ? 16 : 22,
+        flexWrap: compacto ? undefined : "wrap",
+        alignItems: compacto ? "stretch" : "flex-start",
         border: `2px solid ${carta.border}`,
         borderRadius: 8,
         background: `linear-gradient(150deg, ${carta.from}22, ${carta.to} 62%)`,
-        padding: 22,
+        padding: compacto ? 16 : 22,
       }}
     >
       <div
         style={{
           position: "relative",
-          width: "min(300px, 100%)",
+          width: compacto ? "min(240px, 100%)" : "min(300px, 100%)",
+          alignSelf: compacto ? "center" : undefined,
           aspectRatio: "1 / 1",
           flexShrink: 0,
           borderRadius: 6,
@@ -377,19 +437,30 @@ function CartaRevelada({
         )}
       </div>
 
-      <div style={{ flex: "1 1 320px", minWidth: 0 }}>
+      <div style={{ flex: compacto ? "0 0 auto" : "1 1 320px", minWidth: 0 }}>
         <Toolbar style={{ marginBottom: 10 }}>
-          {carta.letter ? <Chip tone="gold">CARTA {carta.letter}</Chip> : null}
-          {carta.dupla ? <Chip tone="warn">DUPLA · VALE PARA OS DOIS TIMES</Chip> : null}
+          {carta.letter ? (
+            <Chip tone="gold">
+              <IconeCarta size={12} aria-hidden />
+              CARTA {carta.letter}
+            </Chip>
+          ) : null}
+          {carta.dupla ? (
+            <Chip tone="warn">
+              <IconeCartas size={12} aria-hidden />
+              DUPLA · VALE PARA OS DOIS TIMES
+            </Chip>
+          ) : null}
         </Toolbar>
 
         <h3
           style={{
             fontFamily: display,
-            fontSize: "clamp(30px,5vw,52px)",
+            fontSize: compacto ? "clamp(28px,8vw,40px)" : "clamp(30px,5vw,52px)",
             lineHeight: 1.02,
             color: C.ink,
             margin: "0 0 10px",
+            overflowWrap: compacto ? "anywhere" : undefined,
           }}
         >
           {carta.title}
@@ -433,10 +504,12 @@ function CartaRevelada({
           </div>
         ) : null}
 
+        {/* A regra a 16px no celular: é o texto que a pessoa lê em voz alta para a call, com
+            o telefone na mão e longe do rosto — o piso de 15px do monitor ficava miúdo. */}
         <p
           style={{
             margin: "0 0 14px",
-            fontSize: "clamp(15px,1.7vw,19px)",
+            fontSize: compacto ? 16 : "clamp(15px,1.7vw,19px)",
             lineHeight: 1.6,
             color: C.ink,
           }}
@@ -447,7 +520,7 @@ function CartaRevelada({
         <p
           style={{
             margin: 0,
-            fontSize: "clamp(13px,1.4vw,15px)",
+            fontSize: compacto ? 14 : "clamp(13px,1.4vw,15px)",
             fontStyle: "italic",
             lineHeight: 1.55,
             color: C.ink3,
@@ -473,6 +546,9 @@ function LinhaDaSemente({ sorteio }: Readonly<{ sorteio: SorteioDaResposta }>) {
         fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
         fontSize: 11,
         color: C.ink4,
+        // A semente são 32 caracteres sem espaço: numa tela estreita ela quebra no meio em
+        // vez de empurrar a cerimônia de lado.
+        overflowWrap: "anywhere",
         ...tabular,
       }}
     >
@@ -521,6 +597,85 @@ function itensDeCartas(dupla: boolean): ItemDaRoda[] {
   }));
 }
 
+type CartaUsada = Readonly<{ teamId: string; cardId: string; dupla?: boolean }>;
+
+const ehDupla = (carta: CartaUsada) => carta.dupla === true || isDuplaCard(carta.cardId as CardId);
+
+/** Carta de um time só é uma cartinha; a dupla (vale para os dois) é o par de cartas. */
+const iconeDaCarta = (carta: CartaUsada): Icone => (ehDupla(carta) ? IconeCartas : IconeCarta);
+
+/** O que o Tab percorre dentro do palco — a mesma lista da Folha do painel. */
+const FOCAVEIS_DO_PALCO =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function LinhaDeEstado({
+  icone: Desenho,
+  cor,
+  children,
+}: Readonly<{ icone: Icone; cor: string; children: ReactNode }>) {
+  return (
+    <li style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13.5, lineHeight: 1.45, color: C.ink2 }}>
+      <Desenho size={17} color={cor} aria-hidden style={{ flexShrink: 0, marginTop: 1 }} />
+      <span style={{ minWidth: 0, overflowWrap: "anywhere" }}>{children}</span>
+    </li>
+  );
+}
+
+/**
+ * "Como está agora", no celular: um fato por linha, com o ícone do que ele é.
+ *
+ * No monitor são chips numa faixa só. Chip não quebra linha (é `nowrap` de propósito, para
+ * não virar duas palavras soltas), e "Capangas do Motomoto · Troca de Rota" num chip
+ * passava da largura do telefone e empurrava a cerimônia de lado.
+ */
+function EstadoAtualCompacto({
+  azul,
+  cartas,
+  dupla,
+  nomeDoTime,
+}: Readonly<{
+  azul?: string;
+  cartas: readonly CartaUsada[];
+  dupla: boolean;
+  nomeDoTime: (id: string) => string;
+}>) {
+  return (
+    <Card padding="14px 14px" style={{ marginBottom: 18 }}>
+      <div style={{ fontSize: 10.5, letterSpacing: ".16em", color: C.bronze, marginBottom: 10 }}>
+        COMO ESTÁ AGORA
+      </div>
+      <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 9 }}>
+        <LinhaDeEstado icone={ArrowLeftRight} cor={azul ? AZUL : C.ink4}>
+          {azul ? (
+            <>
+              Lado azul no jogo 1: <strong style={{ color: C.ink }}>{nomeDoTime(azul)}</strong>
+            </>
+          ) : (
+            "Lados não sorteados"
+          )}
+        </LinhaDeEstado>
+        {cartas.length === 0 ? (
+          <LinhaDeEstado icone={IconeCarta} cor={C.ink4}>
+            Nenhuma cartinha
+          </LinhaDeEstado>
+        ) : (
+          cartas.map((carta) => (
+            <LinhaDeEstado key={`${carta.teamId}:${carta.cardId}`} icone={iconeDaCarta(carta)} cor={C.bronzeHi}>
+              <strong style={{ color: C.ink }}>{nomeDoTime(carta.teamId)}</strong> ·{" "}
+              {defDaCarta(carta.cardId)?.title ?? carta.cardId}
+            </LinhaDeEstado>
+          ))
+        )}
+        {dupla ? (
+          <LinhaDeEstado icone={IconeCartas} cor={C.warnSoft}>
+            Sorteio duplo: a carta vale para os dois times
+          </LinhaDeEstado>
+        ) : null}
+      </ul>
+    </Card>
+  );
+}
+
 // ---------------------------------------------------------------- a tela
 
 export function SorteioAoVivo({
@@ -541,6 +696,7 @@ export function SorteioAoVivo({
   const [giro, setGiro] = useState(0);
   const [transicao, setTransicao] = useState("none");
   const [arteQuebrada, setArteQuebrada] = useState<string | null>(null);
+  const compacto = useCompacto();
 
   const intervalo = useRef<ReturnType<typeof setInterval> | null>(null);
   const partida = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -569,12 +725,27 @@ export function SorteioAoVivo({
     onFechar();
   }, [limparTempos, onFechar]);
 
+  // O pai passa `onFechar` em linha, com identidade nova a cada render — e o `onSorteado`
+  // provoca uma. Se o efeito de abertura dependesse de `fechar`, cada uma dessas renders o
+  // desmontava e remontava no meio da cerimônia, arrancando o foco do botão onde a pessoa
+  // estava. O ouvinte lê sempre o `fechar` mais novo por esta referência.
+  const fecharAtual = useRef(fechar);
+  useEffect(() => {
+    fecharAtual.current = fechar;
+  });
+
   // ESC fecha, a rolagem de fundo trava e o foco entra no palco — a tela é projetada, então
-  // ninguém deveria precisar caçar o X com o mouse na frente de todo mundo.
+  // ninguém deveria precisar caçar o X com o mouse na frente de todo mundo. Ao fechar, o foco
+  // volta para quem abriu ("Sortear ao vivo"): no celular esse botão mora dentro da folha do
+  // editor, e um foco largado no <body> fazia o próximo Tab sair da folha.
+  //
+  // O ouvinte da janela é a rede de segurança para quando o foco NÃO está no palco; com o
+  // foco lá dentro, quem trata o Esc é `aoTeclarNoPalco`, que não deixa o evento subir.
   useEffect(() => {
     if (!aberto) return;
+    const anterior = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const aoTeclar = (evento: KeyboardEvent) => {
-      if (evento.key === "Escape") fechar();
+      if (evento.key === "Escape") fecharAtual.current();
     };
     window.addEventListener("keydown", aoTeclar);
     const rolagemAnterior = document.body.style.overflow;
@@ -583,8 +754,17 @@ export function SorteioAoVivo({
     return () => {
       window.removeEventListener("keydown", aoTeclar);
       document.body.style.overflow = rolagemAnterior;
+      if (anterior && document.contains(anterior)) anterior.focus();
     };
-  }, [aberto, fechar]);
+  }, [aberto]);
+
+  // Sortear troca o conteúdo do palco, e o botão clicado some junto: o foco cairia no <body>,
+  // fora da cerimônia (e fora do alcance do Tab preso abaixo). Volta para o palco.
+  useEffect(() => {
+    if (!aberto) return;
+    const ativo = document.activeElement;
+    if (!ativo || ativo === document.body) palco.current?.focus();
+  }, [aberto, tela.fase]);
 
   // Fechar por fora (o painel some, a série troca) não pode deixar um relógio armado
   // disparando `setTela` numa tela que não existe mais.
@@ -782,17 +962,52 @@ export function SorteioAoVivo({
     })();
   };
 
-  if (!aberto) return null;
+  // Portal no <body>: sem `document` (render no servidor) não há onde montar — e fechado
+  // também não há nada a montar.
+  if (!aberto || typeof document === "undefined") return null;
+
+  /**
+   * Esc e Tab tratados no palco, e sem subir.
+   *
+   * O palco vai por portal, mas evento React sobe pela ÁRVORE React, não pela do DOM: no
+   * celular a cerimônia nasce dentro da folha do editor de série, e a folha também ouve Esc
+   * (fecha o editor) e Tab (prende o foco nos campos dela). Sem o `stopPropagation`, um Esc
+   * aqui fechava o editor por baixo da cerimônia. O Tab fica preso no palco: a página atrás
+   * está coberta, e o foco andando por ela seria invisível.
+   */
+  const aoTeclarNoPalco = (evento: KeyboardEventReact<HTMLDivElement>) => {
+    if (evento.key === "Escape") {
+      evento.stopPropagation();
+      fechar();
+      return;
+    }
+    if (evento.key !== "Tab" || !palco.current) return;
+    evento.stopPropagation();
+    const focaveis = Array.from(palco.current.querySelectorAll<HTMLElement>(FOCAVEIS_DO_PALCO));
+    const primeiro = focaveis[0];
+    const ultimo = focaveis.at(-1);
+    if (!primeiro || !ultimo) {
+      evento.preventDefault();
+      return;
+    }
+    const atual = document.activeElement;
+    if (evento.shiftKey && (atual === primeiro || atual === palco.current)) {
+      evento.preventDefault();
+      ultimo.focus();
+    } else if (!evento.shiftKey && atual === ultimo) {
+      evento.preventDefault();
+      primeiro.focus();
+    }
+  };
 
   const girando = telaAtual.fase === "girando";
+  const emRepouso = telaAtual.fase === "repouso" || telaAtual.fase === "erro";
   const faltaLados = podeLados ? undefined : "Falta o escopo series:sides";
   const faltaCartas = podeCartas ? undefined : "Falta o escopo series:cards";
 
   const azulAtual = blueSideTeamId;
   const cartasAtuais = cardsUsed ?? [];
-  const duplaAtual = cartasAtuais.some(
-    (carta) => carta.dupla === true || isDuplaCard(carta.cardId as CardId),
-  );
+  const duplaAtual = cartasAtuais.some(ehDupla);
 
   const revelacao = telaAtual.fase === "revelado" ? telaAtual.resposta : null;
   const definicaoRevelada =
@@ -809,22 +1024,343 @@ export function SorteioAoVivo({
 
   const tamanhoDaRoda = revelacao ? 240 : 420;
 
-  return (
+  // ------------------------------------------------ peças comuns aos dois arranjos
+
+  const palcoBase: CSSProperties = {
+    position: "fixed",
+    inset: 0,
+    zIndex: 9000,
+    background: C.ground,
+    color: C.ink,
+    outline: "none",
+  };
+
+  const avisos = (
+    <>
+      {telaAtual.fase === "erro" ? (
+        <Banner tone="danger" title="O sorteio não aconteceu">
+          {telaAtual.mensagem} Nada foi gravado nesta tentativa — pode sortear de novo.
+        </Banner>
+      ) : null}
+
+      {revelacao && revelacao.vezes > 1 ? (
+        <Banner tone="warn" title={`Este sorteio já tinha sido feito nesta série (${revelacao.vezes}ª vez)`}>
+          O histórico da série registra as {revelacao.vezes} vezes, com a semente de cada uma —
+          refazer é permitido, apagar o anterior não é.
+        </Banner>
+      ) : null}
+    </>
+  );
+
+  // O selo do cabeçalho é o dos dados: a cerimônia mora dentro da aba Séries, e sem o
+  // `icone` próprio ela herdaria as espadas da seção — que dizem "confronto", não "sorteio".
+  const cabecalhoDoSorteio = (
+    <SectionHead
+      icone={Dices}
+      eyebrow="Antes da partida"
+      title="Sorteio"
+      description="O resultado é decidido no servidor a partir de uma semente gravada na série. A roda aqui só revela — e a semente fica na tela para quem quiser conferir depois."
+    />
+  );
+
+  const semEscopo =
+    !podeLados && !podeCartas ? (
+      <p style={{ marginTop: 16, fontSize: 12.5, color: C.ink4 }}>
+        Sua conta não tem nenhum dos escopos de sorteio (series:sides, series:cards).
+      </p>
+    ) : null;
+
+  const resultado = revelacao ? (
+    <>
+      {revelacao.sorteio.tipo === "lados" ? (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: compacto ? "column" : undefined,
+            gap: compacto ? 12 : 16,
+            flexWrap: compacto ? undefined : "wrap",
+          }}
+        >
+          {[teamAId, teamBId].map((id) => (
+            <PainelDeLado
+              key={id}
+              nome={nomeDoTime(id)}
+              cor={corDoTime(id)}
+              azul={id === revelacao.sorteio.resultado}
+              compacto={compacto}
+            />
+          ))}
+        </div>
+      ) : cartaRevelada ? (
+        <CartaRevelada
+          carta={cartaRevelada}
+          arteQuebrada={arteQuebrada === cartaRevelada.cardId}
+          onArteQuebrada={() => setArteQuebrada(cartaRevelada.cardId)}
+          letras={letras}
+          campeoes={campeoes}
+          compacto={compacto}
+        />
+      ) : (
+        <Banner tone="warn" title="Carta desconhecida">
+          O servidor devolveu {revelacao.sorteio.resultado}, que não está no baralho
+          desta versão do site.
+        </Banner>
+      )}
+
+      <LinhaDaSemente sorteio={revelacao.sorteio} />
+    </>
+  ) : null;
+
+  const statusGirando = girando ? (
+    <p
+      role="status"
+      style={{
+        margin: 0,
+        fontFamily: display,
+        fontSize: compacto ? 18 : 20,
+        letterSpacing: ".18em",
+        color: C.bronzeLit,
+      }}
+    >
+      SORTEANDO...
+    </p>
+  ) : null;
+
+  // ------------------------------------------------ celular
+
+  if (compacto) {
+    /*
+     * Os botões de sortear ficam no rodapé preso, em grade de duas colunas: lados na linha
+     * de cima (é o primeiro sorteio da série), uma carta para cada time lado a lado, e o
+     * duplo embaixo. Cada botão de carta escreve o nome do time numa linha própria — em meia
+     * largura, "Sortear carta · Capangas do Motomoto" quebrava em três linhas tortas.
+     */
+    const rodape = emRepouso ? (
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8, width: "100%" }}>
+        <Button
+          tone="gold"
+          fullWidth
+          disabled={!podeLados}
+          title={faltaLados}
+          onClick={() => sortear({ tipo: "lados" })}
+          style={{ gridColumn: "1 / -1" }}
+        >
+          <ArrowLeftRight size={17} aria-hidden />
+          Sortear lados
+        </Button>
+        {[teamAId, teamBId].map((id) => (
+          <Button
+            key={id}
+            tone="gold"
+            fullWidth
+            disabled={!podeCartas}
+            title={faltaCartas}
+            onClick={() => sortear({ tipo: "carta", teamId: id })}
+            style={{ justifyContent: "flex-start", textAlign: "left", padding: "8px 12px" }}
+          >
+            <IconeCarta size={18} aria-hidden style={{ flexShrink: 0 }} />
+            <span style={{ display: "flex", flexDirection: "column", minWidth: 0, lineHeight: 1.2 }}>
+              <span style={{ fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase" }}>
+                Sortear carta
+              </span>
+              <span style={{ fontSize: 13.5, letterSpacing: ".02em", overflowWrap: "anywhere" }}>
+                {nomeDoTime(id)}
+              </span>
+            </span>
+          </Button>
+        ))}
+        <Button
+          tone="ghost"
+          fullWidth
+          disabled={!podeCartas}
+          title={faltaCartas ?? "Uma carta só, valendo para os dois times (pool de 8)"}
+          onClick={() => sortear({ tipo: "carta", dupla: true })}
+          style={{ gridColumn: "1 / -1" }}
+        >
+          <IconeCartas size={17} aria-hidden />
+          Sorteio duplo
+        </Button>
+      </div>
+    ) : revelacao ? (
+      // "Voltar" fica com a sobra da largura: é o caminho para o próximo sorteio da série.
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 8, width: "100%" }}>
+        <Button tone="ghost" fullWidth onClick={() => setTela(REPOUSO)} style={{ padding: "11px 12px" }}>
+          <Undo2 size={16} aria-hidden />
+          Voltar aos sorteios
+        </Button>
+        <Button tone="ghost" onClick={fechar} style={{ padding: "11px 14px" }}>
+          <X size={16} aria-hidden />
+          Fechar
+        </Button>
+      </div>
+    ) : null;
+
+    const cerimoniaDeBolso = (
+      <div
+        ref={palco}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Sorteio ao vivo"
+        tabIndex={-1}
+        onKeyDown={aoTeclarNoPalco}
+        style={{ ...palcoBase, display: "flex", flexDirection: "column" }}
+      >
+        {/* Barra fina: o confronto (para quem segura o telefone saber de que série é) e o X
+            com alvo de dedo. Não rola — o X nunca sai de vista no meio da cerimônia. */}
+        <header
+          style={{
+            flexShrink: 0,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "calc(8px + env(safe-area-inset-top)) 10px 8px 16px",
+            borderBottom: `1px solid ${C.line}`,
+            background: "linear-gradient(180deg,#1b140c,#0e0905)",
+          }}
+        >
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: ".18em",
+                color: C.bronzeHi,
+              }}
+            >
+              <Dices size={13} aria-hidden />
+              SORTEIO AO VIVO
+            </div>
+            <div
+              style={{
+                marginTop: 3,
+                fontFamily: display,
+                fontSize: 15,
+                lineHeight: 1.2,
+                color: C.ink,
+                overflowWrap: "anywhere",
+              }}
+            >
+              {nomeDoTime(teamAId)} <span style={{ color: C.bronze }}>×</span> {nomeDoTime(teamBId)}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={fechar}
+            aria-label="Fechar"
+            title="Fechar (ESC)"
+            style={{
+              width: 44,
+              height: 44,
+              flexShrink: 0,
+              display: "grid",
+              placeItems: "center",
+              border: `1px solid ${C.line2}`,
+              borderRadius: 4,
+              background: "rgba(201,138,75,.07)",
+              color: C.ink2,
+              cursor: "pointer",
+            }}
+          >
+            <X size={20} aria-hidden />
+          </button>
+        </header>
+
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
+            overflowY: "auto",
+            overscrollBehavior: "contain",
+            padding: "16px 16px 22px",
+          }}
+        >
+          {emRepouso ? (
+            <>
+              {avisos}
+              {cabecalhoDoSorteio}
+              <EstadoAtualCompacto
+                azul={azulAtual}
+                cartas={cartasAtuais}
+                dupla={duplaAtual}
+                nomeDoTime={nomeDoTime}
+              />
+              {semEscopo}
+            </>
+          ) : (
+            // Girando, a roda fica no meio da tela (é o momento em que todo mundo olha); na
+            // revelação ela encolhe e sobe, e o resultado vem logo abaixo dela.
+            <div
+              style={{
+                minHeight: girando ? "100%" : undefined,
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: girando ? "center" : undefined,
+              }}
+            >
+              {avisos}
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 12,
+                  paddingTop: 12,
+                }}
+              >
+                {telaAtual.fase === "girando" || telaAtual.fase === "revelado" ? (
+                  <Roda
+                    itens={telaAtual.itens}
+                    giro={giro}
+                    transicao={transicao}
+                    tamanho={revelacao ? 150 : 400}
+                    fluido
+                  />
+                ) : null}
+                {statusGirando}
+              </div>
+              {resultado ? (
+                <div style={{ marginTop: 18, minWidth: 0 }} aria-live="polite">
+                  {resultado}
+                </div>
+              ) : null}
+            </div>
+          )}
+        </div>
+
+        {rodape ? (
+          <footer
+            style={{
+              flexShrink: 0,
+              padding: "12px 16px calc(12px + env(safe-area-inset-bottom))",
+              borderTop: `1px solid ${C.line}`,
+              background: "rgba(10,7,4,.97)",
+            }}
+          >
+            {rodape}
+          </footer>
+        ) : (
+          <div aria-hidden style={{ height: "env(safe-area-inset-bottom)", flexShrink: 0 }} />
+        )}
+      </div>
+    );
+
+    return createPortal(cerimoniaDeBolso, document.body);
+  }
+
+  // ------------------------------------------------ monitor (o arranjo aprovado)
+
+  const cerimonia = (
     <div
       ref={palco}
       role="dialog"
       aria-modal="true"
       aria-label="Sorteio ao vivo"
       tabIndex={-1}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 9000,
-        background: C.ground,
-        color: C.ink,
-        overflowY: "auto",
-        outline: "none",
-      }}
+      onKeyDown={aoTeclarNoPalco}
+      style={{ ...palcoBase, overflowY: "auto" }}
     >
       <div style={{ maxWidth: 1160, margin: "0 auto", padding: "26px 24px 56px" }}>
         <Toolbar style={{ marginBottom: 18 }}>
@@ -834,31 +1370,17 @@ export function SorteioAoVivo({
           </span>
           <span style={{ marginLeft: "auto" }}>
             <Button tone="ghost" small onClick={fechar} title="Fechar (ESC)">
-              ✕ Fechar
+              <X size={14} aria-hidden />
+              Fechar
             </Button>
           </span>
         </Toolbar>
 
-        {telaAtual.fase === "erro" ? (
-          <Banner tone="danger" title="O sorteio não aconteceu">
-            {telaAtual.mensagem} Nada foi gravado nesta tentativa — pode sortear de novo.
-          </Banner>
-        ) : null}
+        {avisos}
 
-        {revelacao && revelacao.vezes > 1 ? (
-          <Banner tone="warn" title={`Este sorteio já tinha sido feito nesta série (${revelacao.vezes}ª vez)`}>
-            O histórico da série registra as {revelacao.vezes} vezes, com a semente de cada uma —
-            refazer é permitido, apagar o anterior não é.
-          </Banner>
-        ) : null}
-
-        {telaAtual.fase === "repouso" || telaAtual.fase === "erro" ? (
+        {emRepouso ? (
           <>
-            <SectionHead
-              eyebrow="Antes da partida"
-              title="Sorteio"
-              description="O resultado é decidido no servidor a partir de uma semente gravada na série. A roda aqui só revela — e a semente fica na tela para quem quiser conferir depois."
-            />
+            {cabecalhoDoSorteio}
 
             <Card padding="18px 20px" style={{ marginBottom: 22 }}>
               <Toolbar>
@@ -875,13 +1397,22 @@ export function SorteioAoVivo({
                 {cartasAtuais.length === 0 ? (
                   <Chip tone="off">nenhuma cartinha</Chip>
                 ) : (
-                  cartasAtuais.map((carta) => (
-                    <Chip key={`${carta.teamId}:${carta.cardId}`} tone="neutro">
-                      {nomeDoTime(carta.teamId)} · {defDaCarta(carta.cardId)?.title ?? carta.cardId}
-                    </Chip>
-                  ))
+                  cartasAtuais.map((carta) => {
+                    const Desenho = iconeDaCarta(carta);
+                    return (
+                      <Chip key={`${carta.teamId}:${carta.cardId}`} tone="neutro">
+                        <Desenho size={12} aria-hidden />
+                        {nomeDoTime(carta.teamId)} · {defDaCarta(carta.cardId)?.title ?? carta.cardId}
+                      </Chip>
+                    );
+                  })
                 )}
-                {duplaAtual ? <Chip tone="warn">SORTEIO DUPLO</Chip> : null}
+                {duplaAtual ? (
+                  <Chip tone="warn">
+                    <IconeCartas size={12} aria-hidden />
+                    SORTEIO DUPLO
+                  </Chip>
+                ) : null}
               </Toolbar>
             </Card>
 
@@ -892,6 +1423,7 @@ export function SorteioAoVivo({
                 title={faltaLados}
                 onClick={() => sortear({ tipo: "lados" })}
               >
+                <ArrowLeftRight size={15} aria-hidden />
                 Sortear lados
               </Button>
               {[teamAId, teamBId].map((id) => (
@@ -902,6 +1434,7 @@ export function SorteioAoVivo({
                   title={faltaCartas}
                   onClick={() => sortear({ tipo: "carta", teamId: id })}
                 >
+                  <IconeCarta size={15} aria-hidden />
                   Sortear carta · {nomeDoTime(id)}
                 </Button>
               ))}
@@ -911,15 +1444,12 @@ export function SorteioAoVivo({
                 title={faltaCartas ?? "Uma carta só, valendo para os dois times (pool de 8)"}
                 onClick={() => sortear({ tipo: "carta", dupla: true })}
               >
+                <IconeCartas size={15} aria-hidden />
                 Sorteio duplo
               </Button>
             </Toolbar>
 
-            {!podeLados && !podeCartas ? (
-              <p style={{ marginTop: 16, fontSize: 12.5, color: C.ink4 }}>
-                Sua conta não tem nenhum dos escopos de sorteio (series:sides, series:cards).
-              </p>
-            ) : null}
+            {semEscopo}
           </>
         ) : null}
 
@@ -941,51 +1471,12 @@ export function SorteioAoVivo({
                 transicao={transicao}
                 tamanho={tamanhoDaRoda}
               />
-              {girando ? (
-                <p
-                  role="status"
-                  style={{
-                    margin: 0,
-                    fontFamily: display,
-                    fontSize: 20,
-                    letterSpacing: ".18em",
-                    color: C.bronzeLit,
-                  }}
-                >
-                  SORTEANDO...
-                </p>
-              ) : null}
+              {statusGirando}
             </div>
 
             {revelacao ? (
               <div style={{ flex: "1 1 420px", minWidth: 0 }} aria-live="polite">
-                {revelacao.sorteio.tipo === "lados" ? (
-                  <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-                    {[teamAId, teamBId].map((id) => (
-                      <PainelDeLado
-                        key={id}
-                        nome={nomeDoTime(id)}
-                        cor={corDoTime(id)}
-                        azul={id === revelacao.sorteio.resultado}
-                      />
-                    ))}
-                  </div>
-                ) : cartaRevelada ? (
-                  <CartaRevelada
-                    carta={cartaRevelada}
-                    arteQuebrada={arteQuebrada === cartaRevelada.cardId}
-                    onArteQuebrada={() => setArteQuebrada(cartaRevelada.cardId)}
-                    letras={letras}
-                    campeoes={campeoes}
-                  />
-                ) : (
-                  <Banner tone="warn" title="Carta desconhecida">
-                    O servidor devolveu {revelacao.sorteio.resultado}, que não está no baralho
-                    desta versão do site.
-                  </Banner>
-                )}
-
-                <LinhaDaSemente sorteio={revelacao.sorteio} />
+                {resultado}
 
                 <Toolbar style={{ marginTop: 18 }}>
                   <Button tone="ghost" onClick={() => setTela(REPOUSO)}>
@@ -1002,4 +1493,6 @@ export function SorteioAoVivo({
       </div>
     </div>
   );
+
+  return createPortal(cerimonia, document.body);
 }

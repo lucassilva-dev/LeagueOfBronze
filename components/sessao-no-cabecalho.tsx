@@ -212,6 +212,7 @@ export function IndicadorDeSessao({
         aria-label={t.sessaoAbrirMenu}
         aria-expanded={aberto}
         onClick={onAlternar}
+        className="lob-sessao-botao"
         style={{
           display: "flex",
           alignItems: "center",
@@ -244,6 +245,7 @@ export function IndicadorDeSessao({
           {inicial}
         </span>
         <span
+          className="lob-sessao-nome"
           style={{
             fontSize: 12,
             overflow: "hidden",

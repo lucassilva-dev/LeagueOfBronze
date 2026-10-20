@@ -98,6 +98,10 @@ const pt = {
 
   // ---------- app/regras: 4. regras (numeradas; id="regra-N" na página) ----------
   regrasGeraisTitulo: "REGRAS GERAIS",
+  // Rótulo de cada cartão de regra; `{n}` = o número. Fica escrito por extenso (e não só no
+  // selo) porque o regulamento é citado pelo número — "pela regra 7" — e o leitor de tela
+  // precisa ouvir isso também.
+  regraRotulo: "REGRA {n}",
   regra1:
     "Não serão aceitas pessoas de fora do grupo do WhatsApp/Discord que não conhecemos. Basta ser do grupo e conhecido — não existe tempo mínimo no grupo.",
   regra2:
@@ -391,6 +395,7 @@ export const paginasRegras = definir<ChavesPaginasRegras>({
 
     // ---------- app/regras: 4. regras (numeradas; id="regra-N" na página) ----------
     regrasGeraisTitulo: "GENERAL RULES",
+    regraRotulo: "RULE {n}",
     regra1:
       "People from outside the WhatsApp/Discord group whom we do not know will not be accepted. Being in the group and known to us is enough — there is no minimum time in the group.",
     regra2:

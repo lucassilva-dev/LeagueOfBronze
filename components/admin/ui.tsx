@@ -1,6 +1,22 @@
 "use client";
 
-import { useState, type CSSProperties, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent as KeyboardEventReact,
+  type ReactNode,
+} from "react";
+import { createPortal } from "react-dom";
+import { ChevronRight, X } from "lucide-react";
+
+import { useCompacto } from "@/components/admin/responsivo";
+import { SeloHex, type Icone } from "@/components/lob/icones";
+import { eloSvgUrl, resolveElo } from "@/lib/design";
 
 /**
  * Kit visual do painel administrativo — linguagem "Bronze Hextech", a mesma do site público,
@@ -93,47 +109,95 @@ export function Eyebrow({ children }: Readonly<{ children: ReactNode }>) {
   );
 }
 
-/** Cabeçalho de uma seção do painel. */
+/**
+ * Ícone da seção aberta no painel, posto pelo shell. O `SectionHead` usa ele quando não
+ * recebe um `icone` próprio — assim toda seção ganha o selo do menu sem cada painel ter de
+ * saber qual é o seu.
+ */
+export const ContextoIconeDaSecao = createContext<Icone | undefined>(undefined);
+
+/**
+ * Cabeçalho de uma seção do painel.
+ *
+ * O selo hexagonal da seção fica ao lado do título — o mesmo do menu, para a pessoa
+ * reconhecer onde está pelo desenho antes de ler. `icone={null}` tira o selo (subseção
+ * dentro de outra). No celular a descrição encolhe uma linha de fonte: ela é instrução, e
+ * instrução longa empurra o trabalho para baixo da dobra.
+ */
 export function SectionHead({
   eyebrow,
   title,
   description,
   actions,
+  icone,
 }: Readonly<{
   eyebrow?: string;
   title: string;
   description?: string;
   actions?: ReactNode;
+  icone?: Icone | null;
 }>) {
+  const compacto = useCompacto();
+  const daSecao = useContext(ContextoIconeDaSecao);
+  const desenho = icone === null ? undefined : (icone ?? daSecao);
   return (
     <header
       style={{
         display: "flex",
         alignItems: "flex-end",
         justifyContent: "space-between",
-        gap: 16,
+        gap: compacto ? 12 : 16,
         flexWrap: "wrap",
-        marginBottom: 20,
+        marginBottom: compacto ? 16 : 20,
       }}
     >
-      <div>
-        {eyebrow ? <Eyebrow>{eyebrow}</Eyebrow> : null}
-        <h2
+      <div style={{ display: "flex", alignItems: "center", gap: compacto ? 12 : 14, minWidth: 0 }}>
+        {desenho ? <SeloHex icone={desenho} tamanho={compacto ? 40 : 46} /> : null}
+        <div style={{ minWidth: 0 }}>
+          {eyebrow ? <Eyebrow>{eyebrow}</Eyebrow> : null}
+          <h2
+            style={{
+              fontFamily: display,
+              fontSize: "clamp(24px,3.4vw,34px)",
+              lineHeight: 1.05,
+              color: C.ink,
+              margin: "0 0 6px",
+              overflowWrap: "anywhere",
+            }}
+          >
+            {title}
+          </h2>
+        </div>
+      </div>
+      {description ? (
+        <p
           style={{
-            fontFamily: display,
-            fontSize: "clamp(24px,3.4vw,34px)",
-            lineHeight: 1.05,
-            color: C.ink,
-            margin: "0 0 6px",
+            flexBasis: "100%",
+            order: 1,
+            margin: desenho && !compacto ? "-6px 0 0 60px" : "-4px 0 0",
+            fontSize: compacto ? 12.5 : 13,
+            lineHeight: 1.55,
+            color: C.ink3,
+            maxWidth: "62ch",
           }}
         >
-          {title}
-        </h2>
-        {description ? (
-          <p style={{ margin: 0, fontSize: 13, color: C.ink3, maxWidth: "62ch" }}>{description}</p>
-        ) : null}
-      </div>
-      {actions ? <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{actions}</div> : null}
+          {description}
+        </p>
+      ) : null}
+      {/* No celular as ações descem para depois da instrução, ocupando a largura toda. */}
+      {actions ? (
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            flexWrap: "wrap",
+            order: compacto ? 2 : 0,
+            width: compacto ? "100%" : undefined,
+          }}
+        >
+          {actions}
+        </div>
+      ) : null}
     </header>
   );
 }
@@ -201,6 +265,17 @@ export function Button({
     },
   };
 
+  // No celular o botão vira alvo de dedo: 44px de altura (40 no pequeno), a medida mínima
+  // das diretrizes de toque. No monitor continua denso como sempre foi.
+  const compacto = useCompacto();
+  const medidas: CSSProperties = compacto
+    ? {
+        padding: small ? "9px 14px" : "11px 18px",
+        minHeight: small ? 40 : 44,
+        fontSize: small ? 12.5 : 13.5,
+      }
+    : { padding: small ? "7px 12px" : "10px 16px", fontSize: small ? 11.5 : 12.5 };
+
   return (
     <button
       type={type}
@@ -213,15 +288,14 @@ export function Button({
         justifyContent: "center",
         gap: 8,
         width: fullWidth ? "100%" : undefined,
-        padding: small ? "7px 12px" : "10px 16px",
         borderRadius: 3,
         border: "1px solid",
         fontFamily: "inherit",
         fontWeight: 700,
-        fontSize: small ? 11.5 : 12.5,
         letterSpacing: ".05em",
         cursor: disabled ? "not-allowed" : "pointer",
         opacity: disabled ? 0.45 : 1,
+        ...medidas,
         ...tons[tone],
         ...style,
       }}
@@ -277,6 +351,16 @@ const campoBase: CSSProperties = {
   minWidth: 0,
 };
 
+/**
+ * No celular o campo tem 16px de fonte: abaixo disso o Safari do iPhone dá zoom na página
+ * ao focar e ela não volta sozinha — a pessoa digita um placar e perde a tela de vista.
+ */
+const campoCompacto: CSSProperties = { ...campoBase, padding: "11px 12px", fontSize: 16, minHeight: 44 };
+
+function useCampoBase(): CSSProperties {
+  return useCompacto() ? campoCompacto : campoBase;
+}
+
 export function Input({
   value,
   onChange,
@@ -300,6 +384,7 @@ export function Input({
   autoComplete?: string;
   maxLength?: number;
 }>) {
+  const base = useCampoBase();
   return (
     <input
       type={type}
@@ -314,7 +399,7 @@ export function Input({
       // entre uma rodada e outra.
       inputMode={numeric ? "numeric" : undefined}
       style={{
-        ...campoBase,
+        ...base,
         ...(numeric ? { ...tabular, textAlign: "center" } : null),
         ...style,
       }}
@@ -347,6 +432,8 @@ export function Textarea({
   /** O mesmo teto do servidor: passar dele só seria descoberto ao salvar, sem dizer onde. */
   maxLength?: number;
 }>) {
+  const base = useCampoBase();
+  const compacto = useCompacto();
   return (
     <textarea
       id={id}
@@ -358,9 +445,10 @@ export function Textarea({
       aria-label={ariaLabel}
       onChange={(e) => onChange(e.target.value)}
       style={{
-        ...campoBase,
+        ...base,
         fontFamily: mono ? "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" : "inherit",
-        fontSize: mono ? 11.5 : 13,
+        // Monoespaçada fica menor no monitor (JSON longo); no celular vale a regra dos 16px.
+        fontSize: compacto ? 16 : mono ? 11.5 : 13,
         lineHeight: 1.55,
         resize: "vertical",
         ...style,
@@ -384,13 +472,14 @@ export function Select({
   style?: CSSProperties;
   ariaLabel?: string;
 }>) {
+  const base = useCampoBase();
   return (
     <select
       value={value}
       disabled={disabled}
       aria-label={ariaLabel}
       onChange={(e) => onChange(e.target.value)}
-      style={{ ...campoBase, cursor: disabled ? "not-allowed" : "pointer", ...style }}
+      style={{ ...base, cursor: disabled ? "not-allowed" : "pointer", ...style }}
     >
       {children}
     </select>
@@ -497,6 +586,8 @@ export function Metric({
       <div style={{ fontSize: 9.5, letterSpacing: ".16em", textTransform: "uppercase", color: C.ink4 }}>
         {label}
       </div>
+      {/* `anywhere`: um Riot ID inteiro ("nak4y#JPL") não quebra sozinho e vazava do
+          cartão na grade de duas colunas do celular. */}
       <div
         style={{
           fontFamily: display,
@@ -504,6 +595,7 @@ export function Metric({
           lineHeight: 1.1,
           color: C.bronzeHi,
           marginTop: 8,
+          overflowWrap: "anywhere",
           ...tabular,
         }}
       >
@@ -630,6 +722,7 @@ export function ListRow({
   style?: CSSProperties;
 }>) {
   const [focado, setFocado] = useState(false);
+  const compacto = useCompacto();
 
   return (
     <button
@@ -644,7 +737,8 @@ export function ListRow({
         gap: 10,
         width: "100%",
         textAlign: "left",
-        padding: "9px 12px",
+        padding: compacto ? "12px 14px" : "9px 12px",
+        minHeight: compacto ? 52 : undefined,
         borderRadius: 3,
         border: `1px solid ${selected ? C.line2 : C.line}`,
         background: selected ? "rgba(201,138,75,.12)" : "rgba(0,0,0,.22)",
@@ -809,17 +903,20 @@ export function Check({
   disabled?: boolean;
   tone?: "gold" | "danger";
 }>) {
+  const compacto = useCompacto();
   return (
     <label
       style={{
         display: "flex",
         alignItems: "flex-start",
-        gap: 9,
-        fontSize: 12.5,
+        gap: compacto ? 11 : 9,
+        fontSize: compacto ? 13.5 : 12.5,
         lineHeight: 1.5,
         color: C.ink2,
         cursor: disabled ? "not-allowed" : "pointer",
         opacity: disabled ? 0.5 : 1,
+        // Alvo de dedo: a linha inteira, com altura mínima de toque.
+        padding: compacto ? "6px 0" : undefined,
       }}
     >
       <input
@@ -828,9 +925,9 @@ export function Check({
         disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
         style={{
-          width: 15,
-          height: 15,
-          marginTop: 1,
+          width: compacto ? 20 : 15,
+          height: compacto ? 20 : 15,
+          marginTop: compacto ? 0 : 1,
           flexShrink: 0,
           accentColor: tone === "danger" ? C.danger : C.bronze,
           cursor: "inherit",
@@ -900,5 +997,481 @@ export function ActionCard({
         {children}
       </div>
     </Card>
+  );
+}
+
+// ---------------------------------------------------------------- celular
+
+const FOCAVEIS_DA_FOLHA =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/**
+ * Folha: o "modal" do painel.
+ *
+ * No celular sobe de baixo (alcance do polegar) e, com `cheia`, ocupa a tela inteira — é
+ * onde moram os editores (time, jogador, série) que no monitor ficam ao lado da lista. No
+ * monitor vira gaveta na lateral direita, para quem usar a mesma peça lá.
+ *
+ * O que ela garante para quem usa:
+ *  - foco entra nela ao abrir, não escapa pelo Tab e volta ao botão de origem ao fechar;
+ *  - Esc e o toque no fundo escuro chamam `onFechar` — quem tem rascunho decide ali se
+ *    pergunta antes (a folha não descarta nada sozinha);
+ *  - a página atrás não rola enquanto ela está aberta;
+ *  - cabeçalho e rodapé ficam fixos e só o meio rola — o botão de salvar nunca some.
+ *
+ * Vai para o <body> por portal: o cabeçalho do site cria contexto de empilhamento (tem
+ * `backdrop-filter`) e um z-index aqui dentro não venceria ele. Animação só de
+ * `transform` — opacidade animada já deixou páginas inteiras em branco neste projeto.
+ */
+export function Folha({
+  aberta,
+  titulo,
+  subtitulo,
+  icone,
+  onFechar,
+  children,
+  rodape,
+  cheia = false,
+  rotuloFechar = "Fechar",
+}: Readonly<{
+  aberta: boolean;
+  titulo: string;
+  subtitulo?: ReactNode;
+  icone?: Icone;
+  onFechar: () => void;
+  children: ReactNode;
+  /** Ações fixas embaixo (salvar, aplicar). */
+  rodape?: ReactNode;
+  /** Tela inteira no celular — para editores longos. */
+  cheia?: boolean;
+  rotuloFechar?: string;
+}>) {
+  const compacto = useCompacto();
+  const idTitulo = useId();
+  const painel = useRef<HTMLDivElement>(null);
+  // `onFechar` muda a cada render de quem chama; o efeito de abertura não pode reagir a ele.
+  const fechar = useRef(onFechar);
+  useEffect(() => {
+    fechar.current = onFechar;
+  });
+
+  useEffect(() => {
+    if (!aberta) return;
+    const anterior = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    painel.current?.focus();
+    const rolagemAntes = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = rolagemAntes;
+      // Devolve o foco a quem abriu, se ainda existir: quem usa teclado não se perde.
+      if (anterior && document.contains(anterior)) anterior.focus();
+    };
+  }, [aberta]);
+
+  if (!aberta || typeof document === "undefined") return null;
+
+  const aoTeclar = (evento: KeyboardEventReact<HTMLDivElement>) => {
+    if (evento.key === "Escape") {
+      evento.stopPropagation();
+      fechar.current();
+      return;
+    }
+    if (evento.key !== "Tab" || !painel.current) return;
+    const focaveis = Array.from(painel.current.querySelectorAll<HTMLElement>(FOCAVEIS_DA_FOLHA));
+    const primeiro = focaveis[0];
+    const ultimo = focaveis.at(-1);
+    if (!primeiro || !ultimo) {
+      evento.preventDefault();
+      return;
+    }
+    const atual = document.activeElement;
+    if (evento.shiftKey && (atual === primeiro || atual === painel.current)) {
+      evento.preventDefault();
+      ultimo.focus();
+    } else if (!evento.shiftKey && atual === ultimo) {
+      evento.preventDefault();
+      primeiro.focus();
+    }
+  };
+
+  const deBaixo = compacto;
+  const posicao: CSSProperties = deBaixo
+    ? {
+        left: 0,
+        right: 0,
+        bottom: 0,
+        top: cheia ? 0 : undefined,
+        maxHeight: cheia ? undefined : "92dvh",
+        borderRadius: cheia ? 0 : "14px 14px 0 0",
+        borderTop: cheia ? undefined : `1px solid ${C.line2}`,
+      }
+    : {
+        top: 0,
+        right: 0,
+        bottom: 0,
+        width: "min(560px, 100vw)",
+        borderLeft: `1px solid ${C.line2}`,
+      };
+
+  return createPortal(
+    <div style={{ position: "fixed", inset: 0, zIndex: 65 }}>
+      <div
+        aria-hidden
+        onClick={() => fechar.current()}
+        style={{ position: "absolute", inset: 0, background: "rgba(6,4,2,.74)" }}
+      />
+      <div
+        ref={painel}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={idTitulo}
+        tabIndex={-1}
+        onKeyDown={aoTeclar}
+        className={deBaixo ? "adm-folha-baixo" : "adm-folha-lado"}
+        style={{
+          position: "absolute",
+          display: "flex",
+          flexDirection: "column",
+          background: "linear-gradient(180deg,#1b140c,#0e0905)",
+          boxShadow: "0 -18px 50px rgba(0,0,0,.6)",
+          outline: "none",
+          ...posicao,
+        }}
+      >
+        {deBaixo && !cheia ? (
+          <span
+            aria-hidden
+            style={{ width: 42, height: 4, borderRadius: 99, background: C.line2, margin: "8px auto 0", flexShrink: 0 }}
+          />
+        ) : null}
+        <header
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: cheia && deBaixo ? "calc(10px + env(safe-area-inset-top)) 12px 10px 16px" : "10px 12px 10px 16px",
+            borderBottom: `1px solid ${C.line}`,
+            flexShrink: 0,
+          }}
+        >
+          {icone ? <SeloHex icone={icone} tamanho={34} /> : null}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h2
+              id={idTitulo}
+              style={{ fontFamily: display, fontSize: 19, lineHeight: 1.1, color: C.ink, margin: 0, overflowWrap: "anywhere" }}
+            >
+              {titulo}
+            </h2>
+            {subtitulo ? <div style={{ marginTop: 3, fontSize: 11.5, color: C.ink4 }}>{subtitulo}</div> : null}
+          </div>
+          <button
+            type="button"
+            onClick={() => fechar.current()}
+            aria-label={rotuloFechar}
+            title={rotuloFechar}
+            style={{
+              width: 44,
+              height: 44,
+              flexShrink: 0,
+              display: "grid",
+              placeItems: "center",
+              border: `1px solid ${C.line2}`,
+              borderRadius: 4,
+              background: "rgba(201,138,75,.07)",
+              color: C.ink2,
+              cursor: "pointer",
+            }}
+          >
+            <X size={20} aria-hidden />
+          </button>
+        </header>
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", overscrollBehavior: "contain", padding: "16px 16px 20px" }}>
+          {children}
+        </div>
+        {rodape ? (
+          <footer
+            style={{
+              flexShrink: 0,
+              display: "flex",
+              gap: 8,
+              flexWrap: "wrap",
+              padding: "12px 16px calc(12px + env(safe-area-inset-bottom))",
+              borderTop: `1px solid ${C.line}`,
+              background: "rgba(10,7,4,.97)",
+            }}
+          >
+            {rodape}
+          </footer>
+        ) : (
+          <div aria-hidden style={{ height: "env(safe-area-inset-bottom)", flexShrink: 0 }} />
+        )}
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+/**
+ * Uma linha de tabela em forma de cartão — o arranjo de bolso das listas do painel.
+ *
+ * Com `onClick`, o título vira um <button> de verdade e o cartão inteiro responde ao toque
+ * (o botão se estica por cima do cartão via CSS, `.adm-cartao__alvo::after`). Assim o
+ * cartão pode conter qualquer coisa — chips, emblemas, até outro botão (que precisa de
+ * `position: relative; z-index: 1` para ficar por cima) — sem virar botão dentro de botão.
+ */
+export function CartaoLinha({
+  titulo,
+  subtitulo,
+  inicio,
+  fim,
+  children,
+  onClick,
+  selecionado,
+  destaque,
+  idAlvo,
+  rotuloAlvo,
+  abreDialogo,
+  style,
+}: Readonly<{
+  titulo: ReactNode;
+  subtitulo?: ReactNode;
+  /** À esquerda: emblema de elo, logo do time, selo. */
+  inicio?: ReactNode;
+  /** À direita: estado (chips). */
+  fim?: ReactNode;
+  /** Linha extra embaixo (requisitos, valores). */
+  children?: ReactNode;
+  onClick?: () => void;
+  selecionado?: boolean;
+  /** Faixa de cor à esquerda (cor do time, tom do estado). */
+  destaque?: string;
+  /** id do botão — para devolver o foco a ele depois de fechar uma folha. */
+  idAlvo?: string;
+  /** Nome acessível do botão, quando o título visível não basta ("Abrir Fulano"). */
+  rotuloAlvo?: string;
+  /** O toque abre uma folha/diálogo (anuncia `aria-haspopup`). */
+  abreDialogo?: boolean;
+  style?: CSSProperties;
+}>) {
+  const tituloEstilo: CSSProperties = {
+    display: "block",
+    fontSize: 14,
+    fontWeight: selecionado ? 700 : 600,
+    color: selecionado ? C.bronzeLit : C.ink,
+    lineHeight: 1.3,
+    overflowWrap: "anywhere",
+  };
+  return (
+    <div
+      className={onClick ? "adm-cartao adm-cartao--toque" : "adm-cartao"}
+      style={{
+        position: "relative",
+        padding: "12px 12px 12px 14px",
+        minHeight: 56,
+        borderRadius: 4,
+        border: `1px solid ${selecionado ? C.line2 : C.line}`,
+        background: selecionado ? "rgba(201,138,75,.12)" : "rgba(0,0,0,.24)",
+        boxShadow: destaque ? `inset 3px 0 0 ${destaque}` : undefined,
+        ...style,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        {inicio ? <div style={{ flexShrink: 0, display: "flex", alignItems: "center" }}>{inicio}</div> : null}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {onClick ? (
+            <button
+              type="button"
+              id={idAlvo}
+              className="adm-cartao__alvo"
+              onClick={onClick}
+              aria-label={rotuloAlvo}
+              aria-pressed={abreDialogo ? undefined : selecionado}
+              aria-haspopup={abreDialogo ? "dialog" : undefined}
+              style={{
+                ...tituloEstilo,
+                width: "100%",
+                padding: 0,
+                border: "none",
+                background: "none",
+                textAlign: "left",
+                fontFamily: "inherit",
+                cursor: "pointer",
+              }}
+            >
+              {titulo}
+            </button>
+          ) : (
+            <div style={tituloEstilo}>{titulo}</div>
+          )}
+          {subtitulo ? (
+            <div style={{ marginTop: 3, fontSize: 11.5, lineHeight: 1.4, color: C.ink4, overflowWrap: "anywhere" }}>
+              {subtitulo}
+            </div>
+          ) : null}
+        </div>
+        {fim ? (
+          <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>{fim}</div>
+        ) : null}
+        {onClick ? <ChevronRight size={18} aria-hidden style={{ flexShrink: 0, color: C.ink4 }} /> : null}
+      </div>
+      {/* A linha extra ocupa a largura INTEIRA do cartão: espremida ao lado do emblema e do
+          estado, uma fileira de seis chips virava uma coluna. */}
+      {children ? <div style={{ marginTop: 10 }}>{children}</div> : null}
+    </div>
+  );
+}
+
+/** Pares rótulo → valor em grade (ficha de detalhe no celular, no lugar de colunas). */
+export function Dados({
+  itens,
+  colunas = 2,
+}: Readonly<{
+  itens: ReadonlyArray<{ rotulo: string; valor: ReactNode; largo?: boolean }>;
+  colunas?: number;
+}>) {
+  return (
+    <dl
+      style={{
+        display: "grid",
+        gridTemplateColumns: `repeat(${colunas}, minmax(0, 1fr))`,
+        gap: "12px 14px",
+        margin: 0,
+      }}
+    >
+      {itens.map((item) => (
+        <div key={item.rotulo} style={{ gridColumn: item.largo ? "1 / -1" : undefined, minWidth: 0 }}>
+          <dt style={{ fontSize: 9.5, letterSpacing: ".16em", textTransform: "uppercase", color: C.ink4 }}>
+            {item.rotulo}
+          </dt>
+          <dd style={{ margin: "4px 0 0", fontSize: 13, lineHeight: 1.45, color: C.ink2, overflowWrap: "anywhere" }}>
+            {item.valor}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/**
+ * Elo pelo emblema oficial (os mesmos de /public/elo que o site usa) no lugar do nome.
+ *
+ * O nome continua lá para quem não enxerga o desenho: vira o `alt` da imagem (e o `title`
+ * no mouse). Com `mostrarNome` ele aparece escrito ao lado — use onde há espaço e a
+ * leitura importa (ficha do inscrito). Elo que o sistema não reconhece sai como texto: um
+ * dado estranho precisa ficar visível, não sumir.
+ */
+export function Elo({
+  elo,
+  tamanho = 26,
+  mostrarNome = false,
+  detalhe,
+}: Readonly<{
+  elo?: string | null;
+  tamanho?: number;
+  mostrarNome?: boolean;
+  /** Linha miúda ao lado: divisão, PDL, origem ("II · 45 PDL", "Riot"). */
+  detalhe?: ReactNode;
+}>) {
+  const meta = resolveElo(elo);
+  if (!meta) {
+    return <span style={{ color: C.ink3, fontSize: 12 }}>{elo?.trim() ? elo : "—"}</span>;
+  }
+  return (
+    <span
+      title={meta.label}
+      style={{ display: "inline-flex", alignItems: "center", gap: 7, minWidth: 0, verticalAlign: "middle" }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={eloSvgUrl(meta.key)}
+        alt={mostrarNome ? "" : meta.label}
+        width={tamanho}
+        height={tamanho}
+        style={{
+          width: tamanho,
+          height: tamanho,
+          objectFit: "contain",
+          flexShrink: 0,
+          filter: "drop-shadow(0 2px 5px rgba(0,0,0,.75))",
+        }}
+      />
+      {mostrarNome || detalhe ? (
+        <span style={{ display: "flex", flexDirection: "column", lineHeight: 1.25, minWidth: 0 }}>
+          {mostrarNome ? <span style={{ color: meta.color, fontWeight: 700, fontSize: 12.5 }}>{meta.label}</span> : null}
+          {detalhe ? <span style={{ color: C.ink4, fontSize: 10.5, ...tabular }}>{detalhe}</span> : null}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+/**
+ * Chip que liga/desliga um filtro (`aria-pressed`). No celular tem altura de toque; em
+ * fileira larga, ponha dentro de `RolagemX`.
+ */
+export function ChipFiltro({
+  ativo,
+  onClick,
+  children,
+  title,
+  disabled,
+  rotulo,
+}: Readonly<{
+  ativo: boolean;
+  onClick: () => void;
+  children: ReactNode;
+  title?: string;
+  disabled?: boolean;
+  /** Nome acessível quando o conteúdo é só um emblema. */
+  rotulo?: string;
+}>) {
+  const compacto = useCompacto();
+  return (
+    <button
+      type="button"
+      aria-pressed={ativo}
+      aria-label={rotulo}
+      onClick={onClick}
+      title={title ?? rotulo}
+      disabled={disabled}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        flexShrink: 0,
+        minHeight: compacto ? 38 : 30,
+        padding: compacto ? "6px 12px" : "4px 10px",
+        borderRadius: 999,
+        border: `1px solid ${ativo ? "transparent" : C.line2}`,
+        background: ativo ? `linear-gradient(180deg, ${C.bronzeHi}, ${C.bronzeDeep})` : "rgba(201,138,75,.06)",
+        color: ativo ? "#160f06" : C.ink2,
+        fontFamily: "inherit",
+        fontSize: compacto ? 12.5 : 11.5,
+        fontWeight: ativo ? 700 : 500,
+        whiteSpace: "nowrap",
+        cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.5 : 1,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** Fileira que rola de lado sem barra visível (chips de filtro, abas no celular). */
+export function RolagemX({
+  children,
+  rotulo,
+  style,
+}: Readonly<{ children: ReactNode; rotulo?: string; style?: CSSProperties }>) {
+  return (
+    <div
+      role={rotulo ? "group" : undefined}
+      aria-label={rotulo}
+      className="adm-rolagem-x"
+      style={{ display: "flex", gap: 6, overflowX: "auto", maxWidth: "100%", paddingBottom: 2, ...style }}
+    >
+      {children}
+    </div>
   );
 }

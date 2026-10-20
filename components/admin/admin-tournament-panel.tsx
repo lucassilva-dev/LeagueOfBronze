@@ -2,9 +2,11 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 
 import type { SeriesFormat, TournamentDataset } from "@/lib/schema";
 import { createIndexes, getChampionshipResult, isSeriesComplete } from "@/lib/tournament";
+import { useCompacto } from "@/components/admin/responsivo";
 import {
   ActionCard,
   Banner,
@@ -35,6 +37,11 @@ import {
  * /api/admin/tournament/* chamam readDataset()), não sobre o rascunho que está na tela. Então o
  * painel busca o estado gravado e mostra os números a partir dele — mostrar os números do
  * rascunho seria mentir sobre o que vai para o arquivo.
+ *
+ * No celular (`useCompacto()`), o conteúdo é o mesmo e muda só o arranjo: os dois cartões de
+ * ação empilham numa coluna (a grade de 330px estourava a largura em telas de 360), a tabela
+ * de divergências vira lista e os botões que gravam ocupam a largura toda. Nada de ação foi
+ * escondido nem resumido — é justamente a tela onde ler tudo antes de tocar importa mais.
  */
 
 const CONFIRM_PHRASE = "INICIAR";
@@ -190,6 +197,7 @@ function Impacto({
   titulo: string;
   linhas: ReadonlyArray<{ rotulo: string; valor: ReactNode; tone?: "ok" | "warn" | "danger" }>;
 }>) {
+  const compacto = useCompacto();
   const corDe = (tone?: "ok" | "warn" | "danger") =>
     tone === "ok" ? C.okSoft : tone === "warn" ? C.warnSoft : tone === "danger" ? C.dangerSoft : C.ink;
 
@@ -216,12 +224,23 @@ function Impacto({
               alignItems: "baseline",
               justifyContent: "space-between",
               gap: 12,
-              padding: "6px 12px",
-              fontSize: 12.5,
+              // No celular a lista é o que a pessoa lê antes de apagar uma temporada: um
+              // ponto a mais de fonte e de respiro, e o valor pode quebrar em vez de vazar.
+              padding: compacto ? "8px 12px" : "6px 12px",
+              fontSize: compacto ? 13.5 : 12.5,
             }}
           >
             <span style={{ color: C.ink3 }}>{linha.rotulo}</span>
-            <span style={{ color: corDe(linha.tone), fontWeight: 600, textAlign: "right", ...tabular }}>
+            <span
+              style={{
+                color: corDe(linha.tone),
+                fontWeight: 600,
+                textAlign: "right",
+                minWidth: compacto ? 0 : undefined,
+                overflowWrap: compacto ? "anywhere" : undefined,
+                ...tabular,
+              }}
+            >
               {linha.valor}
             </span>
           </li>
@@ -243,11 +262,59 @@ function SeloDaFonte({ gravado }: Readonly<{ gravado: boolean }>) {
   );
 }
 
+/**
+ * As divergências no celular: uma linha por campo, com "gravado" e "na tela" escritos.
+ *
+ * No monitor é uma tabela de três colunas; espremida dentro do aviso numa tela de 360 ela
+ * rolava de lado, e o valor que mais importa (o da tela, que vai ser DESCARTADO) era
+ * justamente o que ficava fora de vista. Aqui os rótulos ficam junto de cada valor, porque
+ * não há cabeçalho de coluna para lembrar qual é qual.
+ */
+function ListaDeDivergencias({ divergencias }: Readonly<{ divergencias: readonly Divergencia[] }>) {
+  const rotulo = { fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: C.ink4 } as const;
+  return (
+    <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 6 }}>
+      {divergencias.map((linha) => (
+        <li
+          key={linha.campo}
+          style={{
+            padding: "8px 10px",
+            borderRadius: 3,
+            border: `1px solid ${C.line}`,
+            background: "rgba(0,0,0,.22)",
+          }}
+        >
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.ink2 }}>{linha.campo}</div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "auto minmax(0, 1fr)",
+              gap: "3px 10px",
+              alignItems: "baseline",
+              marginTop: 5,
+              fontSize: 13,
+              ...tabular,
+            }}
+          >
+            <span style={rotulo}>Gravado</span>
+            <span style={{ color: C.ink, overflowWrap: "anywhere" }}>{linha.gravado}</span>
+            <span style={rotulo}>Na tela</span>
+            <span style={{ color: C.warnSoft, overflowWrap: "anywhere" }}>{linha.rascunho}</span>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 // ---------------------------------------------------------------- estado atual
 
 function StatusAtual({ rascunho }: Readonly<{ rascunho: Resumo }>) {
+  const compacto = useCompacto();
+  const campeao = <Metric label="Campeão" value={rascunho.campeao ?? "A definir"} small />;
+
   return (
-    <Card padding="16px 18px">
+    <Card padding={compacto ? "14px 14px" : "16px 18px"}>
       <div
         style={{
           display: "flex",
@@ -269,7 +336,15 @@ function StatusAtual({ rascunho }: Readonly<{ rascunho: Resumo }>) {
           >
             Temporada atual (rascunho na tela)
           </div>
-          <h3 style={{ fontFamily: display, fontSize: 22, color: C.ink, margin: "4px 0 0" }}>
+          <h3
+            style={{
+              fontFamily: display,
+              fontSize: compacto ? 20 : 22,
+              color: C.ink,
+              margin: "4px 0 0",
+              overflowWrap: compacto ? "anywhere" : undefined,
+            }}
+          >
             {rascunho.nome}
           </h3>
         </div>
@@ -278,11 +353,15 @@ function StatusAtual({ rascunho }: Readonly<{ rascunho: Resumo }>) {
         </Chip>
       </div>
 
+      {/* No celular, duas colunas fixas: com `minmax(140px)` uma tela de 320px caía numa
+          coluna só e os oito números viravam uma escada que empurrava as ações para longe. */}
       <div
         style={{
           display: "grid",
-          gap: 10,
-          gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+          gap: compacto ? 8 : 10,
+          gridTemplateColumns: compacto
+            ? "repeat(2, minmax(0, 1fr))"
+            : "repeat(auto-fit, minmax(140px, 1fr))",
         }}
       >
         <Metric label="Times" value={rascunho.times} small />
@@ -296,7 +375,13 @@ function StatusAtual({ rascunho }: Readonly<{ rascunho: Resumo }>) {
         <Metric label="Formato padrão" value={rascunho.formato === "BO5" ? "MD5" : "MD3"} small />
         <Metric label="Início" value={formatDate(rascunho.inicio)} small />
         <Metric label="Encerramento" value={formatDate(rascunho.fim)} small />
-        <Metric label="Campeão" value={rascunho.campeao ?? "A definir"} small />
+        {compacto ? (
+          // O nome do campeão é o único valor longo da grade: em meia largura ele quebrava
+          // em três linhas. Ocupa a linha inteira; o invólucro em grade estica o cartão.
+          <div style={{ gridColumn: "1 / -1", display: "grid" }}>{campeao}</div>
+        ) : (
+          campeao
+        )}
         <Metric label="Arquivadas" value={rascunho.arquivadas} small />
       </div>
 
@@ -323,6 +408,7 @@ function CartaoEncerrar({
   onEndTournament: () => void;
 }>) {
   const [confirmado, setConfirmado] = useState(false);
+  const compacto = useCompacto();
 
   if (base.encerrada) {
     return (
@@ -393,10 +479,13 @@ function CartaoEncerrar({
       </Check>
 
       <div>
+        {/* No celular, largura toda: o botão que grava precisa ser o alvo óbvio do polegar,
+            depois da confirmação lida — e não um retângulo no canto. */}
         <Button
           tone="danger"
           onClick={onEndTournament}
           disabled={isBusy || carregando || !confirmado}
+          fullWidth={compacto}
         >
           {isBusy ? "Encerrando e arquivando..." : "Encerrar e arquivar"}
         </Button>
@@ -431,6 +520,7 @@ function CartaoIniciar({
   const [arquivarEscolha, setArquivarEscolha] = useState<boolean | null>(null);
   const [backupFeito, setBackupFeito] = useState(false);
   const [confirmacao, setConfirmacao] = useState("");
+  const compacto = useCompacto();
 
   const ativaComSeries = !base.encerrada && base.series > 0;
   // #42: temporada ativa e vazia não deve ser arquivada por padrão.
@@ -611,7 +701,7 @@ function CartaoIniciar({
       </div>
 
       <div>
-        <Button tone="gold" onClick={iniciar} disabled={!podeIniciar}>
+        <Button tone="gold" onClick={iniciar} disabled={!podeIniciar} fullWidth={compacto}>
           {/* #34: sem rótulo de progresso, dava para achar que o clique não pegou. */}
           {isBusy ? "Iniciando nova temporada..." : "Iniciar nova temporada"}
         </Button>
@@ -623,6 +713,8 @@ function CartaoIniciar({
 // ---------------------------------------------------------------- arquivo
 
 function ListaArquivadas({ draft }: Readonly<{ draft: TournamentDataset }>) {
+  const compacto = useCompacto();
+
   if (draft.archivedSeasons.length === 0) {
     return (
       <Empty title="Nenhuma temporada arquivada ainda">
@@ -638,6 +730,52 @@ function ListaArquivadas({ draft }: Readonly<{ draft: TournamentDataset }>) {
   const temporadas = [...draft.archivedSeasons].sort((a, b) =>
     (b.endedAtISO ?? b.archivedAtISO).localeCompare(a.endedAtISO ?? a.archivedAtISO),
   );
+
+  if (compacto) {
+    // No celular, nome em cima e números embaixo: lado a lado, "3ª Edição dos Bronzes"
+    // espremia contra a data e quebrava letra por letra. A seta diz que a linha leva a
+    // outra página — é um link, não um botão que abre algo aqui.
+    return (
+      <div style={{ display: "grid", gap: 8 }}>
+        {temporadas.map((temporada) => (
+          <Link
+            key={temporada.seasonId}
+            href={`/temporadas/${encodeURIComponent(temporada.seasonId)}`}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              minHeight: 56,
+              padding: "10px 12px 10px 14px",
+              borderRadius: 4,
+              border: `1px solid ${C.line}`,
+              background: "rgba(0,0,0,.24)",
+              color: C.ink,
+              textDecoration: "none",
+            }}
+          >
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span
+                style={{
+                  display: "block",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  lineHeight: 1.3,
+                  overflowWrap: "anywhere",
+                }}
+              >
+                {temporada.name}
+              </span>
+              <span style={{ display: "block", marginTop: 3, fontSize: 11.5, color: C.ink4, ...tabular }}>
+                {temporada.snapshot.seriesMatches.length} séries · {formatDate(temporada.endedAtISO)}
+              </span>
+            </span>
+            <ChevronRight size={18} aria-hidden style={{ flexShrink: 0, color: C.ink4 }} />
+          </Link>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "grid", gap: 8 }}>
@@ -679,6 +817,7 @@ export function AdminTournamentPanel({
 }: AdminTournamentPanelProps) {
   const rascunho = resumir(draft);
   const { estado, recarregar } = useResumoGravado(draft);
+  const compacto = useCompacto();
 
   const gravado = estado.situacao === "ok" ? estado.resumo : null;
   // Sem o gravado (rede fora, sessão expirando), o painel continua utilizável com os números da
@@ -698,6 +837,7 @@ export function AdminTournamentPanel({
             onClick={recarregar}
             disabled={estado.situacao === "carregando"}
             title="Ler de novo o estado gravado no servidor"
+            fullWidth={compacto}
           >
             {estado.situacao === "carregando" ? "Conferindo..." : "Reconferir o gravado"}
           </Button>
@@ -725,54 +865,61 @@ export function AdminTournamentPanel({
             Encerrar, iniciar ou importar usam o <strong>estado gravado</strong> e descartam estas
             edições. Salve antes se quiser que elas contem.
           </p>
-          <ScrollX>
-            <table style={{ borderCollapse: "collapse", fontSize: 12, minWidth: 340 }}>
-              <thead>
-                <tr>
-                  {["Campo", "Gravado", "Na tela"].map((coluna) => (
-                    <th
-                      key={coluna}
-                      style={{
-                        textAlign: "left",
-                        padding: "4px 14px 6px 0",
-                        fontSize: 10,
-                        letterSpacing: ".14em",
-                        textTransform: "uppercase",
-                        color: C.ink4,
-                        fontWeight: 600,
-                      }}
-                    >
-                      {coluna}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {divergencias.map((linha) => (
-                  <tr key={linha.campo}>
-                    <td style={{ padding: "3px 14px 3px 0", color: C.ink3 }}>{linha.campo}</td>
-                    <td style={{ padding: "3px 14px 3px 0", color: C.ink, ...tabular }}>
-                      {linha.gravado}
-                    </td>
-                    <td style={{ padding: "3px 0", color: C.warnSoft, ...tabular }}>
-                      {linha.rascunho}
-                    </td>
+          {compacto ? (
+            <ListaDeDivergencias divergencias={divergencias} />
+          ) : (
+            <ScrollX>
+              <table style={{ borderCollapse: "collapse", fontSize: 12, minWidth: 340 }}>
+                <thead>
+                  <tr>
+                    {["Campo", "Gravado", "Na tela"].map((coluna) => (
+                      <th
+                        key={coluna}
+                        style={{
+                          textAlign: "left",
+                          padding: "4px 14px 6px 0",
+                          fontSize: 10,
+                          letterSpacing: ".14em",
+                          textTransform: "uppercase",
+                          color: C.ink4,
+                          fontWeight: 600,
+                        }}
+                      >
+                        {coluna}
+                      </th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </ScrollX>
+                </thead>
+                <tbody>
+                  {divergencias.map((linha) => (
+                    <tr key={linha.campo}>
+                      <td style={{ padding: "3px 14px 3px 0", color: C.ink3 }}>{linha.campo}</td>
+                      <td style={{ padding: "3px 14px 3px 0", color: C.ink, ...tabular }}>
+                        {linha.gravado}
+                      </td>
+                      <td style={{ padding: "3px 0", color: C.warnSoft, ...tabular }}>
+                        {linha.rascunho}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </ScrollX>
+          )}
         </Banner>
       ) : null}
 
       <StatusAtual rascunho={rascunho} />
 
+      {/* `minmax(330px)` passa da largura útil de um celular de 360 (sobram ~336px depois do
+          recuo da página) e a grade empurrava a página de lado. No celular, uma coluna:
+          encerrar em cima, iniciar embaixo — a mesma ordem de risco crescente do monitor. */}
       <div
         style={{
           display: "grid",
-          gap: 16,
+          gap: compacto ? 14 : 16,
           alignItems: "start",
-          gridTemplateColumns: "repeat(auto-fit, minmax(330px, 1fr))",
+          gridTemplateColumns: compacto ? "minmax(0, 1fr)" : "repeat(auto-fit, minmax(330px, 1fr))",
         }}
       >
         <CartaoEncerrar
