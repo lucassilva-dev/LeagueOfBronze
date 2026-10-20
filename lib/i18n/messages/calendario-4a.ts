@@ -32,15 +32,15 @@ export const calendario4a = definir({
     semifinal2: "Semifinal: 2º x 3º colocados",
     final: "FINAL em MD5",
     reserva: "RESERVA: realocação de imprevistos",
-    podeAtrasar: "pode atrasar",
-    podeAtrasarTitulo: "Começa quando o jogo anterior terminar, se ele se estender.",
+    // `{anterior}` = horário do jogo anterior do mesmo dia (ex.: 20:00).
+    podeAtrasar: "Se o jogo das {anterior} passar do horário, este começa assim que ele acabar.",
     formatoMd3: "MD3",
     formatoMd5: "MD5",
 
     notaPosicoes:
       "Time 1 a Time 6 são posições: qual time ocupa cada uma sai de um sorteio ao vivo logo depois do draft.",
     notaAtraso:
-      "Sexta 22:00 e sábado 23:00 podem atrasar se o jogo anterior ainda estiver rolando; a equipe espera.",
+      "Os jogos de sexta às 22:00 e de sábado às 23:00 nunca começam antes do horário. Se o jogo anterior passar do tempo, eles começam assim que ele acabar.",
     notaReserva: "A reserva de sábado 28/11 às 19:00 fica vaga para remarcar imprevistos.",
     notaSemis: "Os confrontos das semifinais saem da classificação da fase de pontos: 1º x 4º e 2º x 3º.",
 
@@ -75,15 +75,14 @@ export const calendario4a = definir({
     semifinal2: "Semifinal: 2nd v 3rd",
     final: "Bo5 FINAL",
     reserva: "RESERVE: slot for rescheduling",
-    podeAtrasar: "may start late",
-    podeAtrasarTitulo: "Starts when the previous game ends, if it runs long.",
+    podeAtrasar: "If the {anterior} game runs over, this one starts as soon as it ends.",
     formatoMd3: "Bo3",
     formatoMd5: "Bo5",
 
     notaPosicoes:
       "Team 1 to Team 6 are slots: which team takes each one is decided by a live draw right after the draft.",
     notaAtraso:
-      "Friday 22:00 and Saturday 23:00 may start late if the previous game is still running; the team waits.",
+      "Friday 22:00 and Saturday 23:00 games never start early. If the game before them runs over, they start as soon as it ends.",
     notaReserva: "The Saturday 28 Nov 19:00 reserve slot is kept free to reschedule anything that goes wrong.",
     notaSemis: "The semifinal match-ups come from the round-robin standings: 1st v 4th and 2nd v 3rd.",
 

@@ -159,6 +159,11 @@ describe("o componente do calendário", () => {
     expect(html).toContain("29/11");
     expect(html).toContain("1º FIM DE SEMANA");
     expect(html).toContain("sorteio ao vivo");
+    // O aviso de horário diz QUAL jogo pode atrasar este, e que ele só começa depois —
+    // "pode atrasar" sozinho dava a entender adiamento ou antecipação do confronto.
+    expect(html).toContain("Se o jogo das 20:00 passar do horário, este começa assim que ele acabar.");
+    expect(html).toContain("Se o jogo das 21:00 passar do horário, este começa assim que ele acabar.");
+    expect(html).not.toContain("pode atrasar");
     // Nenhuma animação de opacidade (já apagou o site quatro vezes).
     expect(html).not.toMatch(/opacity\s*:\s*0/);
   });

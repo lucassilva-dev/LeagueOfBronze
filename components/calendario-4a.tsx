@@ -81,7 +81,11 @@ function Legenda({ t }: Readonly<{ t: Textos }>) {
   );
 }
 
-function LinhaDoSlot({ slot, t }: Readonly<{ slot: SlotDoCalendario; t: Textos }>) {
+function LinhaDoSlot({
+  slot,
+  anterior,
+  t,
+}: Readonly<{ slot: SlotDoCalendario; anterior?: SlotDoCalendario; t: Textos }>) {
   const cat = categoria(slot);
   const cor = CORES[cat];
   const destaque = slot.tipo !== "pontos";
@@ -104,11 +108,15 @@ function LinhaDoSlot({ slot, t }: Readonly<{ slot: SlotDoCalendario; t: Textos }
         <span style={{ display: "block", fontSize: 13, fontWeight: destaque ? 700 : 500, color: cor.texto }}>
           {rotuloDoSlot(slot, t)}
         </span>
-        {/* Embaixo do confronto, e não ao lado: ao lado espremia "Time 2 x Time 5" em
-            duas linhas nos cartões estreitos. */}
-        {slot.podeAtrasar ? (
-          <span title={t.podeAtrasarTitulo} style={{ display: "inline-block", marginTop: 4, fontSize: 10, letterSpacing: ".06em", color: "#cfa877", border: "1px dashed rgba(201,138,75,.45)", borderRadius: 2, padding: "1px 6px", whiteSpace: "nowrap" }}>
-            {t.podeAtrasar}
+        {/*
+          Frase inteira, e não etiqueta: "pode atrasar" sozinho não dizia se o JOGO podia
+          ser adiado, antecipado ou se o time é que podia chegar tarde. O que vale é: nunca
+          começa antes do horário; se o jogo anterior do dia passar do tempo, este começa
+          assim que ele acabar. O horário do anterior vai escrito para não deixar dúvida.
+        */}
+        {slot.podeAtrasar && anterior ? (
+          <span style={{ display: "block", marginTop: 4, fontSize: 11, lineHeight: 1.4, color: "#b89a6e" }}>
+            {t.podeAtrasar.replace("{anterior}", horaDoSlot(anterior))}
           </span>
         ) : null}
       </span>
@@ -156,8 +164,8 @@ export function CalendarioDa4a({
                       <span style={{ fontSize: 13, letterSpacing: ".08em", color: "#c98a4b", fontVariantNumeric: "tabular-nums" }}>{data}</span>
                     </header>
                     <ul style={{ listStyle: "none", margin: 0, padding: 10, display: "flex", flexDirection: "column", gap: 7 }}>
-                      {d.slots.map((slot) => (
-                        <LinhaDoSlot key={slot.quando} slot={slot} t={t} />
+                      {d.slots.map((slot, i) => (
+                        <LinhaDoSlot key={slot.quando} slot={slot} anterior={d.slots[i - 1]} t={t} />
                       ))}
                     </ul>
                   </article>
