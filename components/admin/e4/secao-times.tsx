@@ -3,6 +3,7 @@
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { UserRoundSearch } from "lucide-react";
 
+import { EloPorRota } from "@/components/admin/e4/elo-por-rota";
 import type { Inscrito, PropsSecao } from "@/components/admin/e4/painel-edicao";
 import { useCompacto } from "@/components/admin/responsivo";
 import {
@@ -53,6 +54,10 @@ import { contaParaTimes, distribuirTimes, viabilidadeDeOrcamento } from "@/lib/i
  * esquerda — tabela de 620px num telefone obrigava a rolar de lado para achar o botão
  * "Voltar para apto". No monitor as tabelas continuam, só com o emblema no lugar do nome
  * do elo e o ícone da rota no lugar da bolinha de cor.
+ *
+ * O quadro de elo por rota (`elo-por-rota.tsx`) é a única peça daqui feita para SAIR do
+ * painel — a organização tira print e manda no grupo. Por isso ele recebe só nick, elo de
+ * preço e rotas: os pontos nem chegam até ele.
  */
 
 // ---------------------------------------------------------------- estilos de tabela
@@ -360,8 +365,17 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
       rotas[0],
     );
 
+    // O quadro de elo por rota recebe só nick, elo de preço e rotas: nada de pontos.
+    const jogadoresDoQuadro = pool.map((i) => ({
+      nick: i.nick,
+      elo: eloDePreco(i),
+      primaria: i.rota_primaria,
+      secundaria: i.rota_secundaria,
+    }));
+
     return {
       pool,
+      jogadoresDoQuadro,
       aprovados,
       marcadosSobra,
       semCongelar,
@@ -668,6 +682,12 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
           ) : null}
         </>
       ) : null}
+
+      {/* ------------------------------------------------------- 2b. elo por rota */}
+
+      <BlockTitle>Elo por rota</BlockTitle>
+
+      <EloPorRota jogadores={analise.jogadoresDoQuadro} times={panorama.times} />
 
       {/* ---------------------------------------------------------------- 3. sobra */}
 
