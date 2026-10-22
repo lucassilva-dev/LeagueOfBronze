@@ -82,4 +82,5 @@ alter default privileges in schema public revoke all on functions from anon, aut
 -- =====================================================================
 -- As tabelas da 4a Edicao ficam em supabase/schema-4a-edicao.sql, para este
 -- arquivo continuar sendo o retrato minimo do que o site precisa para existir.
--- Rode aquele arquivo DEPOIS deste.
+-- Ordem num banco novo: este arquivo -> schema-admin.sql (login da organizacao)
+-- -> schema-4a-edicao.sql.

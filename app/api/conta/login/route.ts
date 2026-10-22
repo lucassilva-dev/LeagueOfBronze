@@ -10,25 +10,33 @@ import {
 import { loginJogadorSchema } from "@/lib/jogadores/schema";
 import {
   acharJogadorPorEmail,
+  concluirTentativaJogador,
   contarTentativasJogador,
-  registrarTentativaJogador,
+  reservarTentativaJogador,
+  type ReservaDeTentativa,
 } from "@/lib/jogadores/store";
 import { getClientIp, hashIp } from "@/lib/security/admin-store";
 import { verifyPassword } from "@/lib/security/password";
-import { evaluateLoginRateLimit } from "@/lib/security/rate-limit";
+import { descontarPropriaReserva, evaluateLoginRateLimit, TENTATIVA_ERRO_INTERNO } from "@/lib/security/rate-limit";
 import { respostaDeErro } from "@/lib/security/resposta-erro";
 import { comPisoDeTempo, lerCorpoPublico } from "@/lib/security/rota-publica";
 
 export const dynamic = "force-dynamic";
 
-/** Mensagem única para senha errada e conta inexistente — não conta quem tem conta. */
-const CREDENCIAIS_INVALIDAS = "E-mail ou senha incorretos.";
+// Respostas de recusa. O texto é fixo em português; o `codigo` é estável e é por ele que a
+// tela traduz (lib/i18n/messages/inscricao.ts, `erros.*`) — no site em inglês, o login do
+// formulário de inscrição mostrava "E-mail ou senha incorretos." em português.
+
+/** Resposta única para senha errada, conta inexistente e conta desativada — não conta quem tem conta. */
+const CREDENCIAIS_INVALIDAS = { error: "E-mail ou senha incorretos.", codigo: "credenciais_invalidas" } as const;
+const MUITAS_TENTATIVAS = { error: "Muitas tentativas. Tente novamente mais tarde.", codigo: "muitas_tentativas" } as const;
+const INDISPONIVEL = { error: "Contas ainda não estão disponíveis.", codigo: "indisponivel" } as const;
 
 export async function POST(request: NextRequest) {
   const inicio = Date.now();
 
   if (!contaDeJogadorDisponivel()) {
-    return NextResponse.json({ error: "Contas ainda não estão disponíveis." }, { status: 503 });
+    return NextResponse.json(INDISPONIVEL, { status: 503 });
   }
 
   const lido = await lerCorpoPublico(request);
@@ -36,24 +44,43 @@ export async function POST(request: NextRequest) {
 
   const parsed = loginJogadorSchema.safeParse(lido.corpo);
   if (!parsed.success) {
-    return comPisoDeTempo(inicio, NextResponse.json({ error: CREDENCIAIS_INVALIDAS }, { status: 401 }));
+    return comPisoDeTempo(inicio, NextResponse.json(CREDENCIAIS_INVALIDAS, { status: 401 }));
   }
 
   const { email, senha } = parsed.data;
   const ipHash = hashIp(getClientIp(request.headers));
 
+  // A reserva é fechada em TODO caminho de saída. Os caminhos normais fecham com o
+  // resultado real; se algo estourar depois dela (sessão que não foi criada, contagem que
+  // não foi lida), o `finally` fecha com `erro_interno`, que não conta. Antes, a linha
+  // ficava `em_andamento` e pesava como palpite errado: cinco erros 500 com a senha CERTA
+  // (banco oscilando no dia do draft) trancavam o capitão por 15 minutos.
+  let reserva: ReservaDeTentativa = null;
+  let concluida = false;
+  const concluir = (success: boolean, reason: string) => {
+    concluida = true;
+    return concluirTentativaJogador(reserva, { email, ipHash, success, reason });
+  };
+
   try {
     // 1. Bloqueio por tentativas. O contador vive no Postgres porque serverless não
     //    compartilha memória entre instâncias — em memória, bastava distribuir.
-    const decisao = evaluateLoginRateLimit(await contarTentativasJogador(email, ipHash));
+    //
+    //    A tentativa é RESERVADA antes de contar: contando antes de gravar, uma rajada
+    //    simultânea lia a contagem antes de qualquer falha existir e testava 30 senhas
+    //    de uma vez (ver `descontarPropriaReserva`).
+    reserva = await reservarTentativaJogador({ email, ipHash });
+    const decisao = evaluateLoginRateLimit(
+      descontarPropriaReserva(await contarTentativasJogador(email, ipHash), reserva !== null),
+    );
     if (!decisao.allowed) {
-      await registrarTentativaJogador({ email, ipHash, success: false, reason: decisao.reason });
+      await concluir(false, decisao.reason);
       return comPisoDeTempo(
         inicio,
-        NextResponse.json(
-          { error: "Muitas tentativas. Tente novamente mais tarde." },
-          { status: 429, headers: { "Retry-After": String(decisao.retryAfterSeconds) } },
-        ),
+        NextResponse.json(MUITAS_TENTATIVAS, {
+          status: 429,
+          headers: { "Retry-After": String(decisao.retryAfterSeconds) },
+        }),
       );
     }
 
@@ -63,26 +90,22 @@ export async function POST(request: NextRequest) {
       conta !== null && (await verifyPassword(senha, conta.password_hash, pepperDeSenhaJogador()));
 
     if (!conta || !senhaOk) {
-      await registrarTentativaJogador({
-        email,
-        ipHash,
-        success: false,
-        reason: conta ? "senha_incorreta" : "conta_inexistente",
-      });
-      return comPisoDeTempo(inicio, NextResponse.json({ error: CREDENCIAIS_INVALIDAS }, { status: 401 }));
+      await concluir(false, conta ? "senha_incorreta" : "conta_inexistente");
+      return comPisoDeTempo(inicio, NextResponse.json(CREDENCIAIS_INVALIDAS, { status: 401 }));
     }
 
+    // Conta desativada responde o MESMO 401 da senha errada. Com um 403 próprio aqui,
+    // depois da senha conferida, o "Conta desativada" só aparecia no palpite CERTO — a
+    // rota confirmava a senha de quem saiu, e essa senha costuma ser reaproveitada. O
+    // motivo real fica no registro de tentativas.
     if (conta.disabled_at) {
-      await registrarTentativaJogador({ email, ipHash, success: false, reason: "conta_desativada" });
-      return comPisoDeTempo(
-        inicio,
-        NextResponse.json({ error: "Conta desativada. Fale com a organização." }, { status: 403 }),
-      );
+      await concluir(false, "conta_desativada");
+      return comPisoDeTempo(inicio, NextResponse.json(CREDENCIAIS_INVALIDAS, { status: 401 }));
     }
 
     // 3. Sessão: id aleatório no banco + cookie assinado com segredo próprio do jogador
     const cookie = await emitirCookieDeJogador(conta, request);
-    await registrarTentativaJogador({ email, ipHash, success: true, reason: "ok" });
+    await concluir(true, "ok");
 
     const resposta = NextResponse.json({
       ok: true,
@@ -97,5 +120,11 @@ export async function POST(request: NextRequest) {
     return comPisoDeTempo(inicio, resposta);
   } catch (error) {
     return respostaDeErro("api/conta/login", error, "Não foi possível entrar.");
+  } finally {
+    if (reserva && !concluida) {
+      await concluir(false, TENTATIVA_ERRO_INTERNO).catch((e: unknown) =>
+        console.error("[api/conta/login] falha ao fechar a reserva da tentativa:", e),
+      );
+    }
   }
 }

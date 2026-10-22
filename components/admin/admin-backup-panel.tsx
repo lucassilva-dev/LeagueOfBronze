@@ -44,6 +44,11 @@ type AdminBackupPanelProps = Readonly<{
   onImportText: (text: string) => Promise<void>;
   onImportFile: (file: File) => Promise<void>;
   importing?: boolean;
+  /**
+   * A pessoa tem `dataset:import`? A seção abre para quem só exporta, e os cartões de
+   * importação ficavam habilitados até o 403 do fim. Sem a prop, nada é bloqueado.
+   */
+  podeImportar?: boolean;
 }>;
 
 type ResumoDataset = Readonly<{
@@ -389,9 +394,12 @@ export function AdminBackupPanel({
   onImportText,
   onImportFile,
   importing,
+  podeImportar = true,
 }: AdminBackupPanelProps) {
   const compacto = useCompacto();
   const ocupado = Boolean(importing);
+  /** Os controles de importação: travados durante uma importação OU sem a permissão. */
+  const travado = ocupado || !podeImportar;
   const { estado, recarregar } = useResumoAtual(ocupado);
   const atual = estado.situacao === "ok" ? estado.resumo : null;
 
@@ -500,6 +508,13 @@ export function AdminBackupPanel({
         <BotaoExportarBackup>Exportar backup agora</BotaoExportarBackup>
       </ActionCard>
 
+      {podeImportar ? null : (
+        <Banner tone="warn" title="Importar exige uma permissão que esta conta não tem">
+          Substituir o campeonato pede a permissão de importar dados, que só o responsável pelo
+          campeonato tem. Exportar o backup continua liberado.
+        </Banner>
+      )}
+
       {/* No celular, uma coluna fixa: o mínimo de 330px por cartão é maior que a tela de
           360px menos as margens, e a página inteira passava a rolar de lado. */}
       <div
@@ -530,7 +545,7 @@ export function AdminBackupPanel({
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <Button
               onClick={() => inputArquivo.current?.click()}
-              disabled={ocupado}
+              disabled={travado}
               style={compacto ? DIVIDE_A_LINHA : undefined}
             >
               {arquivoEscolhido ? "Trocar arquivo" : "Escolher arquivo"}
@@ -582,7 +597,7 @@ export function AdminBackupPanel({
                   onClick={() => {
                     void importarArquivo();
                   }}
-                  disabled={ocupado || !confirmaArquivo}
+                  disabled={travado || !confirmaArquivo}
                 >
                   {ocupado ? "Importando..." : "Substituir pelo arquivo"}
                 </Button>
@@ -605,7 +620,7 @@ export function AdminBackupPanel({
               // No celular a fonte sobe para 16px (sem zoom do iPhone): 10 linhas dela
               // tomavam a tela inteira e escondiam os botões de conferir.
               rows={compacto ? 7 : 10}
-              disabled={ocupado}
+              disabled={travado}
               placeholder="Cole aqui um backup válido do campeonato em JSON..."
               onChange={(valor) => {
                 setTexto(valor);
@@ -620,7 +635,7 @@ export function AdminBackupPanel({
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <Button
               onClick={conferirTexto}
-              disabled={ocupado || !texto.trim()}
+              disabled={travado || !texto.trim()}
               style={compacto ? { flex: "1 1 200px" } : undefined}
             >
               Conferir antes de importar
@@ -663,7 +678,7 @@ export function AdminBackupPanel({
                   onClick={() => {
                     void importarTexto();
                   }}
-                  disabled={ocupado || !confirmaTexto}
+                  disabled={travado || !confirmaTexto}
                 >
                   {ocupado ? "Importando..." : "Substituir pelo JSON colado"}
                 </Button>

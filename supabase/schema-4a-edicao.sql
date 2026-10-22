@@ -1,6 +1,6 @@
 -- =====================================================================
 -- 4ª EDIÇÃO — INSCRIÇÃO, CONFERÊNCIA, DINHEIRO E DRAFT
--- Execute no SQL Editor do Supabase, DEPOIS de schema.sql.
+-- Execute no SQL Editor do Supabase, DEPOIS de schema.sql e de schema-admin.sql.
 -- =====================================================================
 --
 -- Por que estas tabelas existem, em vez de mais campos no JSON do campeonato:
@@ -375,11 +375,22 @@ alter table public.inscricoes
 alter table public.inscricoes validate constraint inscricoes_email_minusculo;
 
 -- Mesma razao, para o login da organizacao (ver `normalizarUsuario`).
-alter table public.admin_users
-  drop constraint if exists admin_users_username_minusculo;
-alter table public.admin_users
-  add constraint admin_users_username_minusculo check (username = lower(username)) not valid;
-alter table public.admin_users validate constraint admin_users_username_minusculo;
+--
+-- Dentro de um `if` porque admin_users NAO e criada por este arquivo (e sim por
+-- schema-admin.sql). Num banco novo em que ela ainda nao exista, o `alter` solto abortava
+-- a transacao e desfazia TODAS as tabelas da 4a. Num banco que ja a tem (producao), os
+-- tres comandos sao os mesmos de antes.
+do $admin_minusculo$
+begin
+  if to_regclass('public.admin_users') is not null then
+    alter table public.admin_users
+      drop constraint if exists admin_users_username_minusculo;
+    alter table public.admin_users
+      add constraint admin_users_username_minusculo check (username = lower(username)) not valid;
+    alter table public.admin_users validate constraint admin_users_username_minusculo;
+  end if;
+end
+$admin_minusculo$;
 
 -- ---------------------------------------------------------------- disponibilidade (regra 9)
 -- Turnos em que o jogador pode jogar, pedidos pelo regulamento da 4a Edicao. Entrou

@@ -147,11 +147,13 @@ describe("um «Salvar tudo» só", () => {
     expect(executar).toHaveBeenCalledTimes(1);
     expect(executar).toHaveBeenCalledWith("inscrito", {
       inscricaoId: "x1",
+      // Cada parte leva o que a tela VIU (trava otimista): o servidor só grava se o banco
+      // ainda estiver assim, e senão responde 409 sem gravar.
       conferencias: [
-        { item: "a", estado: "ok" },
-        { item: "f", estado: "recusado" },
+        { item: "a", estado: "ok", estadoAnterior: "pendente" },
+        { item: "f", estado: "recusado", estadoAnterior: "pendente" },
       ],
-      ficha: { situacao: "recusado", observacao: "Conta smurf." },
+      ficha: { situacao: "recusado", observacao: "Conta smurf.", situacaoAnterior: "pendente" },
     });
   });
 
@@ -194,22 +196,24 @@ describe("um «Salvar tudo» só", () => {
 });
 
 describe("atalho «Pendentes → Cumpre»", () => {
-  it("marca só o que está pendente; o (E) sem data de início vira «não avaliável»", () => {
+  it("marca só o que está pendente; o (E) sem data de início fica de fora, intocado", () => {
+    // Gravar o (E) — mesmo como «não avaliável» — carimba o nome do organizador e o tira do
+    // robô da Riot: a regra 4 deixaria de ser contada para todo mundo conferido pelo atalho.
     const { executar } = montar(undefined, undefined, { f: "risco" });
 
     fireEvent.click(within(gaveta()).getByRole("button", { name: /Pendentes → Cumpre/ }));
     expect(marcado("Estado do item F")).toBe("Em risco");
-    expect(marcado("Estado do item E")).toBe("Não avaliável");
+    expect(marcado("Estado do item E")).toBe("Pendente");
+    expect(within(gaveta()).getByText(/\(E\) fica fora do atalho/)).toBeTruthy();
     salvarTudo();
 
     expect(executar).toHaveBeenCalledWith("inscrito", {
       inscricaoId: "x1",
       conferencias: [
-        { item: "a", estado: "ok" },
-        { item: "b", estado: "ok" },
-        { item: "d", estado: "ok" },
-        { item: "e", estado: "nao_avaliavel" },
-        { item: "m", estado: "ok" },
+        { item: "a", estado: "ok", estadoAnterior: "pendente" },
+        { item: "b", estado: "ok", estadoAnterior: "pendente" },
+        { item: "d", estado: "ok", estadoAnterior: "pendente" },
+        { item: "m", estado: "ok", estadoAnterior: "pendente" },
       ],
     });
   });
@@ -226,11 +230,11 @@ describe("atalho «Pendentes → Cumpre»", () => {
     expect(marcado("Estado do item E")).toBe("Cumpre");
   });
 
-  it("com o início decidido mas a janela ainda fechada, o (E) continua «não avaliável»", () => {
+  it("com o início decidido mas a janela ainda fechada, o (E) continua pendente — é do robô", () => {
     // Aprovar o (E) em outubro com início em novembro é afirmar as partidas dos 10 dias
     // antes do início antes de eles existirem — e, aprovado, ninguém volta nele.
     abrirCom(new Date(Date.now() + 30 * DIA).toISOString());
-    expect(marcado("Estado do item E")).toBe("Não avaliável");
+    expect(marcado("Estado do item E")).toBe("Pendente");
     expect(marcado("Estado do item D")).toBe("Cumpre");
     expect(within(gaveta()).getByText(/essa janela só abre em/)).toBeTruthy();
   });
@@ -254,7 +258,7 @@ describe("a gaveta não desfaz o que outro organizador gravou", () => {
     expect(executar).toHaveBeenCalledTimes(1);
     expect(executar).toHaveBeenCalledWith("inscrito", {
       inscricaoId: "x1",
-      ficha: { observacao: "Conferido no grupo." },
+      ficha: { observacao: "Conferido no grupo.", situacaoAnterior: "apto" },
     });
   });
 
@@ -265,7 +269,10 @@ describe("a gaveta não desfaz o que outro organizador gravou", () => {
     rerender(<SecaoInscritos {...p} dados={dados([inscrito({ observacao: "nota do outro" })])} />);
     salvarTudo();
 
-    expect(executar).toHaveBeenCalledWith("inscrito", { inscricaoId: "x1", ficha: { situacao: "recusado" } });
+    expect(executar).toHaveBeenCalledWith("inscrito", {
+      inscricaoId: "x1",
+      ficha: { situacao: "recusado", situacaoAnterior: "pendente" },
+    });
   });
 
   it("o veredicto que outro gravou aparece, e salvar só a observação não o reenvia", () => {
@@ -281,7 +288,7 @@ describe("a gaveta não desfaz o que outro organizador gravou", () => {
 
     expect(executar).toHaveBeenCalledWith("inscrito", {
       inscricaoId: "x1",
-      conferencias: [{ item: "b", observacao: "print no privado" }],
+      conferencias: [{ item: "b", observacao: "print no privado", estadoAnterior: "ok" }],
     });
   });
 
@@ -294,7 +301,7 @@ describe("a gaveta não desfaz o que outro organizador gravou", () => {
 
     expect(executar).toHaveBeenCalledWith("inscrito", {
       inscricaoId: "x1",
-      conferencias: [{ item: "b", estado: "ok" }],
+      conferencias: [{ item: "b", estado: "ok", estadoAnterior: "pendente" }],
     });
   });
 
@@ -310,7 +317,10 @@ describe("a gaveta não desfaz o que outro organizador gravou", () => {
     fireEvent.change(campo, { target: { value: "Fulano de Tal" } });
     expect(salvar().disabled).toBe(false);
     fireEvent.click(salvar());
-    expect(executar).toHaveBeenCalledWith("inscrito", { inscricaoId: "x1", ficha: { nomeReal: "Fulano de Tal" } });
+    expect(executar).toHaveBeenCalledWith("inscrito", {
+      inscricaoId: "x1",
+      ficha: { nomeReal: "Fulano de Tal", situacaoAnterior: "pendente" },
+    });
   });
 
   it("registra os turnos de quem se inscreveu antes da pergunta", () => {
@@ -322,7 +332,7 @@ describe("a gaveta não desfaz o que outro organizador gravou", () => {
     // Na ordem do dia, não na ordem dos cliques.
     expect(executar).toHaveBeenCalledWith("inscrito", {
       inscricaoId: "x1",
-      ficha: { disponibilidade: ["manha", "noite"] },
+      ficha: { disponibilidade: ["manha", "noite"], situacaoAnterior: "pendente" },
     });
   });
 });
@@ -341,7 +351,10 @@ describe("mexer e desfazer é o mesmo que não mexer", () => {
     aba("Ficha");
     fireEvent.change(screen.getByLabelText("Observação da ficha"), { target: { value: "ok" } });
     salvarTudo();
-    expect(executar).toHaveBeenCalledWith("inscrito", { inscricaoId: "x1", ficha: { observacao: "ok" } });
+    expect(executar).toHaveBeenCalledWith("inscrito", {
+      inscricaoId: "x1",
+      ficha: { observacao: "ok", situacaoAnterior: "apto" },
+    });
   });
 
   it("estado de requisito trocado e destrocado também", () => {
@@ -356,7 +369,7 @@ describe("mexer e desfazer é o mesmo que não mexer", () => {
     salvarTudo();
     expect(executar).toHaveBeenCalledWith("inscrito", {
       inscricaoId: "x1",
-      conferencias: [{ item: "a", estado: "ok" }],
+      conferencias: [{ item: "a", estado: "ok", estadoAnterior: "pendente" }],
     });
   });
 });
@@ -387,7 +400,7 @@ describe("navegar pela lista sem perder trabalho", () => {
 
     expect(executar).toHaveBeenCalledWith("inscrito", {
       inscricaoId: "x1",
-      conferencias: [{ item: "a", estado: "ok" }],
+      conferencias: [{ item: "a", estado: "ok", estadoAnterior: "pendente" }],
     });
     expect(within(gaveta()).getByRole("heading", { level: 2 }).textContent).toContain("Beltrano");
   });
@@ -472,7 +485,7 @@ describe("falha no meio do «Salvar tudo»", () => {
     await act(async () => salvarTudo());
     expect(executar).toHaveBeenLastCalledWith("inscrito", {
       inscricaoId: "x1",
-      conferencias: [{ item: "b", estado: "ok" }],
+      conferencias: [{ item: "b", estado: "ok", estadoAnterior: "pendente" }],
     });
   });
 });
@@ -518,7 +531,10 @@ describe("teclado", () => {
     fireEvent.keyDown(gaveta(), { key: "Escape" });
     await act(async () => fireEvent.click(within(gaveta()).getByRole("button", { name: "Salvar e fechar" })));
 
-    expect(executar).toHaveBeenCalledWith("inscrito", { inscricaoId: "x1", ficha: { situacao: "apto" } });
+    expect(executar).toHaveBeenCalledWith("inscrito", {
+      inscricaoId: "x1",
+      ficha: { situacao: "apto", situacaoAnterior: "pendente" },
+    });
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
@@ -534,7 +550,9 @@ describe("lacunas apontadas pela revisão dos testes", () => {
     salvarTudo();
     expect(executar).toHaveBeenCalledWith(
       "inscrito",
-      expect.objectContaining({ conferencias: expect.arrayContaining([{ item: "f", estado: "recusado" }]) }),
+      expect.objectContaining({
+        conferencias: expect.arrayContaining([{ item: "f", estado: "recusado", estadoAnterior: "pendente" }]),
+      }),
     );
   });
 

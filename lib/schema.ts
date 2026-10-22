@@ -172,7 +172,7 @@ function validateGameReferences(
     addCustomIssue(
       ctx,
       ["seriesMatches", seriesIndex, "games", gameIndex, "winnerTeamId"],
-      `Jogo ${gameIndex + 1} da série ${series.id} possui winnerTeamId inválido.`,
+      `Jogo ${gameIndex + 1} da série ${series.id} tem um vencedor que não é nenhum dos dois times.`,
     );
   }
 
@@ -542,4 +542,283 @@ export type TournamentStatus = z.infer<typeof tournamentStatusSchema>;
 export type ArchivedSeason = z.infer<typeof archivedSeasonSchema>;
 export type TournamentDatasetSnapshot = z.infer<typeof tournamentDatasetSnapshotSchema>;
 export type StartTournamentInput = z.infer<typeof startTournamentSchema>;
+
+// ============================================================
+// Jogo lançado depois de a série estar decidida
+// ============================================================
+
+/**
+ * O primeiro jogo registrado DEPOIS de a série já ter vencedor (MD3 com 2 vitórias, MD5
+ * com 3), ou `null` quando não há nenhum.
+ *
+ * Um 3º jogo numa MD3 que já estava 2x0 vira 3x0 no site e dá +3 de saldo e 3 mapas
+ * ganhos na tabela — o 2º e o 3º critérios do desempate. Quase sempre é erro de digitação
+ * (o vencedor do jogo 2 marcado errado, ou o jogo da série seguinte lançado nesta).
+ *
+ * W.O. fica de fora: série de W.O. com jogo registrado já é recusada pelo schema.
+ */
+export function jogoDepoisDaDecisao(
+  serie: SeriesMatch,
+  formatoDoTorneio: SeriesFormat,
+): { jogo: number; quantidade: number; placarA: number; placarB: number } | null {
+  if (serie.walkoverWinnerTeamId) return null;
+  const vitoriasParaFechar = (serie.format ?? formatoDoTorneio) === "BO5" ? 3 : 2;
+
+  let placarA = 0;
+  let placarB = 0;
+  for (const [indice, jogo] of serie.games.entries()) {
+    if (placarA >= vitoriasParaFechar || placarB >= vitoriasParaFechar) {
+      return { jogo: indice + 1, quantidade: serie.games.length - indice, placarA, placarB };
+    }
+    if (jogo.winnerTeamId === serie.teamAId) placarA += 1;
+    else if (jogo.winnerTeamId === serie.teamBId) placarB += 1;
+  }
+  return null;
+}
+
+/**
+ * A regra acima aplicada a uma GRAVAÇÃO: mensagens das séries em que o envio acrescenta
+ * jogo depois da decisão, comparado com o que está gravado.
+ *
+ * ⚠ NÃO ESTÁ NO SCHEMA DE PROPÓSITO. O schema valida o dataset em TODA leitura — inclusive
+ * os retratos das temporadas arquivadas — e o dado real já tem esse caso: na 3ª Edição, a
+ * `serie-14` (MD3) tem um 3º jogo lançado depois de um 2x0. Com a regra no schema, a
+ * primeira leitura depois do deploy recusaria o campeonato inteiro e o site público cairia.
+ *
+ * Pelo mesmo motivo a comparação é com o GRAVADO: a recusa só vale quando o envio PIORA a
+ * série (mais jogos depois da decisão do que havia). Corrigir o K/D/A da `serie-14` continua
+ * possível; lançar um jogo novo numa série já decidida, não.
+ */
+export function problemasDeJogoDepoisDaDecisao(
+  proposta: TournamentDataset,
+  gravado: TournamentDataset | null,
+): string[] {
+  const antes = new Map((gravado?.seriesMatches ?? []).map((serie) => [serie.id, serie]));
+  const nomes = new Map(proposta.teams.map((time) => [time.id, time.name]));
+  const problemas: string[] = [];
+
+  for (const serie of proposta.seriesMatches) {
+    const depois = jogoDepoisDaDecisao(serie, proposta.tournament.format);
+    if (!depois) continue;
+
+    const anterior = antes.get(serie.id);
+    const jaHavia =
+      anterior && gravado ? (jogoDepoisDaDecisao(anterior, gravado.tournament.format)?.quantidade ?? 0) : 0;
+    if (depois.quantidade <= jaHavia) continue;
+
+    const timeA = nomes.get(serie.teamAId) ?? serie.teamAId;
+    const timeB = nomes.get(serie.teamBId) ?? serie.teamBId;
+    problemas.push(
+      `Série ${serie.id} (${timeA} x ${timeB}): a série já estava decidida em ` +
+        `${depois.placarA}x${depois.placarB} depois do jogo ${depois.jogo - 1}, então o jogo ` +
+        `${depois.jogo} não pode ser registrado. Apague esse jogo ou corrija o vencedor dos anteriores.`,
+    );
+  }
+  return problemas;
+}
+
+// ============================================================
+// Mensagens de validação em português, com o nome do que falhou
+// ============================================================
+
+/**
+ * Nome de cada campo como a organização o vê no painel.
+ *
+ * Antes a recusa chegava como "seriesMatches.1.games.0.bans.0.championName: Too small:
+ * expected string to have >=1 characters" — em inglês, e com o índice do ARRAY, que não
+ * bate com a lista do painel (ordenada por data). Ninguém achava a série.
+ */
+const NOME_DO_CAMPO: Record<string, string> = {
+  name: "nome",
+  nick: "nick",
+  slug: "endereço (slug)",
+  imageUrl: "imagem",
+  teamId: "time",
+  role1: "rota principal",
+  role2: "rota secundária",
+  elo: "elo",
+  date: "data",
+  teamAId: "time A",
+  teamBId: "time B",
+  format: "formato",
+  stage: "fase",
+  walkoverWinnerTeamId: "vencedor do W.O.",
+  walkoverReason: "motivo do W.O.",
+  games: "jogos",
+  winnerTeamId: "vencedor",
+  durationMin: "duração (min)",
+  mvpPlayerId: "MVP",
+  statsByPlayer: "K/D/A",
+  champion: "campeão",
+  championName: "campeão",
+  kills: "abates",
+  deaths: "mortes",
+  assists: "assistências",
+  playerId: "jogador",
+  bans: "bans",
+  cardsUsed: "cartinhas",
+  cardId: "carta",
+  gameIndex: "jogo da carta",
+  dupla: "carta dupla",
+  blueSideTeamId: "lado azul",
+  sorteios: "histórico de sorteios",
+  seriesPointsRule: "pontuação",
+  lastUpdatedISO: "data de atualização",
+  teams: "times",
+  players: "jogadores",
+  seriesMatches: "séries",
+  standingsSeed: "classificação inicial",
+  archivedSeasons: "temporadas arquivadas",
+  played: "jogos disputados",
+  points: "pontos",
+};
+
+type ProblemaDeValidacao = z.ZodError["issues"][number];
+type Registro = Record<string, unknown>;
+
+function comoRegistro(valor: unknown): Registro | undefined {
+  return valor && typeof valor === "object" && !Array.isArray(valor) ? (valor as Registro) : undefined;
+}
+
+function textoDe(valor: unknown): string | undefined {
+  return typeof valor === "string" && valor.trim() ? valor.trim() : undefined;
+}
+
+function nomesDosTimes(dataset: unknown): Map<string, string> {
+  const lista = comoRegistro(dataset)?.teams;
+  const nomes = new Map<string, string>();
+  if (!Array.isArray(lista)) return nomes;
+  for (const time of lista) {
+    const id = textoDe(comoRegistro(time)?.id);
+    if (id) nomes.set(id, textoDe(comoRegistro(time)?.name) ?? id);
+  }
+  return nomes;
+}
+
+function rotuloDoItem(lista: string, indice: number, item: Registro | undefined, times: Map<string, string>) {
+  const numero = indice + 1;
+  switch (lista) {
+    case "teams":
+      return `Time ${textoDe(item?.name) ?? textoDe(item?.id) ?? `nº ${numero}`}`;
+    case "players":
+      return `Jogador ${textoDe(item?.nick) ?? textoDe(item?.id) ?? `nº ${numero}`}`;
+    case "seriesMatches": {
+      // O ID e o confronto, e não a posição: é assim que a série aparece no painel.
+      const a = textoDe(item?.teamAId);
+      const b = textoDe(item?.teamBId);
+      const confronto = a && b ? ` (${times.get(a) ?? a} x ${times.get(b) ?? b})` : "";
+      return `Série ${textoDe(item?.id) ?? `nº ${numero}`}${confronto}`;
+    }
+    case "games":
+      return `jogo ${numero}`;
+    case "bans":
+      return `ban ${numero}`;
+    case "statsByPlayer":
+      return `linha ${numero} do K/D/A`;
+    case "cardsUsed":
+      return `cartinha ${numero}`;
+    case "sorteios":
+      return `registro de sorteio ${numero}`;
+    case "standingsSeed":
+      return `Classificação inicial, linha ${numero}`;
+    case "archivedSeasons":
+      return `Temporada arquivada ${textoDe(item?.name) ?? textoDe(item?.seasonId) ?? `nº ${numero}`}`;
+    default:
+      return `${NOME_DO_CAMPO[lista] ?? lista} ${numero}`;
+  }
+}
+
+/** "Série 4a-jogo-04 (Alfa x Beta) › jogo 1 › ban 1 › campeão", a partir do caminho do erro. */
+function descreverLocal(caminho: readonly PropertyKey[], entrada: unknown): string {
+  const partes: string[] = [];
+  let atual: unknown = entrada;
+  let times = nomesDosTimes(entrada);
+
+  for (let i = 0; i < caminho.length; i++) {
+    const chave = String(caminho[i]);
+    const proximo = caminho[i + 1];
+    const valor = comoRegistro(atual)?.[chave];
+
+    if (typeof proximo === "number" && Array.isArray(valor)) {
+      partes.push(rotuloDoItem(chave, proximo, comoRegistro(valor[proximo]), times));
+      atual = valor[proximo];
+      i += 1;
+      continue;
+    }
+
+    if (chave === "tournament") partes.push("Torneio");
+    else if (chave === "snapshot") times = nomesDosTimes(valor); // o retrato tem os times DELE
+    else partes.push(NOME_DO_CAMPO[chave] ?? chave);
+    atual = valor;
+  }
+
+  return partes.join(" › ") || "Dados do campeonato";
+}
+
+function descreverMotivo(problema: ProblemaDeValidacao): string {
+  const p = problema as ProblemaDeValidacao & Registro;
+  const origem = p.origin;
+  switch (problema.code) {
+    case "too_small": {
+      const minimo = Number(p.minimum);
+      if (origem === "string") {
+        return minimo <= 1 ? "não pode ficar vazio" : `precisa ter pelo menos ${minimo} caracteres`;
+      }
+      if (origem === "number") {
+        return p.inclusive === false ? `precisa ser maior que ${minimo}` : `não pode ser menor que ${minimo}`;
+      }
+      if (origem === "array") return `precisa ter pelo menos ${minimo} item(ns)`;
+      return "está abaixo do mínimo";
+    }
+    case "too_big": {
+      const maximo = Number(p.maximum);
+      if (origem === "string") return `passou do limite de ${maximo} caracteres`;
+      if (origem === "number") {
+        return p.inclusive === false ? `precisa ser menor que ${maximo}` : `não pode passar de ${maximo}`;
+      }
+      if (origem === "array") return `passou do limite de ${maximo} itens`;
+      return "passou do limite";
+    }
+    case "invalid_type":
+      return /received undefined/i.test(problema.message) ? "está faltando" : "está num formato inválido";
+    case "invalid_value": {
+      const valores = Array.isArray(p.values) ? (p.values as unknown[]).map(String) : [];
+      return valores.length > 0 ? `precisa ser um destes: ${valores.join(", ")}` : "tem um valor não permitido";
+    }
+    case "invalid_format":
+      return "está num formato inválido";
+    case "unrecognized_keys":
+      return "tem campos desconhecidos";
+    case "custom":
+      return problema.message;
+    default:
+      return "tem um valor inválido";
+  }
+}
+
+/**
+ * Resumo legível dos problemas de validação de um dataset, em português.
+ *
+ * As mensagens próprias das regras de integridade (`refineDatasetIntegrity`) já nascem em
+ * português e já dizem a série ou o jogador — essas passam como estão, a não ser dentro de
+ * uma temporada arquivada ou de uma imagem, onde falta dizer de onde vieram.
+ */
+export function descreverProblemasDoDataset(
+  problemas: readonly ProblemaDeValidacao[],
+  entrada: unknown,
+  limite = 10,
+): string {
+  const linhas: string[] = [];
+  for (const problema of problemas) {
+    const motivo = descreverMotivo(problema);
+    const jaTemContexto =
+      problema.code === "custom" &&
+      problema.path[0] !== "archivedSeasons" &&
+      problema.path[problema.path.length - 1] !== "imageUrl";
+    const linha = jaTemContexto ? motivo : `${descreverLocal(problema.path, entrada)}: ${motivo}`;
+    if (!linhas.includes(linha)) linhas.push(linha);
+  }
+  const resto = linhas.length - limite;
+  return [...linhas.slice(0, limite), ...(resto > 0 ? [`e mais ${resto} problema(s)`] : [])].join(" | ");
+}
 

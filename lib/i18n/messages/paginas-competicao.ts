@@ -21,6 +21,9 @@ export const paginasCompeticao = definir({
       "Classificação zerada até o apito inicial. As posições se definem a partir da 1ª rodada, em {data}.",
     tabelaIntroSemData:
       "Classificação zerada até o apito inicial. As posições se definem a partir da 1ª rodada.",
+    // As duas de cima só valem antes da 1ª série decidida; depois, uma destas.
+    tabelaIntroEmAndamento: "Classificação da fase de pontos, atualizada a cada série.",
+    tabelaIntroEncerrada: "Classificação final da fase de pontos.",
 
     tabelaColPosicao: "#",
     tabelaColTime: "TIME",
@@ -145,6 +148,8 @@ export const paginasCompeticao = definir({
     tabelaIntro:
       "Everyone starts from zero until the first whistle. Positions are set from round 1, on {data}.",
     tabelaIntroSemData: "Everyone starts from zero until the first whistle. Positions are set from round 1.",
+    tabelaIntroEmAndamento: "Group-stage standings, updated after every series.",
+    tabelaIntroEncerrada: "Final group-stage standings.",
 
     tabelaColPosicao: "#",
     tabelaColTime: "TEAM",

@@ -2,6 +2,14 @@
 import "server-only";
 
 import { createSupabaseAdminClient } from "@/lib/data-store";
+import { gerarSenhaProvisoria, hashPassword } from "@/lib/security/password";
+import {
+  contarDasLinhas,
+  LINHAS_DA_CONTAGEM,
+  TENTATIVA_EM_ANDAMENTO,
+  valorDoFiltroOu,
+  type RateLimitInput,
+} from "@/lib/security/rate-limit";
 
 /**
  * Tabelas de conta do jogador (`jogador_contas`, `jogador_sessoes`,
@@ -83,13 +91,87 @@ export async function criarJogador(params: {
   return data;
 }
 
-export async function trocarSenhaJogador(id: string, passwordHash: string): Promise<void> {
-  const { error } = await createSupabaseAdminClient()
+/**
+ * Senha nova e epoch novo num UPDATE SÓ.
+ *
+ * Eram duas escritas (senha, depois `revogarTudoDoJogador`). Se o banco oscilasse entre
+ * elas, a senha já tinha mudado, o epoch não subia e a rota respondia "não foi possível
+ * trocar a senha" — quem invadiu continuava logado, e o dono, tentando de novo com a
+ * senha antiga como "atual", recebia "senha atual incorreta". Junto, ou as duas coisas
+ * acontecem, ou nenhuma (é o que o `/api/admin/senha` já fazia).
+ *
+ * O update é condicionado ao `session_epoch` LIDO pela rota (o epoch novo é `epochLido + 1`),
+ * do mesmo jeito que `redefinirSenhaJogador`. Sem a condição, uma redefinição da
+ * organização que caísse entre a leitura da conta e esta gravação (a janela tem dois
+ * scrypt) era desfeita em silêncio: a provisória entregue à organização não abria a conta,
+ * a troca obrigatória sumia e o epoch ficava no MESMO número da redefinição — o cookie
+ * emitido pela troca sobrevivia a ela.
+ *
+ * Devolve false quando a conta mudou no meio (0 linhas): nada foi gravado, e quem chamou
+ * não pode emitir sessão nova.
+ */
+export async function trocarSenhaJogador(id: string, passwordHash: string, epochLido: number): Promise<boolean> {
+  const { data, error } = await createSupabaseAdminClient()
     .from("jogador_contas")
-    .update({ password_hash: passwordHash, must_change_password: false })
-    .eq("id", id);
+    .update({ password_hash: passwordHash, must_change_password: false, session_epoch: epochLido + 1 })
+    .eq("id", id)
+    .eq("session_epoch", epochLido)
+    .select("id");
 
   if (error) throw new Error(`Falha ao trocar a senha: ${error.message}`);
+  return (data?.length ?? 0) > 0;
+}
+
+/**
+ * Recuperação de senha pela organização — o único caminho, porque o site não envia
+ * e-mail.
+ *
+ * Gera uma senha provisória forte, grava o hash, liga `must_change_password` e sobe o
+ * `session_epoch` NO MESMO UPDATE: toda sessão aberta com a senha antiga cai na hora
+ * (inclusive a de quem tivesse descoberto a senha esquecida). A provisória volta UMA vez,
+ * para a organização repassar; o banco só guarda o hash.
+ *
+ * O update é condicionado ao epoch lido. Sem isso, uma troca de senha do próprio jogador
+ * que caísse entre a leitura e a escrita subiria o epoch para o MESMO número — e a
+ * sessão que ela acabou de emitir sobreviveria à redefinição.
+ *
+ * Devolve null quando a conta não existe.
+ */
+export async function redefinirSenhaJogador(
+  alvo: { id: string } | { email: string },
+  pepper: string,
+): Promise<{ conta: JogadorRow; senhaProvisoria: string } | null> {
+  const senhaProvisoria = gerarSenhaProvisoria();
+  const passwordHash = await hashPassword(senhaProvisoria, pepper);
+  const cliente = createSupabaseAdminClient();
+
+  for (let tentativa = 0; tentativa < 3; tentativa++) {
+    const conta = "id" in alvo ? await acharJogadorPorId(alvo.id) : await acharJogadorPorEmail(alvo.email);
+    if (!conta) return null;
+
+    const novoEpoch = conta.session_epoch + 1;
+    const { data, error } = await cliente
+      .from("jogador_contas")
+      .update({ password_hash: passwordHash, must_change_password: true, session_epoch: novoEpoch })
+      .eq("id", conta.id)
+      .eq("session_epoch", conta.session_epoch)
+      .select("id");
+
+    if (error) throw new Error(`Falha ao redefinir a senha: ${error.message}`);
+    if (!data || data.length === 0) continue; // o epoch mudou no meio: relê e tenta de novo
+
+    // Já não valem pelo epoch; marcar as linhas é só para o registro dizer por quê.
+    await revogarSessoesDoJogador(conta.id, "senha_redefinida").catch((e: unknown) =>
+      console.error("[jogadores] senha redefinida, mas as sessões não foram marcadas:", e),
+    );
+
+    return {
+      conta: { ...conta, password_hash: passwordHash, must_change_password: true, session_epoch: novoEpoch },
+      senhaProvisoria,
+    };
+  }
+
+  throw new Error("A conta mudou durante a redefinição da senha. Tente de novo.");
 }
 
 /*
@@ -139,6 +221,40 @@ export async function acharSessaoAtiva(sessaoId: string): Promise<JogadorSessaoR
   if (data.revogada_em) return null;
   if (new Date(data.expira_em).getTime() <= Date.now()) return null;
   return data;
+}
+
+/**
+ * Renovação deslizante: estende a validade de uma sessão AINDA ATIVA.
+ *
+ * O `.is("revogada_em", null)` impede ressuscitar sessão encerrada por logout ou pela
+ * organização no intervalo entre conferir a identidade e renovar. Devolve false quando a
+ * escrita falhou ou não achou sessão ativa — aí não há cookie novo para emitir. Renovar
+ * é conforto, nunca pode derrubar quem chamou.
+ */
+export async function renovarSessaoJogador(sessaoId: string, expiraEm: Date): Promise<boolean> {
+  const { data, error } = await createSupabaseAdminClient()
+    .from("jogador_sessoes")
+    .update({ expira_em: expiraEm.toISOString() })
+    .eq("id", sessaoId)
+    .is("revogada_em", null)
+    .select("id");
+
+  if (error) {
+    console.error("[jogadores] falha ao renovar sessão:", error.message);
+    return false;
+  }
+  return (data?.length ?? 0) > 0;
+}
+
+/** Marca como revogadas todas as linhas de sessão ainda abertas do jogador. */
+export async function revogarSessoesDoJogador(jogadorId: string, razao: string): Promise<void> {
+  const { error } = await createSupabaseAdminClient()
+    .from("jogador_sessoes")
+    .update({ revogada_em: new Date().toISOString(), revogada_razao: razao })
+    .eq("jogador_id", jogadorId)
+    .is("revogada_em", null);
+
+  if (error) throw new Error(`Falha ao revogar sessões: ${error.message}`);
 }
 
 export async function revogarSessaoJogador(sessaoId: string, razao: string): Promise<void> {
@@ -197,10 +313,80 @@ export async function registrarTentativaJogador(params: {
   if (error) console.error("[jogadores] falha ao registrar tentativa:", error.message);
 }
 
-export async function contarTentativasJogador(
-  email: string,
-  ipHash: string,
-): Promise<{ failuresByIp: number; failuresByUser: number; ipHadRecentSuccess: boolean }> {
+/** Linha de tentativa gravada ANTES de testar a senha; null quando a gravação falhou. */
+export type ReservaDeTentativa = { id: number | string } | null;
+
+/**
+ * Grava a tentativa como "em andamento" ANTES de contar e de testar a senha.
+ *
+ * É o que fecha a rajada simultânea: ver `descontarPropriaReserva` em
+ * lib/security/rate-limit.ts. A rota conta DEPOIS desta chamada e desconta a própria linha.
+ *
+ * Se a gravação falhar, devolve null e a rota segue exatamente como antes da reserva
+ * existir (conta sem descontar e registra no fim). Não estoura de propósito: a leitura da
+ * contagem logo em seguida já falha fechada se o banco estiver fora, e uma falha só de
+ * escrita não pode deixar todo mundo sem login.
+ */
+export async function reservarTentativaJogador(params: {
+  email: string | null;
+  ipHash: string;
+}): Promise<ReservaDeTentativa> {
+  const { data, error } = await createSupabaseAdminClient()
+    .from("jogador_login_attempts")
+    .insert({
+      email: params.email?.slice(0, 254) ?? null,
+      ip_hash: params.ipHash,
+      success: false,
+      reason: TENTATIVA_EM_ANDAMENTO,
+    })
+    .select("id")
+    .single<{ id: number | string }>();
+
+  if (error || !data) {
+    console.error("[jogadores] falha ao reservar tentativa:", error?.message ?? "sem id");
+    return null;
+  }
+  return { id: data.id };
+}
+
+/**
+ * Fecha a tentativa reservada com o resultado de verdade. Recusada pelo limitador vira
+ * `ip_bloqueado`/`usuario_bloqueado` (que não contam como falha — senão o bloqueio se
+ * auto-prorrogaria); senha errada vira falha; sucesso vira sucesso. Erro do servidor
+ * depois da reserva vira `erro_interno` (o `finally` das rotas), que também não conta.
+ *
+ * Sem reserva, grava a linha agora, como antes.
+ */
+export async function concluirTentativaJogador(
+  reserva: ReservaDeTentativa,
+  params: { email: string | null; ipHash: string; success: boolean; reason: string },
+): Promise<void> {
+  if (!reserva) return registrarTentativaJogador(params);
+
+  const { error } = await createSupabaseAdminClient()
+    .from("jogador_login_attempts")
+    .update({ success: params.success, reason: params.reason })
+    .eq("id", reserva.id);
+
+  if (error) console.error("[jogadores] falha ao concluir tentativa:", error.message);
+}
+
+/**
+ * Motivo da linha que o cadastro concluído grava (success:false, ver
+ * app/api/conta/cadastro). Conta no teto por IP e vale como selo do par (e-mail, IP) em
+ * `contarTentativasJogador`.
+ */
+export const TENTATIVA_CADASTRO = "cadastro";
+
+type LinhaLidaJogador = {
+  ip_hash: string | null;
+  email: string | null;
+  success: boolean | null;
+  reason: string | null;
+  occurred_at: string | null;
+};
+
+export async function contarTentativasJogador(email: string, ipHash: string): Promise<Required<RateLimitInput>> {
   const cliente = createSupabaseAdminClient();
   const janela = new Date(Date.now() - 15 * 60 * 1000).toISOString();
   const janelaConfianca = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -210,50 +396,62 @@ export async function contarTentativasJogador(
    * RECUSADA pelo limitador fica gravada, mas não conta como falha. Sem isso o
    * bloqueio se auto-prorroga — cada retentativa entra na janela de 15 minutos e a
    * empurra para a frente, e o bloqueio por IP não tem a válvula do
-   * `ipHadRecentSuccess`.
+   * `ipHadRecentSuccess`. `erro_interno` (reserva fechada por erro do servidor) também
+   * não conta: não houve palpite.
    *
    * Aqui o estrago é maior do que no painel: quem fica trancado é um CAPITÃO, e um
    * capitão que não consegue entrar durante o draft perde todas as escolhas dele
    * para o cronômetro.
+   *
+   * `em_andamento` (tentativa reservada, ver `reservarTentativaJogador`) tem contagem
+   * própria e só enquanto é recente: entra no teto por conta, e no teto por IP só contra
+   * a mesma conta (ver `evaluateLoginRateLimit`). A linha da própria requisição é
+   * descontada pela rota.
    */
-  const naoContaComoFalha = ["ip_bloqueado", "usuario_bloqueado"];
-
-  const [porIp, porEmail, sucessoConhecido] = await Promise.all([
+  const [janelaLida, sucessoConhecido] = await Promise.all([
+    // UM retrato só das linhas da janela (do IP ou da conta): ver `contarDasLinhas`.
+    cliente
+      .from("jogador_login_attempts")
+      .select("ip_hash, email, success, reason, occurred_at")
+      .or(`ip_hash.eq.${valorDoFiltroOu(ipHash)},email.eq.${valorDoFiltroOu(email)}`)
+      .gte("occurred_at", janela)
+      .order("occurred_at", { ascending: false })
+      .limit(LINHAS_DA_CONTAGEM),
+    // O selo de "IP confiável" vale para o PAR (conta, IP), não para o IP. Preso só ao
+    // IP, bastava entrar na própria conta descartável de um endereço para desligar, dali,
+    // o teto por conta de qualquer OUTRO jogador. A válvula continua cumprindo o que
+    // promete: quem já entrou NESTA conta deste IP não é trancado por quem martela o
+    // e-mail dela.
+    //
+    // O CADASTRO concluído daquele par também é prova de posse: quem criou a conta naquele
+    // IP não pode ser trancado fora dela por terceiros que sabem o e-mail — antes do
+    // primeiro login, era só o que ela tinha. A linha 'cadastro' é gravada com
+    // success:false de propósito (ela conta no teto POR IP, e isso não muda); aqui ela é
+    // aceita só como selo do próprio par, então um cadastro descartável não sela outra conta.
+    //
+    // Fica numa consulta à parte (30 dias): só alimenta a válvula, não o teto.
     cliente
       .from("jogador_login_attempts")
       .select("id", { count: "exact", head: true })
       .eq("ip_hash", ipHash)
-      .eq("success", false)
-      .notIn("reason", naoContaComoFalha)
-      .gte("occurred_at", janela),
-    cliente
-      .from("jogador_login_attempts")
-      .select("id", { count: "exact", head: true })
       .eq("email", email)
-      .eq("success", false)
-      .notIn("reason", naoContaComoFalha)
-      .gte("occurred_at", janela),
-    cliente
-      .from("jogador_login_attempts")
-      .select("id", { count: "exact", head: true })
-      .eq("ip_hash", ipHash)
-      .eq("success", true)
+      .or(`success.eq.true,reason.eq.${TENTATIVA_CADASTRO}`)
       .gte("occurred_at", janelaConfianca),
   ]);
 
   /*
    * FALHA FECHADA, pelo mesmo motivo de `getRecentAttemptCounts`: com o erro ignorado,
-   * um `count` nulo virava `0` e o limitador liberava toda tentativa — o freio de força
+   * uma contagem vazia virava `0` e o limitador liberava toda tentativa — o freio de força
    * bruta do login dos jogadores desligado em silêncio.
    */
-  const falha = porIp.error ?? porEmail.error ?? sucessoConhecido.error;
+  const falha = janelaLida.error ?? sucessoConhecido.error;
   if (falha) {
     throw new Error(`Falha ao conferir as tentativas de login: ${falha.message}`);
   }
 
+  const linhas = ((janelaLida.data ?? []) as LinhaLidaJogador[]).map((l) => ({ ...l, conta: l.email }));
   return {
-    failuresByIp: porIp.count ?? 0,
-    failuresByUser: porEmail.count ?? 0,
+    ...contarDasLinhas(linhas, ipHash, email),
     ipHadRecentSuccess: (sucessoConhecido.count ?? 0) > 0,
   };
 }

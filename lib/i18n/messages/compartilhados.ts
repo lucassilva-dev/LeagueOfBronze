@@ -66,6 +66,9 @@ export const compartilhados = definir({
     // semente fica gravada para qualquer um conferir depois.
     sorteioSemente: "semente",
     sorteioPorFulano: "sorteado por",
+    // A carta definida à mão no painel (registro `carta_manual`, sem semente): não foi
+    // sorteada, então a linha de procedência diz quem corrigiu em vez de mostrar semente.
+    sorteioCorrecaoManual: "correção manual por",
     sorteioRepetido: "Este sorteio já foi feito antes nesta série — o histórico registra as duas vezes.",
     sorteioFalhou: "Não foi possível sortear. Nada foi gravado.",
     sorteioLetras: "Letras sorteadas",
@@ -180,6 +183,7 @@ export const compartilhados = definir({
 
     sorteioSemente: "seed",
     sorteioPorFulano: "drawn by",
+    sorteioCorrecaoManual: "manual correction by",
     sorteioRepetido: "This draw was already made for this series — the history records both.",
     sorteioFalhou: "Couldn't draw. Nothing was saved.",
     sorteioLetras: "Letters drawn",

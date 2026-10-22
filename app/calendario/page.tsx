@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import { CalendarioDa4a } from "@/components/calendario-4a";
@@ -12,12 +13,18 @@ import {
 } from "@/lib/calendario-4a";
 import { emPreTemporada, semTemporadaAoVivo } from "@/lib/fase-do-site";
 import { buildCalendarDays, buildFinalGame, buildSemifinalGames, type CalGame } from "@/lib/calendar";
+import { metadadosDaPagina } from "@/lib/i18n/metadados";
 import { getLocale, getMessages } from "@/lib/i18n/server";
 import type { Messages } from "@/lib/i18n/messages";
 import { getServerDataset } from "@/lib/server-data";
 import { nomeDaTemporada } from "@/lib/i18n/nome-da-temporada";
 
 export const dynamic = "force-dynamic";
+
+/** Título e descrição próprios, no idioma da visita (lib/i18n/messages/metadados.ts). */
+export async function generateMetadata(): Promise<Metadata> {
+  return metadadosDaPagina("calendario", "/calendario");
+}
 
 /**
  * O dia da semana vem pronto em pt-BR de lib/calendar. Em inglês reformatamos a partir da
@@ -83,7 +90,8 @@ function CartaoDaSerie({ game, textos, turnoLabel }: Readonly<{ game: CalGame; t
         </div>
         <div style={{ textAlign: "center" }}>
           <div className="lob-display" style={{ fontSize: 22, color: played ? "#f0c88a" : "#6f6656", letterSpacing: ".08em" }}>{played ? `${game.scoreA} – ${game.scoreB}` : "—"}</div>
-          <div style={{ fontSize: 9, letterSpacing: ".10em", color: "#5f5747", marginTop: 2 }}>{game.format === "BO5" ? textos.formatoBo5 : textos.formatoBo3}</div>
+          {/* #8f8472 e 10px: o #5f5747 de 9px dava 2,5:1 de contraste sobre o cartão (AA pede 4,5:1). */}
+          <div style={{ fontSize: 10, letterSpacing: ".10em", color: "#8f8472", marginTop: 2 }}>{game.format === "BO5" ? textos.formatoBo5 : textos.formatoBo3}</div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, justifyContent: "flex-end" }}>
           <span style={{ fontWeight: bWon ? 700 : 600, fontSize: 13.5, color: nameColor(bWon), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "right" }}>{game.teamB.name}</span>
@@ -123,22 +131,35 @@ export default async function CalendarioPage() {
     if (turno === "Noturno") return textos.calendarioTurnoNoturno;
     return turno.toUpperCase();
   };
-  const { dataset } = await getServerDataset();
+  const planejado = (
+    <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "0 clamp(16px,4vw,24px) 96px" }}>
+      <section className="lob-fade" style={{ padding: "clamp(40px,7vw,56px) 0 20px" }}>
+        <Eyebrow>{t.preTemporada.avisoSobretitulo}</Eyebrow>
+        <GoldTitle style={{ fontSize: "clamp(44px,10vw,120px)", lineHeight: 0.88 }}>{textos.calendarioTitulo}</GoldTitle>
+        <p style={{ maxWidth: 680, fontSize: 16, lineHeight: 1.55, color: "#a99e8b", margin: "0 0 8px" }}>{tCal.intro}</p>
+      </section>
+      <section className="lob-fade">
+        <CalendarioDa4a t={tCal} localeTag={t.compartilhados.localeTag} />
+      </section>
+    </div>
+  );
 
-  if (mostrarPlanejado(dataset)) {
-    return (
-      <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "0 clamp(16px,4vw,24px) 96px" }}>
-        <section className="lob-fade" style={{ padding: "clamp(40px,7vw,56px) 0 20px" }}>
-          <Eyebrow>{t.preTemporada.avisoSobretitulo}</Eyebrow>
-          <GoldTitle style={{ fontSize: "clamp(44px,10vw,120px)", lineHeight: 0.88 }}>{textos.calendarioTitulo}</GoldTitle>
-          <p style={{ maxWidth: 680, fontSize: 16, lineHeight: 1.55, color: "#a99e8b", margin: "0 0 8px" }}>{tCal.intro}</p>
-        </section>
-        <section className="lob-fade">
-          <CalendarioDa4a t={tCal} localeTag={t.compartilhados.localeTag} />
-        </section>
-      </div>
-    );
+  /*
+   * Banco fora numa instância que ainda não leu o dataset (sem cópia boa em memória): a
+   * leitura lança. Na pré-temporada o que esta página mostra é o calendário PLANEJADO, que
+   * não depende do banco — então ele sai mesmo assim, em vez da tela de erro. Com a
+   * temporada no ar o erro segue para app/error.tsx: mostrar a grade planejada no lugar das
+   * séries de verdade esconderia resultados.
+   */
+  let dataset: Awaited<ReturnType<typeof getServerDataset>>["dataset"];
+  try {
+    ({ dataset } = await getServerDataset());
+  } catch (erro) {
+    if (emPreTemporada() && calendarioAindaPorVir()) return planejado;
+    throw erro;
   }
+
+  if (mostrarPlanejado(dataset)) return planejado;
 
   if (semTemporadaAoVivo(dataset)) return <PreTemporadaAviso pagina="calendario" />;
 

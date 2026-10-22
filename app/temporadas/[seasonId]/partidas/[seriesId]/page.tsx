@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -17,6 +18,8 @@ import {
 } from "@/components/ui/table";
 import { getCardTitle } from "@/lib/cards";
 import { formatKda, formatSeriesDateLabel } from "@/lib/format";
+import { metadadosDaPagina, montarMetadados } from "@/lib/i18n/metadados";
+import { nomeDaTemporada } from "@/lib/i18n/nome-da-temporada";
 import { getMessages } from "@/lib/i18n/server";
 import { getServerArchivedSeason } from "@/lib/server-data";
 import {
@@ -39,6 +42,22 @@ export const dynamic = "force-dynamic";
 type PageParams = Readonly<{
   params: Promise<{ seasonId: string; seriesId: string }>;
 }>;
+
+/** Os dois times e a temporada CERTA (não a do layout, "4ª Edição") na aba e na prévia. */
+export async function generateMetadata({ params }: PageParams): Promise<Metadata> {
+  const { seasonId, seriesId } = await params;
+  const [{ metadados, compartilhados }, result] = await Promise.all([getMessages(), getServerArchivedSeason(seasonId)]);
+  const series = result ? getSeriesById(result.dataset, seriesId) : undefined;
+  if (!result || !series) return metadadosDaPagina("temporadas");
+  return montarMetadados(metadados.temporadaSerie, {
+    valores: {
+      timeA: result.indexes.teamsById.get(series.teamAId)?.name ?? series.teamAId,
+      timeB: result.indexes.teamsById.get(series.teamBId)?.name ?? series.teamBId,
+      temporada: nomeDaTemporada(result.archived.name, compartilhados.localeTag),
+    },
+    caminho: `/temporadas/${encodeURIComponent(result.archived.seasonId)}/partidas/${encodeURIComponent(series.id)}`,
+  });
+}
 
 export default async function TemporadaPartidaPage({ params }: PageParams) {
   const { seasonId, seriesId } = await params;
@@ -70,7 +89,8 @@ export default async function TemporadaPartidaPage({ params }: PageParams) {
   const teamHref = (id: string, slug?: string) => `/temporadas/${seasonId}/times/${slug ?? id}`;
 
   const title = `${teamAName} ${score.teamAWins}–${score.teamBWins} ${teamBName}`;
-  const description = `${stageLabel} • ${formatSeriesDateLabel(series.date, tc.localeTag)} • ${archived.name}`;
+  const nomeDaEdicao = nomeDaTemporada(archived.name, tc.localeTag);
+  const description = `${stageLabel} • ${formatSeriesDateLabel(series.date, tc.localeTag)} • ${nomeDaEdicao}`;
 
   const cards = series.cardsUsed ?? [];
 
@@ -82,7 +102,7 @@ export default async function TemporadaPartidaPage({ params }: PageParams) {
           className="inline-flex items-center gap-1 text-sm font-semibold text-muted transition hover:text-text"
         >
           <ArrowLeft className="h-4 w-4" />
-          {t.voltarPara} {archived.name}
+          {t.voltarPara} {nomeDaEdicao}
         </Link>
       </div>
 
@@ -224,13 +244,13 @@ export default async function TemporadaPartidaPage({ params }: PageParams) {
                                     </Link>
                                   </TableCell>
                                   <TableCell className="whitespace-nowrap">
-                                    <ChampionIcon champion={row.champion} size={22} showName />
+                                    <ChampionIcon champion={row.champion} size={22} showName semCampeao={tc.campeaoNaoInformado} />
                                   </TableCell>
                                   <TableCell className="whitespace-nowrap">
                                     {row.kills}/{row.deaths}/{row.assists}
                                   </TableCell>
                                   <TableCell className="whitespace-nowrap text-right">
-                                    {formatKda((row.kills + row.assists) / Math.max(1, row.deaths))}
+                                    {formatKda((row.kills + row.assists) / Math.max(1, row.deaths), tc.localeTag)}
                                   </TableCell>
                                 </TableRow>
                               ))

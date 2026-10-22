@@ -19,10 +19,12 @@ import {
 } from "@/lib/inscricoes/store";
 import { z } from "zod";
 
+import { ErroDeConflito } from "@/lib/inscricoes/conflito";
 import {
   conferenciaPatchSchema,
   configPatchSchema,
   fichaPatchSchema,
+  fichaTemMudanca,
   inscritoPatchSchema,
   motivoDaRecusaDoInscrito,
   pagamentoPatchSchema,
@@ -45,9 +47,15 @@ export const maxDuration = 60;
  * declara o próprio escopo e ele é conferido ANTES de qualquer trabalho. Quem pode
  * conferir requisito não mexe em dinheiro, e quem cuida do caixa não aprova ninguém.
  *
- * Diferente do PUT do dataset, aqui não há trava de concorrência: cada ação toca uma
+ * Diferente do PUT do dataset, aqui não há trava de concorrência GLOBAL: cada ação toca uma
  * linha e um campo. Dois organizadores conferindo itens diferentes do mesmo inscrito
  * ao mesmo tempo é normal, e não é conflito.
+ *
+ * O conflito de verdade é a tela velha no MESMO campo: o financeiro com a fila aberta há
+ * 15 minutos desfazendo o «pago» que outro acabou de gravar. Para isso cada escrita aceita o
+ * valor que a tela viu (`estadoAnterior` no pagamento e nos requisitos, `situacaoAnterior`
+ * na ficha). Presente e diferente do banco: 409 `{ error, conflito: true }` e nada muda.
+ * Ausente: grava como sempre gravou.
  */
 
 /** O que a organização vê. Bem mais do que o jogador — inclusive contato. */
@@ -194,9 +202,12 @@ export async function PATCH(request: NextRequest) {
       case "config": {
         const parsed = configPatchSchema.safeParse(corpo.dados);
         if (!parsed.success) {
-          return NextResponse.json({ error: "Configuração inválida." }, { status: 400 });
+          // A chave Pix recusada diz o porquê (telefone sem +55, CPF com dígito errado…): é
+          // texto nosso, em português. O resto continua genérico.
+          const pix = parsed.error.issues.find((i) => i.path[0] === "chave_pix" && i.code === "custom");
+          return NextResponse.json({ error: pix?.message ?? "Configuração inválida." }, { status: 400 });
         }
-        const config = await salvarConfig(parsed.data);
+        const config = await salvarConfig(parsed.data, autor);
         return NextResponse.json({ ok: true, config });
       }
 
@@ -246,7 +257,7 @@ export async function PATCH(request: NextRequest) {
         );
         const falha = gravacoes.find((g): g is PromiseRejectedResult => g.status === "rejected");
         if (falha) throw falha.reason;
-        if (ficha && Object.values(ficha).some((valor) => valor !== undefined)) {
+        if (ficha && fichaTemMudanca(ficha)) {
           await atualizarInscricao(inscricaoId, ficha, autor);
         }
         const promovido = await reavaliar(inscricaoId, "inscrito");
@@ -292,6 +303,11 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: "Ação desconhecida." }, { status: 400 });
     }
   } catch (error) {
+    // A tela gravava por cima de um valor que já mudou: 409, para ela recarregar e mostrar o
+    // valor de agora (ver `ErroDeConflito`). Antes do `respostaDeErro`, que daria 400.
+    if (error instanceof ErroDeConflito) {
+      return NextResponse.json({ error: error.message, conflito: true }, { status: 409 });
+    }
     return respostaDeErro("api/admin/edicao", error, "Não foi possível salvar.");
   }
 }

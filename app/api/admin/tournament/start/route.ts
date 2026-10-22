@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof ConflitoDeVersaoError) {
       return NextResponse.json(
         {
-          error: "Alguém salvou o campeonato enquanto você iniciar a temporada. Recarregue e tente de novo.",
+          error: "Alguém salvou o campeonato enquanto você iniciava a nova temporada. Recarregue e tente de novo.",
           conflict: true,
           serverVersion: error.versaoAtual,
         },

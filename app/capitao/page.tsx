@@ -2,16 +2,20 @@ import type { Metadata } from "next";
 
 import PainelCapitao from "@/components/draft/painel-capitao";
 import { Eyebrow, GoldTitle, LobShell } from "@/components/lob/ui";
+import { metadadosDaPagina } from "@/lib/i18n/metadados";
 import { getMessages } from "@/lib/i18n/server";
 
 /** Dinâmica pela CSP por nonce e porque é uma tela pessoal — nada aqui pode ser cacheado. */
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "Painel do capitão · League of Bronze",
-  // Tela de trabalho de uma pessoa específica: não é conteúdo para busca.
-  robots: { index: false, follow: false },
-};
+/** Título da aba no idioma da visita ("Captain panel" em inglês). */
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    ...(await metadadosDaPagina("capitao")),
+    // Tela de trabalho de uma pessoa específica: não é conteúdo para busca.
+    robots: { index: false, follow: false },
+  };
+}
 
 export default async function CapitaoPage() {
   const { draft: t } = await getMessages();

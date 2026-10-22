@@ -17,7 +17,10 @@ export default function AdminPage() {
   return (
     // Respiro nas laterais e teto de largura: antes o painel encostava nas bordas da tela —
     // no celular os cartões tocavam o vidro, e num monitor largo as linhas iam até o fim.
-    <main
+    // É <div>, não <main>: o SiteFrame já envolve toda página no `<main id="conteudo">`, o
+    // único do site. Um segundo <main> aqui ficava aninhado nele (HTML inválido, e o leitor
+    // de tela anunciava duas regiões principais).
+    <div
       style={{
         minHeight: "100vh",
         maxWidth: 1520,
@@ -26,6 +29,6 @@ export default function AdminPage() {
       }}
     >
       <AdminDashboardClient />
-    </main>
+    </div>
   );
 }

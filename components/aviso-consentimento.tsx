@@ -21,7 +21,8 @@ export async function AvisoConsentimento() {
         borderTop: "1px solid rgba(201,138,75,.12)",
         fontSize: 11.5,
         lineHeight: 1.6,
-        color: "#7d7263",
+        // Texto pequeno pede 4,5:1 (WCAG AA): o #7d7263 dava 4,1:1 sobre o fundo do site.
+        color: "#8f8472",
       }}
     >
       {t.consentimentoJogadores}{" "}

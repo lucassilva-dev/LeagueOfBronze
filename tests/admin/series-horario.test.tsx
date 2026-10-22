@@ -381,7 +381,7 @@ describe("painel de Séries", () => {
   it("mostra o aviso de FINAL em MD3 no editor", () => {
     montar(dataset([serie({ id: "final-md3", stage: "FINAL", format: "BO3" })]));
     abrir("Alfa", "Beta");
-    expect(screen.getByText(/Confira a etapa e o formato/)).toBeTruthy();
+    expect(screen.getByText(/Confira esta série/)).toBeTruthy();
     expect(screen.getByText(/Final em MD3/)).toBeTruthy();
   });
 

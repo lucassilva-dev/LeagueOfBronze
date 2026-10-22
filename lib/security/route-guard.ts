@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 import { getAdminIdentity, isAdminConfigured, type AdminIdentity } from "@/lib/admin-auth";
+import { respostaDeErro } from "@/lib/security/resposta-erro";
 import { hasScope, scopeLabel, type Scope } from "@/lib/security/scopes";
 
 /**
@@ -75,7 +76,26 @@ export async function requireAdmin(request: NextRequest, scope?: Scope): Promise
     };
   }
 
-  const identity = await getAdminIdentity(request);
+  /*
+   * Banco fora do ar na hora de conferir a sessão vira 503 em JSON, e não uma exceção.
+   *
+   * A guarda roda ANTES do `try` de cada rota, então a falha do Supabase ao ler a sessão
+   * escapava inteira: a rota respondia 500 sem corpo, e o painel mostrava "Unexpected end
+   * of JSON input" (no Safari, "The string did not match the expected pattern.") — no
+   * meio do dia de jogo, sem dizer que era só esperar e tentar de novo.
+   */
+  let identity: AdminIdentity | null;
+  try {
+    identity = await getAdminIdentity(request);
+  } catch (error) {
+    const resposta = respostaDeErro(
+      "requireAdmin",
+      error,
+      "Serviço de sessão indisponível. Tente de novo em instantes.",
+      503,
+    );
+    return { ok: false, response: resposta };
+  }
   if (!identity) {
     return { ok: false, response: NextResponse.json({ error: "Não autorizado." }, { status: 401 }) };
   }

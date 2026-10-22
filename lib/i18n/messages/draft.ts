@@ -6,6 +6,12 @@ import { definir } from "@/lib/i18n/definir";
  * Nada de número aqui: orçamento, vagas e segundos por escolha vêm do estado do draft,
  * que por sua vez veio da configuração da edição. O formato muda a cada edição — foi o
  * que aconteceu entre a 2ª e a 3ª — e texto com número cravado envelhece calado.
+ *
+ * Os números entram por marcador (`{n}`, `{pontos}`…), preenchido pela tela. Os ordinais
+ * têm quatro moldes porque o inglês muda o sufixo (1st, 2nd, 3rd, 4th); em português os
+ * quatro são iguais. Os `erros` traduzem a recusa do servidor pelo `codigo` que ela traz
+ * (lib/draft/motor.ts e app/api/draft/escolha) — sem eles, o capitão com o site em inglês
+ * lia o recado do servidor em português.
  */
 export const draft = definir({
   pt: {
@@ -35,6 +41,13 @@ export const draft = definir({
     naVez: "NA VEZ",
     capitao: "capitão",
     vagaAberta: "vaga aberta",
+    vagasAbertas: "vagas abertas",
+    vagaAbertaN: "{n} vaga aberta",
+    vagasAbertasN: "{n} vagas abertas",
+    ordinalUm: "{n}º",
+    ordinalDois: "{n}º",
+    ordinalTres: "{n}º",
+    ordinalOutros: "{n}º",
     pontos: "pts",
     pontosLivres: "livres de",
     orcamentoRestante: "ORÇAMENTO RESTANTE",
@@ -50,6 +63,9 @@ export const draft = definir({
     naoEhCapitao: "Você não é capitão nesta edição",
     naoEhCapitaoTexto:
       "Só quem capitaneia um time escolhe no draft. Você pode acompanhar tudo pela transmissão.",
+    semInscricao: "Esta conta não tem inscrição nesta edição",
+    semInscricaoTexto:
+      "Se você é capitão, saia e entre com a conta usada na inscrição, ou peça à organização para escolher por você.",
     verTransmissao: "VER A TRANSMISSÃO →",
     suaVez: "É A SUA VEZ",
     suaVezTexto: "Escolha um jogador antes do tempo acabar. Se o relógio virar, o mais barato válido entra sozinho.",
@@ -59,6 +75,7 @@ export const draft = definir({
     nestaEscolha: "nesta escolha",
     reservado: "o resto fica reservado para as vagas que ainda faltam",
     escolher: "ESCOLHER",
+    escolherRotulo: "Escolher {riotId}, {pontos} pontos",
     escolhendo: "ESCOLHENDO…",
     caroDemais: "acima do que você pode gastar agora",
     naoFecha: "deixaria algum elenco sem como fechar no orçamento",
@@ -68,6 +85,32 @@ export const draft = definir({
 
     erroGenerico: "Não foi possível falar com o servidor. A tela se atualiza sozinha em instantes.",
 
+    // recusas do servidor, pelo `codigo`
+    erros: {
+      encerrado: "O draft já terminou.",
+      nao_comecou: "O draft ainda não começou.",
+      pausado: "O draft está pausado.",
+      sem_escolha: "Não há escolha em andamento.",
+      nao_e_a_vez: "Não é a vez do seu time.",
+      fora_do_pool: "Jogador não está no pool.",
+      ja_escolhido: "Esse jogador já foi escolhido.",
+      elenco_completo: "Seu elenco já está completo.",
+      acima_do_teto:
+        "Esse jogador custa {pontos} e você só pode gastar {teto} nesta escolha — o resto está reservado para as vagas que faltam.",
+      nao_fecha_o_seu:
+        "Com {riotId} ({pontos} pts) o seu elenco não fecha: não sobraria jogador barato o bastante para as vagas que faltam. Escolha alguém mais barato.",
+      falta_para_outro:
+        "{riotId} é o que falta para outro time conseguir fechar o elenco dentro do orçamento. Escolha outro jogador.",
+      vez_passou:
+        "Essa escolha não entrou: a sua vez já tinha passado (o tempo acabou ou a escolha já foi feita). Confira o quadro.",
+      sem_sessao: "Entre na sua conta para escolher.",
+      sem_jogador: "Escolha um jogador.",
+      sem_inscricao: "Sua conta não está ligada a uma inscrição.",
+      sem_draft: "O draft ainda não foi montado.",
+      nao_e_capitao: "Você não é capitão nesta edição.",
+      outra_escolha: "Outra escolha entrou primeiro. Confira o quadro e tente de novo.",
+    },
+
     // ---- textos do handoff de design da transmissão ----
     vazioTitulo: "O DRAFT AINDA NÃO ABRIU",
     vazioTexto:
@@ -76,7 +119,9 @@ export const draft = definir({
     sorteioKicker: "SORTEIO DOS TIMES E DA ORDEM DE ESCOLHA",
     sorteioTitulo: "OS CAPITÃES ESTÃO DEFINIDOS",
     sorteando: "sorteando…",
-    ordemSerpentina: "Ordem serpentina: 1-2-3-4-5-6 · 6-5-4-3-2-1 · e repete.",
+    // A sequência (1-2-…-N · N-…-1) é montada pela tela com o número real de times.
+    ordemSerpentina: "Ordem serpentina:",
+    eRepete: "e repete.",
     escolhaLivre: "ESCOLHA LIVRE",
     poolDisponivel: "POOL DISPONÍVEL",
     poolNota: "quem escolhe é o capitão, pelo painel dele",
@@ -116,6 +161,13 @@ export const draft = definir({
     naVez: "ON THE CLOCK",
     capitao: "captain",
     vagaAberta: "open slot",
+    vagasAbertas: "open slots",
+    vagaAbertaN: "{n} open slot",
+    vagasAbertasN: "{n} open slots",
+    ordinalUm: "{n}st",
+    ordinalDois: "{n}nd",
+    ordinalTres: "{n}rd",
+    ordinalOutros: "{n}th",
     pontos: "pts",
     pontosLivres: "free of",
     orcamentoRestante: "BUDGET LEFT",
@@ -129,6 +181,9 @@ export const draft = definir({
     entreParaVer: "Sign in to open your panel.",
     naoEhCapitao: "You're not a captain this edition",
     naoEhCapitaoTexto: "Only captains pick in the draft. You can still follow everything on the broadcast.",
+    semInscricao: "This account has no sign-up for this edition",
+    semInscricaoTexto:
+      "If you are a captain, sign out and sign in with the account you used to sign up, or ask the organizers to pick for you.",
     verTransmissao: "WATCH THE BROADCAST →",
     suaVez: "IT'S YOUR TURN",
     suaVezTexto: "Pick a player before time runs out. If the clock turns, the cheapest valid player comes in.",
@@ -138,6 +193,7 @@ export const draft = definir({
     nestaEscolha: "on this pick",
     reservado: "the rest is reserved for the slots you still have to fill",
     escolher: "PICK",
+    escolherRotulo: "Pick {riotId}, {pontos} points",
     escolhendo: "PICKING…",
     caroDemais: "above what you can spend right now",
     naoFecha: "would leave a roster unable to fill up within budget",
@@ -147,6 +203,31 @@ export const draft = definir({
 
     erroGenerico: "We couldn't reach the server. The screen refreshes itself in a moment.",
 
+    erros: {
+      encerrado: "The draft is over.",
+      nao_comecou: "The draft hasn't started yet.",
+      pausado: "The draft is paused.",
+      sem_escolha: "There's no pick in progress.",
+      nao_e_a_vez: "It's not your team's turn.",
+      fora_do_pool: "That player isn't in the pool.",
+      ja_escolhido: "That player has already been picked.",
+      elenco_completo: "Your roster is already full.",
+      acima_do_teto:
+        "That player costs {pontos} and you can only spend {teto} on this pick — the rest is reserved for the slots you still have to fill.",
+      nao_fecha_o_seu:
+        "With {riotId} ({pontos} pts) your roster can't be completed: there wouldn't be anyone cheap enough left for your remaining slots. Pick someone cheaper.",
+      falta_para_outro:
+        "{riotId} is the player another team needs to complete its roster within budget. Pick someone else.",
+      vez_passou:
+        "That pick didn't go through: your turn had already passed (time ran out or the pick was already made). Check the board.",
+      sem_sessao: "Sign in to your account to pick.",
+      sem_jogador: "Choose a player.",
+      sem_inscricao: "Your account isn't linked to a sign-up.",
+      sem_draft: "The draft hasn't been set up yet.",
+      nao_e_capitao: "You're not a captain this edition.",
+      outra_escolha: "Another pick got in first. Check the board and try again.",
+    },
+
     vazioTitulo: "THE DRAFT HASN'T OPENED YET",
     vazioTexto:
       "Date and time will be announced on Discord. Once it opens, this screen becomes the official broadcast: the team draw, the clock, budgets draining and every pick landing live.",
@@ -154,7 +235,8 @@ export const draft = definir({
     sorteioKicker: "DRAWING THE TEAMS AND THE PICK ORDER",
     sorteioTitulo: "THE CAPTAINS ARE SET",
     sorteando: "drawing…",
-    ordemSerpentina: "Snake order: 1-2-3-4-5-6 · 6-5-4-3-2-1 · and repeat.",
+    ordemSerpentina: "Snake order:",
+    eRepete: "and repeat.",
     escolhaLivre: "FREE PICK",
     poolDisponivel: "AVAILABLE POOL",
     poolNota: "the captain picks, from their own panel",

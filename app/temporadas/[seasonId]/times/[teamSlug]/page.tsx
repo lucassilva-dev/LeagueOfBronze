@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -15,6 +16,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatKda } from "@/lib/format";
+import { eloLabel, rotaCurto } from "@/lib/i18n/messages/paginas-home";
+import { metadadosDaPagina, montarMetadados } from "@/lib/i18n/metadados";
+import { nomeDaTemporada } from "@/lib/i18n/nome-da-temporada";
 import { getMessages } from "@/lib/i18n/server";
 import { buildDesignTeams } from "@/lib/roster";
 import { getServerArchivedSeason } from "@/lib/server-data";
@@ -26,13 +30,27 @@ type PageParams = Readonly<{
   params: Promise<{ seasonId: string; teamSlug: string }>;
 }>;
 
+/** O time e a temporada CERTA (não a do layout, "4ª Edição") na aba e na prévia do link. */
+export async function generateMetadata({ params }: PageParams): Promise<Metadata> {
+  const { seasonId, teamSlug } = await params;
+  const [{ metadados, compartilhados }, result] = await Promise.all([getMessages(), getServerArchivedSeason(seasonId)]);
+  const team = result ? buildDesignTeams(result.dataset).find((time) => time.slug === teamSlug) : undefined;
+  if (!result || !team) return metadadosDaPagina("temporadas");
+  return montarMetadados(metadados.temporadaTime, {
+    valores: { time: team.name, temporada: nomeDaTemporada(result.archived.name, compartilhados.localeTag) },
+    caminho: `/temporadas/${encodeURIComponent(result.archived.seasonId)}/times/${encodeURIComponent(team.slug)}`,
+  });
+}
+
 export default async function TemporadaTimePage({ params }: PageParams) {
   const { seasonId, teamSlug } = await params;
   const result = await getServerArchivedSeason(seasonId);
   if (!result) notFound();
 
-  const { paginasRegras: t, paginasStats: ts } = await getMessages();
+  // `paginasHome` traduz a sigla da rota (SEL → JG) e o elo, como as páginas ao vivo.
+  const { paginasRegras: t, paginasStats: ts, compartilhados: tc, paginasHome: tHome } = await getMessages();
   const { archived, dataset } = result;
+  const nomeDaEdicao = nomeDaTemporada(archived.name, tc.localeTag);
   const team = buildDesignTeams(dataset).find((time) => time.slug === teamSlug);
   if (!team) notFound();
 
@@ -48,7 +66,7 @@ export default async function TemporadaTimePage({ params }: PageParams) {
           className="inline-flex items-center gap-1 text-sm font-semibold text-muted transition hover:text-text"
         >
           <ArrowLeft className="h-4 w-4" />
-          {t.voltarPara} {archived.name}
+          {t.voltarPara} {nomeDaEdicao}
         </Link>
       </div>
 
@@ -62,7 +80,7 @@ export default async function TemporadaTimePage({ params }: PageParams) {
               <Badge variant="outline">{t.somenteLeitura}</Badge>
             </div>
             <h1 className="mt-2 font-heading text-2xl font-bold tracking-tight sm:text-3xl" style={{ color: "#f4ecdd" }}>{team.name}</h1>
-            <p className="mt-1 text-sm text-muted">{t.timeElencoDescricaoPre} {archived.name}.</p>
+            <p className="mt-1 text-sm text-muted">{t.timeElencoDescricaoPre} {nomeDaEdicao}.</p>
           </div>
           <div className="flex items-center gap-3">
             {team.captain ? (
@@ -119,11 +137,11 @@ export default async function TemporadaTimePage({ params }: PageParams) {
                         </Link>
                       </span>
                     </TableCell>
-                    <TableCell><RoleTag role={player.role1} /></TableCell>
+                    <TableCell><RoleTag role={player.role1} label={rotaCurto(tHome, player.roleMeta.short)} /></TableCell>
                     <TableCell>
                       <span className="inline-flex items-center gap-1.5">
                         <EloCrest elo={player.eloMeta?.key} size={20} title={false} labels={ts.elos} />
-                        <span className="text-sm text-muted">{player.eloMeta?.label ?? player.elo}</span>
+                        <span className="text-sm text-muted">{eloLabel(tHome, player.eloMeta?.key, player.eloMeta?.label ?? player.elo)}</span>
                       </span>
                     </TableCell>
                     <TableCell className="text-right">{games}</TableCell>
@@ -131,7 +149,7 @@ export default async function TemporadaTimePage({ params }: PageParams) {
                     <TableCell className="whitespace-nowrap text-right">
                       {games > 0 ? `${agg?.kills ?? 0}/${agg?.deaths ?? 0}/${agg?.assists ?? 0}` : "—"}
                     </TableCell>
-                    <TableCell className="text-right">{games > 0 ? formatKda(agg?.kda ?? 0) : "—"}</TableCell>
+                    <TableCell className="text-right">{games > 0 ? formatKda(agg?.kda ?? 0, tc.localeTag) : "—"}</TableCell>
                     <TableCell className="text-right">{agg?.gameMvps ?? 0}</TableCell>
                   </TableRow>
                 );

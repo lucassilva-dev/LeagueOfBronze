@@ -1,6 +1,7 @@
 import { slugifyValue } from "@/components/admin/shared";
 import { resolveElo, resolveRole } from "@/lib/design";
 import type { EstadoDraft } from "@/lib/draft/motor";
+import type { Inscricao } from "@/lib/inscricoes/store";
 import type { Player, Team } from "@/lib/schema";
 
 /**
@@ -133,4 +134,56 @@ export function problemasDaVirada(estado: EstadoDraft): string[] {
   }
 
   return problemas;
+}
+
+// ---------------------------------------------------------------- quem saiu depois do sorteio
+
+/** Como está a inscrição de quem segue no draft sem ser mais `apto`. */
+export type SituacaoForaDoDraft = Exclude<Inscricao["situacao"], "apto"> | "sem_inscricao";
+
+export type ForaDoDraft = { riotId: string; situacao: SituacaoForaDoDraft };
+
+const COMO_FICOU: Record<SituacaoForaDoDraft, string> = {
+  recusado: "recusado",
+  desistiu: "desistiu",
+  sobra: "na sobra",
+  pendente: "voltou a pendente",
+  sem_inscricao: "inscrição não encontrada",
+};
+
+/**
+ * Quem está no draft (no pool ou num elenco) e cuja inscrição deixou de ser `apto`.
+ *
+ * O sorteio copia a lista de aptos para o estado do draft, e dali em diante o draft não
+ * olha mais para as inscrições: recusar alguém ou registrar a desistência depois do
+ * sorteio não aparecia em lugar nenhum da mesa — a pessoa continuava escolhível, podia ser
+ * escolhida e atravessava a virada para o site.
+ *
+ * Isto só AVISA. Não tira ninguém do draft nem muda regra: o que fazer (trocar, refazer o
+ * sorteio, manter) é decisão da organização. O nome que sai é o Riot ID que está no draft,
+ * que é o que a mesa e a transmissão mostram.
+ */
+export function jogadoresForaDoDraft(
+  estado: Pick<EstadoDraft, "jogadores"> | null,
+  inscritos: readonly Pick<Inscricao, "id" | "situacao">[],
+): ForaDoDraft[] {
+  if (!estado) return [];
+  const situacaoPor = new Map(inscritos.map((i) => [i.id, i.situacao]));
+  const fora: ForaDoDraft[] = [];
+  for (const jogador of estado.jogadores) {
+    const situacao = situacaoPor.get(jogador.id);
+    if (situacao === "apto") continue;
+    fora.push({ riotId: jogador.riotId, situacao: situacao ?? "sem_inscricao" });
+  }
+  return fora;
+}
+
+/** "recusado", "desistiu", "na sobra"… — o mesmo texto no painel e na recusa da virada. */
+export function rotuloForaDoDraft(situacao: SituacaoForaDoDraft): string {
+  return COMO_FICOU[situacao] ?? situacao;
+}
+
+/** "Fulano#BR1 (desistiu), Ciclano#BR1 (recusado)". */
+export function listaForaDoDraft(fora: readonly ForaDoDraft[]): string {
+  return fora.map((f) => `${f.riotId} (${rotuloForaDoDraft(f.situacao)})`).join(", ");
 }

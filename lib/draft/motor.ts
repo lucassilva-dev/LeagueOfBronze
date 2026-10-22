@@ -81,7 +81,29 @@ export type EstadoDraft = {
   motivoDaPausa?: MotivoDaPausa;
 };
 
-export type Recusa = { ok: false; motivo: string };
+/**
+ * Por que a escolha não vale. `motivo` é o recado em português (o painel da mesa e o log
+ * leem ele); `codigo` e `params` deixam a tela do capitão dizer a mesma coisa no idioma
+ * dela (lib/i18n/messages/draft.ts, `erros`).
+ */
+export type CodigoDaRecusa =
+  | "encerrado"
+  | "nao_comecou"
+  | "pausado"
+  | "sem_escolha"
+  | "nao_e_a_vez"
+  | "fora_do_pool"
+  | "ja_escolhido"
+  | "elenco_completo"
+  | "acima_do_teto"
+  | "nao_fecha_o_seu"
+  | "falta_para_outro";
+export type Recusa = {
+  ok: false;
+  motivo: string;
+  codigo: CodigoDaRecusa;
+  params?: Readonly<Record<string, string | number>>;
+};
 export type Aprovacao = { ok: true };
 
 // ---------------------------------------------------------------- ordem
@@ -159,26 +181,28 @@ export function podeEscolher(
   timeId: string,
   jogadorId: string,
 ): Aprovacao | Recusa {
-  if (estado.fase === "encerrado") return { ok: false, motivo: "O draft já terminou." };
-  if (estado.fase === "preparando") return { ok: false, motivo: "O draft ainda não começou." };
-  if (estado.fase === "pausado") return { ok: false, motivo: "O draft está pausado." };
+  if (estado.fase === "encerrado") return { ok: false, codigo: "encerrado", motivo: "O draft já terminou." };
+  if (estado.fase === "preparando") return { ok: false, codigo: "nao_comecou", motivo: "O draft ainda não começou." };
+  if (estado.fase === "pausado") return { ok: false, codigo: "pausado", motivo: "O draft está pausado." };
 
   const daVez = timeDaVez(estado);
-  if (daVez === null) return { ok: false, motivo: "Não há escolha em andamento." };
-  if (daVez !== timeId) return { ok: false, motivo: "Não é a vez do seu time." };
+  if (daVez === null) return { ok: false, codigo: "sem_escolha", motivo: "Não há escolha em andamento." };
+  if (daVez !== timeId) return { ok: false, codigo: "nao_e_a_vez", motivo: "Não é a vez do seu time." };
 
   const jogador = estado.jogadores.find((j) => j.id === jogadorId);
-  if (!jogador) return { ok: false, motivo: "Jogador não está no pool." };
-  if (jogador.timeId !== null) return { ok: false, motivo: "Esse jogador já foi escolhido." };
+  if (!jogador) return { ok: false, codigo: "fora_do_pool", motivo: "Jogador não está no pool." };
+  if (jogador.timeId !== null) return { ok: false, codigo: "ja_escolhido", motivo: "Esse jogador já foi escolhido." };
 
   if (vagasAbertasDoTime(estado, timeId) === 0) {
-    return { ok: false, motivo: "Seu elenco já está completo." };
+    return { ok: false, codigo: "elenco_completo", motivo: "Seu elenco já está completo." };
   }
 
   const teto = tetoDaEscolha(estado, timeId);
   if (jogador.pontos > teto) {
     return {
       ok: false,
+      codigo: "acima_do_teto",
+      params: { pontos: jogador.pontos, teto },
       motivo: `Esse jogador custa ${jogador.pontos} e você só pode gastar ${teto} nesta escolha — o resto está reservado para as vagas que faltam.`,
     };
   }
@@ -190,6 +214,8 @@ export function podeEscolher(
     const soEuFecho = elencosFecham([situacaoDoTime(estado, timeId, jogador)], custosRestantes(estado, jogador.id));
     return {
       ok: false,
+      codigo: soEuFecho === "nao_fecha" ? "nao_fecha_o_seu" : "falta_para_outro",
+      params: { riotId: jogador.riotId, pontos: jogador.pontos },
       motivo:
         soEuFecho === "nao_fecha"
           ? `Com ${jogador.riotId} (${jogador.pontos} pts) o seu elenco não fecha: não sobraria jogador barato o bastante para as vagas que faltam. Escolha alguém mais barato.`

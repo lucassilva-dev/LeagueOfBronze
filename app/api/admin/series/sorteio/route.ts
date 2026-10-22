@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 
-import { ConflitoDeVersaoError, readDatasetComVersao, saveDataset } from "@/lib/data-store";
+import { ConflitoDeVersaoError, readDatasetComVersao, saveDatasetComVersao } from "@/lib/data-store";
 import { isDuplaCard } from "@/lib/cards";
 import { novaSemente, sortearCarta, sortearLado, sortearLetras } from "@/lib/series/sorteio";
 import { requireAdmin } from "@/lib/security/route-guard";
@@ -173,8 +173,9 @@ export async function POST(request: NextRequest) {
      * simultâneos passavam os dois pela conferência, e o segundo sobrescrevia o primeiro
      * com 200 na tela dos dois: o organizador via um resultado que não estava salvo.
      */
+    let versaoGravada: number;
     try {
-      await saveDataset(paraSalvar, { versaoEsperada: versaoLida });
+      versaoGravada = (await saveDatasetComVersao(paraSalvar, { versaoEsperada: versaoLida })).versao;
     } catch (erro) {
       if (erro instanceof ConflitoDeVersaoError) {
         return NextResponse.json(
@@ -213,8 +214,12 @@ export async function POST(request: NextRequest) {
        * primeiro "Salvar" depois de qualquer sorteio ao vivo caía sempre em 409 — o que
        * antes era mascarado pela recarga completa que a cerimônia disparava (e que abria
        * `window.confirm` no meio da transmissão).
+       *
+       * É a versão em que a GRAVAÇÃO caiu, não `versaoLida + 1`: no provedor local a versão
+       * é sempre 0, e a previsão fazia o painel guardar 1 e o Salvar seguinte cair num 409
+       * falso ("outra pessoa salvou") sem ninguém ter salvo nada.
        */
-      versao: versaoLida + 1,
+      versao: versaoGravada,
       /** A versão que esta rota LEU antes de gravar — o painel só adota `versao` se casar. */
       versaoLida,
       /** Quantas vezes este mesmo sorteio já foi feito — a tela avisa na repetição. */

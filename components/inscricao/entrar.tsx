@@ -1,10 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useId, useState } from "react";
 import Link from "next/link";
 
+import { caminhoDaTrocaDeSenha, navegarPara } from "@/components/inscricao/navegar";
+import { destinoDeVolta } from "@/lib/destino-de-volta";
 import type { Messages } from "@/lib/i18n/messages";
 import { avisarSessaoMudou } from "@/lib/sessao-mudou";
+
+/** O que `GET /api/sessao` devolve — só o que esta tela usa. */
+type SessaoDoSite = {
+  jogador: { precisaTrocarSenha?: boolean } | null;
+  organizacao: unknown;
+};
+
+/**
+ * Para onde vai o JOGADOR que acabou de entrar (ou que já estava dentro): a troca de senha,
+ * quando a organização gerou uma provisória; senão o `?volta=` conferido pela lista fechada
+ * (lib/destino-de-volta.ts), ou a própria inscrição. A troca leva o destino junto, para a
+ * pessoa seguir para ele depois de trocar — ou sem trocar: a troca cobra, mas não tranca.
+ */
+export function destinoDoJogador(volta: string | null | undefined, precisaTrocarSenha?: boolean): string {
+  const conferida = destinoDeVolta(volta);
+  return precisaTrocarSenha ? caminhoDaTrocaDeSenha(conferida) : (conferida ?? "/minha-inscricao");
+}
 
 /**
  * A porta de entrada do site — para as DUAS contas.
@@ -42,6 +61,36 @@ export default function Entrar({
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+  const ajudaDoIdentificador = useId();
+
+  /*
+   * INS-18 — a sessão que a PÁGINA não viu.
+   *
+   * O cookie das contas é SameSite=Strict: quem chega a /entrar por um link de outro site
+   * (WhatsApp Web, Discord no navegador) já logado não manda o cookie nessa navegação, e
+   * a página — que decide pela sessão lida no servidor — mostra o formulário de login a
+   * quem já está dentro. Um fetch daqui é da mesma origem e leva o cookie: se ele disser
+   * que há sessão, segue para onde a página teria mandado (organização primeiro, como lá).
+   * Na falha, nada muda: o formulário continua aqui.
+   */
+  useEffect(() => {
+    let vivo = true;
+    void (async () => {
+      try {
+        const r = await fetch("/api/sessao", { cache: "no-store" });
+        if (!r.ok) return;
+        const sessao = (await r.json()) as SessaoDoSite;
+        if (!vivo) return;
+        if (sessao.organizacao) navegarPara("/admin");
+        else if (sessao.jogador) navegarPara(destinoDoJogador(volta, sessao.jogador.precisaTrocarSenha));
+      } catch {
+        // Silêncio proposital: sem resposta, a pessoa entra pelo formulário como sempre.
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [volta]);
 
   async function entrar(e: React.FormEvent) {
     e.preventDefault();
@@ -60,16 +109,26 @@ export default function Entrar({
           ehJogador ? { email: valor, senha } : { username: valor, password: senha },
         ),
       });
-      const corpo = (await resposta.json().catch(() => ({}))) as { error?: string };
+      const corpo = (await resposta.json().catch(() => ({}))) as {
+        error?: string;
+        codigo?: string;
+        jogador?: { mustChangePassword?: boolean };
+      };
 
       if (resposta.ok) {
         avisarSessaoMudou();
         // Navegação de página inteira: o cabeçalho e as telas com sessão precisam ser
-        // remontados com o cookie novo.
-        window.location.assign(ehJogador ? (volta ?? "/minha-inscricao") : "/admin");
+        // remontados com o cookie novo. Jogador com senha provisória vai direto trocá-la.
+        navegarPara(ehJogador ? destinoDoJogador(volta, corpo.jogador?.mustChangePassword) : "/admin");
         return;
       }
-      setErro(corpo.error ?? t.erroGenerico);
+      // Pelo código, quando a rota manda um que o dicionário conhece: o texto dela é fixo
+      // em português.
+      const traduzido =
+        corpo.codigo && Object.hasOwn(t.erros, corpo.codigo)
+          ? t.erros[corpo.codigo as keyof Messages["inscricao"]["erros"]]
+          : undefined;
+      setErro(traduzido ?? corpo.error ?? t.erroGenerico);
     } catch {
       setErro(t.erroGenerico);
     } finally {
@@ -79,10 +138,11 @@ export default function Entrar({
 
   return (
     <form onSubmit={entrar} className="lob-card-2 lob-fade" style={{ padding: "30px 28px" }}>
-      <Campo label={t.entrarIdentificador} ajuda={t.entrarIdentificadorAjuda}>
+      <Campo label={t.entrarIdentificador} ajuda={t.entrarIdentificadorAjuda} ajudaId={ajudaDoIdentificador}>
         <input
           style={entrada}
           type="text"
+          aria-describedby={ajudaDoIdentificador}
           // `username` e não `email`: o gerenciador de senhas precisa saber que este
           // campo aceita as duas coisas, senão sugere só endereços de e-mail.
           autoComplete="username"
@@ -130,6 +190,13 @@ export default function Entrar({
         {enviando ? t.enviando : t.entrarBotao}
       </button>
 
+      {/* O site não envia e-mail, então não existe "esqueci a senha" automático — mas a
+          organização gera uma senha provisória pelo painel. Antes esta tela não dizia
+          nada, e quem esqueceu a senha não sabia que tinha saída. */}
+      <p style={{ margin: "14px 0 0", fontSize: 12.5, color: "var(--lob-muted)", lineHeight: 1.5 }}>
+        {t.entrarEsqueceuSenha}
+      </p>
+
       <p style={{ margin: "20px 0 0", fontSize: 13, color: "var(--lob-muted)" }}>
         {t.entrarSemConta}{" "}
         <Link href="/inscricao" style={{ color: "var(--lob-gold-1)" }}>
@@ -140,7 +207,8 @@ export default function Entrar({
   );
 }
 
-const entrada: React.CSSProperties = {
+/** O campo de texto das telas da conta (entrar e trocar a senha), num lugar só. */
+export const entrada: React.CSSProperties = {
   width: "100%",
   padding: "10px 12px",
   fontFamily: "inherit",
@@ -151,31 +219,42 @@ const entrada: React.CSSProperties = {
   borderRadius: 4,
 };
 
-function Campo({
+export function Campo({
   label,
   ajuda,
+  ajudaId,
   children,
-}: Readonly<{ label: string; ajuda?: string; children: React.ReactNode }>) {
+}: Readonly<{
+  label: string;
+  ajuda?: string;
+  /** Id da ajuda, para o campo apontar para ela com `aria-describedby`. */
+  ajudaId?: string;
+  children: React.ReactNode;
+}>) {
+  // A ajuda fica FORA do <label>: dentro, ela entrava no nome do campo, e o leitor de tela
+  // lia o rótulo e a ajuda juntos como se fossem o nome (e de novo pela descrição).
   return (
-    <label style={{ display: "block" }}>
-      <span
-        style={{
-          display: "block",
-          fontSize: 10,
-          letterSpacing: ".16em",
-          textTransform: "uppercase",
-          color: "var(--lob-bronze)",
-          marginBottom: 6,
-        }}
-      >
-        {label}
-      </span>
-      {children}
+    <div>
+      <label style={{ display: "block" }}>
+        <span
+          style={{
+            display: "block",
+            fontSize: 10,
+            letterSpacing: ".16em",
+            textTransform: "uppercase",
+            color: "var(--lob-bronze)",
+            marginBottom: 6,
+          }}
+        >
+          {label}
+        </span>
+        {children}
+      </label>
       {ajuda ? (
-        <span style={{ display: "block", marginTop: 6, fontSize: 11.5, color: "var(--lob-muted)" }}>
+        <span id={ajudaId} style={{ display: "block", marginTop: 6, fontSize: 11.5, color: "var(--lob-muted)" }}>
           {ajuda}
         </span>
       ) : null}
-    </label>
+    </div>
   );
 }

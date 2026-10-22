@@ -123,13 +123,22 @@ function rotuloElo(inscrito: Inscrito): string {
   return resolveElo(eloDePreco(inscrito))?.label ?? eloDePreco(inscrito);
 }
 
-/** Data-âncora só como informação. Data nula é estado legítimo, nunca um veredicto. */
+/**
+ * Data-âncora só como informação. Data nula é estado legítimo, nunca um veredicto. No fuso
+ * de Brasília, como o resto do painel — no do computador, um congelamento às 00:30 de
+ * Brasília virava o dia anterior para quem está em Manaus.
+ */
 function formatarData(iso: string | null): string {
   if (!iso) return "a definir";
   const quando = new Date(iso);
   return Number.isNaN(quando.getTime())
     ? "data inválida"
-    : quando.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
+    : quando.toLocaleDateString("pt-BR", {
+        timeZone: "America/Sao_Paulo",
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      });
 }
 
 /**
@@ -428,7 +437,9 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
   };
 
   const mudarSituacao = (inscrito: Inscrito, situacao: "apto" | "sobra") => {
-    void executar("ficha", { inscricaoId: inscrito.id, situacao });
+    // Com a situação que esta tela mostrava: se outra pessoa mudou antes (recusou, segurou),
+    // o servidor responde 409 sem gravar e a tela recarrega com o valor de agora.
+    void executar("ficha", { inscricaoId: inscrito.id, situacao, situacaoAnterior: inscrito.situacao });
   };
 
   const v = analise.viabilidade;

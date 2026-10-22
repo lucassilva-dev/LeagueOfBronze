@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
@@ -5,6 +6,8 @@ import { PlayerCard } from "@/components/lob/player-card";
 import { caminhoNoArquivo } from "@/lib/arquivo";
 import { semTemporadaAoVivo } from "@/lib/fase-do-site";
 import { rotaCurto } from "@/lib/i18n/messages/paginas-home";
+import { metadadosDaPagina, montarMetadados } from "@/lib/i18n/metadados";
+import { nomeDaTemporada } from "@/lib/i18n/nome-da-temporada";
 import { getMessages } from "@/lib/i18n/server";
 import { getOpGgMultiSearchUrlFromNicks } from "@/lib/opgg";
 import { buildDesignTeams } from "@/lib/roster";
@@ -13,6 +16,27 @@ import { getServerDataset } from "@/lib/server-data";
 export const dynamic = "force-dynamic";
 
 type TeamPageParams = Readonly<{ params: Promise<{ slug: string }> }>;
+
+/**
+ * O nome do time na aba e na prévia do link. Sem o time (ou com o banco fora), fica o
+ * título da seção: o título nunca é motivo para a página cair.
+ */
+export async function generateMetadata({ params }: TeamPageParams): Promise<Metadata> {
+  const { slug } = await params;
+  try {
+    const [{ metadados, compartilhados }, { dataset }] = await Promise.all([getMessages(), getServerDataset()]);
+    const team = buildDesignTeams(dataset).find((time) => time.slug === slug);
+    if (team) {
+      return montarMetadados(metadados.time, {
+        valores: { time: team.name, temporada: nomeDaTemporada(dataset.tournament.name, compartilhados.localeTag) },
+        caminho: `/times/${encodeURIComponent(team.slug)}`,
+      });
+    }
+  } catch {
+    // Banco fora: quem decide o que mostrar é a página (e a app/error.tsx).
+  }
+  return metadadosDaPagina("times");
+}
 
 export default async function TeamRosterPage({ params }: TeamPageParams) {
   const { slug } = await params;

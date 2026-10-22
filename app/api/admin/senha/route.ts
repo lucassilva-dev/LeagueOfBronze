@@ -9,8 +9,17 @@ import {
   issueSessionCookie,
 } from "@/lib/admin-auth";
 import { createSupabaseAdminClient } from "@/lib/data-store";
-import { findUserById } from "@/lib/security/admin-store";
+import {
+  concluirTentativaAdmin,
+  findUserById,
+  getClientIp,
+  getRecentAttemptCounts,
+  hashIp,
+  reservarTentativaAdmin,
+  type ReservaDeTentativaAdmin,
+} from "@/lib/security/admin-store";
 import { hashPassword, validatePasswordStrength, verifyPassword } from "@/lib/security/password";
+import { descontarPropriaReserva, evaluateLoginRateLimit, TENTATIVA_ERRO_INTERNO } from "@/lib/security/rate-limit";
 import { respostaDeErro } from "@/lib/security/resposta-erro";
 import { comPisoDeTempo, lerCorpoPublico } from "@/lib/security/rota-publica";
 
@@ -67,11 +76,50 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "A senha nova precisa ser diferente da atual." }, { status: 400 });
   }
 
+  // A reserva da tentativa (ver abaixo) é fechada em TODO caminho de saída: se algo
+  // estourar depois dela e antes de a senha atual ser conferida, o `finally` fecha com
+  // `erro_interno`, que não conta. Antes, a linha ficava `em_andamento` e pesava como
+  // palpite errado contra quem tinha a senha certa.
+  let reserva: ReservaDeTentativaAdmin = null;
+  let concluida = false;
+  let usuarioDaConta: string | null = null;
+  let ipHash = "";
+  const concluir = (success: boolean, reason: string) => {
+    concluida = true;
+    return concluirTentativaAdmin(reserva, { username: usuarioDaConta, ipHash, success, reason });
+  };
+
   try {
     const conta = await findUserById(identidade.id);
     if (!conta) return NextResponse.json({ error: "Conta não encontrada." }, { status: 404 });
 
+    /*
+     * A "senha atual" passa pelo MESMO limitador do login.
+     *
+     * Sem ele, quem tivesse uma sessão alheia (painel aberto num computador
+     * compartilhado) chutava a senha atual sem contador nem registro — inclusive em
+     * paralelo — e, ao acertar, trocava a senha, subia o epoch e ficava com a conta. As
+     * tentativas entram em `admin_login_attempts`, então contam no mesmo teto do login.
+     */
+    usuarioDaConta = conta.username;
+    ipHash = hashIp(getClientIp(request.headers));
+    reserva = await reservarTentativaAdmin({ username: conta.username, ipHash });
+    const decisao = evaluateLoginRateLimit(
+      descontarPropriaReserva(await getRecentAttemptCounts(conta.username, ipHash), reserva !== null),
+    );
+    if (!decisao.allowed) {
+      await concluir(false, decisao.reason);
+      return comPisoDeTempo(
+        inicio,
+        NextResponse.json(
+          { error: "Muitas tentativas. Tente novamente mais tarde." },
+          { status: 429, headers: { "Retry-After": String(decisao.retryAfterSeconds) } },
+        ),
+      );
+    }
+
     const confere = await verifyPassword(senhaAtual, conta.password_hash, getPasswordPepper());
+    await concluir(confere, confere ? "troca_de_senha" : "senha_atual_incorreta");
     if (!confere) {
       return comPisoDeTempo(inicio, NextResponse.json({ error: "Senha atual incorreta." }, { status: 401 }));
     }
@@ -118,5 +166,11 @@ export async function POST(request: NextRequest) {
     return comPisoDeTempo(inicio, resposta);
   } catch (error) {
     return respostaDeErro("api/admin/senha", error, "Não foi possível trocar a senha.");
+  } finally {
+    if (reserva && !concluida) {
+      await concluir(false, TENTATIVA_ERRO_INTERNO).catch((e: unknown) =>
+        console.error("[api/admin/senha] falha ao fechar a reserva da tentativa:", e),
+      );
+    }
   }
 }

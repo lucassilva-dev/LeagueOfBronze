@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type { ReactNode } from "react";
-import { Check, ChevronUp, Download, LayoutGrid, Lock, LogOut, RefreshCcw, Save } from "lucide-react";
+import { Check, ChevronUp, Download, KeyRound, LayoutGrid, Lock, LogOut, RefreshCcw, Save } from "lucide-react";
 
 import type { SeriesFormat, TournamentDataset } from "@/lib/schema";
 import { applyAutoGameMvpsToDataset, calculateStandings } from "@/lib/tournament";
@@ -45,6 +45,12 @@ import {
   type MutateDraft,
 } from "@/components/admin/shared";
 import { ICONE_DA_SECAO } from "@/components/admin/icones-admin";
+import {
+  descreverCaminho,
+  mudancaEstrutural,
+  rebasearRascunho,
+  resumirMudancasDoServidor,
+} from "@/components/admin/rebase-do-rascunho";
 import { ModoCompacto, useCompacto, useLarguraCompacta } from "@/components/admin/responsivo";
 import { SeloHex } from "@/components/lob/icones";
 
@@ -83,12 +89,29 @@ type DatasetResponse = {
   message?: string;
   error?: string;
   missing?: string[];
+  /** Só no encerramento: `true` quando a temporada já estava encerrada e o retrato foi refeito. */
+  refeito?: boolean;
 };
 
 type MessageResponse = {
   ok?: boolean;
   error?: string;
 };
+
+/**
+ * O 409 do Salvar, já resolvido pelo rebase: só chega aqui o que o painel NÃO pode decidir
+ * sozinho (os dois mexeram no mesmo campo), com o que a outra pessoa mudou em palavras.
+ */
+type Conflito = Readonly<{
+  /** "+6 times", "+30 jogadores", "sorteio de lado ou carta em 1 série"... */
+  resumoDoServidor: string[];
+  /** Campos que os dois mudaram, por nome ("Alfa x Beta › jogos"). */
+  campos: string[];
+  /** Times/jogadores/séries criados ou apagados, temporada encerrada: sem "Salvar por cima". */
+  estrutural: boolean;
+  /** Não deu para ler a versão nova (rede): o aviso sai sem o resumo. */
+  semDetalhe?: boolean;
+}>;
 
 /** Qual operação está em curso — o rótulo do botão precisa dizer a verdade (auditoria #21/#22). */
 type Tarefa = "login" | "salvar" | "recarregar" | "sair" | "exportar" | null;
@@ -105,6 +128,13 @@ type AdminTabContentProps = Readonly<{
   onAlert: (kind: "ok" | "erro", text: string) => void;
   /** Aplica no rascunho E na baseline o que o servidor já gravou (sorteio ao vivo). */
   aplicarDoServidor: MutateDraft;
+  /** As séries como estão GRAVADAS: o sorteio ao vivo só funciona sobre elas. */
+  seriesGravadas: TournamentDataset["seriesMatches"];
+  /** Escopos que decidem botões da aba Séries e da aba Importar/Exportar. */
+  podeLados: boolean;
+  podeCartas: boolean;
+  podeRiot: boolean;
+  podeImportar: boolean;
   /** Acompanha a versão da linha quando uma rota grava por fora do editor. */
   onVersaoDoServidor: (versaoLida?: number, versaoGravada?: number) => void;
   /** Formulário de Times/Jogadores preenchido e ainda não aplicado ao rascunho. */
@@ -114,6 +144,11 @@ type AdminTabContentProps = Readonly<{
   podeFinanceiro: boolean;
   podeConfigurar: boolean;
   podeConduzirDraft: boolean;
+  /**
+   * «Gerar senha provisória» na gaveta do inscrito. A rota (`POST /api/admin/jogadores/senha`)
+   * exige `users:manage`, que é só da master — sem esta prop o bloco nunca aparecia.
+   */
+  podeRedefinirSenha: boolean;
   /** O draft gravou o dataset pelo servidor (virada, calendário): recarregar o rascunho. */
   onDatasetMudouNoServidor: () => void;
 }>;
@@ -167,6 +202,36 @@ function erroDaResposta(response: Response, corpo: DatasetResponse | MessageResp
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
+}
+
+const SEM_CONEXAO = "Sem conexão com o servidor. Confira a internet e tente de novo.";
+const SEM_CONEXAO_AO_SALVAR =
+  "Sem conexão: não deu para confirmar o salvamento. Confira a internet e tente de novo — se ele chegou a gravar, o próximo Salvar percebe sozinho.";
+
+/**
+ * `fetch` + leitura do corpo, sem deixar escapar texto técnico em inglês.
+ *
+ * Queda de rede no 4G virava "Load failed"/"Failed to fetch" na tela, e uma resposta sem
+ * JSON (500 da plataforma, 502 do proxy) virava "Unexpected end of JSON input" — a pessoa
+ * não sabia se tinha salvo nem o que fazer. Aqui a rede vira `ApiError` com status 0 e o
+ * corpo ilegível vira a mensagem do status HTTP.
+ */
+async function pedir(
+  url: string,
+  init: RequestInit,
+  semConexao = SEM_CONEXAO,
+): Promise<{ response: Response; corpo: DatasetResponse }> {
+  let response: Response;
+  try {
+    response = await fetch(url, init);
+  } catch (falha) {
+    if (falha instanceof TypeError) throw new ApiError(semConexao, 0);
+    throw falha;
+  }
+  const corpo = (await response
+    .json()
+    .catch(() => ({ error: `O servidor falhou (HTTP ${response.status}). Tente de novo em instantes.` }))) as DatasetResponse;
+  return { response, corpo };
 }
 
 function formatarEspera(segundos: number) {
@@ -848,12 +913,18 @@ function AdminTabContent({
   onStartTournament,
   onAlert,
   aplicarDoServidor,
+  seriesGravadas,
+  podeLados,
+  podeCartas,
+  podeRiot,
+  podeImportar,
   onVersaoDoServidor,
   onFormularioSujo,
   podeConferir,
   podeFinanceiro,
   podeConfigurar,
   podeConduzirDraft,
+  podeRedefinirSenha,
   onDatasetMudouNoServidor,
 }: AdminTabContentProps) {
   if (activeTab === "users") return <AdminUsersPanel onAlert={onAlert} />;
@@ -881,6 +952,7 @@ function AdminTabContent({
         podeConferir={podeConferir}
         podeFinanceiro={podeFinanceiro}
         podeConfigurar={podeConfigurar}
+        podeRedefinirSenha={podeRedefinirSenha}
         render={(props) => <Secao {...props} />}
       />
     );
@@ -909,6 +981,10 @@ function AdminTabContent({
           mutateDraft={mutateDraft}
           aplicarDoServidor={aplicarDoServidor}
           onVersaoDoServidor={onVersaoDoServidor}
+          seriesGravadas={seriesGravadas}
+          podeLados={podeLados}
+          podeCartas={podeCartas}
+          podeRiot={podeRiot}
         />
       );
     case "backup":
@@ -917,6 +993,7 @@ function AdminTabContent({
           importing={isBusy}
           onImportFile={onImportFile}
           onImportText={onImportText}
+          podeImportar={podeImportar}
         />
       );
     default:
@@ -978,8 +1055,24 @@ function PainelDoAdmin() {
   const [formularioSujo, setFormularioSujo] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [tarefa, setTarefa] = useState<Tarefa>(null);
-  /** Alguém gravou por cima enquanto este rascunho estava aberto (resposta 409). */
-  const [conflict, setConflict] = useState(false);
+  /**
+   * Alguém gravou por cima enquanto este rascunho estava aberto (resposta 409) E mexeu nos
+   * mesmos campos — o 409 sem sobreposição é resolvido sozinho pelo rebase.
+   */
+  const [conflito, setConflito] = useState<Conflito | null>(null);
+  const conflict = conflito !== null;
+  /**
+   * A sessão expirou (401) com o rascunho aberto. O editor continua montado e o cartão de
+   * entrar aparece por cima dele: entrar de novo NÃO recarrega o campeonato.
+   */
+  const [sessaoExpirada, setSessaoExpirada] = useState(false);
+  /**
+   * O draft (virada, calendário) gravou no site enquanto havia alteração não salva aqui. O
+   * rascunho é de ANTES da virada: num conflito, salvar por cima apagaria times e séries.
+   */
+  const [rascunhoAnteriorAoDraft, setRascunhoAnteriorAoDraft] = useState(false);
+  /** "Sair da página" já confirmado por um clique em link: o beforeunload não pergunta de novo. */
+  const saidaConfirmada = useRef(false);
   /** Folha de seções do celular aberta. */
   const [seletorAberto, setSeletorAberto] = useState(false);
   /** Texto do aviso flutuante que a pessoa já dispensou (ou que já expirou). */
@@ -1010,6 +1103,14 @@ function PainelDoAdmin() {
       setError(erro.message);
       setFaltando(erro.status === 403 ? erro.missing : []);
       setEsperaSegundos(erro.retryAfterSeconds);
+      // Sessão expirada no meio do trabalho: o cartão de entrar aparece SEM desmontar o
+      // editor. Antes só aparecia "Não autorizado." e a saída era redigitar tudo.
+      if (erro.status === 401 && session?.authorized) {
+        setSessaoExpirada(true);
+        if (!username && session.user?.username) setUsername(session.user.username);
+      }
+      // No celular o formulário de troca mora na folha de seções, longe da tela de trabalho.
+      if (erro.code === "SENHA_PENDENTE" && compacto) setSeletorAberto(true);
       return;
     }
     setError(getErrorMessage(erro, fallback));
@@ -1018,12 +1119,13 @@ function PainelDoAdmin() {
   };
 
   const fetchSession = async () => {
-    const response = await fetch("/api/admin/session", {
+    const { response, corpo } = await pedir("/api/admin/session", {
       method: "GET",
       credentials: "same-origin",
       cache: "no-store",
     });
-    const data = (await response.json()) as SessionResponse;
+    if (!response.ok) throw erroDaResposta(response, corpo, "Falha ao consultar a sessão.");
+    const data = corpo as unknown as SessionResponse;
     setSession(data);
     return data;
   };
@@ -1033,20 +1135,26 @@ function PainelDoAdmin() {
     setDraft(dataset);
     setBaseline(cloneDataset(dataset));
     if (typeof versaoDoServidor === "number") setVersao(versaoDoServidor);
+    setRascunhoAnteriorAoDraft(false);
   };
 
-  const fetchDataset = async () => {
-    const response = await fetch("/api/admin/dataset", {
+  /** Lê o campeonato e a versão do servidor SEM mexer no rascunho (o rebase do 409 usa). */
+  const lerDoServidor = async () => {
+    const { response, corpo } = await pedir("/api/admin/dataset", {
       method: "GET",
       credentials: "same-origin",
       cache: "no-store",
     });
-    const data = (await response.json()) as DatasetResponse;
-    if (!response.ok || !data.dataset) {
-      throw erroDaResposta(response, data, "Falha ao carregar os dados do campeonato.");
+    if (!response.ok || !corpo.dataset) {
+      throw erroDaResposta(response, corpo, "Falha ao carregar os dados do campeonato.");
     }
-    adotarDatasetDoServidor(data.dataset, data.versao);
-    return data.dataset;
+    return { dataset: corpo.dataset, versao: corpo.versao };
+  };
+
+  const fetchDataset = async () => {
+    const lido = await lerDoServidor();
+    adotarDatasetDoServidor(lido.dataset, lido.versao);
+    return lido.dataset;
   };
 
   /**
@@ -1151,12 +1259,68 @@ function PainelDoAdmin() {
   useEffect(() => {
     if (!temTrabalhoNaoSalvo) return;
     const aoSair = (event: BeforeUnloadEvent) => {
+      // A pessoa já respondeu "sim" ao aviso do link — ou ao do "Sair" do menu da conta,
+      // que marca o <html> com `data-lob-saida-confirmada`: perguntar de novo seria em dobro
+      // e, se ela escolhesse "Ficar", continuaria aqui já sem sessão.
+      if (saidaConfirmada.current || document.documentElement.dataset.lobSaidaConfirmada === "1") return;
       event.preventDefault();
       event.returnValue = "";
     };
     window.addEventListener("beforeunload", aoSair);
     return () => window.removeEventListener("beforeunload", aoSair);
   }, [temTrabalhoNaoSalvo]);
+
+  /** O texto do aviso de sair: diz QUANTO se perde, como o de recarregar e o de sair da conta. */
+  const avisoDeSaida = sujo
+    ? `Você tem ${changes.length} alteração(ões) não salva(s) no painel. Sair desta página vai descartar tudo. Continuar?`
+    : "Você preencheu uma ficha e ainda não aplicou ao rascunho. Sair desta página vai descartá-la. Continuar?";
+
+  /*
+   * Links do site (logo, menu, "Minha inscrição") navegam pelo next/link, sem recarregar a
+   * página — e o `beforeunload` não dispara nesse caso. O painel era desmontado e o rascunho
+   * sumia sem pergunta nenhuma. A guarda escuta o clique na CAPTURA, no `document`: roda
+   * antes do React (que escuta no contêiner da raiz), então recusar aqui impede tanto a
+   * navegação do navegador quanto a do next/link, sem mexer no cabeçalho do site.
+   *
+   * O atributo `data-lob-painel-sujo` no <html> é o sinal para quem está fora do painel
+   * (o "Sair" do menu da conta) poder perguntar antes de agir.
+   */
+  useEffect(() => {
+    if (!temTrabalhoNaoSalvo) return;
+    const raiz = document.documentElement;
+    raiz.dataset.lobPainelSujo = "1";
+
+    const guarda = (evento: MouseEvent) => {
+      if (evento.defaultPrevented || evento.button !== 0) return;
+      // Ctrl/⌘/Shift/Alt abrem em outra aba ou baixam: o painel continua aqui.
+      if (evento.metaKey || evento.ctrlKey || evento.shiftKey || evento.altKey) return;
+      const alvo = evento.target instanceof Element ? evento.target.closest("a[href]") : null;
+      if (!(alvo instanceof HTMLAnchorElement)) return;
+      if ((alvo.target && alvo.target !== "_self") || alvo.hasAttribute("download")) return;
+
+      const destino = new URL(alvo.href, window.location.href);
+      // Outro site: a navegação é de verdade e o `beforeunload` já pergunta.
+      if (destino.origin !== window.location.origin) return;
+      // Âncora na própria página não tira ninguém do painel.
+      if (destino.pathname === window.location.pathname && destino.search === window.location.search) return;
+
+      if (window.confirm(avisoDeSaida)) {
+        saidaConfirmada.current = true;
+        window.setTimeout(() => {
+          saidaConfirmada.current = false;
+        }, 1500);
+        return;
+      }
+      evento.preventDefault();
+      evento.stopPropagation();
+    };
+
+    document.addEventListener("click", guarda, true);
+    return () => {
+      document.removeEventListener("click", guarda, true);
+      delete raiz.dataset.lobPainelSujo;
+    };
+  }, [temTrabalhoNaoSalvo, avisoDeSaida]);
 
   /**
    * Troca de seção pedindo confirmação quando há ficha preenchida e não aplicada.
@@ -1256,18 +1420,26 @@ function PainelDoAdmin() {
       "login",
       async () => {
         clearAlerts();
-        const response = await fetch("/api/admin/login", {
+        const { response, corpo: data } = await pedir("/api/admin/login", {
           method: "POST",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ username: username.trim(), password }),
         });
-        const data = (await response.json()) as MessageResponse;
         if (!response.ok) {
           throw erroDaResposta(response, data, "Falha no login.");
         }
         setPassword("");
+        setSessaoExpirada(false);
         await fetchSession();
+        // Rascunho com trabalho pendente (a sessão caiu e a tela de entrar apareceu por
+        // cima dele) não é trocado pelo do servidor: ele é justamente o que a pessoa
+        // entrou de novo para salvar.
+        if (draft && temTrabalhoNaoSalvo) {
+          avisarSessaoMudou();
+          setMessage("Login realizado. Seu rascunho continua aqui — salve quando quiser.");
+          return;
+        }
         /*
          * A falha AQUI precisa virar `bootError`, e não o erro comum da barra.
          *
@@ -1301,7 +1473,7 @@ function PainelDoAdmin() {
       "sair",
       async () => {
         clearAlerts();
-        await fetch("/api/admin/logout", {
+        await pedir("/api/admin/logout", {
           method: "POST",
           credentials: "same-origin",
         });
@@ -1309,7 +1481,8 @@ function PainelDoAdmin() {
         setDraft(null);
         setBaseline(null);
         setVersao(null);
-        setConflict(false);
+        setConflito(null);
+        setSessaoExpirada(false);
         // A seção volta para o começo. Sem isto, o master que saiu da aba "Usuários"
         // deixava a próxima pessoa caindo direto nela — e quem não é master leva 403
         // ali. No notebook da organização, num dia de jogo, isso é a troca normal de
@@ -1329,6 +1502,37 @@ function PainelDoAdmin() {
   };
 
   /**
+   * Entrar de novo depois de a sessão expirar, SEM recarregar o campeonato.
+   *
+   * A sessão é absoluta (12 h) e o 21/11 tem grade de 08:30 às 23:00: quem entrou de manhã
+   * cai no 401 à noite, no meio de um lançamento. O `login` normal busca o dataset e
+   * trocaria o rascunho pelo do servidor; este só renova a sessão, e a pessoa toca em
+   * Salvar de novo.
+   */
+  const reentrar = () => {
+    runTransitionTask(
+      "login",
+      async () => {
+        clearAlerts();
+        const { response, corpo } = await pedir("/api/admin/login", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: username.trim(), password }),
+        });
+        if (!response.ok) throw erroDaResposta(response, corpo, "Falha no login.");
+        setPassword("");
+        const renovada = await fetchSession();
+        if (!renovada.authorized) throw new ApiError("Não autorizado.", 401);
+        setSessaoExpirada(false);
+        avisarSessaoMudou();
+        setMessage("Sessão renovada. Seu rascunho continua aqui — toque em Salvar de novo.");
+      },
+      "Falha no login.",
+    );
+  };
+
+  /**
    * A virada do draft e o calendário gravam o dataset pelo servidor. O rascunho aberto no
    * painel ficou para trás — e o próximo "Salvar" cairia em 409 ou, pior, mandaria os times
    * velhos de volta. Sem nada pendente, adota o do servidor; com trabalho não salvo, avisa
@@ -1336,14 +1540,19 @@ function PainelDoAdmin() {
    */
   const recarregarDepoisDoDraft = () => {
     if (temTrabalhoNaoSalvo) {
-      setMessage("O draft gravou no site. Você tem alterações não salvas aqui: recarregue o rascunho antes de salvar.");
+      // O rascunho fica, mas marcado como anterior à virada: no Salvar, o que ele mudou é
+      // reaplicado sobre a versão nova, e um conflito NÃO oferece "salvar por cima".
+      setRascunhoAnteriorAoDraft(true);
+      setMessage(
+        "O draft gravou no site. Você tem alterações não salvas aqui: ao salvar, elas são aplicadas sobre a versão nova — se alguma bater com o que o draft mudou, o painel avisa.",
+      );
       return;
     }
     runTransitionTask(
       "recarregar",
       async () => {
         await fetchDataset();
-        setConflict(false);
+        setConflito(null);
       },
       "O draft gravou no site, mas o rascunho não recarregou. Clique em Recarregar.",
     );
@@ -1356,7 +1565,7 @@ function PainelDoAdmin() {
       async () => {
         clearAlerts();
         await fetchDataset();
-        setConflict(false);
+        setConflito(null);
         setMessage(
           session?.dataProvider === "supabase"
             ? "Rascunho recarregado do Supabase."
@@ -1367,44 +1576,141 @@ function PainelDoAdmin() {
     );
   };
 
-  const saveDraft = (force = false) => {
-    if (!draft) return;
-    runTransitionTask(
-      "salvar",
-      async () => {
-        clearAlerts();
-        const datasetToSave = applyAutoGameMvpsToDataset(draft);
-        const response = await fetch("/api/admin/dataset", {
+  /**
+   * Salva o rascunho. No 409 não devolve o problema para a pessoa: relê o servidor e
+   * REAPLICA por cima da versão nova só o que este rascunho mudou (ver
+   * components/admin/rebase-do-rascunho.ts). O aviso de conflito só aparece quando os dois
+   * mexeram no mesmo campo.
+   *
+   * `porCima` é o "Salvar por cima assim mesmo" do aviso: nos campos em conflito vale o
+   * deste rascunho — e SÓ neles. O resto do que a outra pessoa gravou fica. Não usa o
+   * `force` do servidor, que mandaria o rascunho inteiro e desfaria o trabalho dela fora do
+   * conflito; a gravação continua condicionada à versão que acabou de ser lida.
+   */
+  const saveDraft = (porCima = false) => {
+    if (!draft || !baseline) return;
+    // Capturados no clique: o que se digita com o PUT em voo NÃO é o que foi enviado, e
+    // não pode ser trocado pela resposta (ver `adotarGravado`).
+    const enviado = draft;
+    const base = baseline;
+    const versaoDoRascunho = versao;
+    const anteriorAoDraft = rascunhoAnteriorAoDraft;
+
+    /** O dataset gravado vira a baseline; no rascunho, as edições feitas depois do clique ficam. */
+    const adotarGravado = (gravado: TournamentDataset, versaoGravada?: number) => {
+      setBaseline(cloneDataset(gravado));
+      if (typeof versaoGravada === "number") setVersao(versaoGravada);
+      setDraft((atual) => {
+        if (!atual || atual === enviado) return gravado;
+        return rebasearRascunho(enviado, atual, gravado).dataset;
+      });
+      setRascunhoAnteriorAoDraft(false);
+      setConflito(null);
+    };
+
+    /** O 409 que o rebase não resolve sozinho: vira o aviso, com o que a outra pessoa mudou. */
+    const avisarConflito = (servidor: TournamentDataset, campos: string[]) => {
+      setConflito({
+        resumoDoServidor: resumirMudancasDoServidor(base, servidor),
+        campos: campos.map((caminho) => descreverCaminho(caminho, servidor)),
+        estrutural: anteriorAoDraft || mudancaEstrutural(base, servidor),
+      });
+    };
+
+    const enviar = (dataset: TournamentDataset, versaoDoEnvio: number | null) =>
+      pedir(
+        "/api/admin/dataset",
+        {
           method: "PUT",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
           // A versão vai junto: é o que o servidor confere ANTES do diff e o que ele
-          // condiciona a gravação. Com `force` ela é ignorada de propósito.
-          body: JSON.stringify({ dataset: datasetToSave, force, versao }),
-        });
-        const data = (await response.json()) as DatasetResponse;
+          // condiciona a gravação.
+          body: JSON.stringify({ dataset: applyAutoGameMvpsToDataset(dataset), versao: versaoDoEnvio }),
+        },
+        SEM_CONEXAO_AO_SALVAR,
+      );
 
-        // 409: outra pessoa gravou enquanto este rascunho estava aberto. O rascunho NÃO é
-        // descartado — quem está editando decide entre recarregar ou sobrescrever.
-        if (response.status === 409) {
-          setConflict(true);
-          throw erroDaResposta(
-            response,
-            data,
-            "Outra pessoa salvou alterações enquanto você editava.",
-          );
+    /** Relê o servidor; sem conseguir, o aviso de conflito sai sem detalhe (e o erro aparece). */
+    const lerParaRebase = async () => {
+      try {
+        return await lerDoServidor();
+      } catch (falha) {
+        setConflito({ resumoDoServidor: [], campos: [], estrutural: anteriorAoDraft, semDetalhe: true });
+        throw falha;
+      }
+    };
+
+    runTransitionTask(
+      "salvar",
+      async () => {
+        clearAlerts();
+        let paraEnviar = enviado;
+        let versaoDoEnvio = versaoDoRascunho;
+        let reaplicado = false;
+
+        if (porCima) {
+          // Sempre sobre a versão MAIS NOVA: entre o aviso e o clique pode ter entrado outra.
+          const servidor = await lerParaRebase();
+          const rebase = rebasearRascunho(base, enviado, servidor.dataset);
+          if (rebase.conflitos.length > 0 && (anteriorAoDraft || mudancaEstrutural(base, servidor.dataset))) {
+            avisarConflito(servidor.dataset, rebase.conflitos);
+            return;
+          }
+          if (rebase.jaSalvo) {
+            adotarGravado(servidor.dataset, servidor.versao);
+            setMessage("Suas alterações já estavam gravadas no servidor. Nada se perdeu.");
+            return;
+          }
+          paraEnviar = rebase.dataset;
+          versaoDoEnvio = servidor.versao ?? null;
+          reaplicado = true;
         }
 
-        if (!response.ok || !data.dataset) {
-          throw erroDaResposta(response, data, "Falha ao salvar.");
+        // Poucas voltas: cada 409 relê e reaplica. Um servidor que muda sem parar vira aviso.
+        for (let volta = 0; volta < 3; volta++) {
+          const { response, corpo } = await enviar(paraEnviar, versaoDoEnvio);
+
+          if (response.ok && corpo.dataset) {
+            adotarGravado(corpo.dataset, corpo.versao);
+            const standings = calculateStandings(corpo.dataset);
+            const lider = `Líder atual: ${standings.rows[0]?.teamName ?? "—"} (${standings.rows[0]?.points ?? 0} pts).`;
+            setMessage(
+              reaplicado
+                ? `${corpo.message || "Salvo com sucesso."} Outra pessoa tinha salvo antes: suas alterações foram aplicadas sobre a versão nova, sem desfazer as dela. ${lider}`
+                : `${corpo.message || "Salvo com sucesso."} ${lider}`,
+            );
+            return;
+          }
+
+          if (response.status !== 409) throw erroDaResposta(response, corpo, "Falha ao salvar.");
+
+          // 409: alguém gravou no meio. Relê e reaplica SÓ o que este rascunho mudou.
+          const servidor = await lerParaRebase();
+          const rebase = rebasearRascunho(base, enviado, servidor.dataset);
+          if (rebase.jaSalvo) {
+            // Tudo o que o rascunho mudou já está lá: em geral, o Salvar anterior gravou e
+            // só a resposta se perdeu na rede. Não houve "outra pessoa".
+            adotarGravado(servidor.dataset, servidor.versao);
+            setMessage("Suas alterações já estavam gravadas no servidor (a resposta anterior não chegou). Nada se perdeu.");
+            return;
+          }
+          if (rebase.conflitos.length > 0 && !porCima) {
+            avisarConflito(servidor.dataset, rebase.conflitos);
+            return;
+          }
+          if (rebase.conflitos.length > 0 && (anteriorAoDraft || mudancaEstrutural(base, servidor.dataset))) {
+            avisarConflito(servidor.dataset, rebase.conflitos);
+            return;
+          }
+          paraEnviar = rebase.dataset;
+          versaoDoEnvio = servidor.versao ?? null;
+          reaplicado = true;
         }
-        setConflict(false);
-        adotarDatasetDoServidor(data.dataset, data.versao);
-        const standings = calculateStandings(data.dataset);
-        setMessage(
-          `${data.message || "Salvo com sucesso."} Líder atual: ${
-            standings.rows[0]?.teamName ?? "—"
-          } (${standings.rows[0]?.points ?? 0} pts).`,
+
+        throw new ApiError(
+          "O campeonato recebeu outras gravações seguidas enquanto você salvava. Seu rascunho continua aqui — tente de novo em instantes.",
+          409,
         );
       },
       "Falha ao salvar os dados do campeonato.",
@@ -1421,11 +1727,17 @@ function PainelDoAdmin() {
       "exportar",
       async () => {
         clearAlerts();
-        const response = await fetch("/api/admin/export", {
-          method: "GET",
-          credentials: "same-origin",
-          cache: "no-store",
-        });
+        let response: Response;
+        try {
+          response = await fetch("/api/admin/export", {
+            method: "GET",
+            credentials: "same-origin",
+            cache: "no-store",
+          });
+        } catch (falha) {
+          if (falha instanceof TypeError) throw new ApiError(SEM_CONEXAO, 0);
+          throw falha;
+        }
         if (!response.ok) {
           const corpo = (await response.json().catch(() => ({}))) as DatasetResponse;
           throw erroDaResposta(response, corpo, "Falha ao exportar o backup.");
@@ -1441,16 +1753,16 @@ function PainelDoAdmin() {
     clearAlerts();
     const form = new FormData();
     form.append("file", file);
-    const response = await fetch("/api/admin/import", {
+    const { response, corpo: data } = await pedir("/api/admin/import", {
       method: "POST",
       credentials: "same-origin",
       body: form,
     });
-    const data = (await response.json()) as DatasetResponse;
     if (!response.ok || !data.dataset) {
       throw erroDaResposta(response, data, "Falha ao importar arquivo.");
     }
     adotarDatasetDoServidor(data.dataset, data.versao);
+    setConflito(null);
     setMessage(data.message || "Importação concluída.");
   };
 
@@ -1458,34 +1770,39 @@ function PainelDoAdmin() {
     clearAlerts();
     const form = new FormData();
     form.append("text", text);
-    const response = await fetch("/api/admin/import", {
+    const { response, corpo: data } = await pedir("/api/admin/import", {
       method: "POST",
       credentials: "same-origin",
       body: form,
     });
-    const data = (await response.json()) as DatasetResponse;
     if (!response.ok || !data.dataset) {
       throw erroDaResposta(response, data, "Falha ao importar texto.");
     }
     adotarDatasetDoServidor(data.dataset, data.versao);
+    setConflito(null);
     setMessage(data.message || "Importação concluída.");
   };
 
+  /**
+   * Encerrar a temporada — e, com ela JÁ encerrada, a ação explícita de refazer o retrato
+   * arquivado (a final corrigida depois do encerramento precisa chegar ao arquivo). É a
+   * mesma rota: o servidor responde `refeito: true` nesse caso.
+   */
   const endTournament = () => {
     runTransitionTask(
       "salvar",
       async () => {
         clearAlerts();
-        const response = await fetch("/api/admin/tournament/end", {
+        const { response, corpo: data } = await pedir("/api/admin/tournament/end", {
           method: "POST",
           credentials: "same-origin",
         });
-        const data = (await response.json()) as DatasetResponse;
         if (!response.ok || !data.dataset) {
           throw erroDaResposta(response, data, "Falha ao encerrar a temporada.");
         }
         adotarDatasetDoServidor(data.dataset, data.versao);
-        setMessage(data.message || "Temporada encerrada.");
+        setConflito(null);
+        setMessage(data.message || (data.refeito ? "Retrato arquivado atualizado." : "Temporada encerrada."));
       },
       "Falha ao encerrar a temporada.",
     );
@@ -1496,17 +1813,17 @@ function PainelDoAdmin() {
       "salvar",
       async () => {
         clearAlerts();
-        const response = await fetch("/api/admin/tournament/start", {
+        const { response, corpo: data } = await pedir("/api/admin/tournament/start", {
           method: "POST",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...payload, confirm: true }),
         });
-        const data = (await response.json()) as DatasetResponse;
         if (!response.ok || !data.dataset) {
           throw erroDaResposta(response, data, "Falha ao iniciar a temporada.");
         }
         adotarDatasetDoServidor(data.dataset, data.versao);
+        setConflito(null);
         setActiveTab("overview");
         setMessage(data.message || "Nova temporada iniciada.");
       },
@@ -1664,11 +1981,10 @@ function PainelDoAdmin() {
       setSemeando(true);
       void (async () => {
         try {
-          const resposta = await fetch("/api/admin/dataset/seed", {
+          const { response: resposta, corpo: dados } = await pedir("/api/admin/dataset/seed", {
             method: "POST",
             credentials: "same-origin",
           });
-          const dados = (await resposta.json()) as DatasetResponse;
           if (!resposta.ok || !dados.dataset) {
             throw erroDaResposta(resposta, dados, "Falha ao semear o banco.");
           }
@@ -1970,7 +2286,65 @@ function PainelDoAdmin() {
         mensagem={message}
       />
 
-      {conflict ? (
+      {sessaoExpirada ? (
+        <Banner tone="warn" title="Sua sessão expirou — o rascunho continua aqui">
+          <p style={{ margin: "0 0 10px" }}>
+            Entre de novo para salvar. Nada do que você digitou foi perdido, e entrar aqui não
+            recarrega o campeonato.
+          </p>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (password && !isBusy) reentrar();
+            }}
+            style={{ display: "grid", gap: 10, maxWidth: 360 }}
+          >
+            {session.authMode === "accounts" ? (
+              <Field label="Usuário">
+                <Input value={username} onChange={setUsername} autoComplete="username" disabled={isBusy} />
+              </Field>
+            ) : null}
+            <Field label="Senha">
+              <Input
+                type="password"
+                value={password}
+                onChange={setPassword}
+                autoComplete="current-password"
+                placeholder="sua senha"
+                disabled={isBusy}
+              />
+            </Field>
+            <div>
+              <Button type="submit" tone="gold" small disabled={isBusy || !password}>
+                <KeyRound size={14} aria-hidden />
+                {tarefa === "login" ? "Entrando..." : "Entrar de novo"}
+              </Button>
+            </div>
+          </form>
+        </Banner>
+      ) : null}
+
+      {session.user?.mustChangePassword && !session.user.legacy ? (
+        <Banner
+          tone="warn"
+          title="Troque a senha provisória antes de salvar"
+          actions={
+            compacto ? (
+              <Button small onClick={() => setSeletorAberto(true)}>
+                <KeyRound size={14} aria-hidden />
+                Trocar a senha agora
+              </Button>
+            ) : undefined
+          }
+        >
+          O servidor recusa qualquer gravação desta conta até a senha provisória ser trocada.{" "}
+          {compacto
+            ? "O formulário fica na folha de seções, junto da sua conta."
+            : "O formulário fica no cartão da sua conta, à esquerda."}
+        </Banner>
+      ) : null}
+
+      {conflito ? (
         <Banner
           tone="warn"
           title="Alguém salvou antes de você"
@@ -1980,15 +2354,52 @@ function PainelDoAdmin() {
                 <RefreshCcw size={14} aria-hidden />
                 Trazer a versão nova (descarta seu rascunho)
               </Button>
-              <Button tone="danger" onClick={() => saveDraft(true)} disabled={isBusy}>
-                <Save size={14} aria-hidden />
-                Salvar por cima assim mesmo
-              </Button>
+              {conflito.estrutural ? null : (
+                <Button tone="danger" onClick={() => saveDraft(true)} disabled={isBusy}>
+                  <Save size={14} aria-hidden />
+                  Salvar por cima assim mesmo
+                </Button>
+              )}
             </>
           }
         >
-          Outra pessoa gravou alterações enquanto este rascunho estava aberto (pode ter sido um
-          sorteio de carta ou de lado). Seu rascunho continua aqui — escolha o que fazer.
+          {conflito.semDetalhe ? (
+            <p style={{ margin: 0 }}>
+              Outra pessoa gravou alterações enquanto este rascunho estava aberto, e não deu para
+              ler a versão nova agora. Seu rascunho continua aqui — escolha o que fazer.
+            </p>
+          ) : (
+            <>
+              <p style={{ margin: "0 0 6px" }}>
+                Outra pessoa gravou alterações enquanto este rascunho estava aberto
+                {conflito.resumoDoServidor.length > 0 ? (
+                  <>
+                    : <strong style={{ color: C.ink }}>{conflito.resumoDoServidor.join(", ")}</strong>
+                  </>
+                ) : null}
+                . O que não bate com o seu rascunho já foi juntado sozinho; sobrou o que vocês dois
+                mudaram:
+              </p>
+              <ul style={{ margin: "0 0 6px", paddingLeft: 18 }}>
+                {conflito.campos.slice(0, 6).map((campo) => (
+                  <li key={campo}>{campo}</li>
+                ))}
+                {conflito.campos.length > 6 ? <li>+ {conflito.campos.length - 6} outro(s)</li> : null}
+              </ul>
+              {conflito.estrutural ? (
+                <p style={{ margin: 0 }}>
+                  A versão nova cria ou apaga times, jogadores ou séries (a virada do draft, por
+                  exemplo) ou mudou o estado da temporada. Salvar por cima desfaria isso, então essa
+                  opção não aparece: traga a versão nova e refaça só o que está listado acima.
+                </p>
+              ) : (
+                <p style={{ margin: 0 }}>
+                  “Salvar por cima” grava a sua versão SÓ nesses campos; o resto do que a outra pessoa
+                  salvou continua.
+                </p>
+              )}
+            </>
+          )}
         </Banner>
       ) : null}
 
@@ -2007,12 +2418,19 @@ function PainelDoAdmin() {
         <ContextoIconeDaSecao.Provider value={ICONE_DA_SECAO[activeTab]}>
           <AdminTabContent
             aplicarDoServidor={aplicarDoServidor}
+            seriesGravadas={baseline?.seriesMatches ?? draft.seriesMatches}
+            podeLados={alcanca(["series:sides"])}
+            podeCartas={alcanca(["series:cards"])}
+            podeRiot={alcanca(["riot:import"])}
+            podeImportar={alcanca(["dataset:import"])}
             onVersaoDoServidor={sincronizarVersaoDoServidor}
             onFormularioSujo={setFormularioSujo}
             podeConferir={alcanca(["inscricoes:conferir"])}
             podeFinanceiro={alcanca(["inscricoes:financeiro"])}
             podeConfigurar={alcanca(["edicao:configurar"])}
             podeConduzirDraft={alcanca(["draft:conduzir"])}
+            // `users:manage` é masterOnly: `hasScope` só o dá à master.
+            podeRedefinirSenha={alcanca(["users:manage"])}
             onDatasetMudouNoServidor={recarregarDepoisDoDraft}
             activeTab={activeTab}
             draft={draft}

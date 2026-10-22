@@ -5,6 +5,7 @@ import Link from "next/link";
 import FormularioInscricao from "@/components/inscricao/formulario";
 import { Eyebrow, GoldTitle, LobShell } from "@/components/lob/ui";
 import { ELO_ORDER } from "@/lib/design";
+import { metadadosDaPagina } from "@/lib/i18n/metadados";
 import { getMessages } from "@/lib/i18n/server";
 import { estadoDaJanela } from "@/lib/inscricoes/schema";
 import { inscricaoIdDoJogador, lerConfigOuNulo } from "@/lib/inscricoes/store";
@@ -23,10 +24,11 @@ import { JOGADOR_COOKIE, identidadePorToken } from "@/lib/jogadores/auth";
  */
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "Inscrição · League of Bronze",
-  description: "Inscrição individual para a 4ª Edição do League of Bronze.",
-};
+// Título da aba no idioma da visita (lib/i18n/messages/metadados.ts): com `metadata`
+// fixa, o site em inglês mostrava "Inscrição · League of Bronze".
+export async function generateMetadata(): Promise<Metadata> {
+  return metadadosDaPagina("inscricao", "/inscricao");
+}
 
 function Aviso({
   titulo,
@@ -40,8 +42,14 @@ function Aviso({
       </h2>
       <p style={{ margin: 0, maxWidth: "60ch", color: "var(--lob-muted)", lineHeight: 1.6 }}>{texto}</p>
       {link ? (
-        <Link className="lob-btn-gold" href={link.href} style={{ display: "inline-block", marginTop: 20 }}>
-          {link.rotulo}
+        // Quebra em duas linhas só quando não cabe (num celular de 320px o rótulo passava da
+        // borda do cartão e era cortado), com a seta presa à última palavra.
+        <Link
+          className="lob-btn-gold"
+          href={link.href}
+          style={{ display: "inline-block", marginTop: 20, whiteSpace: "normal", maxWidth: "100%", textAlign: "center" }}
+        >
+          {link.rotulo.replace(/\s+→$/, "\u00a0→")}
         </Link>
       ) : null}
     </div>
@@ -65,6 +73,11 @@ export default async function InscricaoPage() {
 
   // A decisão sai de uma função pura, com o "agora" resolvido fora do render.
   const janela = estadoDaJanela(config);
+
+  // Com a janela fechada o formulário some — e com ele o "Já tenho conta". Quem se inscreveu
+  // e está sem sessão (venceu, outro aparelho) precisa de um caminho para a própria
+  // inscrição; quem está logado não precisa dele.
+  const entrarParaVer = jogador ? undefined : { href: "/entrar?volta=/minha-inscricao", rotulo: t.jaMeInscreviEntrar };
 
   const eloRotulos: Record<string, string> = ts.elos;
   // Sem os pontos de cada elo: a tabela da 4ª só sai depois que a lista fechar
@@ -93,9 +106,9 @@ export default async function InscricaoPage() {
       ) : janela === "indisponivel" ? (
         <Aviso titulo={t.indisponivelTitulo} texto={t.indisponivelTexto} />
       ) : janela === "encerrada" ? (
-        <Aviso titulo={t.encerradaTitulo} texto={t.encerradaTexto} />
+        <Aviso titulo={t.encerradaTitulo} texto={t.encerradaTexto} link={entrarParaVer} />
       ) : janela === "ainda_nao_abriu" || config === null ? (
-        <Aviso titulo={t.fechadaTitulo} texto={t.fechadaTexto} />
+        <Aviso titulo={t.fechadaTitulo} texto={t.fechadaTexto} link={entrarParaVer} />
       ) : (
         <FormularioInscricao
           t={t}

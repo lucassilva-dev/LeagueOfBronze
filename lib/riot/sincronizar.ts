@@ -34,6 +34,8 @@ import { FILA_SOLO_DUO, FILA_SOLO_DUO_PARTIDAS, PLATAFORMA_DO_CAMPEONATO } from 
  */
 
 const SEMANA_MS = 7 * 24 * 60 * 60 * 1000;
+/** Gravações seguidas que falham antes de a rodada desistir (banco fora do ar). */
+const FALHAS_DE_GRAVACAO_PARA_PARAR = 3;
 
 export type MudancaSimulada = {
   riotId: string;
@@ -211,6 +213,16 @@ export async function sincronizarComRiot(opcoes: {
     resumo.naFila = fila.length;
     const elosJaCongelados = inscricoes.some((i) => Boolean(i.elo_congelado));
 
+    // A conta (PUUID) de cada inscrito que ainda conta, atualizada a cada consulta desta
+    // rodada: quem se inscreveu com a Riot fora do ar só ganha o PUUID aqui, e é aqui que se
+    // descobre que "SAMUEL VENÂNCIO" e "SAMUEL VENANCIO" são a mesma conta. A inscrição mais
+    // nova é a repetida — a mais antiga segue normal.
+    const ativos = inscricoes.filter((i) => i.situacao !== "recusado" && i.situacao !== "desistiu");
+    const contaDe = new Map<string, string | null>(ativos.map((i) => [i.id, i.puuid ?? null]));
+    const veioAntes = (a: Inscricao, b: Inscricao) =>
+      a.criado_em < b.criado_em || (a.criado_em === b.criado_em && a.id < b.id);
+    let falhasDeGravacaoSeguidas = 0;
+
     for (const inscrito of fila) {
       // Margem para gravar o que já foi consultado antes de a função ser encerrada.
       if (Date.now() > prazo - 5_000) {
@@ -234,12 +246,19 @@ export async function sincronizarComRiot(opcoes: {
         continue;
       }
 
+      const conta = consulta.riot.conta;
+      contaDe.set(inscrito.id, conta.tipo === "ok" ? conta.puuid : null);
+      const contaEmOutraInscricao =
+        conta.tipo === "ok" &&
+        ativos.some((o) => o.id !== inscrito.id && contaDe.get(o.id) === conta.puuid && veioAntes(o, inscrito));
+
       const decisao = decidirSincronizacao({
         inscrito,
         conferencias: conferencias.filter((c) => c.inscricao_id === inscrito.id),
         riot: consulta.riot,
         config: { ...config, elos_ja_congelados: elosJaCongelados },
         agoraMs: Date.now(),
+        contaEmOutraInscricao,
       });
       resumo.processados += 1;
 
@@ -251,9 +270,24 @@ export async function sincronizarComRiot(opcoes: {
         continue;
       }
 
-      const gravado = await aplicarSincronizacao(inscrito.id, decisao);
-      if (gravado.eloGravado && decisao.elo?.mudouValor) resumo.elosMudados += 1;
-      resumo.itensGravados += gravado.itensGravados;
+      // Um erro de banco ao gravar UM inscrito (a rede piscou) não derruba a rodada: os
+      // seguintes ainda são consultados e a rodada é registrada. Ele fica marcado com erro
+      // para o painel e volta na próxima. Várias falhas SEGUIDAS são o banco fora do ar —
+      // aí insistir só gastaria a cota da Riot, e a rodada para como antes.
+      try {
+        const gravado = await aplicarSincronizacao(inscrito.id, decisao);
+        falhasDeGravacaoSeguidas = 0;
+        if (gravado.eloGravado && decisao.elo?.mudouValor) resumo.elosMudados += 1;
+        resumo.itensGravados += gravado.itensGravados;
+      } catch (erro) {
+        resumo.erros += 1;
+        falhasDeGravacaoSeguidas += 1;
+        console.error(`[riot] falha ao gravar o resultado de ${inscrito.riot_id}`, erro);
+        if (falhasDeGravacaoSeguidas >= FALHAS_DE_GRAVACAO_PARA_PARAR) throw erro;
+        await registrarFalhaDoRobo(inscrito.id, "falha ao gravar o resultado no banco").catch((e) =>
+          console.error("[riot] falha ao registrar o erro de gravação", e),
+        );
+      }
     }
     concluiu = true;
   } finally {

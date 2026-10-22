@@ -1,9 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import { Eyebrow, GoldTitle, RoleIcon, SectionTitle } from "@/components/lob/ui";
 import { PreTemporadaAviso } from "@/components/pre-temporada-aviso";
 import { semTemporadaAoVivo } from "@/lib/fase-do-site";
 import { rotaCurto, type PaginasHomeTextos } from "@/lib/i18n/messages/paginas-home";
+import { metadadosDaPagina } from "@/lib/i18n/metadados";
 import { getMessages } from "@/lib/i18n/server";
 import { nomeDaTemporada } from "@/lib/i18n/nome-da-temporada";
 import { buildDesignTeams, type DesignTeam } from "@/lib/roster";
@@ -11,6 +13,11 @@ import { getServerDataset } from "@/lib/server-data";
 import { calculateStandings } from "@/lib/tournament";
 
 export const dynamic = "force-dynamic";
+
+/** Título e descrição próprios, no idioma da visita (lib/i18n/messages/metadados.ts). */
+export async function generateMetadata(): Promise<Metadata> {
+  return metadadosDaPagina("times", "/times");
+}
 
 // Campanha do time na fase de pontos (vitórias/derrotas em séries e pontos).
 type Campaign = { position: number; wins: number; losses: number; points: number } | null;

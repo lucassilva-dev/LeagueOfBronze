@@ -19,7 +19,11 @@ export const comum = definir({
     sessaoFazerInscricao: "Fazer minha inscrição",
     sessaoPainelCapitao: "Painel do capitão",
     sessaoPainelAdmin: "Painel da organização",
+    // Aviso de senha provisória pendente; é LINK para /conta/senha, não só um recado.
     sessaoTrocarSenha: "Troque sua senha",
+    sessaoMenuTrocarSenha: "Trocar senha",
+    // Pergunta do "Sair" com rascunho do painel por salvar (o painel marca `data-lob-painel-sujo`).
+    sessaoSairPainelSujo: "Você tem alterações não salvas no painel. Sair da conta vai descartá-las. Continuar?",
     sessaoDuasContas: "Você está nas duas ao mesmo tempo.",
     navInicio: "INÍCIO",
     navTimes: "TIMES",
@@ -33,6 +37,7 @@ export const comum = definir({
     navInscricao: "INSCRIÇÃO",
     navAriaPrincipal: "Navegação principal",
     navAbrirMenu: "Abrir menu",
+    pularParaConteudo: "Pular para o conteúdo",
 
     edicao: "4ª EDIÇÃO",
     rodapeAssinatura: "LEAGUE OF BRONZE · 4ª EDIÇÃO · 2026",
@@ -63,6 +68,8 @@ export const comum = definir({
     sessaoPainelCapitao: "Captain panel",
     sessaoPainelAdmin: "Organisers' panel",
     sessaoTrocarSenha: "Change your password",
+    sessaoMenuTrocarSenha: "Change password",
+    sessaoSairPainelSujo: "You have unsaved changes in the panel. Signing out will discard them. Continue?",
     sessaoDuasContas: "You're signed in to both at once.",
     navInicio: "HOME",
     navTimes: "TEAMS",
@@ -76,6 +83,7 @@ export const comum = definir({
     navInscricao: "SIGN-UP",
     navAriaPrincipal: "Main navigation",
     navAbrirMenu: "Open menu",
+    pularParaConteudo: "Skip to content",
 
     edicao: "4TH EDITION",
     rodapeAssinatura: "LEAGUE OF BRONZE · 4TH EDITION · 2026",

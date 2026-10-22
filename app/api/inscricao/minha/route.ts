@@ -16,14 +16,16 @@ export const dynamic = "force-dynamic";
  * um trocando um número na URL.
  */
 export async function GET(request: NextRequest) {
-  const identidade = await getJogadorIdentity(request);
-  if (!identidade) {
-    const semSessao = NextResponse.json({ jogador: null, inscricao: null });
-    semSessao.headers.set("Cache-Control", "no-store, private");
-    return semSessao;
-  }
-
   try {
+    // DENTRO do try: a leitura da sessão consulta o banco, e uma falha dela fora daqui
+    // estourava a rota sem a resposta padrão (texto + `ref` no log).
+    const identidade = await getJogadorIdentity(request);
+    if (!identidade) {
+      const semSessao = NextResponse.json({ jogador: null, inscricao: null });
+      semSessao.headers.set("Cache-Control", "no-store, private");
+      return semSessao;
+    }
+
     const inscricao = await minhaInscricao(identidade.id);
 
     // A chave Pix só vai junto enquanto há o que pagar. Quem se inscreveu antes de a

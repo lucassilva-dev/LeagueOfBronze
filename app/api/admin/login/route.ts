@@ -11,14 +11,16 @@ import {
   verifyAdminPassword,
 } from "@/lib/admin-auth";
 import {
+  concluirTentativaAdmin,
   findUserByUsername,
   getClientIp,
   getRecentAttemptCounts,
   hashIp,
-  recordLoginAttempt,
+  reservarTentativaAdmin,
+  type ReservaDeTentativaAdmin,
 } from "@/lib/security/admin-store";
 import { verifyPassword } from "@/lib/security/password";
-import { evaluateLoginRateLimit } from "@/lib/security/rate-limit";
+import { descontarPropriaReserva, evaluateLoginRateLimit, TENTATIVA_ERRO_INTERNO } from "@/lib/security/rate-limit";
 import { respostaDeErro } from "@/lib/security/resposta-erro";
 import { mesmaOrigem } from "@/lib/security/route-guard";
 import { adminLoginSchema } from "@/lib/schema";
@@ -49,7 +51,7 @@ export async function POST(request: NextRequest) {
    * errada, e o limitador bloqueia o IP DELA por 15 minutos. Alguém tranca você fora
    * do próprio painel só fazendo você abrir um link.
    *
-   * Vem antes do `recordLoginAttempt` de propósito: tentativa vinda de fora nem
+   * Vem antes do registro da tentativa de propósito: tentativa vinda de fora nem
    * chega a contar.
    */
   if (!mesmaOrigem(request)) {
@@ -103,74 +105,95 @@ export async function POST(request: NextRequest) {
     return comPisoDeTempo(inicio, NextResponse.json({ error: CREDENCIAIS_INVALIDAS }, { status: 401 }));
   }
 
-  // 1. Bloqueio por tentativas (contador no Postgres — serverless não compartilha memória)
-  //
-  // A leitura FALHA FECHADA (estoura quando o banco não responde, para o limitador nunca
-  // ficar desligado em silêncio). Esta rota não tem try em volta daqui, então sem o
-  // tratamento o erro escaparia como 500 cru, sem o código de referência do log.
-  let tentativas;
+  // A reserva é fechada em TODO caminho de saída. Os caminhos normais fecham com o
+  // resultado real; se algo estourar depois dela (contagem que não foi lida, usuário que
+  // não foi achado, sessão que não foi criada), o `finally` fecha com `erro_interno`, que
+  // não conta. Antes, a linha ficava `em_andamento` e pesava como palpite errado — e esta
+  // rota nem tinha try depois da contagem: cinco erros 500 com a senha CERTA trancavam a
+  // master fora do painel por 15 minutos assim que o banco voltasse.
+  let reserva: ReservaDeTentativaAdmin = null;
+  let concluida = false;
+  const concluir = (success: boolean, reason: string) => {
+    concluida = true;
+    return concluirTentativaAdmin(reserva, { username: usuario, ipHash, success, reason });
+  };
+
   try {
-    tentativas = await getRecentAttemptCounts(usuario, ipHash);
+    // 1. Bloqueio por tentativas (contador no Postgres — serverless não compartilha memória)
+    //
+    // A leitura FALHA FECHADA (estoura quando o banco não responde, para o limitador nunca
+    // ficar desligado em silêncio); o catch abaixo responde com o código de referência do log.
+    //
+    // A tentativa é RESERVADA antes de contar: contando antes de gravar, 25 pedidos
+    // simultâneos liam a contagem antes de qualquer falha existir e testavam 25 senhas da
+    // conta master (ver `descontarPropriaReserva`).
+    reserva = await reservarTentativaAdmin({ username: usuario, ipHash });
+    const decisao = evaluateLoginRateLimit(
+      descontarPropriaReserva(await getRecentAttemptCounts(usuario, ipHash), reserva !== null),
+    );
+    if (!decisao.allowed) {
+      await concluir(false, decisao.reason);
+      return comPisoDeTempo(
+        inicio,
+        NextResponse.json(
+          { error: "Muitas tentativas. Tente novamente mais tarde." },
+          { status: 429, headers: { "Retry-After": String(decisao.retryAfterSeconds) } },
+        ),
+      );
+    }
+
+    // 2. Credenciais
+    const conta = await findUserByUsername(usuario);
+    const senhaOk =
+      conta !== null && (await verifyPassword(parsed.data.password, conta.password_hash, getPasswordPepper()));
+
+    if (!conta || !senhaOk) {
+      await concluir(false, conta ? "senha_incorreta" : "usuario_inexistente");
+      return comPisoDeTempo(inicio, NextResponse.json({ error: CREDENCIAIS_INVALIDAS }, { status: 401 }));
+    }
+
+    // Conta desativada responde o MESMO 401 da senha errada. Com um 403 próprio aqui,
+    // depois da senha conferida, o "Conta desativada." só aparecia no palpite CERTO — a
+    // rota confirmava a senha de quem saiu da organização. O motivo real fica no registro.
+    if (conta.disabled_at) {
+      await concluir(false, "conta_desativada");
+      return comPisoDeTempo(inicio, NextResponse.json({ error: CREDENCIAIS_INVALIDAS }, { status: 401 }));
+    }
+
+    // 3. Sessão (id aleatório no banco + cookie assinado)
+    const cookie = await issueSessionCookie(conta, request);
+    await concluir(true, "ok");
+
+    const resposta = NextResponse.json({
+      ok: true,
+      user: {
+        username: conta.username,
+        displayName: conta.display_name,
+        isMaster: conta.is_master,
+        scopes: conta.scopes ?? [],
+        mustChangePassword: conta.must_change_password,
+      },
+    });
+    resposta.cookies.set({
+      name: cookie.name,
+      value: cookie.value,
+      httpOnly: true,
+      sameSite: "strict",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: cookie.maxAge,
+    });
+
+    return comPisoDeTempo(inicio, resposta);
   } catch (error) {
     // Com o MESMO piso de tempo dos outros returns desta rota: um caminho de erro
     // que responde mais rapido que os demais vira canal de medicao.
     return comPisoDeTempo(inicio, respostaDeErro("api/admin/login", error, "Não foi possível entrar agora."));
+  } finally {
+    if (reserva && !concluida) {
+      await concluir(false, TENTATIVA_ERRO_INTERNO).catch((e: unknown) =>
+        console.error("[api/admin/login] falha ao fechar a reserva da tentativa:", e),
+      );
+    }
   }
-  const decisao = evaluateLoginRateLimit(tentativas);
-  if (!decisao.allowed) {
-    await recordLoginAttempt({ username: usuario, ipHash, success: false, reason: decisao.reason });
-    return comPisoDeTempo(
-      inicio,
-      NextResponse.json(
-        { error: "Muitas tentativas. Tente novamente mais tarde." },
-        { status: 429, headers: { "Retry-After": String(decisao.retryAfterSeconds) } },
-      ),
-    );
-  }
-
-  // 2. Credenciais
-  const conta = await findUserByUsername(usuario);
-  const senhaOk =
-    conta !== null && (await verifyPassword(parsed.data.password, conta.password_hash, getPasswordPepper()));
-
-  if (!conta || !senhaOk) {
-    await recordLoginAttempt({
-      username: usuario,
-      ipHash,
-      success: false,
-      reason: conta ? "senha_incorreta" : "usuario_inexistente",
-    });
-    return comPisoDeTempo(inicio, NextResponse.json({ error: CREDENCIAIS_INVALIDAS }, { status: 401 }));
-  }
-
-  if (conta.disabled_at) {
-    await recordLoginAttempt({ username: usuario, ipHash, success: false, reason: "conta_desativada" });
-    return comPisoDeTempo(inicio, NextResponse.json({ error: "Conta desativada." }, { status: 403 }));
-  }
-
-  // 3. Sessão (id aleatório no banco + cookie assinado)
-  const cookie = await issueSessionCookie(conta, request);
-  await recordLoginAttempt({ username: usuario, ipHash, success: true, reason: "ok" });
-
-  const resposta = NextResponse.json({
-    ok: true,
-    user: {
-      username: conta.username,
-      displayName: conta.display_name,
-      isMaster: conta.is_master,
-      scopes: conta.scopes ?? [],
-      mustChangePassword: conta.must_change_password,
-    },
-  });
-  resposta.cookies.set({
-    name: cookie.name,
-    value: cookie.value,
-    httpOnly: true,
-    sameSite: "strict",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: cookie.maxAge,
-  });
-
-  return comPisoDeTempo(inicio, resposta);
 }

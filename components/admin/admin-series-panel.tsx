@@ -28,14 +28,15 @@ import {
   UsersRound,
 } from "lucide-react";
 
-import type {
-  CardId,
-  Player,
-  PlayerGameStats,
-  SeriesFormat,
-  SeriesStage,
-  SeriesMatch,
-  TournamentDataset,
+import {
+  jogoDepoisDaDecisao,
+  type CardId,
+  type Player,
+  type PlayerGameStats,
+  type SeriesFormat,
+  type SeriesStage,
+  type SeriesMatch,
+  type TournamentDataset,
 } from "@/lib/schema";
 import {
   getKda,
@@ -230,6 +231,16 @@ function rotuloJogador(dataset: TournamentDataset, player: Player) {
   return `${resolveRole(player.role1).short} · ${player.nick} — ${getTeamName(dataset, player.teamId)}`;
 }
 
+/**
+ * Linha de quem não está em nenhum dos dois times HOJE — em geral, substituição feita depois
+ * da série. Pelo nick e pelo time atual: o id cru ("player-1729...") não dizia quem era.
+ */
+function rotuloForaDaSerie(dataset: TournamentDataset, playerId: string) {
+  const jogador = dataset.players.find((player) => player.id === playerId);
+  if (!jogador) return `${playerId} (fora do cadastro)`;
+  return `${jogador.nick} (hoje em ${getTeamName(dataset, jogador.teamId)})`;
+}
+
 function getDefaultSeriesSettings(format: SeriesFormat) {
   if (format === "BO5") {
     return { maxGames: 5, targetWins: 3, formatLabel: "MD5" };
@@ -291,7 +302,22 @@ function getGamesSectionDescription(
  * técnico por índice de array. Aqui o problema é detectado ANTES, com nome de série e número
  * de jogo, e a linha totalmente vazia (que nunca é intencional) pode ser descartada de uma vez.
  */
-type EstadoLinha = "ok" | "vazia" | "incompleta" | "repetida" | "forasteira";
+/**
+ * "incompleta" = números digitados sem jogador (o servidor recusa). "sem-campeao" e
+ * "forasteira" são só AVISO: o servidor aceita, e tratá-los como bloqueio levava a pessoa a
+ * apagar estatística histórica de quem trocou de time depois (ver `auditarSerie`).
+ */
+type EstadoLinha = "ok" | "vazia" | "incompleta" | "sem-campeao" | "repetida" | "forasteira";
+
+/** Estados que travam o salvamento (o schema recusa). Os outros só pedem conferência. */
+function linhaTrava(estado: EstadoLinha) {
+  return estado === "incompleta" || estado === "repetida";
+}
+
+/** Estados que pedem conferência sem travar. */
+function linhaAvisa(estado: EstadoLinha) {
+  return estado === "sem-campeao" || estado === "forasteira";
+}
 
 /** Linha sem jogador, sem campeão e sem número digitado: sobra de clique no "+ Linha". */
 function isLinhaDescartavel(row: PlayerGameStats) {
@@ -312,11 +338,12 @@ function getEstadosDasLinhas(rows: PlayerGameStats[], idsDoConfronto: Set<string
 
     const playerId = row.playerId.trim();
     const champion = (row.champion ?? "").trim();
-    if (!playerId || !champion) return "incompleta";
+    if (!playerId) return "incompleta";
     if (vistos.has(playerId)) return "repetida";
 
     vistos.add(playerId);
     if (idsDoConfronto.size > 0 && !idsDoConfronto.has(playerId)) return "forasteira";
+    if (!champion) return "sem-campeao";
     return "ok";
   });
 }
@@ -384,7 +411,23 @@ function avisosDaEtapa(series: SeriesMatch, draft: TournamentDataset): string[] 
   return avisos;
 }
 
-export function auditarSerie(series: SeriesMatch, draft: TournamentDataset): AuditoriaSerie {
+/**
+ * O que trava (`bloqueios`) e o que só pede conferência (`avisos`) numa série do rascunho.
+ *
+ * Bloqueio é SÓ o que o servidor recusa — a lista existe para a pessoa resolver antes de
+ * salvar, e um bloqueio que o servidor não faz é pior que nenhum: induz a apagar dado bom
+ * (a linha de quem trocou de time depois, por exemplo). Tudo que o servidor aceita, mas
+ * quase sempre é engano, vira aviso.
+ *
+ * `gravada` é a mesma série como está no servidor: o jogo lançado depois de a série estar
+ * decidida só TRAVA quando o rascunho piora o que está gravado — a mesma regra do PUT. A
+ * `serie-14` da 3ª já tem um 3º jogo depois de 2x0 e precisa continuar editável.
+ */
+export function auditarSerie(
+  series: SeriesMatch,
+  draft: TournamentDataset,
+  gravada?: SeriesMatch,
+): AuditoriaSerie {
   const bloqueios: string[] = [];
   const avisos = avisosDaEtapa(series, draft);
   const estadosPorJogo: EstadoLinha[][] = [];
@@ -397,6 +440,11 @@ export function auditarSerie(series: SeriesMatch, draft: TournamentDataset): Aud
     bloqueios.push("Time A e Time B são o mesmo time.");
   }
 
+  // Cartinha vale também para série de W.O.: o schema confere o time de cada uma.
+  (series.cardsUsed ?? []).forEach((carta, indice) => {
+    if (!carta.teamId.trim()) bloqueios.push(`Cartinha ${indice + 1}: falta escolher o time.`);
+  });
+
   if (isWalkoverSeries(series)) {
     return { bloqueios, avisos, estadosPorJogo, jogosComProblema, descartaveis };
   }
@@ -408,6 +456,21 @@ export function auditarSerie(series: SeriesMatch, draft: TournamentDataset): Aud
     );
   }
 
+  const depoisDaDecisao = jogoDepoisDaDecisao(series, draft.tournament.format);
+  if (depoisDaDecisao) {
+    const jaHavia = gravada ? (jogoDepoisDaDecisao(gravada, draft.tournament.format)?.quantidade ?? 0) : 0;
+    const texto =
+      `Jogo ${depoisDaDecisao.jogo} lançado depois de a série estar decidida ` +
+      `(${depoisDaDecisao.placarA}x${depoisDaDecisao.placarB} no jogo ${depoisDaDecisao.jogo - 1}). ` +
+      `Apague esse jogo ou corrija o vencedor dos anteriores.`;
+    if (depoisDaDecisao.quantidade > jaHavia) {
+      bloqueios.push(texto);
+      jogosComProblema.push(depoisDaDecisao.jogo - 1);
+    } else {
+      avisos.push(texto);
+    }
+  }
+
   const nomeA = getTeamName(draft, series.teamAId);
   const nomeB = getTeamName(draft, series.teamBId);
   const idsDoConfronto = new Set(
@@ -415,6 +478,7 @@ export function auditarSerie(series: SeriesMatch, draft: TournamentDataset): Aud
       .filter((player) => player.teamId === series.teamAId || player.teamId === series.teamBId)
       .map((player) => player.id),
   );
+  const jogadoresPorId = new Map(draft.players.map((player) => [player.id, player]));
 
   series.games.forEach((game, gameIndex) => {
     const estados = getEstadosDasLinhas(game.statsByPlayer, idsDoConfronto);
@@ -432,26 +496,59 @@ export function auditarSerie(series: SeriesMatch, draft: TournamentDataset): Aud
       temProblema = true;
     }
 
+    if (game.durationMin !== undefined && game.durationMin < 1) {
+      bloqueios.push(`${jogo}: a duração precisa ser maior que 0 (ou fique em branco).`);
+      temProblema = true;
+    }
+
+    (game.bans ?? []).forEach((ban, banIndex) => {
+      const faltaTime = !ban.teamId.trim();
+      const faltaCampeao = !ban.championName.trim();
+      if (!faltaTime && !faltaCampeao) return;
+      const falta = faltaTime && faltaCampeao ? "o time e o campeão" : faltaTime ? "o time" : "o campeão";
+      bloqueios.push(`${jogo}, ban ${banIndex + 1}: falta ${falta}.`);
+      temProblema = true;
+    });
+
     estados.forEach((estado, rowIndex) => {
       const linha = `${jogo}, linha ${rowIndex + 1}`;
+      const row = game.statsByPlayer[rowIndex];
       if (estado === "incompleta") {
-        bloqueios.push(`${linha}: falta o jogador ou o campeão.`);
+        bloqueios.push(`${linha}: falta escolher o jogador.`);
         temProblema = true;
       } else if (estado === "repetida") {
         bloqueios.push(`${linha}: o mesmo jogador aparece duas vezes.`);
         temProblema = true;
       } else if (estado === "forasteira") {
-        bloqueios.push(`${linha}: jogador não pertence a ${nomeA} nem a ${nomeB}.`);
-        temProblema = true;
+        const jogador = row ? jogadoresPorId.get(row.playerId) : undefined;
+        if (!jogador) {
+          // Id que não existe mais no cadastro: isso o servidor recusa.
+          bloqueios.push(`${linha}: o jogador ${row?.playerId ?? ""} não existe mais no cadastro.`);
+          temProblema = true;
+        } else {
+          // Quase sempre é substituição: o jogador trocou de time DEPOIS desta série. A
+          // linha é história e o servidor a aceita — apagar mudaria estatística e MVP.
+          avisos.push(
+            `${linha}: ${jogador.nick} hoje está em ${getTeamName(draft, jogador.teamId)} (não em ${nomeA} nem em ${nomeB}). Se ele jogou esta série por outro time, está certo — não apague.`,
+          );
+        }
+      } else if (estado === "sem-campeao") {
+        avisos.push(`${linha}: falta o campeão.`);
       }
     });
 
-    if (!estados.includes("ok")) {
+    // O MVP automático sai da melhor linha com jogador cadastrado (é o que o painel envia);
+    // sem nenhuma, vale o MVP gravado. Sem os dois, o servidor recusa.
+    const temLinhaParaMvp = game.statsByPlayer.some(
+      (linha) => linha.playerId.trim() !== "" && jogadoresPorId.has(linha.playerId),
+    );
+    const mvpGravadoValido = Boolean(game.mvpPlayerId) && jogadoresPorId.has(game.mvpPlayerId);
+    if (!temLinhaParaMvp && !mvpGravadoValido) {
       bloqueios.push(`${jogo}: nenhuma linha de K/D/A válida — sem isso o MVP não é calculado.`);
       temProblema = true;
     }
 
-    if (temProblema) jogosComProblema.push(gameIndex);
+    if (temProblema && !jogosComProblema.includes(gameIndex)) jogosComProblema.push(gameIndex);
   });
 
   return { bloqueios, avisos, estadosPorJogo, jogosComProblema, descartaveis };
@@ -808,6 +905,9 @@ function applyRiotMatchToSeriesGame({
  */
 let serieLembrada: string | null = null;
 
+/** O servidor exige `riot:import` na rota da Riot: sem ele o botão só entregaria um 403. */
+const SEM_PERMISSAO_RIOT = "Falta a permissão: Importar partida pela Riot. Peça a quem administra as contas.";
+
 /** Invólucro do botão "Sortear ao vivo" no celular — para devolver o foco a ele (ver `sorteioAoVivo`). */
 const ID_SORTEIO_COMPACTO = "lob-series-sortear-compacto";
 
@@ -1160,6 +1260,10 @@ export function AdminSeriesPanel({
   mutateDraft,
   aplicarDoServidor,
   onVersaoDoServidor,
+  seriesGravadas,
+  podeLados = true,
+  podeCartas = true,
+  podeRiot = true,
 }: Readonly<{
   draft: TournamentDataset;
   mutateDraft: MutateDraft;
@@ -1167,6 +1271,16 @@ export function AdminSeriesPanel({
   aplicarDoServidor: MutateDraft;
   /** Avisa a versão que a rota leu e a que ela gravou, para o painel acompanhar a trava. */
   onVersaoDoServidor: (versaoLida?: number, versaoGravada?: number) => void;
+  /**
+   * As séries como estão GRAVADAS no servidor (a baseline do painel). O sorteio ao vivo é
+   * feito pelo servidor sobre a série gravada — não sobre o rascunho —, então ele só é
+   * oferecido quando as duas batem. Sem a prop (uso isolado), nada é bloqueado.
+   */
+  seriesGravadas?: readonly SeriesMatch[];
+  /** Escopos da pessoa: botão sem o escopo só entregaria um 403 depois da roda girar. */
+  podeLados?: boolean;
+  podeCartas?: boolean;
+  podeRiot?: boolean;
 }>) {
   // O sorteio ao vivo grava DIRETO no servidor, fora do rascunho. Por isso ele DEVOLVE
   // o que gravou (`onSorteado`): o rascunho local sincroniza só `blueSideTeamId` e
@@ -1265,12 +1379,37 @@ export function AdminSeriesPanel({
   const selectedSeriesMaxGames = selectedSeriesSettings.maxGames;
   const selectedSeriesTargetWins = selectedSeriesSettings.targetWins;
 
+  const gravadasPorId = useMemo(
+    () => (seriesGravadas ? new Map(seriesGravadas.map((series) => [series.id, series])) : null),
+    [seriesGravadas],
+  );
+
   // Auditoria de TODAS as séries: alimenta o aviso do topo, o selo na lista e o vermelho no editor.
   const auditorias = useMemo(() => {
     const mapa = new Map<string, AuditoriaSerie>();
-    for (const series of draft.seriesMatches) mapa.set(series.id, auditarSerie(series, draft));
+    for (const series of draft.seriesMatches) {
+      mapa.set(series.id, auditarSerie(series, draft, gravadasPorId?.get(series.id)));
+    }
     return mapa;
-  }, [draft]);
+  }, [draft, gravadasPorId]);
+
+  /**
+   * Por que o "Sortear ao vivo" está desligado, ou `null` se pode sortear.
+   *
+   * A rota sorteia sobre a série GRAVADA. Série criada no rascunho e não salva dava "Série não
+   * encontrada" a cada tentativa, com a roda girando na tela projetada; série com time trocado
+   * e não salva sorteava entre os times ANTIGOS — e o lado azul podia cair num time que a tela
+   * nem mostrava.
+   */
+  const motivoSemSorteio = (() => {
+    if (!selectedSeries || !gravadasPorId) return null;
+    const gravada = gravadasPorId.get(selectedSeries.id);
+    if (!gravada) return "Salve a série antes de sortear: o sorteio é feito sobre a série gravada no site.";
+    if (gravada.teamAId !== selectedSeries.teamAId || gravada.teamBId !== selectedSeries.teamBId) {
+      return "Salve a troca de time antes de sortear: o sorteio é feito sobre a série gravada no site.";
+    }
+    return null;
+  })();
 
   const auditoriaSelecionada = selectedSeries ? auditorias.get(selectedSeries.id) ?? null : null;
   const seriesComProblema = sortedSeries.filter(
@@ -1497,15 +1636,45 @@ export function AdminSeriesPanel({
       if (game.winnerTeamId && !timesFinais.includes(game.winnerTeamId)) vencedoresOrfaos += 1;
     }
 
-    if (selectedSeries.games.length > 0) {
+    // O sorteio também aponta para os times: lado azul e cartinhas do time que sai somem.
+    const ladoSorteado = Boolean(selectedSeries.blueSideTeamId) && !timesFinais.includes(selectedSeries.blueSideTeamId!);
+    const cartasOrfas = (selectedSeries.cardsUsed ?? []).filter(
+      (card) => card.teamId && !timesFinais.includes(card.teamId),
+    ).length;
+    const perdeSorteio = ladoSorteado || cartasOrfas > 0;
+
+    if (selectedSeries.games.length > 0 || perdeSorteio) {
+      const partes: string[] = [];
+      if (selectedSeries.games.length > 0) {
+        partes.push(
+          `Esta série já tem ${selectedSeries.games.length} jogo(s) lançado(s). Serão apagados: ` +
+            `${linhasOrfas} linha(s) de K/D/A, ${bansOrfaos} ban(s) e o vencedor de ${vencedoresOrfaos} jogo(s) ` +
+            `que ainda apontam para o time removido.`,
+        );
+      }
+      if (perdeSorteio) {
+        const oQue = [
+          ladoSorteado ? `o lado azul sorteado (${getTeamName(draft, selectedSeries.blueSideTeamId!)})` : null,
+          cartasOrfas > 0 ? `${cartasOrfas} cartinha(s)` : null,
+        ]
+          .filter(Boolean)
+          .join(" e ");
+        partes.push(
+          `O sorteio desta série deixa de valer: ${oQue} ${ladoSorteado && cartasOrfas > 0 ? "serão apagados" : "será apagado(a)"}. ` +
+            `O site já pode ter anunciado esse sorteio.`,
+        );
+      }
       const confirmou = confirmBrowserAction(
         `Trocar o Time ${lado} de "${getTeamName(draft, anterior)}" para "${getTeamName(draft, novoTimeId)}"?\n\n` +
-          `Esta série já tem ${selectedSeries.games.length} jogo(s) lançado(s). Serão apagados: ` +
-          `${linhasOrfas} linha(s) de K/D/A, ${bansOrfaos} ban(s) e o vencedor de ${vencedoresOrfaos} jogo(s) ` +
-          `que ainda apontam para o time removido.`,
+          partes.join("\n\n"),
       );
       if (!confirmou) return;
     }
+
+    // Voltar ao confronto GRAVADO (troca desfeita antes de salvar) devolve o sorteio gravado
+    // que a troca tinha apagado: sem isto, desfazer o engano não desfazia o estrago.
+    const gravada = gravadasPorId?.get(selectedSeries.id);
+    const voltaAoGravado = Boolean(gravada) && gravada!.teamAId === timesFinais[0] && gravada!.teamBId === timesFinais[1];
 
     updateSelectedSeries((series) => {
       if (lado === "A") series.teamAId = novoTimeId;
@@ -1540,6 +1709,13 @@ export function AdminSeriesPanel({
 
       if (series.cardsUsed) {
         series.cardsUsed = series.cardsUsed.filter((card) => !card.teamId || times.includes(card.teamId));
+      }
+
+      if (voltaAoGravado && gravada) {
+        if (!series.blueSideTeamId && gravada.blueSideTeamId) series.blueSideTeamId = gravada.blueSideTeamId;
+        if ((series.cardsUsed?.length ?? 0) === 0 && gravada.cardsUsed !== undefined) {
+          series.cardsUsed = structuredClone(gravada.cardsUsed);
+        }
       }
     });
 
@@ -1702,7 +1878,23 @@ export function AdminSeriesPanel({
     });
   };
 
+  /**
+   * Linha com algo digitado pede confirmação: no celular a lixeira fica ao lado do nome, e
+   * um toque errado apagava campeão e K/D/A sem desfazer (recarregar descarta o rascunho
+   * inteiro). Linha em branco sai direto — é sobra de clique no "+ Linha".
+   */
   const removeStatsRowFromGame = (gameIndex: number, rowIndex: number) => {
+    const row = selectedSeries?.games[gameIndex]?.statsByPlayer[rowIndex];
+    if (!row) return;
+    if (!isLinhaDescartavel(row)) {
+      const jogador = draft.players.find((player) => player.id === row.playerId);
+      const quem = jogador?.nick ?? (row.playerId || "sem jogador");
+      const campeao = (row.champion ?? "").trim() || "sem campeão";
+      const confirmou = confirmBrowserAction(
+        `Remover a linha de ${quem} (${campeao}, ${row.kills}/${row.deaths}/${row.assists}) do Jogo ${gameIndex + 1}?`,
+      );
+      if (!confirmou) return;
+    }
     updateSelectedSeries((series) => {
       series.games[gameIndex]?.statsByPlayer.splice(rowIndex, 1);
     });
@@ -1733,6 +1925,13 @@ export function AdminSeriesPanel({
   };
 
   const removeBanFromGame = (gameIndex: number, banIndex: number) => {
+    const ban = selectedSeries?.games[gameIndex]?.bans?.[banIndex];
+    if (ban?.championName.trim()) {
+      const confirmou = confirmBrowserAction(
+        `Remover o ban de ${ban.championName.trim()} (${getTeamName(draft, ban.teamId)}) do Jogo ${gameIndex + 1}?`,
+      );
+      if (!confirmou) return;
+    }
     updateSelectedSeries((series) => {
       series.games[gameIndex]?.bans?.splice(banIndex, 1);
     });
@@ -1764,7 +1963,7 @@ export function AdminSeriesPanel({
   };
 
   const adicionarJogo = () => {
-    if (!selectedSeries) return;
+    if (!selectedSeries || getSeriesWinnerTeamId(selectedSeries, draft)) return;
     const total = selectedSeries.games.length + 1;
     updateSelectedSeries((series) => {
       if (series.games.length >= selectedSeriesMaxGames) return;
@@ -1791,7 +1990,16 @@ export function AdminSeriesPanel({
     });
   };
 
+  /** A cartinha é o resultado de um sorteio anunciado: tirar pede confirmação. */
   const removeCardFromSeries = (cardIndex: number) => {
+    const carta = selectedSeries?.cardsUsed?.[cardIndex];
+    if (carta) {
+      const nomeDaCarta = CARDS_BY_ID[carta.cardId]?.title ?? carta.cardId;
+      const confirmou = confirmBrowserAction(
+        `Remover a cartinha ${nomeDaCarta}${carta.teamId ? ` de ${getTeamName(draft, carta.teamId)}` : ""}?`,
+      );
+      if (!confirmou) return;
+    }
     updateSelectedSeries((series) => {
       series.cardsUsed?.splice(cardIndex, 1);
     });
@@ -2123,20 +2331,26 @@ export function AdminSeriesPanel({
     rowIndex: number,
     estado: EstadoLinha,
   ) => {
-    const problema = estado === "incompleta" || estado === "repetida" || estado === "forasteira";
-    const corBorda = problema ? "rgba(212,87,74,.55)" : estado === "vazia" ? "rgba(224,163,58,.40)" : C.line;
+    const problema = linhaTrava(estado);
+    const corBorda = problema
+      ? "rgba(212,87,74,.55)"
+      : estado === "vazia" || linhaAvisa(estado)
+        ? "rgba(224,163,58,.40)"
+        : C.line;
     const kda = getKda(row.kills, row.deaths, row.assists);
 
     const motivo =
       estado === "incompleta"
-        ? "Falta o jogador ou o campeão"
+        ? "Falta escolher o jogador"
         : estado === "repetida"
           ? "Este jogador já está em outra linha deste jogo"
           : estado === "forasteira"
-            ? "Jogador não pertence a nenhum dos dois times da série"
-            : estado === "vazia"
-              ? "Linha em branco — será descartada"
-              : undefined;
+            ? "Jogador hoje não está em nenhum dos dois times da série (não trava o salvamento)"
+            : estado === "sem-campeao"
+              ? "Falta o campeão (não trava o salvamento)"
+              : estado === "vazia"
+                ? "Linha em branco — será descartada"
+                : undefined;
 
     return (
       <div
@@ -2167,7 +2381,7 @@ export function AdminSeriesPanel({
           ))}
           {/* Jogador de fora do confronto continua listado para não sumir silenciosamente. */}
           {row.playerId && !currentRosters.combined.some((player) => player.id === row.playerId) ? (
-            <option value={row.playerId}>{row.playerId} (fora da série)</option>
+            <option value={row.playerId}>{rotuloForaDaSerie(draft, row.playerId)}</option>
           ) : null}
         </Select>
 
@@ -2287,15 +2501,17 @@ export function AdminSeriesPanel({
             <Button
               tone="ghost"
               disabled={
+                !podeRiot ||
                 isImportingRiot ||
                 !riotMatchId.trim() ||
                 !selectedSeries.teamAId ||
                 !selectedSeries.teamBId
               }
+              title={podeRiot ? undefined : SEM_PERMISSAO_RIOT}
               onClick={() => void importGameFromRiot(gameIndex)}
               style={{ marginBottom: 22 }}
             >
-              {isImportingRiot ? "Importando…" : "Importar da Riot"}
+              {isImportingRiot ? "Importando…" : podeRiot ? "Importar da Riot" : "Importar da Riot (sem permissão)"}
             </Button>
           </div>
 
@@ -2498,22 +2714,28 @@ export function AdminSeriesPanel({
     rowIndex: number,
     estado: EstadoLinha,
   ) => {
-    const problema = estado === "incompleta" || estado === "repetida" || estado === "forasteira";
-    const corBorda = problema ? "rgba(212,87,74,.55)" : estado === "vazia" ? "rgba(224,163,58,.40)" : C.line;
+    const problema = linhaTrava(estado);
+    const corBorda = problema
+      ? "rgba(212,87,74,.55)"
+      : estado === "vazia" || linhaAvisa(estado)
+        ? "rgba(224,163,58,.40)"
+        : C.line;
     const kda = getKda(row.kills, row.deaths, row.assists);
     const jogador = draft.players.find((player) => player.id === row.playerId) ?? null;
     const rota = jogador ? resolveRole(jogador.role1) : null;
 
     const motivo =
       estado === "incompleta"
-        ? "Falta o jogador ou o campeão."
+        ? "Falta escolher o jogador."
         : estado === "repetida"
           ? "Este jogador já está em outra linha deste jogo."
           : estado === "forasteira"
-            ? "Jogador não pertence a nenhum dos dois times da série."
-            : estado === "vazia"
-              ? "Linha em branco — será descartada."
-              : null;
+            ? "Jogador hoje não está em nenhum dos dois times da série. Se ele jogou por outro time, está certo."
+            : estado === "sem-campeao"
+              ? "Falta o campeão."
+              : estado === "vazia"
+                ? "Linha em branco — será descartada."
+                : null;
 
     const campoNumero = (rotulo: string, nomeLongo: string, campo: "kills" | "deaths" | "assists") => (
       <Field label={rotulo}>
@@ -2571,7 +2793,7 @@ export function AdminSeriesPanel({
                 </option>
               ))}
               {row.playerId && !currentRosters.combined.some((player) => player.id === row.playerId) ? (
-                <option value={row.playerId}>{row.playerId} (fora da série)</option>
+                <option value={row.playerId}>{rotuloForaDaSerie(draft, row.playerId)}</option>
               ) : null}
             </Select>
           </div>
@@ -2855,10 +3077,11 @@ export function AdminSeriesPanel({
                 <Button
                   tone="ghost"
                   fullWidth
-                  disabled={isImportingRiot || !riotMatchId.trim() || !temOsDoisTimes}
+                  disabled={!podeRiot || isImportingRiot || !riotMatchId.trim() || !temOsDoisTimes}
+                  title={podeRiot ? undefined : SEM_PERMISSAO_RIOT}
                   onClick={() => void importGameFromRiot(gameIndex)}
                 >
-                  {isImportingRiot ? "Importando…" : "Importar da Riot"}
+                  {isImportingRiot ? "Importando…" : podeRiot ? "Importar da Riot" : "Importar da Riot (sem permissão)"}
                 </Button>
               </div>
               {riotImportStatus ? <AvisoDaRiot status={riotImportStatus} /> : null}
@@ -2992,6 +3215,12 @@ export function AdminSeriesPanel({
   // -------------------------------------------------------------- editor da direita
 
   const placarSelecionado = selectedSeries ? getSeriesScore(selectedSeries, draft) : null;
+  /**
+   * Série que já tem vencedor (2 vitórias na MD3, 3 na MD5) não aceita jogo NOVO: um 3º jogo
+   * depois de 2x0 vira 3x0 no site e mexe no saldo de mapas do desempate. Editar os jogos
+   * existentes continua livre — inclusive trocar o vencedor de um deles.
+   */
+  const serieDecidida = selectedSeries ? Boolean(getSeriesWinnerTeamId(selectedSeries, draft)) : false;
   const dataHoraSelecionada = isoParaCamposBrasilia(selectedSeries?.date);
 
   /*
@@ -3017,10 +3246,11 @@ export function AdminSeriesPanel({
         </div>
       ) : null}
 
-      {/* Não trava o salvamento, mas muda resultado: campeão cedo demais ou pontos a mais. */}
+      {/* Não trava o salvamento, mas costuma ser engano: campeão cedo demais, pontos a mais,
+          linha sem campeão, jogador que hoje está em outro time. */}
       {auditoriaSelecionada.avisos.length > 0 ? (
         <div style={{ marginTop: 16 }}>
-          <Banner tone="warn" title="Confira a etapa e o formato desta série">
+          <Banner tone="warn" title="Confira esta série (não trava o salvamento)">
             <ul style={{ margin: 0, paddingLeft: 18 }}>
               {auditoriaSelecionada.avisos.map((texto) => (
                 <li key={texto}>{texto}</li>
@@ -3247,9 +3477,24 @@ export function AdminSeriesPanel({
       corDoTime={(id) => teamColor(id)}
       blueSideTeamId={selectedSeries.blueSideTeamId}
       cardsUsed={selectedSeries.cardsUsed}
-      podeLados
-      podeCartas
+      podeLados={podeLados}
+      podeCartas={podeCartas}
       onSorteado={({ tipo, blueSideTeamId, cardsUsed, versao, versaoLida, sorteios }) => {
+        // Lado azul fora do confronto da tela = o servidor sorteou sobre outra série gravada
+        // (times trocados e não salvos). Não entra no rascunho como se fosse desta.
+        if (
+          tipo === "lados" &&
+          blueSideTeamId &&
+          blueSideTeamId !== selectedSeries.teamAId &&
+          blueSideTeamId !== selectedSeries.teamBId
+        ) {
+          avisar(
+            "cartinhas",
+            `O servidor sorteou entre os times GRAVADOS desta série (${getTeamName(draft, blueSideTeamId)} no azul). Salve o confronto e sorteie de novo.`,
+            "warn",
+          );
+          return;
+        }
         // Aplica no rascunho exatamente o que o servidor gravou, sem recarregar:
         // a recarga abre `window.confirm` quando há edição pendente e congelava a
         // roda na tela projetada — e, se passasse direto, descartaria em silêncio
@@ -3412,7 +3657,13 @@ export function AdminSeriesPanel({
               CORRIGIR à mão — e agora toda correção manual entra no histórico, para a
               divergência entre o que foi sorteado e o que ficou gravado ficar visível.
             */}
-            <Button tone="gold" small onClick={() => setSorteioAberto(true)}>
+            <Button
+              tone="gold"
+              small
+              onClick={() => setSorteioAberto(true)}
+              disabled={motivoSemSorteio !== null}
+              title={motivoSemSorteio ?? undefined}
+            >
               Sortear ao vivo
             </Button>
             <Button tone="ghost" small onClick={addCardToSeries}>
@@ -3425,6 +3676,8 @@ export function AdminSeriesPanel({
       </BlockTitle>
 
       {sorteioAoVivo}
+
+      {motivoSemSorteio ? <AvisoEmLinha texto={motivoSemSorteio} tom="warn" /> : null}
 
       {(selectedSeries.cardsUsed ?? []).length === 0 ? (
         <LinhaVazia>Nenhuma cartinha registrada nesta série.</LinhaVazia>
@@ -3488,10 +3741,13 @@ export function AdminSeriesPanel({
             <Button
               tone="gold"
               small
-              disabled={selectedSeriesIsWalkover || selectedSeries.games.length >= selectedSeriesMaxGames}
+              disabled={
+                selectedSeriesIsWalkover || serieDecidida || selectedSeries.games.length >= selectedSeriesMaxGames
+              }
+              title={serieDecidida ? `Série decidida (${placarSelecionado?.teamAWins}x${placarSelecionado?.teamBWins})` : undefined}
               onClick={adicionarJogo}
             >
-              <Plus size={14} aria-hidden /> Adicionar jogo
+              <Plus size={14} aria-hidden /> {serieDecidida && !selectedSeriesIsWalkover ? "Série decidida" : "Adicionar jogo"}
             </Button>
           </div>
         }
@@ -3601,6 +3857,13 @@ export function AdminSeriesPanel({
   }
 
   const serieCompleta = selectedSeries ? selectedSeries.games.length >= selectedSeriesMaxGames : false;
+  const rotuloDoAdicionarCompacto = !selectedSeries
+    ? ""
+    : serieDecidida
+      ? `Série decidida (${placarSelecionado?.teamAWins}x${placarSelecionado?.teamBWins})`
+      : serieCompleta
+        ? `${selectedSeriesFormatLabel} completa: ${selectedSeriesMaxGames} jogos`
+        : `Adicionar jogo ${selectedSeries.games.length + 1}`;
 
   const editorCompacto =
     compacto && selectedSeries ? (
@@ -3643,11 +3906,9 @@ export function AdminSeriesPanel({
       {avisoCompacto("jogos") ? <div style={{ marginTop: 12 }}>{avisoCompacto("jogos")}</div> : null}
       {selectedSeriesIsWalkover ? null : (
         <div style={{ marginTop: 12 }}>
-          <Button tone="gold" fullWidth disabled={serieCompleta} onClick={adicionarJogo}>
+          <Button tone="gold" fullWidth disabled={serieCompleta || serieDecidida} onClick={adicionarJogo}>
             <Plus size={17} aria-hidden />
-            {serieCompleta
-              ? `${selectedSeriesFormatLabel} completa: ${selectedSeriesMaxGames} jogos`
-              : `Adicionar jogo ${selectedSeries.games.length + 1}`}
+            {rotuloDoAdicionarCompacto}
           </Button>
         </div>
       )}
@@ -3659,7 +3920,14 @@ export function AdminSeriesPanel({
           <>
             {/* O id é do invólucro: o `Button` do kit não repassa id, e o foco volta para cá. */}
             <span id={ID_SORTEIO_COMPACTO} style={{ display: "flex", flex: "1 1 auto" }}>
-              <Button tone="gold" small fullWidth onClick={() => setSorteioAberto(true)}>
+              <Button
+                tone="gold"
+                small
+                fullWidth
+                onClick={() => setSorteioAberto(true)}
+                disabled={motivoSemSorteio !== null}
+                title={motivoSemSorteio ?? undefined}
+              >
                 <Dices size={15} aria-hidden /> Sortear ao vivo
               </Button>
             </span>
@@ -3671,6 +3939,7 @@ export function AdminSeriesPanel({
       >
         Cartinhas da série
       </TituloCompacto>
+      {motivoSemSorteio ? <AvisoEmLinha texto={motivoSemSorteio} tom="warn" /> : null}
       {cartinhasCompactas}
 
       {confrontoNoTopo ? null : blocoConfrontoCompacto}

@@ -55,7 +55,22 @@ export function DataTable<TData>({
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id} className="border-white/10">
               {headerGroup.headers.map((header) => (
-                <TableHeadCell key={header.id} className="whitespace-nowrap">
+                <TableHeadCell
+                  key={header.id}
+                  scope="col"
+                  // A seta ↑/↓ só se vê; aria-sort diz ao leitor de tela qual coluna ordena
+                  // e em que sentido. Coluna que não ordena fica sem o atributo.
+                  aria-sort={
+                    header.column.getCanSort()
+                      ? header.column.getIsSorted() === "asc"
+                        ? "ascending"
+                        : header.column.getIsSorted() === "desc"
+                          ? "descending"
+                          : "none"
+                      : undefined
+                  }
+                  className="whitespace-nowrap"
+                >
                   {header.isPlaceholder ? null : (
                     <button
                       type="button"

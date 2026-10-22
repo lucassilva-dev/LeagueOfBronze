@@ -17,7 +17,8 @@ export function PageShell({
   const reduce = useReducedMotion();
 
   return (
-    <motion.main
+    // <div>, não <main>: o <main id="conteudo"> é um só e já envolve tudo no SiteFrame.
+    <motion.div
       key={pathname}
       // ⚠ SÓ DESLOCAMENTO. Nada de opacidade nem de blur aqui.
       //
@@ -36,6 +37,6 @@ export function PageShell({
       )}
     >
       {children}
-    </motion.main>
+    </motion.div>
   );
 }

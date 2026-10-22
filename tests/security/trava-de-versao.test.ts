@@ -121,13 +121,17 @@ describe("trava de versão do PUT do dataset", () => {
     expect(store.save).not.toHaveBeenCalled();
   });
 
-  it("com `force`, grava sem condição — é a decisão consciente de sobrescrever", async () => {
+  it("com `force`, grava condicionada à versão que acabou de ler (relê e remescla)", async () => {
+    // Sobrescrever é a decisão consciente de quem edita, mas a mesclagem e a autorização só
+    // valem para o estado que ESTA volta leu (TOR-07). Gravar sem condição deixava um
+    // sorteio que caísse entre a leitura e a gravação sumir.
     store.versao.atual = 9;
 
     const r = await PUT(req({ dataset: datasetAlterado(), versao: 5, force: true }));
 
     expect(r.status).toBe(200);
-    expect(store.save.mock.calls[0]![1]).toEqual({ versaoEsperada: undefined });
+    expect(store.save).toHaveBeenCalledTimes(1);
+    expect(store.save.mock.calls[0]![1]).toEqual({ versaoEsperada: 9 });
   });
 
   it("devolve a versão REAL depois de salvar, e não uma previsão", async () => {

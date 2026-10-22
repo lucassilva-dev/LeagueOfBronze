@@ -10,6 +10,7 @@ import {
   acharJogadorPorId,
   acharSessaoAtiva,
   criarSessaoJogador,
+  renovarSessaoJogador,
   revogarSessaoJogador,
   type JogadorRow,
 } from "@/lib/jogadores/store";
@@ -33,8 +34,15 @@ const ROTULO_SESSAO = "lob/jogador/sessao/v1";
 const ROTULO_SENHA = "lob/jogador/senha/v1";
 
 /** Sete dias: a inscrição acontece semanas antes do draft, e o capitão não pode cair
- *  no meio da escolha. Revogável na hora pela organização via `session_epoch`. */
+ *  no meio da escolha. Revogável na hora pela organização via `session_epoch`.
+ *
+ *  Os sete dias contam do último USO, não do login: ver `renovarCookieDeJogador`. */
 const SESSAO_DIAS = 7;
+const SESSAO_MS = SESSAO_DIAS * 24 * 60 * 60 * 1000;
+
+/** Idade a partir da qual o token é reemitido. Um dia: no máximo uma escrita por dia
+ *  por jogador ativo, em vez de uma por página aberta. */
+const RENOVAR_APOS_MS = 24 * 60 * 60 * 1000;
 
 export const JOGADOR_COOKIE =
   process.env.NODE_ENV === "production" ? "__Host-lob_jogador" : "lob_jogador";
@@ -75,7 +83,7 @@ export async function emitirCookieDeJogador(
   request: NextRequest,
 ): Promise<{ name: string; value: string; maxAge: number }> {
   const sessaoId = newSessionId();
-  const expiraEm = new Date(Date.now() + SESSAO_DIAS * 24 * 60 * 60 * 1000);
+  const expiraEm = new Date(Date.now() + SESSAO_MS);
 
   await criarSessaoJogador({
     id: sessaoId,
@@ -95,7 +103,49 @@ export async function emitirCookieDeJogador(
     segredoDeSessao(),
   );
 
-  return { name: JOGADOR_COOKIE, value, maxAge: SESSAO_DIAS * 24 * 60 * 60 };
+  return { name: JOGADOR_COOKIE, value, maxAge: SESSAO_MS / 1000 };
+}
+
+/**
+ * Renovação deslizante da sessão.
+ *
+ * A validade era fixa na emissão: quem entrou numa sexta às 20h05 caía às 20h05 da
+ * sexta seguinte MESMO usando o site sem parar — no meio do draft, se o draft fosse
+ * nesse horário. A sondagem do painel do capitão não renovava nada, a tela trocava pelo
+ * convite "Entre na sua conta" e a vez dele ia para o cronômetro.
+ *
+ * Chamada pelas rotas que o site consulta em toda página (`/api/sessao`,
+ * `/api/conta/sessao`), SEMPRE depois de a identidade ter sido conferida por inteiro
+ * (sessão ativa, conta ativa, epoch igual). Quando o token tem mais de um dia, estende
+ * a linha da sessão e devolve um cookie reassinado com o MESMO `sid`, `uid` e `epoch` —
+ * trocar a senha ou "sair de todos os dispositivos" continua derrubando na hora.
+ *
+ * Devolve null quando não há o que renovar ou quando a renovação falhou; nunca estoura.
+ */
+export async function renovarCookieDeJogador(
+  token: string | undefined,
+  agoraMs: number = Date.now(),
+): Promise<{ name: string; value: string; maxAge: number } | null> {
+  try {
+    const payload = verifySessionToken(token, segredoDeSessao(), agoraMs);
+    if (!payload) return null;
+
+    // O token não guarda a hora da emissão; ela é a validade menos a duração da sessão.
+    const emitidoEm = payload.exp * 1000 - SESSAO_MS;
+    if (agoraMs - emitidoEm < RENOVAR_APOS_MS) return null;
+
+    const expiraEm = new Date(agoraMs + SESSAO_MS);
+    if (!(await renovarSessaoJogador(payload.sid, expiraEm))) return null;
+
+    const value = signSessionToken(
+      { sid: payload.sid, uid: payload.uid, exp: Math.floor(expiraEm.getTime() / 1000), epoch: payload.epoch },
+      segredoDeSessao(),
+    );
+    return { name: JOGADOR_COOKIE, value, maxAge: SESSAO_MS / 1000 };
+  } catch (error) {
+    console.error("[jogadores] falha ao renovar o cookie da sessão:", error);
+    return null;
+  }
 }
 
 /** Atributos do cookie, num lugar só — não podem divergir entre login e logout. */

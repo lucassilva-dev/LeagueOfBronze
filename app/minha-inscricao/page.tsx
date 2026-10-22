@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import MinhaInscricaoCliente from "@/components/inscricao/minha";
 import { Eyebrow, GoldTitle, LobShell } from "@/components/lob/ui";
+import { metadadosDaPagina } from "@/lib/i18n/metadados";
 import { getMessages } from "@/lib/i18n/server";
 
 /**
@@ -11,11 +12,15 @@ import { getMessages } from "@/lib/i18n/server";
  */
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "Minha inscrição · League of Bronze",
-  // Página pessoal: não deve ser indexada nem aparecer em busca.
-  robots: { index: false, follow: false },
-};
+// Título da aba no idioma da visita (lib/i18n/messages/metadados.ts): com `metadata`
+// fixa, o site em inglês mostrava "Minha inscrição · League of Bronze".
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    ...(await metadadosDaPagina("minhaInscricao")),
+    // Página pessoal: não deve ser indexada nem aparecer em busca.
+    robots: { index: false, follow: false },
+  };
+}
 
 export default async function MinhaInscricaoPage() {
   const { inscricao: t } = await getMessages();

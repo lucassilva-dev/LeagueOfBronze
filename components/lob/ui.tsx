@@ -228,9 +228,10 @@ export function RoleTag({
 }
 
 // Container das páginas (largura máx. + padding + fade de entrada).
+// É <div>, não <main>: o <main id="conteudo"> é um só e mora no SiteFrame, por fora.
 export function LobShell({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <main
+    <div
       style={{
         position: "relative",
         maxWidth: 1280,
@@ -244,7 +245,7 @@ export function LobShell({ children }: Readonly<{ children: ReactNode }>) {
       }}
     >
       {children}
-    </main>
+    </div>
   );
 }
 

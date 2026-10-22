@@ -150,7 +150,10 @@ describe("elo: automático pela Riot ou travado à mão", () => {
 
     fireEvent.change(select, { target: { value: "Mestre" } });
     salvarTudo();
-    expect(executar).toHaveBeenCalledWith("inscrito", { inscricaoId: "x1", ficha: { eloVerificado: "Mestre" } });
+    expect(executar).toHaveBeenCalledWith("inscrito", {
+      inscricaoId: "x1",
+      ficha: { eloVerificado: "Mestre", situacaoAnterior: "pendente" },
+    });
   });
 
   it("travado: aparece o elo travado; voltar ao automático manda nulo", () => {
@@ -162,7 +165,10 @@ describe("elo: automático pela Riot ou travado à mão", () => {
 
     fireEvent.change(select, { target: { value: "" } });
     salvarTudo();
-    expect(executar).toHaveBeenCalledWith("inscrito", { inscricaoId: "x1", ficha: { eloVerificado: null } });
+    expect(executar).toHaveBeenCalledWith("inscrito", {
+      inscricaoId: "x1",
+      ficha: { eloVerificado: null, situacaoAnterior: "pendente" },
+    });
   });
 
   it("elo gravado à mão ANTES do robô (sem fonte) conta como automático — o robô vai segui-lo", () => {
@@ -188,7 +194,12 @@ describe("requisitos do robô", () => {
   });
 
   it("apto que ganha requisito ruim: a tela avisa que a situação continua Apta", () => {
-    abrir([inscrito({ situacao: "apto" })], Object.fromEntries(ITENS_CONFERENCIA.map((i) => [i, { estado: "ok" }])));
+    // Apto COM pagamento confirmado: sem ele, o alerta «apto sem pagamento» também apareceria.
+    abrir(
+      [inscrito({ situacao: "apto" })],
+      Object.fromEntries(ITENS_CONFERENCIA.map((i) => [i, { estado: "ok" }])),
+      [pagamento({ estado: "pago" })],
+    );
     expect(within(gaveta()).queryByText(/continua/)).toBeNull();
     marcar("Estado do item F", "Não cumpre");
     expect(within(gaveta()).getByRole("alert").textContent).toMatch(/continua\s+Apto/);
@@ -243,6 +254,11 @@ describe("caixa sem provedor", () => {
     const executar = vi.fn(async () => true);
     render(<SecaoPagamentos {...props(executar)} dados={dados([inscrito({ organizador: true })], {}, [pagamento()])} />);
     fireEvent.click(await waitFor(() => screen.getByRole("button", { name: "Isentar" })));
-    expect(executar).toHaveBeenCalledWith("pagamento", { inscricaoId: "x1", estado: "isento", observacao: undefined });
+    expect(executar).toHaveBeenCalledWith("pagamento", {
+      inscricaoId: "x1",
+      estado: "isento",
+      observacao: undefined,
+      estadoAnterior: "aguardando",
+    });
   });
 });

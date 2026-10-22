@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import Transmissao from "@/components/draft/transmissao";
+import { metadadosDaPagina } from "@/lib/i18n/metadados";
 import { getMessages } from "@/lib/i18n/server";
 
 /**
@@ -10,10 +11,10 @@ import { getMessages } from "@/lib/i18n/server";
  */
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "Draft ao vivo · League of Bronze",
-  description: "Acompanhe o sorteio dos times da 4ª Edição em tempo real.",
-};
+/** Título da aba no idioma da visita ("Live draft" em inglês), como o resto do site. */
+export async function generateMetadata(): Promise<Metadata> {
+  return metadadosDaPagina("draft", "/draft");
+}
 
 /**
  * A transmissão ocupa a página inteira, SEM o `LobShell`.

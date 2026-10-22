@@ -48,7 +48,13 @@ vi.mock("@/lib/inscricoes/store", () => ({
   lerConfig: async () => {
     throw new Error("não usado");
   },
-  listarInscricoes: async () => [],
+  // Todos do draft seguem aptos: com alguém fora, a virada pede uma confirmação a mais
+  // (DRF-03, fora-do-draft.test.ts) — não é o que estes testes exercitam.
+  listarInscricoes: async () =>
+    ((banco.draft.estado as { jogadores?: { id: string }[] } | null)?.jogadores ?? []).map((j) => ({
+      id: j.id,
+      situacao: "apto",
+    })),
 }));
 vi.mock("@/lib/draft/store", async () => {
   const real = await vi.importActual<typeof import("@/lib/draft/store")>("@/lib/draft/store");

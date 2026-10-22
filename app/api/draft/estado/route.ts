@@ -4,7 +4,12 @@ import type { NextRequest } from "next/server";
 import { alcancarORelogio } from "@/lib/draft/motor";
 import { lerDraftCompleto, paraPublico, salvarDraftSeIntacto, timeDoCapitao } from "@/lib/draft/store";
 import { inscricaoIdDoJogador } from "@/lib/inscricoes/store";
-import { identidadePorToken, JOGADOR_COOKIE } from "@/lib/jogadores/auth";
+import {
+  atributosDoCookie,
+  identidadePorToken,
+  JOGADOR_COOKIE,
+  renovarCookieDeJogador,
+} from "@/lib/jogadores/auth";
 import { respostaDeErro } from "@/lib/security/resposta-erro";
 
 export const dynamic = "force-dynamic";
@@ -68,11 +73,23 @@ export async function GET(request: NextRequest) {
     const token = request.cookies.get(JOGADOR_COOKIE)?.value;
     const identidade = await identidadePorToken(token).catch(() => null);
     let souCapitaoDe: string | null = null;
+    // Conta logada SEM inscrição é um caso à parte de "inscrição que não capitaneia": é o
+    // capitão que esqueceu a senha e criou outra conta. Com o mesmo recado dos dois ("você
+    // não é capitão"), ele ia embora e as escolhas do time caíam no auto-pick.
+    let semInscricao = false;
 
     if (identidade) {
       const inscricaoId = await inscricaoIdDoJogador(identidade.id);
       if (inscricaoId) souCapitaoDe = timeDoCapitao(estadoFinal, inscricaoId);
+      else semInscricao = true;
     }
+
+    // Renovação deslizante da sessão, a mesma de /api/sessao. O cabeçalho renova a cada
+    // página carregada, mas o capitão que deixou o /capitao aberto desde o login de 7 dias
+    // antes não navega: só esta sondagem fala com o servidor, e a sessão vencia no meio do
+    // draft. Só com a identidade conferida por inteiro; a função só regrava quando o token
+    // tem mais de 1 dia, então a sondagem de 2 s não vira uma escrita a cada 2 s.
+    const renovado = identidade ? await renovarCookieDeJogador(token) : null;
 
     // A hora do servidor vai junto: as telas contam o cronômetro com o relógio do aparelho,
     // e uma TV ou um celular com 20 s de diferença mostrava 0:00 com tempo sobrando (ou o
@@ -84,8 +101,12 @@ export async function GET(request: NextRequest) {
       // "esta conta não capitaneia" — oferecer login a quem já entrou fazia a pessoa voltar
       // para a mesma tela, em laço.
       logado: identidade !== null,
+      semInscricao,
       agoraServidorISO: new Date().toISOString(),
     });
+    if (renovado) {
+      resposta.cookies.set({ name: renovado.name, value: renovado.value, ...atributosDoCookie(renovado.maxAge) });
+    }
     resposta.headers.set("Cache-Control", "no-store");
     return resposta;
   } catch (error) {

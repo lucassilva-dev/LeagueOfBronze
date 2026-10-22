@@ -1,8 +1,10 @@
+import type { Metadata } from "next";
 import { AvisoConsentimento } from "@/components/aviso-consentimento";
 import { JogadoresClient, type PlayerPerf } from "@/components/lob/jogadores-client";
 import { PreTemporadaAviso } from "@/components/pre-temporada-aviso";
 import { semTemporadaAoVivo } from "@/lib/fase-do-site";
 import { Eyebrow, GoldTitle, Pill } from "@/components/lob/ui";
+import { metadadosDaPagina } from "@/lib/i18n/metadados";
 import { getMessages } from "@/lib/i18n/server";
 import { nomeDaTemporada } from "@/lib/i18n/nome-da-temporada";
 import { buildDesignPlayers } from "@/lib/roster";
@@ -10,6 +12,11 @@ import { getServerDataset } from "@/lib/server-data";
 import { calculatePlayerAggregates } from "@/lib/tournament";
 
 export const dynamic = "force-dynamic";
+
+/** Título e descrição próprios, no idioma da visita (lib/i18n/messages/metadados.ts). */
+export async function generateMetadata(): Promise<Metadata> {
+  return metadadosDaPagina("jogadores", "/jogadores");
+}
 
 export default async function JogadoresPage() {
   const { paginasHome: t, paginasStats: ts, compartilhados } = await getMessages();
@@ -46,7 +53,7 @@ export default async function JogadoresPage() {
           <Pill>{t.jogadoresRotas}</Pill>
         </div>
       </section>
-      <JogadoresClient players={players} perfByPlayer={perfByPlayer} textos={t} elos={ts.elos} />
+      <JogadoresClient players={players} perfByPlayer={perfByPlayer} textos={t} elos={ts.elos} localeTag={compartilhados.localeTag} />
       <AvisoConsentimento />
     </div>
   );

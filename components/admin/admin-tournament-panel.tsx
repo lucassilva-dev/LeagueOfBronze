@@ -410,17 +410,53 @@ function CartaoEncerrar({
   const [confirmado, setConfirmado] = useState(false);
   const compacto = useCompacto();
 
+  /*
+   * Temporada JÁ encerrada: a ação vira "refazer o retrato". Uma correção feita depois do
+   * encerramento (o jogo 4 da final lançado depois) só chegava ao vivo — o arquivo ficava
+   * "sem campeão" para sempre, e era o único exemplar depois de iniciar a próxima. A rota é
+   * a mesma; o servidor troca a entrada da temporada e mantém a data do fim.
+   */
   if (base.encerrada) {
     return (
       <ActionCard
         tone="neutro"
         title="Encerrar temporada"
-        badge={<Chip tone="off">indisponível</Chip>}
+        badge={<Chip tone="ok">encerrada</Chip>}
         description="Arquiva um retrato completo da temporada (fica visível em Temporadas) e a marca como encerrada."
       >
         <Banner tone="ok" title="Esta temporada já está encerrada">
-          O snapshot já foi para o arquivo. Para recomeçar, use “Iniciar nova temporada”.
+          O snapshot já foi para o arquivo. Se você corrigiu algo depois de encerrar (um resultado
+          da final, por exemplo), atualize o retrato abaixo — senão a correção não chega a
+          /temporadas. Para recomeçar, use “Iniciar nova temporada”.
         </Banner>
+
+        <Impacto
+          titulo="O que vai para o arquivo"
+          linhas={[
+            { rotulo: "Nome arquivado", valor: base.nome },
+            {
+              rotulo: "Séries",
+              valor: `${base.seriesCompletas} de ${base.series} concluídas`,
+            },
+            { rotulo: "Campeão", valor: base.campeao ?? "nenhum", tone: base.campeao ? "ok" : "warn" },
+            { rotulo: "Temporadas arquivadas", valor: `${base.arquivadas} (o retrato desta é substituído)` },
+          ]}
+        />
+
+        <Check checked={confirmado} onChange={setConfirmado} tone="danger" disabled={isBusy}>
+          Confirmo que quero trocar o retrato arquivado desta temporada pelo estado gravado agora.
+        </Check>
+
+        <div>
+          <Button
+            tone="gold"
+            onClick={onEndTournament}
+            disabled={isBusy || carregando || !confirmado}
+            fullWidth={compacto}
+          >
+            {isBusy ? "Atualizando o retrato..." : "Atualizar o retrato arquivado"}
+          </Button>
+        </div>
       </ActionCard>
     );
   }
@@ -558,14 +594,17 @@ function CartaoIniciar({
       </Banner>
 
       <FieldGrid min={190}>
+        {/* Só o número da edição: o site já escreve "League of Bronze" em volta (home,
+            calendário) e traduz "4ª Edição" para "4th Edition". Com a marca no nome, ela
+            aparecia duas vezes e o inglês ficava em português. */}
         <Field
           label="Nome da nova temporada"
-          hint={`A atual chama-se “${base.nome}”.`}
+          hint={`A atual chama-se “${base.nome}”. Use só a edição — a marca e a tradução já vêm do site.`}
         >
           <Input
             value={nome}
             onChange={setNome}
-            placeholder="Ex.: 4ª Edição da League of Bronze"
+            placeholder="Ex.: 4ª Edição"
             disabled={isBusy}
           />
         </Field>
@@ -587,6 +626,14 @@ function CartaoIniciar({
         </Banner>
       ) : null}
 
+      {/league\s+of\s+bronze/i.test(nome) ? (
+        <Banner tone="warn" title="O nome já ganha a marca do site">
+          A home e o calendário já escrevem “League of Bronze” junto do nome da temporada: com a
+          marca no nome ela aparece duas vezes, e a versão em inglês não traduz. Prefira só a
+          edição, como “4ª Edição”.
+        </Banner>
+      ) : null}
+
       <div style={{ display: "grid", gap: 9 }}>
         <Check checked={manterTimes} onChange={setManterTimes} disabled={isBusy}>
           Manter os times cadastrados
@@ -604,7 +651,19 @@ function CartaoIniciar({
             Arquivar a temporada atual antes de limpar
             {ativaComSeries ? " (recomendado — preserva o histórico)" : ""}
           </Check>
-        ) : null}
+        ) : (
+          // Já encerrada: o arquivo existe, mas pode estar velho (correção feita depois do
+          // encerramento). Marcar refaz o retrato antes de zerar as séries — é a última
+          // chance, porque depois disso o retrato é o único exemplar. Nunca vem marcado.
+          <Check
+            checked={arquivarAtual}
+            onChange={setArquivarEscolha}
+            tone="danger"
+            disabled={isBusy}
+          >
+            Atualizar o arquivo da temporada encerrada com o estado atual antes de limpar
+          </Check>
+        )}
       </div>
 
       {manterJogadores && !manterTimes ? (
@@ -657,7 +716,9 @@ function CartaoIniciar({
           {
             rotulo: "Temporada atual",
             valor: base.encerrada
-              ? "já encerrada"
+              ? arquivarAtual
+                ? "já encerrada · retrato atualizado antes de limpar"
+                : "já encerrada"
               : arquivarAtual
                 ? "arquivada antes de limpar"
                 : "NÃO será arquivada",

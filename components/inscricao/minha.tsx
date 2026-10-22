@@ -6,7 +6,7 @@ import Link from "next/link";
 
 import { resolveRole } from "@/lib/design";
 import type { Messages } from "@/lib/i18n/messages";
-import { inscricaoEsperaPagamento } from "@/lib/inscricoes/pagamento";
+import { foraDaCobranca, inscricaoEsperaPagamento } from "@/lib/inscricoes/pagamento";
 import { TURNOS } from "@/lib/inscricoes/turnos";
 
 /**
@@ -125,6 +125,17 @@ function moeda(centavos: number) {
   return (centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+/*
+ * Botão de rótulo longo dentro de cartão: `.lob-btn-gold` não quebra linha, e num celular
+ * de 320px "FAZER MINHA INSCRIÇÃO →" passava da borda do cartão e era cortado pela borda
+ * da tela. Quebra em duas linhas só quando não cabe, com a seta presa à última palavra.
+ */
+const BOTAO_QUE_QUEBRA: React.CSSProperties = { whiteSpace: "normal", maxWidth: "100%", textAlign: "center" };
+
+function setaPresa(rotulo: string) {
+  return rotulo.replace(/\s+→$/, "\u00a0→");
+}
+
 export default function MinhaInscricaoCliente({ t }: Readonly<{ t: Rotulos }>) {
   const [dados, setDados] = useState<Resposta | null>(null);
   const [carregando, setCarregando] = useState(true);
@@ -163,8 +174,13 @@ export default function MinhaInscricaoCliente({ t }: Readonly<{ t: Rotulos }>) {
         await carregar();
         return;
       }
-      const corpo = (await r.json().catch(() => ({}))) as { error?: string };
-      setErro(corpo.error ?? t.erroGenerico);
+      const corpo = (await r.json().catch(() => ({}))) as { error?: string; codigo?: string };
+      // O texto da rota é fixo em português; pelo `codigo` a tela mostra no idioma dela.
+      const traduzido =
+        corpo.codigo && Object.hasOwn(t.erros, corpo.codigo)
+          ? t.erros[corpo.codigo as keyof Rotulos["erros"]]
+          : undefined;
+      setErro(traduzido ?? corpo.error ?? t.erroGenerico);
     } catch {
       setErro(t.erroGenerico);
     } finally {
@@ -176,13 +192,44 @@ export default function MinhaInscricaoCliente({ t }: Readonly<{ t: Rotulos }>) {
     return <p style={{ color: "var(--lob-muted)" }}>…</p>;
   }
 
+  // Falha ao carregar (500, rede caída) ANTES de qualquer dado: antes ela caía no ramo
+  // "sem conta" abaixo, e o inscrito lia "Entre na sua conta" + "FAZER MINHA INSCRIÇÃO" —
+  // achava que tinha perdido a sessão ou a inscrição. Aqui ele lê o que houve e tenta de novo.
+  if (!dados && erro) {
+    return (
+      <div className="lob-card-2" style={{ padding: "28px 26px" }}>
+        <p role="alert" style={{ margin: "0 0 18px", color: "#f0a79e" }}>
+          {t.minhaErroCarregar}
+        </p>
+        <button
+          type="button"
+          className="lob-btn-gold"
+          onClick={() => {
+            setCarregando(true);
+            void carregar();
+          }}
+        >
+          {t.tentarDeNovo}
+        </button>
+      </div>
+    );
+  }
+
   if (!dados?.jogador) {
+    // Sem sessão (a de 7 dias venceu, ou a pessoa chegou pelo link da cobrança em outro
+    // aparelho): o caminho principal é ENTRAR, e de volta para cá. Fazer inscrição fica
+    // como segunda opção — mandar um inscrito para o formulário contradizia o texto.
     return (
       <div className="lob-card-2" style={{ padding: "28px 26px" }}>
         <p style={{ margin: "0 0 18px", color: "var(--lob-muted)" }}>{t.minhaSemConta}</p>
-        <Link className="lob-btn-gold" href="/inscricao">
-          {t.minhaIrParaInscricao}
-        </Link>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <Link className="lob-btn-gold" href="/entrar?volta=/minha-inscricao" style={BOTAO_QUE_QUEBRA}>
+            {t.entrarBotao}
+          </Link>
+          <Link className="lob-btn-ghost" href="/inscricao" style={BOTAO_QUE_QUEBRA}>
+            {setaPresa(t.minhaIrParaInscricao)}
+          </Link>
+        </div>
       </div>
     );
   }
@@ -191,8 +238,8 @@ export default function MinhaInscricaoCliente({ t }: Readonly<{ t: Rotulos }>) {
     return (
       <div className="lob-card-2" style={{ padding: "28px 26px" }}>
         <p style={{ margin: "0 0 18px", color: "var(--lob-muted)" }}>{t.minhaSemInscricao}</p>
-        <Link className="lob-btn-gold" href="/inscricao">
-          {t.minhaIrParaInscricao}
+        <Link className="lob-btn-gold" href="/inscricao" style={BOTAO_QUE_QUEBRA}>
+          {setaPresa(t.minhaIrParaInscricao)}
         </Link>
       </div>
     );
@@ -202,6 +249,11 @@ export default function MinhaInscricaoCliente({ t }: Readonly<{ t: Rotulos }>) {
   const pag = i.pagamento;
   // Mesma regra da rota: recusado ou desistente não tem mais o que pagar nem avisar.
   const podeAvisar = inscricaoEsperaPagamento(i);
+  // Recusado ou desistente que não pagou: o pagamento segue "aguardando" no banco (recusar
+  // não cancela pagamento), mas para ele a cobrança não vale mais. Mostrar "Aguardando
+  // pagamento · R$ 20,00 — Vence em …" era o convite a pagar que a rota evita ao esconder
+  // o QR. Mesma regra do painel (`foraDaCobranca`).
+  const semCobranca = foraDaCobranca(i.situacao, pag?.estado);
   // Na ordem do dia, e só os turnos que esta tela conhece.
   const turnos = TURNOS.filter((x) => i.disponibilidade.includes(x)).map((x) => t.turnos[x]);
 
@@ -233,10 +285,14 @@ export default function MinhaInscricaoCliente({ t }: Readonly<{ t: Rotulos }>) {
               <div style={{ fontSize: 10, letterSpacing: ".2em", color: "var(--lob-bronze)", marginBottom: 6 }}>
                 {t.pagamentoLabel}
               </div>
-              <Chip tom={TOM_PAGAMENTO[pag.estado] ?? "espera"}>
-                {t.pagamentos[pag.estado] ?? pag.estado} · {moeda(pag.valorCentavos)}
-              </Chip>
-              {pag.venceEm && pag.estado === "aguardando" && (
+              {semCobranca ? (
+                <Chip tom="espera">{t.semCobranca}</Chip>
+              ) : (
+                <Chip tom={TOM_PAGAMENTO[pag.estado] ?? "espera"}>
+                  {t.pagamentos[pag.estado] ?? pag.estado} · {moeda(pag.valorCentavos)}
+                </Chip>
+              )}
+              {pag.venceEm && pag.estado === "aguardando" && !semCobranca && (
                 <div style={{ marginTop: 6, fontSize: 11.5, color: "var(--lob-muted)" }}>
                   {t.venceEm} {new Date(pag.venceEm).toLocaleDateString()}
                 </div>

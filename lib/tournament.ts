@@ -675,6 +675,22 @@ export function getSeriesSummaries(dataset: TournamentDataset): SeriesSummary[] 
   }));
 }
 
+/**
+ * A ordem do /partidas: primeiro os RESULTADOS, do mais recente para o mais antigo; depois
+ * as séries POR JOGAR, da mais próxima para a mais distante.
+ *
+ * Só por data decrescente, a página abria com as séries mais distantes no futuro: as 15 da
+ * 4ª são criadas de uma vez, e em 21/11 a lista começava pela de 28/11 (sem resultado),
+ * com a recém-terminada lá pela 13ª posição. Recebe a lista de `getSeriesSummaries` (já
+ * em data decrescente) e não mexe nela — a ordem decrescente continua valendo para quem
+ * a usa (campeão, histórico do time, últimos resultados).
+ */
+export function ordenarSeriesParaPartidas(resumos: SeriesSummary[]): SeriesSummary[] {
+  const resultados = resumos.filter((resumo) => resumo.isComplete);
+  const porJogar = resumos.filter((resumo) => !resumo.isComplete).reverse();
+  return [...resultados, ...porJogar];
+}
+
 export function getChampionshipResult(
   dataset: TournamentDataset,
 ): ChampionshipResult | null {
@@ -1166,6 +1182,49 @@ export function snapshotToDataset(
   snapshot: TournamentDatasetSnapshot,
 ): TournamentDataset {
   return { ...snapshot, archivedSeasons: [] };
+}
+
+/** `2026-08-02T14:00` — com hora e SEM fuso escrito: é horário de Brasília. */
+const HORA_SEM_FUSO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/;
+/** `2026-08-02` — só a data. */
+const DATA_PURA = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Instante (ms) da data gravada na série, lendo Brasília quando o fuso não está escrito —
+ * o mesmo critério de `lib/format.ts`. O servidor roda em UTC: `new Date("2026-08-02T14:00")`
+ * lá vira 14:00Z, três horas antes do jogo, e a data pura vira meia-noite UTC, que em
+ * Brasília ainda é o dia ANTERIOR.
+ */
+function instanteDaDataDaSerie(texto: string): number | null {
+  const normalizado = HORA_SEM_FUSO.test(texto)
+    ? `${texto}-03:00`
+    : DATA_PURA.test(texto)
+      ? `${texto}T00:00:00-03:00`
+      : texto;
+  const instante = Date.parse(normalizado);
+  return Number.isNaN(instante) ? null : instante;
+}
+
+/**
+ * Quando a temporada ACABOU de verdade: a data da final decidida ou, sem ela, a da série
+ * com resultado mais tarde. `null` quando nenhuma série tem resultado (ou data legível).
+ *
+ * É a data que /temporadas mostra como "Encerrada em". Usar o instante do clique em
+ * "Encerrar" fazia a 3ª — final em 02/08 — aparecer como encerrada em novembro, quando
+ * ela for arquivada para começar a 4ª.
+ */
+export function dataDoFimDaTemporada(dataset: TournamentDataset): string | null {
+  const final = getChampionshipResult(dataset);
+  const comResultado = final
+    ? [final.summary.series]
+    : dataset.seriesMatches.filter((serie) => serie.games.length > 0 || Boolean(serie.walkoverWinnerTeamId));
+
+  let maisTarde: number | null = null;
+  for (const serie of comResultado) {
+    const instante = instanteDaDataDaSerie(serie.date);
+    if (instante !== null && (maisTarde === null || instante > maisTarde)) maisTarde = instante;
+  }
+  return maisTarde === null ? null : new Date(maisTarde).toISOString();
 }
 
 // Monta o registro arquivado da temporada atual (marca como finished).

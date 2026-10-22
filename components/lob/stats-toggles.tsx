@@ -147,6 +147,8 @@ function Toggle<T extends { key: string; label: string }>({
           <button
             key={item.key}
             type="button"
+            // A métrica escolhida só se via pela cor; o leitor de tela precisa do estado.
+            aria-pressed={active}
             onClick={() => onChange(item.key)}
             style={{
               padding: "8px 16px",

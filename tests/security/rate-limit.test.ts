@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { evaluateLoginRateLimit, RATE_LIMIT } from "@/lib/security/rate-limit";
+import {
+  descontarPropriaReserva,
+  evaluateLoginRateLimit,
+  MOTIVOS_QUE_NAO_CONTAM,
+  RATE_LIMIT,
+  reservasDoIpContamNoTeto,
+  TENTATIVA_EM_ANDAMENTO,
+  TENTATIVA_ERRO_INTERNO,
+} from "@/lib/security/rate-limit";
 
 const base = { failuresByIp: 0, failuresByUser: 0, ipHadRecentSuccess: false };
 
@@ -45,5 +53,42 @@ describe("bloqueio de força bruta no login", () => {
     });
     expect(d.allowed).toBe(false);
     expect(d.reason).toBe("ip_bloqueado");
+  });
+});
+
+describe("reservas em voo (DIFF-BE-01 / DIFF-BE-03)", () => {
+  it("no teto por IP, reserva em voo só pesa contra a MESMA conta", () => {
+    // 5 reservas em voo deste IP contra OUTRAS contas: logins certos e simultâneos da mesma rede.
+    expect(evaluateLoginRateLimit({ ...base, emVooDoIp: 5, emVooDoIpNaConta: 0 }).allowed).toBe(true);
+    // 5 reservas em voo deste IP contra esta conta: rajada contra um alvo.
+    const d = evaluateLoginRateLimit({ ...base, emVooDoIp: 5, emVooDoIpNaConta: 5 });
+    expect(d).toMatchObject({ allowed: false, reason: "ip_bloqueado", retryAfterSeconds: RATE_LIMIT.windowSeconds });
+    // Falhas concluídas e reservas na mesma conta somam.
+    expect(evaluateLoginRateLimit({ ...base, failuresByIp: 3, emVooDoIp: 2, emVooDoIpNaConta: 2 }).allowed).toBe(false);
+  });
+
+  it("folga própria: falhas concluídas + reservas em voo do IP, de qualquer conta, até o teto da folga", () => {
+    const abaixo = { ...base, failuresByIp: 2, emVooDoIp: RATE_LIMIT.maxTentativasPorIpComEmVoo - 3 };
+    expect(evaluateLoginRateLimit(abaixo).allowed).toBe(true);
+    const d = evaluateLoginRateLimit({ ...abaixo, emVooDoIp: RATE_LIMIT.maxTentativasPorIpComEmVoo - 2 });
+    // Bloqueio passageiro: as reservas em voo terminam em menos de 1 s.
+    expect(d).toMatchObject({ allowed: false, reason: "ip_bloqueado", retryAfterSeconds: RATE_LIMIT.emVooSeconds });
+  });
+
+  it("descontarPropriaReserva tira a própria linha das contagens de reservas em voo e da conta, não das falhas concluídas", () => {
+    const lido = { failuresByIp: 3, failuresByUser: 4, ipHadRecentSuccess: false, emVooDoIp: 2, emVooDoIpNaConta: 1 };
+    expect(descontarPropriaReserva(lido, true)).toEqual({ ...lido, failuresByUser: 3, emVooDoIp: 1, emVooDoIpNaConta: 0 });
+    expect(descontarPropriaReserva(lido, false)).toEqual(lido);
+  });
+
+  it("cadastro: toda reserva em voo do IP pesa no teto por IP", () => {
+    const lido = { ...base, emVooDoIp: 5, emVooDoIpNaConta: 0 };
+    expect(evaluateLoginRateLimit(lido).allowed).toBe(true);
+    expect(evaluateLoginRateLimit(reservasDoIpContamNoTeto(lido)).allowed).toBe(false);
+  });
+
+  it("os motivos que não contam incluem o erro do servidor, e nunca a reserva em voo", () => {
+    expect(MOTIVOS_QUE_NAO_CONTAM).toEqual(expect.arrayContaining(["ip_bloqueado", "usuario_bloqueado", TENTATIVA_ERRO_INTERNO]));
+    expect(MOTIVOS_QUE_NAO_CONTAM).not.toContain(TENTATIVA_EM_ANDAMENTO);
   });
 });

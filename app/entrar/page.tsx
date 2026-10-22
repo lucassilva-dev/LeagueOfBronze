@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 
 import Entrar from "@/components/inscricao/entrar";
+import { caminhoDaTrocaDeSenha } from "@/components/inscricao/navegar";
 import { Eyebrow } from "@/components/lob/ui";
 import { getMessages } from "@/lib/i18n/server";
 import { JOGADOR_COOKIE, identidadePorToken } from "@/lib/jogadores/auth";
@@ -13,10 +14,11 @@ import { destinoDeVolta } from "@/lib/destino-de-volta";
 /** Dinâmica pela CSP por nonce e porque lê a sessão. */
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "Entrar · League of Bronze",
-  robots: { index: false, follow: false },
-};
+/** Título no idioma da visita ("Sign in" em inglês); a página segue fora dos buscadores. */
+export async function generateMetadata(): Promise<Metadata> {
+  const { metadados } = await getMessages();
+  return { title: metadados.entrar.titulo, robots: { index: false, follow: false } };
+}
 
 /**
  * Layout PRÓPRIO, sem o `LobShell`.
@@ -45,10 +47,13 @@ export default async function EntrarPage({
   if (admin) redirect("/admin");
 
   const jogador = await identidadePorToken(jar.get(JOGADOR_COOKIE)?.value).catch(() => null);
-  if (jogador) redirect(volta ?? "/minha-inscricao");
+  // Com senha provisória pendente, a troca primeiro (levando o destino junto) — o mesmo
+  // caminho de quem acaba de entrar por esta tela.
+  if (jogador) redirect(jogador.mustChangePassword ? caminhoDaTrocaDeSenha(volta) : (volta ?? "/minha-inscricao"));
 
   return (
-    <main
+    // <div>, não <main>: o <main id="conteudo"> é um só e mora no SiteFrame, por fora.
+    <div
       style={{
         // Ocupa a altura útil entre cabeçalho e rodapé para o cartão ficar no meio da
         // tela, e não colado no topo com um vazio embaixo.
@@ -85,6 +90,6 @@ export default async function EntrarPage({
           </Link>
         </p>
       </div>
-    </main>
+    </div>
   );
 }

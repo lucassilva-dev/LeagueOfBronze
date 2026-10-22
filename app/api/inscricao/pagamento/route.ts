@@ -16,6 +16,9 @@ export const dynamic = "force-dynamic";
  * como conferido, e o caixa deixaria de significar alguma coisa.
  *
  * Sem corpo de requisição: quem paga é sempre quem está na sessão.
+ *
+ * Os erros levam um `codigo` estável além do texto (fixo em português): é por ele que
+ * "Minha inscrição" mostra a mensagem no idioma de quem lê (`inscricao.erros`).
  */
 export async function POST(request: NextRequest) {
   if (!mesmaOrigem(request)) {
@@ -24,18 +27,24 @@ export async function POST(request: NextRequest) {
 
   const identidade = await getJogadorIdentity(request);
   if (!identidade) {
-    return NextResponse.json({ error: "Entre na sua conta primeiro." }, { status: 401 });
+    return NextResponse.json({ error: "Entre na sua conta primeiro.", codigo: "sem_sessao" }, { status: 401 });
   }
 
   try {
     const resultado = await declararPagamento(identidade.id);
 
     if (resultado === "sem_inscricao") {
-      return NextResponse.json({ error: "Você ainda não tem inscrição nesta edição." }, { status: 404 });
+      return NextResponse.json(
+        { error: "Você ainda não tem inscrição nesta edição.", codigo: "sem_inscricao" },
+        { status: 404 },
+      );
     }
     if (resultado === "nao_permitido") {
       return NextResponse.json(
-        { error: "Esse pagamento já foi tratado pela organização. Fale com ela se algo estiver errado." },
+        {
+          error: "Esse pagamento já foi tratado pela organização. Fale com ela se algo estiver errado.",
+          codigo: "pagamento_ja_tratado",
+        },
         { status: 409 },
       );
     }

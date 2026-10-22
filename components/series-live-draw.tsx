@@ -24,6 +24,8 @@ type Sorteio = {
   tipo: string;
   semente: string;
   autor: string;
+  /** Time que recebeu a carta (ausente no sorteio duplo, que vale para os dois). */
+  teamId?: string;
   resultado: string;
   detalhe?: { letras?: [string, string]; campeoes?: number };
 };
@@ -238,6 +240,16 @@ export function SeriesLiveDraw({
       : null;
   const redTeam = blueTeam ? (blueTeam.id === teamA?.id ? teamB : teamA) : null;
 
+  /**
+   * O último registro é um SORTEIO de carta (não uma correção à mão) e a carta na tela é a
+   * que ele deu. Só então as letras dele descrevem o que está à vista.
+   */
+  const ultimoValeParaACartaAtual =
+    ultimo?.tipo === "carta" &&
+    (ultimo.teamId
+      ? cardByTeam[ultimo.teamId] === ultimo.resultado
+      : Object.values(cardByTeam).includes(ultimo.resultado));
+
   const renderTeam = (team: TeamRef | null) => {
     if (!team) return null;
     return (
@@ -298,8 +310,10 @@ export function SeriesLiveDraw({
           {renderTeam(teamB)}
         </div>
 
-        {/* As letras completam a carta: sem elas o ABCDRAFT não diz o que fazer. */}
-        {ultimo?.detalhe?.letras ? (
+        {/* As letras completam a carta: sem elas o ABCDRAFT não diz o que fazer. Mas só valem
+            enquanto a carta na tela é a que AQUELE sorteio deu: depois de uma correção à mão,
+            letras e semente antigas embaixo da carta nova pareciam ter produzido a nova. */}
+        {ultimo?.detalhe?.letras && ultimoValeParaACartaAtual ? (
           <div className="mt-3 rounded-xl border border-accent2/30 bg-accent2/[0.06] p-3 text-center">
             <p className="text-[10px] uppercase tracking-[0.16em] text-muted">{t.sorteioLetras}</p>
             <p className="mt-1 text-3xl font-bold tracking-[0.2em] text-accent2">
@@ -318,7 +332,15 @@ export function SeriesLiveDraw({
           recalculá-lo depois — mostrar isso é o que separa "confie em nós" de
           "confira você mesmo".
         */}
-        {ultimo ? (
+        {/* Só sorteio de verdade tem semente. A correção à mão (registro `carta_manual`, sem
+            semente) não pode sair como "semente: · sorteado por fulano" — ela não foi
+            sorteada. Ela ganha a própria linha, «correção manual por fulano», para a carta na
+            tela não ficar sem procedência; o detalhe continua no histórico da série. */}
+        {ultimo?.tipo === "carta_manual" ? (
+          <p className="mt-3 text-center text-[10.5px] text-muted">
+            {t.sorteioCorrecaoManual} {ultimo.autor}
+          </p>
+        ) : ultimo?.semente ? (
           <p className="mt-3 text-center text-[10.5px] text-muted">
             <span className="font-mono">
               {t.sorteioSemente}: {ultimo.semente}

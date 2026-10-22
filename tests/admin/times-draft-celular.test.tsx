@@ -117,9 +117,10 @@ describe("Times e vagas no celular", () => {
     expect(screen.getAllByText("Nreserva").length).toBeGreaterThan(0);
     expect(screen.getByText("na sobra")).toBeTruthy();
 
-    // O botão da sobra ocupa o cartão e continua chamando a mesma ação.
+    // O botão da sobra ocupa o cartão e continua chamando a mesma ação — com a situação que a
+    // tela via, para o servidor recusar (409) se outra pessoa mudou antes.
     fireEvent.click(screen.getByRole("button", { name: "Voltar para apto" }));
-    expect(executar).toHaveBeenCalledWith("ficha", { inscricaoId: "reserva", situacao: "apto" });
+    expect(executar).toHaveBeenCalledWith("ficha", { inscricaoId: "reserva", situacao: "apto", situacaoAnterior: "sobra" });
   });
 });
 

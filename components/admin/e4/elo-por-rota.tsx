@@ -1013,7 +1013,9 @@ export function EloPorRota({
   const quadro = useMemo(() => montarEloPorRota(jogadores, modo), [jogadores, modo]);
   const destaques = useMemo(() => destaquesDoQuadro(quadro), [quadro]);
   // O print circula dias depois: a data diz de quando é o retrato.
-  const [hoje] = useState(() => new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }));
+  const [hoje] = useState(() =>
+    new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" }),
+  );
 
   const props = { quadro, destaques, modo, times, hoje };
 

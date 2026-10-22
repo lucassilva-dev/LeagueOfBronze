@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import { Eyebrow, GoldTitle, TeamMark } from "@/components/lob/ui";
@@ -7,12 +8,18 @@ import { calendarioEDestaTemporada } from "@/lib/calendario-4a";
 import { semTemporadaAoVivo } from "@/lib/fase-do-site";
 import { teamColor } from "@/lib/design";
 import { diaEMes } from "@/lib/i18n/messages/paginas-home";
+import { metadadosDaPagina } from "@/lib/i18n/metadados";
 import { getMessages } from "@/lib/i18n/server";
 import { buildDesignTeams } from "@/lib/roster";
 import { getServerDataset } from "@/lib/server-data";
 import { calculateStandings } from "@/lib/tournament";
 
 export const dynamic = "force-dynamic";
+
+/** Título e descrição próprios, no idioma da visita (lib/i18n/messages/metadados.ts). */
+export async function generateMetadata(): Promise<Metadata> {
+  return metadadosDaPagina("tabela", "/tabela");
+}
 
 const GRID = "44px 1fr 46px 46px 46px 56px 60px 84px";
 
@@ -74,9 +81,16 @@ export default async function TabelaPage() {
   const teamsById = new Map(buildDesignTeams(dataset).map((team) => [team.id, team]));
   // Dia da 1ª rodada: o da primeira série da temporada no ar (em Brasília).
   const primeiraSerie = buildRegularGames(dataset)[0];
-  const intro = primeiraSerie?.dateKey
-    ? textos.tabelaIntro.replace("{data}", diaEMes(primeiraSerie.dateKey, t.compartilhados.localeTag))
-    : textos.tabelaIntroSemData;
+  // "Zerada até o apito inicial" só vale ANTES da primeira série decidida: com a tabela já
+  // andando (ou fechada), a frase contradizia os pontos logo abaixo dela.
+  const comecou = standings.some((row) => row.seriesPlayed > 0);
+  const intro = comecou
+    ? dataset.tournament.status === "finished"
+      ? textos.tabelaIntroEncerrada
+      : textos.tabelaIntroEmAndamento
+    : primeiraSerie?.dateKey
+      ? textos.tabelaIntro.replace("{data}", diaEMes(primeiraSerie.dateKey, t.compartilhados.localeTag))
+      : textos.tabelaIntroSemData;
 
   return (
     <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "0 clamp(16px,4vw,24px) 96px" }}>
@@ -90,16 +104,23 @@ export default async function TabelaPage() {
 
       <section className="lob-fade">
         <div className="lob-scroll" style={{ overflowX: "auto", border: "1px solid rgba(201,138,75,.20)", borderRadius: 3, background: "linear-gradient(180deg,#1a150d,#120e08)" }}>
-          <div style={{ minWidth: 680 }}>
-            <div style={{ display: "grid", gridTemplateColumns: GRID, alignItems: "center", gap: 6, padding: "13px 18px", background: "rgba(201,138,75,.08)", fontSize: 10.5, letterSpacing: ".10em", color: "#a98a5f" }}>
-              <span>{textos.tabelaColPosicao}</span>
-              <span>{textos.tabelaColTime}</span>
-              <span style={{ textAlign: "center" }}>{textos.tabelaColJogos}</span>
-              <span style={{ textAlign: "center" }}>{textos.tabelaColVitorias}</span>
-              <span style={{ textAlign: "center" }}>{textos.tabelaColDerrotas}</span>
-              <span style={{ textAlign: "center" }}>{textos.tabelaColSaldo}</span>
-              <span style={{ textAlign: "center" }}>{textos.tabelaColPontos}</span>
-              <span style={{ textAlign: "center" }}>{textos.tabelaColElenco}</span>
+          {/*
+            Semântica de TABELA por ARIA, com o desenho de grade de sempre. Antes cada linha
+            era um link inteiro, e o leitor de tela lia "1 PANTERA 3 2 1 +2 6 25" sem dizer
+            o que era cada número. Agora cada célula responde ao seu cabeçalho; o link fica
+            no nome do time e se estica por cima da linha (.lob-linha-link), então clicar em
+            qualquer ponto dela continua levando ao time.
+          */}
+          <div role="table" aria-label={textos.tabelaTitulo} style={{ minWidth: 680 }}>
+            <div role="row" style={{ display: "grid", gridTemplateColumns: GRID, alignItems: "center", gap: 6, padding: "13px 18px", background: "rgba(201,138,75,.08)", fontSize: 10.5, letterSpacing: ".10em", color: "#a98a5f" }}>
+              <span role="columnheader">{textos.tabelaColPosicao}</span>
+              <span role="columnheader">{textos.tabelaColTime}</span>
+              <span role="columnheader" style={{ textAlign: "center" }}>{textos.tabelaColJogos}</span>
+              <span role="columnheader" style={{ textAlign: "center" }}>{textos.tabelaColVitorias}</span>
+              <span role="columnheader" style={{ textAlign: "center" }}>{textos.tabelaColDerrotas}</span>
+              <span role="columnheader" style={{ textAlign: "center" }}>{textos.tabelaColSaldo}</span>
+              <span role="columnheader" style={{ textAlign: "center" }}>{textos.tabelaColPontos}</span>
+              <span role="columnheader" style={{ textAlign: "center" }}>{textos.tabelaColElenco}</span>
             </div>
             {standings.map((row) => {
               const team = teamsById.get(row.teamId);
@@ -108,24 +129,24 @@ export default async function TabelaPage() {
               // Linha de corte: a borda de cima do primeiro que fica de fora é tracejada e dourada.
               const primeiroForaDoCorte = row.position === classificados + 1;
               return (
-              <Link
+              <div
                 key={row.teamId}
-                href={`/times/${row.teamSlug}`}
+                role="row"
                 data-classificado={classificado ? "sim" : undefined}
-                style={{ display: "grid", gridTemplateColumns: GRID, alignItems: "center", gap: 6, padding: "14px 18px", borderTop: primeiroForaDoCorte ? "1px dashed rgba(232,184,120,.55)" : "1px solid rgba(201,138,75,.10)", fontSize: 13, textDecoration: "none" }}
+                style={{ position: "relative", display: "grid", gridTemplateColumns: GRID, alignItems: "center", gap: 6, padding: "14px 18px", borderTop: primeiroForaDoCorte ? "1px dashed rgba(232,184,120,.55)" : "1px solid rgba(201,138,75,.10)", fontSize: 13 }}
               >
-                <span className="lob-display" style={{ color: classificado ? "#cfa877" : "#6f6656", fontSize: 16 }}>{row.position}</span>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                <span role="cell" className="lob-display" style={{ color: classificado ? "#cfa877" : "#6f6656", fontSize: 16 }}>{row.position}</span>
+                <div role="cell" style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                   <TeamMark imageUrl={team?.imageUrl} color={color} name={row.teamName} size={30} diamond={11} />
-                  <div style={{ color: "#f0e9dd", fontWeight: 600, letterSpacing: ".02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.teamName}</div>
+                  <Link href={`/times/${row.teamSlug}`} className="lob-linha-link" style={{ color: "#f0e9dd", fontWeight: 600, letterSpacing: ".02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: "none" }}>{row.teamName}</Link>
                 </div>
-                <span style={{ textAlign: "center", color: "#8f8472" }}>{row.seriesPlayed}</span>
-                <span style={{ textAlign: "center", color: "#8f8472" }}>{row.seriesWon}</span>
-                <span style={{ textAlign: "center", color: "#8f8472" }}>{row.seriesLost}</span>
-                <span style={{ textAlign: "center", color: "#8f8472" }}>{row.gameDiff > 0 ? `+${row.gameDiff}` : row.gameDiff}</span>
-                <span style={{ textAlign: "center", color: "#f0e9dd", fontWeight: 700 }}>{row.points}</span>
-                <span className="lob-display" style={{ textAlign: "center", color: "#cfa877" }}>{team?.total ?? 0}</span>
-              </Link>
+                <span role="cell" style={{ textAlign: "center", color: "#8f8472" }}>{row.seriesPlayed}</span>
+                <span role="cell" style={{ textAlign: "center", color: "#8f8472" }}>{row.seriesWon}</span>
+                <span role="cell" style={{ textAlign: "center", color: "#8f8472" }}>{row.seriesLost}</span>
+                <span role="cell" style={{ textAlign: "center", color: "#8f8472" }}>{row.gameDiff > 0 ? `+${row.gameDiff}` : row.gameDiff}</span>
+                <span role="cell" style={{ textAlign: "center", color: "#f0e9dd", fontWeight: 700 }}>{row.points}</span>
+                <span role="cell" className="lob-display" style={{ textAlign: "center", color: "#cfa877" }}>{team?.total ?? 0}</span>
+              </div>
               );
             })}
           </div>

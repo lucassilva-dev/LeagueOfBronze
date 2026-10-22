@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { CAMINHO_TROCA_DE_SENHA } from "@/components/inscricao/navegar";
 import type { Messages } from "@/lib/i18n/messages";
 import { EVENTO_SESSAO } from "@/lib/sessao-mudou";
 
@@ -115,6 +116,17 @@ export function SessaoNoCabecalho({ t }: Readonly<{ t: Rotulos }>) {
   }, [aberto]);
 
   async function sair() {
+    // PNL-01: com rascunho do painel por salvar, sair da conta o descartaria sem pergunta —
+    // o "Sair" é um botão, e a guarda do painel só pega cliques em link. O painel marca o
+    // <html> com `data-lob-painel-sujo` enquanto há trabalho a perder; a pergunta vem ANTES
+    // de qualquer logout.
+    const raiz = document.documentElement;
+    if (raiz.dataset.lobPainelSujo === "1") {
+      if (!window.confirm(t.sessaoSairPainelSujo)) return;
+      // A pessoa já respondeu: o aviso de sair da página (beforeunload) do painel, que
+      // dispara na navegação do fim, pode ler isto para não perguntar em dobro.
+      raiz.dataset.lobSaidaConfirmada = "1";
+    }
     setSaindo(true);
     // Sai das DUAS: se a pessoa está nas duas e clica em sair, deixar uma de pé seria
     // exatamente o tipo de estado ambíguo que este componente existe para acabar.
@@ -127,6 +139,11 @@ export function SessaoNoCabecalho({ t }: Readonly<{ t: Rotulos }>) {
     setSessao(await buscar());
     // Recarrega a página: o painel e as telas com sessão precisam refletir a saída.
     window.location.assign("/");
+    // Se a navegação não levar a página embora, a marca não pode ficar para sempre e
+    // desligar a guarda de fechar a aba do painel.
+    window.setTimeout(() => {
+      delete raiz.dataset.lobSaidaConfirmada;
+    }, 1500);
   }
 
   // Enquanto a primeira busca não volta, nada é desenhado — piscar "entrar" e depois
@@ -180,6 +197,7 @@ export function IndicadorDeSessao({
     return (
       <Link
         href="/entrar"
+        className="lob-sessao-entrar"
         style={{
           padding: "6px 12px",
           borderRadius: 3,
@@ -207,9 +225,15 @@ export function IndicadorDeSessao({
 
   return (
     <div ref={caixa} style={{ position: "relative" }}>
+      {/*
+        O nome da conta ABRE o nome acessível: o aria-label substitui o texto visível, e com
+        o rótulo fixo o leitor de tela anunciava só "Abrir menu da conta" — sem dizer quem
+        está logado — e o comando de voz "clicar Nakay" não achava o botão. Abaixo de 520px
+        o nome some da tela (globals.css) e fica só aqui.
+      */}
       <button
         type="button"
-        aria-label={t.sessaoAbrirMenu}
+        aria-label={`${principal} · ${t.sessaoAbrirMenu}`}
         aria-expanded={aberto}
         onClick={onAlternar}
         className="lob-sessao-botao"
@@ -290,9 +314,14 @@ export function IndicadorDeSessao({
             ) : null}
           </div>
 
+          {/* Senha provisória pendente: o aviso LEVA à troca. Antes era só um recado, sem
+              link nem formulário, e nunca sumia (INS-01). */}
           {jogador?.precisaTrocarSenha ? (
-            <div
+            <Link
+              href={CAMINHO_TROCA_DE_SENHA}
+              onClick={onFechar}
               style={{
+                display: "block",
                 margin: "0 4px 6px",
                 padding: "7px 9px",
                 borderRadius: 4,
@@ -300,10 +329,11 @@ export function IndicadorDeSessao({
                 background: "rgba(224,163,58,.1)",
                 fontSize: 11.5,
                 color: "#f3d69a",
+                textDecoration: "none",
               }}
             >
-              {t.sessaoTrocarSenha}
-            </div>
+              {t.sessaoTrocarSenha} →
+            </Link>
           ) : null}
 
           <div style={{ height: 1, background: COR.linha, margin: "0 4px 6px" }} />
@@ -315,6 +345,9 @@ export function IndicadorDeSessao({
               </ItemDoMenu>
               <ItemDoMenu href="/capitao" onIr={onFechar}>
                 {t.sessaoPainelCapitao}
+              </ItemDoMenu>
+              <ItemDoMenu href={CAMINHO_TROCA_DE_SENHA} onIr={onFechar}>
+                {t.sessaoMenuTrocarSenha}
               </ItemDoMenu>
             </>
           ) : null}

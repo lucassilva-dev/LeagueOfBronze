@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
 
 
   try {
-    const { dataset, versao } = await endCurrentTournament();
+    const { dataset, versao, refeito } = await endCurrentTournament();
     /*
      * A VERSÃO vai junto. Esta rota grava pelo caminho incondicional, que INCREMENTA a
      * versão da linha; sem devolvê-la, o painel adotava o dataset novo e seguia com o
@@ -22,7 +22,16 @@ export async function POST(request: NextRequest) {
      * ter salvo nada, e com as duas saídas ruins (descartar o rascunho ou usar `force`,
      * que desliga a própria trava).
      */
-    return NextResponse.json({ dataset, versao, message: "Temporada encerrada e arquivada." });
+    /*
+     * Encerrar de novo uma temporada já encerrada é a ação de REFAZER o retrato arquivado
+     * (depois de corrigir a final, por exemplo) — `refeito` diz à tela qual das duas foi.
+     */
+    return NextResponse.json({
+      dataset,
+      versao,
+      refeito,
+      message: refeito ? "Retrato arquivado atualizado." : "Temporada encerrada e arquivada.",
+    });
   } catch (error) {
     /*
      * Conflito de versão não é falha de sistema: é outra pessoa tendo gravado entre a
@@ -32,7 +41,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof ConflitoDeVersaoError) {
       return NextResponse.json(
         {
-          error: "Alguém salvou o campeonato enquanto você encerrar a temporada. Recarregue e tente de novo.",
+          error: "Alguém salvou o campeonato enquanto você encerrava a temporada. Recarregue e tente de novo.",
           conflict: true,
           serverVersion: error.versaoAtual,
         },

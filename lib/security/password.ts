@@ -1,6 +1,7 @@
 import {
   createHmac,
   randomBytes,
+  randomInt,
   scrypt as scryptCallback,
   timingSafeEqual,
   type ScryptOptions,
@@ -103,12 +104,65 @@ export async function verifyPassword(
   return derived.length === expected.length && timingSafeEqual(derived, expected);
 }
 
+/**
+ * Por que a senha foi recusada, como CÓDIGO estável — o texto depende do idioma de quem
+ * lê (o cadastro de jogador responde em inglês no site em inglês), o código não.
+ */
+export type MotivoDeSenhaFraca = "senha_curta" | "senha_longa" | "senha_fraca";
+
+export const MENSAGENS_DE_SENHA_FRACA: Record<"pt" | "en", Record<MotivoDeSenhaFraca, string>> = {
+  pt: {
+    senha_curta: "A senha precisa ter pelo menos 12 caracteres.",
+    senha_longa: "A senha é longa demais (máximo de 200 caracteres).",
+    senha_fraca: "A senha precisa combinar letras e números.",
+  },
+  en: {
+    senha_curta: "The password must be at least 12 characters long.",
+    senha_longa: "The password is too long (200 characters at most).",
+    senha_fraca: "The password must mix letters and numbers.",
+  },
+};
+
+export function motivoDeSenhaFraca(password: string): MotivoDeSenhaFraca | null {
+  if (password.length < 12) return "senha_curta";
+  if (password.length > 200) return "senha_longa";
+  if (!/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) return "senha_fraca";
+  return null;
+}
+
 /** Senha forte o suficiente para uma conta que controla o campeonato inteiro. */
 export function validatePasswordStrength(password: string): string | null {
-  if (password.length < 12) return "A senha precisa ter pelo menos 12 caracteres.";
-  if (password.length > 200) return "A senha é longa demais (máximo de 200 caracteres).";
-  if (!/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
-    return "A senha precisa combinar letras e números.";
+  const motivo = motivoDeSenhaFraca(password);
+  return motivo ? MENSAGENS_DE_SENHA_FRACA.pt[motivo] : null;
+}
+
+/*
+ * Alfabeto da senha provisória: minúsculas e dígitos SEM os que se confundem quando a
+ * senha é ditada ou copiada de um print no grupo (0/o, 1/l/i). Fica com 31 símbolos.
+ */
+const ALFABETO_PROVISORIO = "abcdefghjkmnpqrstuvwxyz23456789";
+const BLOCOS_PROVISORIOS = 3;
+const TAMANHO_DO_BLOCO = 4;
+
+/**
+ * Senha provisória que a organização entrega ao jogador que esqueceu a dele.
+ *
+ * 12 símbolos sorteados com `randomInt` (uniforme, do gerador criptográfico) em 3 blocos
+ * separados por hífen: "k7wm-3qfa-x9pe". Dá ~59 bits — muito acima do que o limitador de
+ * tentativas deixa alguém chutar — e ainda é fácil de ler em voz alta.
+ *
+ * Sempre tem letra E número, então também passa em `validatePasswordStrength`: o jogador
+ * que só confirmar a provisória na tela de troca não esbarra na regra de senha.
+ */
+export function gerarSenhaProvisoria(): string {
+  for (;;) {
+    const blocos = Array.from({ length: BLOCOS_PROVISORIOS }, () =>
+      Array.from(
+        { length: TAMANHO_DO_BLOCO },
+        () => ALFABETO_PROVISORIO[randomInt(ALFABETO_PROVISORIO.length)],
+      ).join(""),
+    );
+    const senha = blocos.join("-");
+    if (/[a-z]/.test(senha) && /[0-9]/.test(senha)) return senha;
   }
-  return null;
 }

@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 import { getAdminIdentity } from "@/lib/admin-auth";
-import { getJogadorIdentity } from "@/lib/jogadores/auth";
+import {
+  JOGADOR_COOKIE,
+  atributosDoCookie,
+  getJogadorIdentity,
+  renovarCookieDeJogador,
+} from "@/lib/jogadores/auth";
 import { inscricaoIdDoJogador } from "@/lib/inscricoes/store";
 
 export const dynamic = "force-dynamic";
@@ -37,12 +42,20 @@ export async function GET(request: NextRequest) {
     // mostra "minha inscrição" ou "fazer inscrição".
     const temInscricao = jogador ? Boolean(await inscricaoIdDoJogador(jogador.id).catch(() => null)) : false;
 
+    // Renovação deslizante: o cabeçalho chama esta rota em toda página, então quem usa
+    // o site não vê a sessão vencer no meio do draft. Só depois de a identidade ter sido
+    // conferida por inteiro; falhar aqui não muda nada na resposta.
+    const renovado = jogador ? await renovarCookieDeJogador(request.cookies.get(JOGADOR_COOKIE)?.value) : null;
+
     const resposta = NextResponse.json({
       jogador: jogador
         ? { nome: jogador.displayName, temInscricao, precisaTrocarSenha: jogador.mustChangePassword }
         : null,
       organizacao: admin ? { nome: admin.displayName, master: admin.isMaster } : null,
     });
+    if (renovado) {
+      resposta.cookies.set({ name: renovado.name, value: renovado.value, ...atributosDoCookie(renovado.maxAge) });
+    }
     resposta.headers.set("Cache-Control", "no-store, private");
     return resposta;
   } catch {

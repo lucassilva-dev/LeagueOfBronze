@@ -7,7 +7,8 @@ import { ehErroDeRegra } from "@/lib/security/erros";
 /**
  * Resposta de erro padrão das rotas de admin.
  *
- * - ErroDeRegra  → mensagem vai para o usuário (é informação do produto).
+ * - ErroDeRegra  → mensagem vai para o usuário (é informação do produto), com o `codigo`
+ *   da regra quando ela tiver um — é por ele que a tela traduz.
  * - Qualquer outro → mensagem genérica + `ref`. O detalhe real sai só no log do
  *   servidor, com o mesmo `ref`. Assim continua dando para diagnosticar ("deu erro,
  *   ref a1b2c3d4") sem publicar o interior do banco na resposta HTTP.
@@ -19,7 +20,10 @@ export function respostaDeErro(
   status = 500,
 ): NextResponse {
   if (ehErroDeRegra(error)) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json(
+      { error: error.message, ...(error.codigo ? { codigo: error.codigo } : {}) },
+      { status: 400 },
+    );
   }
 
   const ref = randomUUID().slice(0, 8);

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import {
   ArrowLeftRight,
   BadgeCheck,
@@ -48,6 +49,7 @@ import { CalendarioDa4a } from "@/components/calendario-4a";
 import { IconeCarta, IconeCartas, SeloHex, type Icone, type PropsDoIcone } from "@/components/lob/icones";
 import { EloCrest, Eyebrow, GoldTitle, RoleIcon, SectionTitle } from "@/components/lob/ui";
 import { CARTAS_ATIVAS, type CardDef } from "@/lib/cards";
+import { metadadosDaPagina } from "@/lib/i18n/metadados";
 import { getMessages } from "@/lib/i18n/server";
 import { lerConfigOuNulo } from "@/lib/inscricoes/store";
 import type { CardId } from "@/lib/schema";
@@ -63,6 +65,11 @@ import type { CardId } from "@/lib/schema";
  * CSP for baseada em nonce.
  */
 export const dynamic = "force-dynamic";
+
+/** Título e descrição próprios, no idioma da visita (lib/i18n/messages/metadados.ts). */
+export async function generateMetadata(): Promise<Metadata> {
+  return metadadosDaPagina("regras", "/regras");
+}
 
 /**
  * /regras — regulamento da 4ª Edição (4º Campeonato dos Bronzes).

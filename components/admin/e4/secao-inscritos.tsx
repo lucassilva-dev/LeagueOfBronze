@@ -53,7 +53,7 @@ import {
 } from "@/lib/inscricoes/schema";
 import { TURNOS, type Turno } from "@/lib/inscricoes/turnos";
 import { getOpGgSummonerUrlFromNick } from "@/lib/opgg";
-import { AUTOR_RIOT } from "@/lib/riot/decidir";
+import { AUTOR_RIOT, itemEhDoRobo } from "@/lib/riot/decidir";
 
 /**
  * Matriz de conferência + gaveta do inscrito.
@@ -177,12 +177,14 @@ const DIA_MS = 24 * 60 * 60 * 1000;
  * Itens cujo veredicto depende de uma data-âncora — que pode não existir ainda, ou cuja
  * janela de medição ainda não abriu.
  *
- * Nos dois casos o item é "não avaliável", nunca "não cumpre" nem "cumpre": reprovar
+ * Nos dois casos ninguém afirma nada sobre o item, nem "não cumpre" nem "cumpre": reprovar
  * alguém porque a organização ainda não decidiu a data seria reprovar pela nossa
  * indecisão, e aprovar o (e) em outubro com o início marcado para novembro é afirmar
  * "jogou 5 partidas nos 10 dias antes do início" antes de esses 10 dias existirem — e,
- * aprovado, ninguém volta nele (deixa de ser pendência). Os outros cinco itens (a, b, d,
- * f, m) se avaliam a qualquer hora.
+ * aprovado, ninguém volta nele (deixa de ser pendência). Ele fica PENDENTE e intocado: é o
+ * robô da Riot que conta as partidas quando a janela abre, e qualquer gravação da
+ * organização no item o tiraria do robô. Até o início, (e) pendente não segura ninguém
+ * (`requisitosCumpridos`). Os outros cinco itens (a, b, d, f, m) se avaliam a qualquer hora.
  */
 const ANCORA_DO_ITEM: Partial<
   Record<
@@ -192,6 +194,27 @@ const ANCORA_DO_ITEM: Partial<
 > = {
   e: { campo: "inicio_campeonato", texto: "a data de início do campeonato", janelaDias: 10 },
 };
+
+/**
+ * Por que o item ainda não pode ser medido — ou nulo, se pode. Fica fora da gaveta porque a
+ * lista também lê: item que ninguém consegue resolver ainda não é "pendência" do filtro.
+ */
+function semBaseDoItem(item: ItemConferencia, config: EdicaoConfig, agoraMs: number): string | null {
+  const ancora = ANCORA_DO_ITEM[item];
+  if (!ancora) return null;
+  const valor = config[ancora.campo];
+  if (!valor) {
+    return `Ainda não existe ${ancora.texto}: sem ela este item não tem como ser medido. Deixe pendente — até o início não segura ninguém, e o robô da Riot conta as partidas quando a janela abrir.`;
+  }
+  const abre = Date.parse(valor) - ancora.janelaDias * DIA_MS;
+  if (Number.isFinite(abre) && agoraMs < abre) {
+    return `Este item olha os ${ancora.janelaDias} dias antes do início, e essa janela só abre em ${diaCurto(abre)}: até lá deixe pendente — o robô da Riot conta as partidas sozinho.`;
+  }
+  return null;
+}
+
+/** Os itens que o robô da Riot decide sozinho (`decidirSincronizacao`): (d), (e) e (m). */
+const ITENS_DO_ROBO: ReadonlySet<ItemConferencia> = new Set<ItemConferencia>(["d", "e", "m"]);
 
 const ROTULO_TURNO: Record<Turno, string> = { manha: "Manhã", tarde: "Tarde", noite: "Noite" };
 
@@ -585,7 +608,10 @@ type PropsRequisito = Readonly<{
   conferidoEm: string | null;
   /** Por que o item ainda não pode ser medido (data inexistente ou janela fechada). */
   semBase: string | null;
-  /** O item é do robô da Riot: ninguém da organização escreveu nele ainda. */
+  /**
+   * O item é do robô da Riot — um dos que ele decide, e ninguém da organização escreveu nele
+   * ainda (ou só o atalho antigo, no (e) «não avaliável» sem observação: ver `itemEhDoRobo`).
+   */
   doRobo: boolean;
   verCriterio: boolean;
   observacaoAberta: boolean;
@@ -684,10 +710,13 @@ function Requisito({
         <p style={{ margin: "6px 0 0", fontSize: 11.5, lineHeight: 1.55, color: C.warnSoft }}>{semBase}</p>
       ) : null}
 
-      {doRobo && conferidoPor === AUTOR_RIOT ? (
+      {/* Também no item que o robô ainda não tocou: marcar ali (o atalho fazia isso no (e))
+          tira o item dele em silêncio, e a regra deixa de ser conferida pela Riot. */}
+      {doRobo ? (
         <p style={{ margin: "6px 0 0", fontSize: 11.5, lineHeight: 1.55, color: C.ink3 }}>
-          Conferido pela Riot e atualizado todo dia. Marcar outro estado (ou escrever uma observação) tira
-          este item do robô — daí em diante vale o que a organização gravou.
+          {conferidoPor === AUTOR_RIOT
+            ? "Conferido pela Riot e atualizado todo dia. Marcar outro estado (ou escrever uma observação) tira este item do robô — daí em diante vale o que a organização gravou."
+            : "Quem confere este item é o robô da Riot, sozinho. Marcar um estado (ou escrever uma observação) aqui tira o item do robô — daí em diante vale o que a organização gravar."}
         </p>
       ) : null}
 
@@ -836,6 +865,10 @@ type PropsGaveta = Readonly<{
   ocupado: boolean;
   podeConferir: boolean;
   ultimoErro: string | null;
+  /** O que a última ação que deu certo respondeu (o resumo do «atualizar da Riot»). */
+  ultimaMensagem: string | null;
+  /** Só a master: mostra o «Gerar senha provisória» na aba Contato. */
+  podeRedefinirSenha: boolean;
   /** Posição na lista filtrada; nulo quando o filtro atual esconde quem está aberto. */
   posicao: Readonly<{ atual: number; total: number }> | null;
   anterior: Inscrito | null;
@@ -853,6 +886,8 @@ function GavetaInscrito({
   ocupado,
   podeConferir,
   ultimoErro,
+  ultimaMensagem,
+  podeRedefinirSenha,
   posicao,
   anterior,
   proximo,
@@ -864,6 +899,8 @@ function GavetaInscrito({
   const compacto = useCompacto();
   const [saida, setSaida] = useState<Saida | null>(null);
   const [resultado, setResultado] = useState<"salvo" | "falhou" | null>(null);
+  /** O «atualizar da Riot» daqui: o aviso do topo fica atrás da gaveta, então a resposta vem para cá. */
+  const [resultadoRiot, setResultadoRiot] = useState<"ok" | "falhou" | null>(null);
   const [observacoesAbertas, setObservacoesAbertas] = useState<ReadonlySet<ItemConferencia>>(
     () => new Set(),
   );
@@ -941,18 +978,18 @@ function GavetaInscrito({
   }
 
   /** Por que o item ainda não pode ser medido — ou nulo, se pode. */
-  const semBaseDe = (item: ItemConferencia): string | null => {
-    const ancora = ANCORA_DO_ITEM[item];
-    if (!ancora) return null;
-    const valor = config[ancora.campo];
-    if (!valor) {
-      return `Ainda não existe ${ancora.texto}: sem ela este item não tem como ser medido — o estado honesto é «não avaliável».`;
-    }
-    const abre = Date.parse(valor) - ancora.janelaDias * DIA_MS;
-    if (Number.isFinite(abre) && agora < abre) {
-      return `Este item olha os ${ancora.janelaDias} dias antes do início, e essa janela só abre em ${diaCurto(abre)}: até lá o estado honesto é «não avaliável».`;
-    }
-    return null;
+  const semBaseDe = (item: ItemConferencia): string | null => semBaseDoItem(item, config, agora);
+
+  /** O item ainda é do robô da Riot (ver `itemEhDoRobo`) — e é um dos que ele decide. */
+  const doRoboDe = (item: ItemConferencia): boolean => {
+    if (!ITENS_DO_ROBO.has(item)) return false;
+    const salvo = itemSalvo(item);
+    return itemEhDoRobo({
+      item,
+      estado: salvo.estado,
+      observacao: salvo.observacao === "" ? null : salvo.observacao,
+      conferido_por: salvo.conferidoPor,
+    });
   };
 
   // ------------------------------------------------ edição
@@ -1026,6 +1063,20 @@ function GavetaInscrito({
     nomeReal: rascunho.ficha.nomeReal !== undefined && nomeReal.trim() !== fichaSalva.nomeReal.trim(),
   };
 
+  /*
+   * Cada requisito leva também o estado que ESTA TELA viu (`estadoAnterior`): o servidor só
+   * grava se o banco ainda estiver nele, na mesma instrução, e senão responde 409 sem gravar
+   * o item. Sem isso, uma gaveta aberta antes de outro organizador (ou o robô) recusar o (A)
+   * devolvia o (A) a «ok» pelo atalho sem ninguém ver a recusa. Vai mesmo quando só a
+   * observação mudou: ela justifica o veredicto, e escrita sobre um veredicto que já é outro
+   * vira justificativa do que a pessoa nem viu. Linha que não veio do banco (ou com um
+   * estado que esta tela não conhece) vai sem a trava, como antes.
+   */
+  const estadoVisto = (item: ItemConferencia) => {
+    const registro = conferencias.get(item);
+    return ESTADOS_CONFERENCIA.find((e) => e === registro?.estado);
+  };
+
   const conferenciasMudadas = ITENS_CONFERENCIA.flatMap((item) => {
     const doItem = rascunho.itens[item];
     const salvo = itemSalvo(item);
@@ -1033,11 +1084,13 @@ function GavetaInscrito({
     const observacaoMudou =
       doItem?.observacao !== undefined && doItem.observacao.trim() !== salvo.observacao.trim();
     if (!estadoMudou && !observacaoMudou) return [];
+    const anterior = estadoVisto(item);
     return [
       {
         item,
         ...(estadoMudou && { estado: doItem!.estado }),
         ...(observacaoMudou && { observacao: doItem!.observacao!.trim() }),
+        ...(anterior !== undefined && { estadoAnterior: anterior }),
       },
     ];
   });
@@ -1082,12 +1135,24 @@ function GavetaInscrito({
       return novo === "risco" || novo === "recusado";
     });
 
+  // A mesma regra do servidor (store.ts, `atualizarInscricao`): tirar alguém de Apto/Sobra
+  // para Pendente SEGURA a pessoa (`promocao_automatica = false`); qualquer outra situação
+  // escolhida à mão a solta. Sem trocar a situação, vale o que está gravado.
+  const seguradoAoSalvar = mudouNaFicha.situacao
+    ? situacao === "pendente" && (fichaSalva.situacao === "apto" || fichaSalva.situacao === "sobra")
+    : inscrito.promocao_automatica === false;
+
   const pendentes = ITENS_CONFERENCIA.filter((item) => estadoDe(item) === "pendente");
   // Item pendente que ainda é do robô (ex.: (D) sem ranque na solo/duo) fica fora do atalho:
   // marcar «Cumpre» ali afirmaria o contrário do que a Riot acabou de mostrar.
   const doRoboPendentes = pendentes.filter((item) => itemSalvo(item).conferidoPor === AUTOR_RIOT);
-  const pendentesDoAtalho = pendentes.filter((item) => !doRoboPendentes.includes(item));
-  const pendentesSemBase = pendentesDoAtalho.filter((item) => semBaseDe(item));
+  // O que ainda não dá para medir também fica fora — e INTOCADO. O atalho gravava ali «não
+  // avaliável» com o nome do organizador, e isso tirava o (E) do robô: a regra 4 deixava de
+  // ser contada pela Riot para todo mundo conferido pelo atalho.
+  const pendentesSemBase = pendentes.filter((item) => !doRoboPendentes.includes(item) && semBaseDe(item));
+  const pendentesDoAtalho = pendentes.filter(
+    (item) => !doRoboPendentes.includes(item) && !pendentesSemBase.includes(item),
+  );
 
   // ------------------------------------------------ ações
 
@@ -1113,11 +1178,16 @@ function GavetaInscrito({
 
   /** Atalho do caso comum: quem cumpre tudo resolve em um clique, e ainda dá para ajustar. */
   const marcarPendentesComoCumpre = () => {
-    for (const item of pendentesDoAtalho) {
-      // Item que ainda não dá para medir não "cumpre": o estado honesto é «não avaliável».
-      editarItem(item, "estado", semBaseDe(item) ? "nao_avaliavel" : "ok");
-    }
+    // Só o que dá para medir: o item sem base fica de fora da lista (ver `pendentesSemBase`).
+    for (const item of pendentesDoAtalho) editarItem(item, "estado", "ok");
     segurarFoco();
+  };
+
+  const atualizarDaRiot = async () => {
+    setResultadoRiot(null);
+    const ok = await executar("sincronizar_riot", { inscricaoId: inscrito.id });
+    if (!montada.current) return;
+    setResultadoRiot(ok ? "ok" : "falhou");
   };
 
   const salvar = async (depois?: () => void) => {
@@ -1125,10 +1195,16 @@ function GavetaInscrito({
     // Zera o resultado ANTES: senão, numa nova tentativa depois de uma falha, o rodapé
     // continuava dizendo "Não foi possível salvar" durante o próprio salvamento.
     setResultado(null);
+    // O aviso da Riot lê a última resposta do painel, que passa a ser a deste salvamento.
+    setResultadoRiot(null);
     const ok = await executar("inscrito", {
       inscricaoId: inscrito.id,
       ...(conferenciasMudadas.length > 0 && { conferencias: conferenciasMudadas }),
-      ...(Object.keys(fichaPatch).length > 0 && { ficha: fichaPatch }),
+      // A ficha leva a situação que esta tela viu: mudou no banco (outra pessoa, a promoção
+      // automática), o servidor responde 409 e não grava a ficha.
+      ...(Object.keys(fichaPatch).length > 0 && {
+        ficha: { ...fichaPatch, situacaoAnterior: fichaSalva.situacao },
+      }),
     });
     // A gaveta pode ter sido trocada enquanto a resposta não vinha; o que vem depois é dela.
     if (!montada.current) return;
@@ -1262,8 +1338,9 @@ function GavetaInscrito({
       </Toolbar>
       {pendentesSemBase.length > 0 ? (
         <p style={{ margin: "6px 0 0", fontSize: 11, color: C.ink4 }}>
-          O atalho marca {pendentesSemBase.map((item) => `(${item.toUpperCase()})`).join(", ")} como «Não
-          avaliável»: ainda não dá para medir.
+          {pendentesSemBase.map((item) => `(${item.toUpperCase()})`).join(", ")}{" "}
+          {pendentesSemBase.length === 1 ? "fica" : "ficam"} fora do atalho: ainda não dá para medir, e quem conta as
+          partidas é o robô da Riot, quando a janela abrir.
         </p>
       ) : null}
       {doRoboPendentes.length > 0 ? (
@@ -1298,7 +1375,7 @@ function GavetaInscrito({
             conferidoPor={salvo.conferidoPor}
             conferidoEm={salvo.conferidoEm}
             semBase={semBaseDe(item)}
-            doRobo={salvo.conferidoPor === null || salvo.conferidoPor === AUTOR_RIOT}
+            doRobo={doRoboDe(item)}
             verCriterio={verCriterios}
             observacaoAberta={observacoesAbertas.has(item)}
             bloqueado={bloqueado}
@@ -1409,9 +1486,11 @@ function GavetaInscrito({
         </p>
       </fieldset>
 
+      {/* O jogador LÊ este campo em «Minha inscrição», logo abaixo da situação — o mesmo aviso
+          da observação de cada requisito. Nota interna da organização não vai aqui. */}
       <Field
         label="Observação da ficha"
-        hint="Vale para a inscrição inteira. Cada requisito tem a observação dele, na aba Requisitos."
+        hint="Vale para a inscrição inteira. O jogador lê esta observação em «Minha inscrição» — não escreva aqui o que é só da organização."
       >
         <Textarea
           value={observacao}
@@ -1477,6 +1556,8 @@ function GavetaInscrito({
           />
         </FieldGrid>
       </div>
+
+      {podeRedefinirSenha ? <SenhaProvisoria inscrito={inscrito} /> : null}
     </div>
   );
 
@@ -1594,9 +1675,11 @@ function GavetaInscrito({
           Este inscrito continua <b>Apto</b> — se o requisito marcado agora o tira do campeonato, ajuste a
           situação também.
         </p>
-      ) : inscrito.promocao_automatica === false && situacao === "pendente" ? (
+      ) : seguradoAoSalvar && situacao === "pendente" ? (
         <p style={{ margin: "-4px 0 10px", fontSize: 11.5, color: C.ink3 }}>
-          Segurado pela organização: o sistema não promove este inscrito a Apto sozinho.
+          {mudouNaFicha.situacao
+            ? "Ao salvar, fica segurado: o sistema não promove este inscrito a Apto sozinho — volte para Apto à mão quando for o caso."
+            : "Segurado pela organização: o sistema não promove este inscrito a Apto sozinho."}
         </p>
       ) : situacao === "pendente" ? (
         <p style={{ margin: "-4px 0 10px", fontSize: 11, color: C.ink4 }}>
@@ -1776,13 +1859,28 @@ function GavetaInscrito({
             ) : (
               <span style={{ color: C.ink4 }}>ainda não consultado</span>
             )}
-            <BotaoLink
-              disabled={bloqueado}
-              onClick={() => void executar("sincronizar_riot", { inscricaoId: inscrito.id })}
-            >
+            <BotaoLink disabled={bloqueado} onClick={() => void atualizarDaRiot()}>
               atualizar da Riot
             </BotaoLink>
           </div>
+          {/* A resposta do «atualizar da Riot» mora aqui: o aviso do topo da página fica atrás
+              da gaveta (e, no celular, ela é a tela inteira). "Outra atualização rodando", "a
+              Riot pediu pausa" e "robô desligado" voltam como sucesso, com texto. */}
+          {resultadoRiot && !ocupado ? (
+            <p
+              role={resultadoRiot === "falhou" ? "alert" : "status"}
+              style={{
+                margin: "6px 0 0",
+                fontSize: 11.5,
+                lineHeight: 1.5,
+                color: resultadoRiot === "falhou" ? C.dangerSoft : C.ink2,
+              }}
+            >
+              {resultadoRiot === "falhou"
+                ? (ultimoErro ?? "Não foi possível atualizar da Riot.")
+                : (ultimaMensagem ?? "Atualizado.")}
+            </p>
+          ) : null}
 
           <div role="tablist" aria-label="Partes da inscrição" style={{ display: "flex", gap: 4, marginTop: 10 }}>
             {ABAS.map((a, indice) => {
@@ -1851,6 +1949,170 @@ function GavetaInscrito({
       </div>
     </div>,
     document.body,
+  );
+}
+
+// ---------------------------------------------------------------- senha provisória
+
+/**
+ * «Gerar senha provisória» — a recuperação de senha de quem perdeu a da conta de jogador.
+ *
+ * O site não manda e-mail, então "esqueci a senha" não tem autoatendimento: a pessoa fala
+ * com a organização, e a master gera aqui uma provisória (`POST /api/admin/jogadores/senha`)
+ * para repassar no privado. O servidor não guarda a provisória e a conta fica obrigada a
+ * trocá-la.
+ *
+ * A senha aparece UMA vez: mora só no estado deste bloco e some ao trocar de aba, de
+ * inscrito ou fechar a gaveta. Nada aqui a grava no navegador.
+ *
+ * Dois passos, como abrir as inscrições: gerar derruba na hora todas as sessões do jogador
+ * (inclusive a de um capitão no meio do draft), e quem gerou passa a saber a senha dele.
+ */
+function SenhaProvisoria({ inscrito }: Readonly<{ inscrito: Inscrito }>) {
+  const [fase, setFase] = useState<"parado" | "confirmando" | "gerando">("parado");
+  const [gerada, setGerada] = useState<Readonly<{ senha: string; email: string | null }> | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+  const [copiada, setCopiada] = useState<"ok" | "falhou" | null>(null);
+  const contaId = inscrito.jogador_id ?? null;
+  const quem = `${inscrito.nick}#${inscrito.tag}`;
+
+  const gerar = async () => {
+    if (!contaId) return;
+    setFase("gerando");
+    setErro(null);
+    setCopiada(null);
+    try {
+      const r = await fetch("/api/admin/jogadores/senha", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: contaId }),
+        cache: "no-store",
+      });
+      const corpo = (await r.json().catch(() => ({}))) as {
+        senhaProvisoria?: unknown;
+        conta?: { email?: string };
+        error?: string;
+        missing?: string[];
+      };
+      if (!r.ok || typeof corpo.senhaProvisoria !== "string") {
+        const falta = corpo.missing?.length ? ` (falta: ${corpo.missing.join(", ")})` : "";
+        setErro(`${corpo.error ?? "Não foi possível gerar a senha provisória."}${falta}`);
+        return;
+      }
+      setGerada({ senha: corpo.senhaProvisoria, email: corpo.conta?.email ?? null });
+    } catch {
+      // A resposta pode ter se perdido DEPOIS de a senha mudar: aí a antiga já não vale e a
+      // nova não chegou. Gerar de novo resolve — vale sempre a última.
+      setErro("Não foi possível falar com o servidor. Se a senha chegou a mudar, gere de novo: vale sempre a última gerada.");
+    } finally {
+      setFase("parado");
+    }
+  };
+
+  const copiar = async () => {
+    if (!gerada) return;
+    try {
+      await navigator.clipboard.writeText(gerada.senha);
+      setCopiada("ok");
+    } catch {
+      setCopiada("falhou");
+    }
+  };
+
+  const texto: CSSProperties = { margin: "6px 0 0", fontSize: 12, lineHeight: 1.6, color: C.ink3 };
+
+  let conteudo: ReactNode;
+  if (!contaId) {
+    conteudo = (
+      <p style={texto}>
+        Esta inscrição não tem conta de jogador vinculada (foi feita antes das contas): não há senha para
+        redefinir por aqui.
+      </p>
+    );
+  } else if (gerada) {
+    conteudo = (
+      <div role="status">
+        <p style={texto}>
+          Senha provisória de <b style={{ color: C.ink }}>{quem}</b>
+          {gerada.email ? ` (conta ${gerada.email})` : ""}:
+        </p>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
+          <code
+            style={{
+              padding: "6px 10px",
+              borderRadius: 3,
+              border: `1px solid ${C.line2}`,
+              background: "rgba(0,0,0,.35)",
+              color: C.bronzeHi,
+              fontSize: 15,
+              letterSpacing: ".06em",
+              userSelect: "all",
+              overflowWrap: "anywhere",
+            }}
+          >
+            {gerada.senha}
+          </code>
+          <Button small onClick={() => void copiar()}>
+            Copiar
+          </Button>
+          {copiada === "ok" ? (
+            <span style={{ fontSize: 12, color: C.okSoft }}>Copiada.</span>
+          ) : copiada === "falhou" ? (
+            <span style={{ fontSize: 12, color: C.dangerSoft }}>O navegador não deixou copiar — selecione e copie à mão.</span>
+          ) : null}
+        </div>
+        <p style={{ ...texto, color: C.warnSoft }}>
+          Mande no PRIVADO do jogador, nunca no grupo. Ele entra com ela e troca a senha em seguida, na tela
+          /conta/senha. Ela
+          aparece só agora: ao sair desta aba ela some, e o servidor não a guarda. As sessões que ele tinha
+          abertas caíram.
+        </p>
+      </div>
+    );
+  } else if (fase === "confirmando") {
+    conteudo = (
+      <>
+        <p style={{ ...texto, color: C.warnSoft }}>
+          Gerar uma senha provisória para {quem}? A senha atual dele deixa de valer e todas as sessões abertas
+          caem na hora — inclusive a de capitão, se o draft estiver rodando.
+        </p>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+          <Button small tone="gold" onClick={() => void gerar()}>
+            Confirmar: gerar senha
+          </Button>
+          <Button small onClick={() => setFase("parado")}>
+            Cancelar
+          </Button>
+        </div>
+      </>
+    );
+  } else {
+    conteudo = (
+      <>
+        <p style={texto}>
+          Para quem perdeu a senha da conta: gera uma provisória para você repassar. Só a master vê isto.
+        </p>
+        <div style={{ marginTop: 8 }}>
+          <Button small disabled={fase === "gerando"} onClick={() => setFase("confirmando")}>
+            {fase === "gerando" ? "Gerando…" : "Gerar senha provisória"}
+          </Button>
+        </div>
+        {erro ? (
+          <p role="alert" style={{ ...texto, color: C.dangerSoft }}>
+            {erro}
+          </p>
+        ) : null}
+      </>
+    );
+  }
+
+  return (
+    <section aria-label="Senha da conta" style={{ marginTop: 18, paddingTop: 14, borderTop: `1px solid ${C.line}` }}>
+      <div style={{ fontSize: 10, letterSpacing: ".16em", textTransform: "uppercase", color: C.bronze }}>
+        Senha da conta
+      </div>
+      {conteudo}
+    </section>
   );
 }
 
@@ -1934,7 +2196,15 @@ function BarraDoRobo({
 
 // ---------------------------------------------------------------- seção
 
-export function SecaoInscritos({ dados, executar, ocupado, podeConferir, ultimoErro = null }: PropsSecao) {
+export function SecaoInscritos({
+  dados,
+  executar,
+  ocupado,
+  podeConferir,
+  ultimoErro = null,
+  ultimaMensagem = null,
+  podeRedefinirSenha = false,
+}: PropsSecao) {
   const [selecionadoId, setSelecionadoId] = useState<string | null>(null);
   const [busca, setBusca] = useState("");
   const [filtroSituacao, setFiltroSituacao] = useState("todos");
@@ -1987,6 +2257,9 @@ export function SecaoInscritos({ dados, executar, ocupado, podeConferir, ultimoE
         pagamento: pagamentoDe.get(i.id) ?? null,
         config,
         agoraMs: agora,
+        // A lista inteira: sem ela o alerta de conta da Riot repetida (`mesma_conta`) não é
+        // calculado — o índice do banco não pega "VENANCIO" × "VENÂNCIO", e a Riot sim.
+        inscritos,
       });
       if (alertas.length > 0) mapa.set(i.id, alertas);
     }
@@ -2035,10 +2308,14 @@ export function SecaoInscritos({ dados, executar, ocupado, podeConferir, ultimoE
 
     // "Com pendência" é só o estado `pendente` — item sem linha no banco conta como
     // pendente também. "não avaliável" fica de fora de propósito: ali não há nada que a
-    // organização possa fazer enquanto a data não for decidida.
+    // organização possa fazer enquanto a data não for decidida. Pelo mesmo motivo fica de
+    // fora o pendente que ainda não tem como ser medido (o (E) antes da janela): ele espera
+    // o robô, e contá-lo deixaria todo inscrito "com pendência" até novembro.
     const temPendencia = (id: string) => {
       const doInscrito = porInscrito.get(id);
-      return ITENS_CONFERENCIA.some((item) => comoEstado(doInscrito?.get(item)?.estado) === "pendente");
+      return ITENS_CONFERENCIA.some(
+        (item) => comoEstado(doInscrito?.get(item)?.estado) === "pendente" && !semBaseDoItem(item, config, agora),
+      );
     };
 
     return ordenados.filter((i) => {
@@ -2051,7 +2328,7 @@ export function SecaoInscritos({ dados, executar, ocupado, podeConferir, ultimoE
         campo.toLowerCase().includes(termo),
       );
     });
-  }, [ordenados, busca, filtroSituacao, soPendencia, soAlerta, filtroElos, porInscrito, alertasPorInscrito]);
+  }, [ordenados, busca, filtroSituacao, soPendencia, soAlerta, filtroElos, porInscrito, alertasPorInscrito, config, agora]);
 
   // A gaveta busca em TODOS os inscritos, não nos visíveis: mudar um filtro (ou salvar
   // alguém que por isso sai do filtro) não pode fechar a pessoa que está aberta.
@@ -2504,6 +2781,8 @@ export function SecaoInscritos({ dados, executar, ocupado, podeConferir, ultimoE
           ocupado={ocupado}
           podeConferir={podeConferir}
           ultimoErro={ultimoErro}
+          ultimaMensagem={ultimaMensagem}
+          podeRedefinirSenha={podeRedefinirSenha}
           posicao={vizinhos.posicao}
           anterior={vizinhos.anterior}
           proximo={vizinhos.proximo}

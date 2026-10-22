@@ -108,6 +108,14 @@ let defasagemDoServidorMs = 0;
 const ROLAGEM_MS = 2600;
 /** Quanto a revelação de cada escolha fica na tela. */
 const REVELACAO_MS = 2400;
+/** Com mais escolhas esperando na fila, cada uma fica menos — a TV não pode se atrasar. */
+const REVELACAO_EM_FILA_MS = 1500;
+/**
+ * Teto da fila de revelação. Duas cobrem a virada da serpentina (o mesmo time escolhe duas
+ * vezes seguidas). Mais que isso só acontece quando a TV volta de queda de rede ou de aba em
+ * segundo plano — e aí reprisar minutos de escolhas cobriria o quadro ao vivo por N × 1,5 s.
+ */
+const MAXIMO_NA_FILA = 2;
 /** A partir daqui o cronômetro fica vermelho e pulsa. */
 const URGENTE_S = 10;
 
@@ -128,6 +136,32 @@ const kicker = (cor: string, espaco: string): CSSProperties => ({
   textTransform: "uppercase",
   color: cor,
 });
+
+/** "1º" em português, "1st/2nd/3rd/4th" em inglês: os moldes vêm do idioma da página. */
+function ordinal(n: number, t: Rotulos): string {
+  const resto100 = n % 100;
+  const resto10 = n % 10;
+  const molde =
+    resto100 >= 11 && resto100 <= 13
+      ? t.ordinalOutros
+      : resto10 === 1
+        ? t.ordinalUm
+        : resto10 === 2
+          ? t.ordinalDois
+          : resto10 === 3
+            ? t.ordinalTres
+            : t.ordinalOutros;
+  return molde.replace("{n}", String(n));
+}
+
+/**
+ * A frase da ordem com o número REAL de times. Era cravada em "1-2-3-4-5-6 · 6-5-4-3-2-1",
+ * e com 25 a 29 aprovados (5 times) a TV anunciava um 6º time que não existe.
+ */
+function fraseDaSerpentina(times: number, t: Rotulos): string {
+  const ida = Array.from({ length: times }, (_, i) => i + 1);
+  return `${t.ordemSerpentina} ${ida.join("-")} · ${[...ida].reverse().join("-")} · ${t.eRepete}`;
+}
 
 /** A cor do time por posição, do handoff — com a do banco como reserva. */
 function corDoTime(time: TimePublico, indice: number): string {
@@ -361,7 +395,9 @@ function Sorteio({
                 background: D.painel,
                 border: `1px solid ${pronto ? alfa(cor, "66") : D.borda}`,
                 borderRadius: 10,
-                transition: ".4s",
+                // Propriedades nomeadas, nunca `all`: um `opacity` acrescentado aqui um dia
+                // entraria na transição calado (ver a regra da opacidade em globals.css).
+                transition: "border-color .4s, box-shadow .4s",
                 boxShadow: pronto ? `0 0 30px ${alfa(cor, "1f")}` : "none",
               }}
             >
@@ -375,7 +411,7 @@ function Sorteio({
                   ...kicker(D.kicker, ".14em"),
                 }}
               >
-                {i + 1}º
+                {ordinal(i + 1, t)}
               </div>
               <div
                 style={{
@@ -429,7 +465,7 @@ function Sorteio({
       {pronto ? (
         <div style={{ marginTop: 34, animation: "lobdRise .5s ease both" }}>
           <p style={{ margin: "0 0 16px", fontSize: 14, color: D.secundario2 }}>
-            {t.ordemSerpentina}
+            {fraseDaSerpentina(draft.times.length, t)}
           </p>
         </div>
       ) : null}
@@ -500,7 +536,9 @@ function AoVivo({
 
         <div aria-hidden style={{ width: 1, height: 38, background: D.borda }} />
 
-        <div style={{ flex: 1, minWidth: 0 }}>
+        {/* Base de 200px: abaixo disso o bloco desce para a própria linha em vez de espremer
+            o nome do time da vez (a 320px ele ficava com ~44px e o nome vazava). */}
+        <div style={{ flex: "1 1 200px", minWidth: 0 }}>
           <div style={kicker(D.kicker, ".26em")}>
             {t.escolha} {Math.min(draft.escolhaAtual + 1, draft.totalEscolhas)} {t.de}{" "}
             {draft.totalEscolhas} · {t.naVez}
@@ -522,11 +560,13 @@ function AoVivo({
                 fontWeight: 700,
                 letterSpacing: ".08em",
                 color: corDaVez,
+                minWidth: 0,
+                overflowWrap: "anywhere",
               }}
             >
               {daVez.nome}
             </span>
-            <span style={{ fontSize: 14, color: D.secundario2 }}>
+            <span style={{ fontSize: 14, color: D.secundario2, minWidth: 0, overflowWrap: "anywhere" }}>
               {t.capitaoAbrev} {daVez.capitaoRiotId}
             </span>
           </div>
@@ -642,18 +682,30 @@ function AoVivo({
         })}
       </div>
 
-      {/* d) grade dos times */}
+      {/* d) grade dos times
+          As colunas moram na classe `.lobd-grade-times` (app/globals.css), e não no estilo
+          inline: só a classe aceita @media. A partir de 900px são N colunas fixas (N vem da
+          variável `--times`), então os times ficam TODOS lado a lado — na TV de 1920px, no
+          notebook e no projetor de 1024×768. Abaixo de 900px (tablet em pé, celular) vale
+          `auto-fit` com mínimo de 180px: quantas couberem, e o resto desce de linha.
+
+          Só `auto-fit` em qualquer largura deixava 5 + 1 entre 976 e 1163px (6 trilhas de
+          180px pedem 1164px): no projetor o 6º time descia para uma 2ª linha, e numa TV que
+          ninguém rola ele saía da transmissão. E só N fixas em qualquer largura deixava cada
+          coluna com ~48px no celular — o nick sumia e os pontos vazavam na vizinha. */}
       <div
-        className="lob-scroll"
-        style={{
-          flex: 1,
-          display: "grid",
-          gridTemplateColumns: `repeat(${draft.times.length}, minmax(0,1fr))`,
-          gap: 8,
-          padding: "14px 22px",
-          minHeight: 0,
-          overflow: "auto",
-        }}
+        className="lob-scroll lobd-grade-times"
+        style={
+          {
+            flex: 1,
+            display: "grid",
+            "--times": Math.max(1, draft.times.length),
+            gap: 8,
+            padding: "14px 22px",
+            minHeight: 0,
+            overflow: "auto",
+          } as CSSProperties
+        }
       >
         {draft.times.map((time, i) => {
           const cor = corDoTime(time, i);
@@ -666,11 +718,13 @@ function AoVivo({
               style={{
                 display: "flex",
                 flexDirection: "column",
+                minWidth: 0,
+                overflow: "hidden",
                 background: D.painelColuna,
                 border: `1px solid ${naVez ? cor : D.borda2}`,
                 borderRadius: 9,
                 boxShadow: naVez ? `0 0 34px ${alfa(cor, "26")}` : "none",
-                transition: ".25s",
+                transition: "border-color .25s, box-shadow .25s",
               }}
             >
               <div
@@ -1003,6 +1057,9 @@ function Revelacao({
       <div
         style={{
           position: "relative",
+          // No celular o cartão não passa da tela: Riot ID longo e sem espaço
+          // ("Gar3naTheBestMid#BR1" a 30px tem ~345px) quebra em vez de ser cortado.
+          maxWidth: "100%",
           padding: "38px clamp(20px,5vw,46px)",
           background: "linear-gradient(160deg,#1c1109,#0d0806)",
           border: `1px solid ${cor}`,
@@ -1026,7 +1083,7 @@ function Revelacao({
           }}
         >
           <span aria-hidden style={emblemaDeElo(elo?.key ?? "ferro", 96)} />
-          <div style={{ textAlign: "left" }}>
+          <div style={{ textAlign: "left", minWidth: 0, maxWidth: "100%" }}>
             <div
               style={{
                 fontFamily: DISPLAY,
@@ -1034,6 +1091,7 @@ function Revelacao({
                 fontWeight: 700,
                 lineHeight: 1,
                 color: D.titulo,
+                overflowWrap: "anywhere",
               }}
             >
               {entrada.riotId}
@@ -1091,6 +1149,20 @@ export default function Transmissao({ t }: Readonly<{ t: Rotulos }>) {
   /** Quantas escolhas já tínhamos visto — o que passar disto é notícia. */
   const vistas = useRef<number | null>(null);
   const relogioDaRevelacao = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Escolhas que já entraram e ainda esperam a vez de ser reveladas, na ordem do histórico. */
+  const filaDeRevelacao = useRef<EntradaHistorico[]>([]);
+
+  /**
+   * Põe na tela a próxima da fila e agenda a seguinte; com a fila vazia, tira a revelação.
+   * Com mais escolhas esperando, cada uma fica `REVELACAO_EM_FILA_MS` em vez dos 2400ms.
+   */
+  const revelarProxima = useCallback(function proxima() {
+    const entrada = filaDeRevelacao.current.shift() ?? null;
+    setRevelando(entrada);
+    relogioDaRevelacao.current = entrada
+      ? setTimeout(proxima, filaDeRevelacao.current.length > 0 ? REVELACAO_EM_FILA_MS : REVELACAO_MS)
+      : null;
+  }, []);
 
   /**
    * Sondagem de 2 em 2 segundos. Nada de websocket: a CSP do site tem
@@ -1152,6 +1224,12 @@ export default function Transmissao({ t }: Readonly<{ t: Rotulos }>) {
    *
    * A primeira leitura só anota o tamanho — sem isso, quem abre a transmissão no meio do
    * draft levaria na cara a revelação de uma escolha que aconteceu dez minutos antes.
+   *
+   * TODAS as escolhas novas entram na fila, não só a última. Na virada da serpentina o
+   * mesmo time escolhe duas vezes seguidas, e o capitão recebe o estado novo na resposta
+   * do clique — a segunda escolha pode chegar antes da próxima sondagem da TV (o mesmo
+   * vale para um auto-pick seguido de escolha rápida). Revelando só `historico[total - 1]`,
+   * a primeira aparecia calada na coluna.
    */
   useEffect(() => {
     if (!draft) return;
@@ -1162,22 +1240,25 @@ export default function Transmissao({ t }: Readonly<{ t: Rotulos }>) {
       return;
     }
     if (total <= vistas.current) {
+      // Encolheu: sorteio novo. O que esperava na fila era do draft anterior.
+      if (total < vistas.current) filaDeRevelacao.current = [];
       vistas.current = total;
       return;
     }
 
+    // Só as mais recentes: as anteriores já estão na grade, e a escolha ao vivo corre por baixo.
+    filaDeRevelacao.current = [...filaDeRevelacao.current, ...draft.historico.slice(vistas.current, total)].slice(
+      -MAXIMO_NA_FILA,
+    );
     vistas.current = total;
-    const ultima = draft.historico[total - 1];
-    if (!ultima) return;
-
-    setRevelando(ultima);
-    if (relogioDaRevelacao.current) clearTimeout(relogioDaRevelacao.current);
-    relogioDaRevelacao.current = setTimeout(() => setRevelando(null), REVELACAO_MS);
-  }, [draft]);
+    // Já há uma revelação na tela: as novas esperam o relógio dela.
+    if (relogioDaRevelacao.current === null) revelarProxima();
+  }, [draft, revelarProxima]);
 
   useEffect(
     () => () => {
       if (relogioDaRevelacao.current) clearTimeout(relogioDaRevelacao.current);
+      relogioDaRevelacao.current = null;
     },
     [],
   );

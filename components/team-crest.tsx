@@ -25,7 +25,9 @@ export function TeamCrest({
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={team.imageUrl}
-        alt={`Escudo ${team.name}`}
+        // Só o nome: "Escudo X" ficava em português com o site em inglês, e o nome do time
+        // já diz o que a imagem é (o TeamMark das páginas novas faz igual).
+        alt={team.name}
         style={dimension}
         className={cn(
           "shrink-0 rounded-lg border border-border/70 object-cover",

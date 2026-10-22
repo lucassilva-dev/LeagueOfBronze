@@ -18,6 +18,7 @@ import { lerConfig, listarInscricoes, type Inscricao } from "@/lib/inscricoes/st
 import { distribuirTimes, estadoDaJanela, orcamentoSugerido } from "@/lib/inscricoes/schema";
 import { forcaDoElo, rankingDeCapitaes, type CandidatoACapitao } from "@/lib/draft/capitaes";
 import { ORCAMENTO_DA_MONTAGEM } from "@/lib/draft/viabilidade";
+import { jogadoresForaDoDraft, type ForaDoDraft } from "@/lib/draft/virada";
 import { embaralhar, novaSemente } from "@/lib/series/sorteio";
 
 /**
@@ -106,10 +107,18 @@ function temConta(i: Inscricao): boolean {
  * É a tela de conferência do painel do draft: quantos times, quem joga, se o orçamento
  * fecha, quem seriam os capitães pela regra — e se algum deles não tem conta de jogador,
  * o que o impediria de escolher na hora (a escolha é autenticada pela conta).
+ *
+ * Com um draft já sorteado, também diz quem está nele e NÃO é mais apto (`foraDoDraft`):
+ * recusado ou desistente depois do sorteio continuava no pool e nos elencos sem a mesa
+ * saber. `draftLido` é a leitura do draft que quem chama já fez (o GET do painel lê os dois
+ * em paralelo); sem ela, a prévia lê sozinha.
  */
-export async function previaDoDraft() {
-  const config = await lerConfig();
-  const inscritos = await listarInscricoes();
+export async function previaDoDraft(draftLido?: DraftGravado | Promise<DraftGravado>) {
+  const [config, inscritos, draft] = await Promise.all([
+    lerConfig(),
+    listarInscricoes(),
+    draftLido ?? lerDraftCompleto(),
+  ]);
 
   const aprovados = inscritos.filter((i) => i.situacao === "apto" || i.situacao === "sobra");
   const vaoJogar = inscritos.filter((i) => i.situacao === "apto");
@@ -170,10 +179,16 @@ export async function previaDoDraft() {
     semEloCongelado: vaoJogar.filter((i) => !i.elo_congelado).map((i) => i.riot_id),
     // Inscrição aberta durante o draft cobra taxa de quem não tem mais vaga.
     inscricoesAbertas: estadoDaJanela(config) === "aberta",
+    // Quem está no draft sorteado e a inscrição não é mais `apto` (só Riot ID e situação).
+    // É aviso: o draft não tira ninguém sozinho, e a virada pede confirmação.
+    foraDoDraft: jogadoresForaDoDraft(draft.estado, inscritos),
   };
 }
 
-export type PreviaDoDraft = Awaited<ReturnType<typeof previaDoDraft>>;
+/** `foraDoDraft` é opcional no tipo: a tela aguenta a resposta de um servidor anterior a ele. */
+export type PreviaDoDraft = Omit<Awaited<ReturnType<typeof previaDoDraft>>, "foraDoDraft"> & {
+  foraDoDraft?: ForaDoDraft[];
+};
 
 /**
  * Monta o draft a partir de quem foi aprovado — e SORTEIA a ordem.

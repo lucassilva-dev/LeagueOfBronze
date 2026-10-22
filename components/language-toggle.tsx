@@ -62,6 +62,7 @@ export function LanguageToggle({ locale, rotulo, titulos }: LanguageToggleProps)
             aria-label={titulos[alvo]}
             aria-pressed={ativo}
             onClick={() => escolher(alvo)}
+            className="lob-idioma-botao"
             style={{
               padding: "6px 9px",
               minWidth: 34,

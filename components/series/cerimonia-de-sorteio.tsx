@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { CARDS_BY_ID, baralhoDoSorteio, letraDaCarta, type CardDef } from "@/lib/cards";
+import { teamColor } from "@/lib/design";
 import type { CardId } from "@/lib/schema";
 import {
   CURVA_DO_FREIO,
@@ -97,6 +98,8 @@ type ItemDaRoda = Readonly<{ chave: string; cor: string; rotulo: string; nota?: 
 
 const AZUL = "#4d9bff";
 const VERMELHO = "#ff5d5d";
+/** Segunda fatia da roda de lados quando os dois times têm a mesma cor. */
+const NEUTRO_DA_RODA = "#8a7a62";
 const OURO = "#e8b878";
 
 /** Cada número da contagem. Três números = ~2,1 s, e o pedido ao servidor já corre solto. */
@@ -390,9 +393,17 @@ export function CerimoniaDeSorteio({
   const itens: readonly ItemDaRoda[] = useMemo(() => {
     if (!tipoDoPedido) return [];
     if (tipoDoPedido === "lados") {
+      // A fatia é do TIME, não do lado: pintada de azul/vermelho pela posição, a roda parava
+      // numa fatia VERMELHA quando o Time B ganhava o azul, enquanto o texto anunciava
+      // "Lado azul". Com a cor de cada time a roda não promete lado nenhum — quem diz o lado
+      // é a revelação. Dois times da mesma cor: o segundo fica neutro, para as fatias se
+      // distinguirem.
+      const corA = teamColor(teamAId ?? "a");
+      const corDoB = teamColor(teamBId ?? "b");
+      const corB = corDoB === corA ? NEUTRO_DA_RODA : corDoB;
       return [
-        { chave: teamAId ?? "a", cor: AZUL, rotulo: teamAName ?? "—" },
-        { chave: teamBId ?? "b", cor: VERMELHO, rotulo: teamBName ?? "—" },
+        { chave: teamAId ?? "a", cor: corA, rotulo: teamAName ?? "—" },
+        { chave: teamBId ?? "b", cor: corB, rotulo: teamBName ?? "—" },
       ];
     }
     // O baralho de AGORA: a roda gira antes da resposta, e o servidor sorteia neste mesmo

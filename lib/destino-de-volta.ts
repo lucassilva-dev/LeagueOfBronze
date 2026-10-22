@@ -6,9 +6,10 @@
  * a senha para fora do site, com cara de continuação do nosso.
  *
  * Existe por causa do capitão: quem perde a sessão no dia do draft chega ao /entrar vindo
- * do /capitao e precisa voltar para lá — não para a ficha de inscrição.
+ * do /capitao e precisa voltar para lá — não para a ficha de inscrição. E quem abre a
+ * troca de senha (/conta/senha) sem sessão precisa cair nela depois de entrar.
  */
-const DESTINOS = new Set(["/capitao", "/draft", "/minha-inscricao"]);
+const DESTINOS = new Set(["/capitao", "/draft", "/minha-inscricao", "/conta/senha"]);
 
 export function destinoDeVolta(pedido: unknown): string | null {
   return typeof pedido === "string" && DESTINOS.has(pedido) ? pedido : null;

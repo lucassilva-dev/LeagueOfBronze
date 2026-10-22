@@ -44,6 +44,11 @@ vi.mock("@/lib/security/admin-store", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   findUserById: async () => conta.atual,
   createSession: async (p: unknown) => void banco.sessoesCriadas.push(p),
+  // A "senha atual" passa pelo limitador do login (SEG-06). Aqui ele sempre libera: o
+  // limitador tem os próprios testes (tests/security/limitador-de-tentativas.test.ts).
+  reservarTentativaAdmin: async () => ({ id: 1 }),
+  getRecentAttemptCounts: async () => ({ failuresByIp: 0, failuresByUser: 0, ipHadRecentSuccess: false }),
+  concluirTentativaAdmin: async () => {},
 }));
 
 const identidade = vi.hoisted(() => ({ valor: null as unknown }));

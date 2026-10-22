@@ -31,6 +31,11 @@ vi.mock("@/lib/data-store", () => ({
   readDatasetComVersao: async () => ({ dataset: await store.read(), versao: store.versao.atual }),
   readDataset: store.read,
   saveDataset: store.save,
+  // A rota devolve a versão em que a gravação CAIU; aqui, a do Supabase (lida + 1).
+  saveDatasetComVersao: async (input: unknown, opts?: { versaoEsperada?: number }) => ({
+    dataset: await store.save(input, opts),
+    versao: (opts?.versaoEsperada ?? store.versao.atual) + 1,
+  }),
   ConflitoDeVersaoError: ConflitoDeVersaoErrorFake,
 }));
 vi.mock("@/lib/security/route-guard", () => ({

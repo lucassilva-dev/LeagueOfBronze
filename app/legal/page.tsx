@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getMessages();
-  return { title: t.legal.metaTitulo, description: t.legal.metaDescricao };
+  return { title: t.legal.metaTitulo, description: t.legal.metaDescricao, alternates: { canonical: "/legal" } };
 }
 
 /**

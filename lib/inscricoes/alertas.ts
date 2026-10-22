@@ -24,6 +24,8 @@ export type CodigoDoAlerta =
   | "declarou_diferente"
   | "apto_com_requisito"
   | "e_abaixo_do_minimo"
+  | "mesma_conta"
+  | "apto_sem_pagamento"
   | "organizador_cobrado"
   | "recusado_pago"
   | "recusado_declarado"
@@ -37,7 +39,11 @@ export type Alerta = {
 };
 
 export type InscritoParaAlerta = {
+  /** Para não se achar a si mesmo na lista de `inscritos` (ver «mesma_conta»). */
+  id?: string;
   riot_id: string;
+  /** A conta na Riot. Duas inscrições com o mesmo = a mesma conta, com grafias diferentes. */
+  puuid?: string | null;
   situacao: string;
   organizador: boolean;
   elo_declarado: string;
@@ -57,6 +63,11 @@ export function alertasDoInscrito(args: {
   pagamento: { estado: string } | null;
   config: { inicio_campeonato: string | null; min_ranqueadas: number };
   agoraMs: number;
+  /**
+   * Todos os inscritos (o próprio pode estar no meio). Opcional: sem a lista, o alerta de
+   * conta repetida simplesmente não é calculado.
+   */
+  inscritos?: readonly InscritoParaAlerta[];
 }): Alerta[] {
   const { inscrito: i, conferencias, pagamento, config, agoraMs } = args;
   const alertas: Alerta[] = [];
@@ -85,6 +96,25 @@ export function alertasDoInscrito(args: {
     case "erro":
       alertas.push({ codigo: "erro_riot", texto: `A última consulta à Riot falhou${i.riot_erro ? `: ${i.riot_erro}` : ""}.` });
       break;
+  }
+
+  // A mesma conta em duas inscrições: o índice do banco compara o Riot ID escrito, e a Riot
+  // acha "SAMUEL VENANCIO" e "SAMUEL VENÂNCIO" como a mesma conta. Só entre quem ainda conta.
+  if (i.puuid && !fora && args.inscritos) {
+    const outras = args.inscritos.filter(
+      (o) =>
+        o !== i &&
+        (i.id === undefined || o.id !== i.id) &&
+        o.puuid === i.puuid &&
+        o.situacao !== "recusado" &&
+        o.situacao !== "desistiu",
+    );
+    if (outras.length > 0) {
+      alertas.push({
+        codigo: "mesma_conta",
+        texto: `A mesma conta da Riot está em outra inscrição: ${outras.map((o) => o.riot_id).join(", ")}. Confira se não é a mesma pessoa inscrita duas vezes.`,
+      });
+    }
   }
 
   if (i.elo_fonte === "organizacao" && i.elo_riot && i.elo_riot !== i.elo_verificado) {
@@ -134,6 +164,16 @@ export function alertasDoInscrito(args: {
 
   // ------------------------------------------------ caixa
   const estado = pagamento?.estado;
+  // O sistema só PROMOVE: se o pagamento voltou atrás depois da promoção (o «pago» foi na
+  // linha errada), ou se alguém marcou apto à mão sem pagamento, a pessoa continuava apta e
+  // entrava no sorteio do draft sem nada na tela apontar. Organizador não paga — o caso dele
+  // é o «organizador_cobrado».
+  if ((i.situacao === "apto" || i.situacao === "sobra") && !i.organizador && estado !== "pago" && estado !== "isento") {
+    alertas.push({
+      codigo: "apto_sem_pagamento",
+      texto: "Aprovado sem pagamento confirmado (regra 22) — confira o caixa ou ajuste a situação.",
+    });
+  }
   if (i.organizador && !fora && (estado === "aguardando" || estado === "declarado")) {
     alertas.push({
       codigo: "organizador_cobrado",

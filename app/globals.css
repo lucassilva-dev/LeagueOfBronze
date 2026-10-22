@@ -174,6 +174,18 @@ a:hover {
   animation: shimmer 1.4s linear infinite;
 }
 
+/* O brilho do esqueleto de carregamento (app/<rota>/loading.tsx). O Tailwind só emitia
+   este keyframe se alguém usasse `animate-shimmer` — ninguém usa —, e o esqueleto ficava
+   parado, com cara de página travada. Anima SÓ a posição do fundo: nada de opacidade. */
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
 @keyframes championPulse {
   0%,
   100% {
@@ -398,6 +410,65 @@ a:hover {
   }
 }
 
+/* Invólucro do site inteiro (components/site-frame.tsx): impede a rolagem lateral quando
+   algo passa da largura da tela.
+   `clip` corta SEM virar contêiner de rolagem. Com `hidden` o overflow-y do div passava a
+   `auto`, o <header> sticky grudava NESTE div (que nunca rola) e ia embora com a página —
+   e as barras sticky do painel junto. O `hidden` de antes fica só de reserva para navegador
+   sem `clip` (Safari < 16), que continua exatamente como era. */
+.lob-raiz {
+  overflow-x: hidden;
+  overflow-x: clip;
+}
+
+/* "Pular para o conteúdo": primeiro foco da página, invisível até alguém chegar nele pelo
+   Tab. Fica fora da tela (não com opacidade nem display) para os leitores de tela lerem. */
+.lob-pular {
+  position: absolute;
+  left: 12px;
+  top: 0;
+  z-index: 70;
+  padding: 10px 14px;
+  border-radius: 3px;
+  background: #f0c88a;
+  color: #160f06;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  transform: translateY(-120%);
+}
+.lob-pular:focus,
+.lob-pular:focus-visible {
+  transform: translateY(12px);
+  color: #160f06;
+}
+
+/* Link que se estica por cima da linha inteira (a linha precisa de position: relative).
+   Usado na /tabela: a semântica de tabela pede o link numa célula, mas clicar em qualquer
+   ponto da linha continua levando ao time. O anel do Tab vai em volta da linha toda. */
+.lob-linha-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+.lob-linha-link:focus-visible {
+  outline: none;
+}
+.lob-linha-link:focus-visible::after {
+  outline: 2px solid hsl(var(--accent) / 0.8);
+  outline-offset: -2px;
+}
+
+/* Menu do celular (components/main-nav.tsx). O cabeçalho é sticky e o menu desce de
+   dentro dele: se a lista for mais alta que a tela (9 itens num celular deitado), o fim
+   dela nunca apareceria, porque rolar a página leva o menu junto. Rola por dentro. */
+.lob-menu-movel {
+  max-height: calc(100vh - 72px);
+  max-height: calc(100dvh - 72px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 /* Cabeçalho do site no celular: com a sessão aberta, o nome da conta empurrava o menu
    para fora da tela. Abaixo de 520px fica só a inicial — o nome segue no aria-label. */
 @media (max-width: 520px) {
@@ -406,6 +477,37 @@ a:hover {
   }
   .lob-sessao-botao {
     padding: 5px !important;
+  }
+}
+
+/* Celular estreito (320–380px, ex.: iPhone SE de 1ª geração, Androids compactos): logo +
+   menu + PT|EN + ENTRAR somavam ~363px e o ENTRAR saía cortado pela direita. Aperta só os
+   respiros — nada some, e os alvos de toque (menu, idioma, entrar) continuam inteiros. */
+@media (max-width: 380px) {
+  .lob-cabecalho-linha {
+    gap: 8px !important;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+  .lob-cabecalho-marca {
+    gap: 8px !important;
+  }
+  .lob-cabecalho-logo {
+    width: 36px !important;
+    height: 36px !important;
+  }
+  .lob-cabecalho-acoes {
+    gap: 6px !important;
+  }
+  .lob-idioma-botao {
+    min-width: 28px !important;
+    padding-left: 6px !important;
+    padding-right: 6px !important;
+  }
+  .lob-sessao-entrar {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+    letter-spacing: 0.08em !important;
   }
 }
 
@@ -538,9 +640,9 @@ a:hover {
   border-radius: 2px;
   cursor: pointer;
   box-shadow: 0 12px 30px -12px rgba(232, 184, 120, 0.6);
-  transition:
-    filter 0.2s ease,
-    transform 0.2s ease;
+  /* Só transform anima. O clarear do hover (filter, abaixo) é instantâneo: filtro não
+     entra em transição/animação neste site — mesma regra da opacidade (ver .lob-fade). */
+  transition: transform 0.2s ease;
 }
 .lob-btn-gold:hover {
   filter: brightness(1.05);
@@ -589,9 +691,10 @@ a:hover {
    depois de um clique. Nada disto renderiza no servidor.
 
    A REGRA DA CASA VALE AQUI TAMBÉM: nenhuma animação decide se o conteúdo é visível.
-   As opacidades animadas abaixo estão todas em elementos DECORATIVOS (brilho, holofote,
-   confete, faixas de velocidade) — se a animação não rodar, some o efeito e o resultado
-   do sorteio continua na tela. Nome, resultado e semente nunca dependem de keyframe.
+   As opacidades animadas abaixo estão todas em elementos DECORATIVOS e `aria-hidden`
+   (anel de brilho, parafusos que faíscam, confete) — se a animação não rodar, some o
+   efeito e o resultado do sorteio continua na tela. Nome, resultado, semente e o número
+   da contagem só animam transform.
 */
 
 /* Holofotes girando atrás da roda. */
@@ -646,19 +749,18 @@ a:hover {
     transform: rotate(0deg);
   }
 }
-/* Número da contagem regressiva: entra grande e assenta. */
+/* Número da contagem regressiva: entra grande e assenta. É CONTEÚDO (o "3, 2, 1"), então
+   só escala e gira — antes ele também nascia quase transparente (0.15) e saía a 0.25, e
+   com o relógio de animação parado o número ficava apagado na tela. */
 @keyframes lobCerContagem {
   0% {
     transform: scale(2.6) rotate(-9deg);
-    opacity: 0.15;
   }
   45% {
     transform: scale(1) rotate(0deg);
-    opacity: 1;
   }
   100% {
     transform: scale(0.86) rotate(2deg);
-    opacity: 0.25;
   }
 }
 /* Chegada do vencedor: estoura, passa do ponto e volta. */
@@ -758,9 +860,16 @@ a:hover {
    quebraria em silêncio num lugar sem relação com o draft. Prefixo resolve sem mudar
    um milissegundo do que foi especificado.
 
-   Vale a regra da casa: as opacidades animadas aqui estão todas em ELEMENTOS
-   DECORATIVOS ou em sobreposições que só existem por 2,4s. Nome, pontos e time
-   nascem opacos.
+   Vale a regra da casa: CONTEÚDO só anima transform. `lobdRise` (a frase da serpentina)
+   e `lobdSlam` (o cartão da revelação, com nick, pontos e time) começavam em opacity 0
+   com fill-mode `both` — a armadilha que já apagou o site quatro vezes: aba da TV em
+   segundo plano, relógio de animação parado, e a plateia via o cartão vazio. Agora só
+   deslocam e escalam; se a animação não rodar, o conteúdo já está lá, opaco.
+
+   Opacidade animada ficou SÓ nos enfeites, todos `aria-hidden` e sem texto: o quadradinho
+   que pulsa ao lado do time da vez (`lobdPulse`, que nasce opaco), o clarão atrás da
+   revelação (`lobdFlash`) e o confete do fim (`lobdConfetti`). Se não rodarem, some o
+   efeito e nada mais. tests/draft/animacoes-sem-opacidade.test.ts confere a lista.
 */
 @keyframes lobdSheen {
   0% { background-position: 0% 50%; }
@@ -771,14 +880,14 @@ a:hover {
   50% { opacity: 0.35; transform: scale(0.8); }
 }
 @keyframes lobdRise {
-  from { opacity: 0; transform: translateY(14px); }
-  to { opacity: 1; transform: none; }
+  from { transform: translateY(14px); }
+  to { transform: none; }
 }
 @keyframes lobdSlam {
-  0% { opacity: 0; transform: scale(2.4) rotate(-9deg); }
-  55% { opacity: 1; transform: scale(0.93) rotate(1.5deg); }
+  0% { transform: scale(2.4) rotate(-9deg); }
+  55% { transform: scale(0.93) rotate(1.5deg); }
   75% { transform: scale(1.04) rotate(-0.5deg); }
-  100% { opacity: 1; transform: scale(1) rotate(0); }
+  100% { transform: scale(1) rotate(0); }
 }
 @keyframes lobdFlash {
   0% { opacity: 0; }
@@ -820,6 +929,30 @@ a:hover {
 .lobd-tv footer,
 .lobd-tv [role="status"][style*="ffcf3f"] {
   display: none !important;
+}
+
+/*
+  GRADE DOS TIMES da transmissão ao vivo (components/draft/transmissao.tsx).
+
+  De 900px para cima: N colunas, todas na mesma linha. N vem do componente pela variável
+  `--times` (o número real de times do draft). Projetor de 1024×768 incluso — com 6 times
+  cada coluna fica com ~156px, e o nick corta com reticências em vez de o 6º time descer
+  para uma linha que a TV não mostra (a página só cresce para baixo e ninguém rola a TV).
+
+  Abaixo de 900px: `auto-fit` com mínimo de 180px — no tablet em pé 3 + 3 (768px) ou 4 + 2
+  (820px), no celular um por linha. Aí rolar é normal.
+
+  `auto-fit` sozinho em toda largura deixava 5 + 1 entre 976 e 1163px; mudar o corte daqui
+  é mudar onde a TV pode perder um time — tests/draft/grade-da-transmissao.test.tsx faz a
+  conta.
+*/
+.lobd-grade-times {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+@media (min-width: 900px) {
+  .lobd-grade-times {
+    grid-template-columns: repeat(var(--times, 6), minmax(0, 1fr));
+  }
 }
 
 /*

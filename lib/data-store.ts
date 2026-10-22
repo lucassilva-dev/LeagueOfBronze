@@ -9,6 +9,7 @@ import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 
 import {
+  descreverProblemasDoDataset,
   tournamentDatasetSchema,
   type ArchivedSeason,
   type SeriesFormat,
@@ -19,6 +20,7 @@ import {
   applyAutoGameMvpsToDataset,
   buildArchivedSeason,
   buildNextSeasonDataset,
+  dataDoFimDaTemporada,
   summarizeArchivedSeason,
   type ArchivedSeasonSummary,
 } from "@/lib/tournament";
@@ -76,10 +78,10 @@ type SupabaseRow = {
 function parseAndValidateDataset(json: unknown) {
   const parsed = tournamentDatasetSchema.safeParse(json);
   if (!parsed.success) {
-    const summary = parsed.error.issues
-      .slice(0, 20)
-      .map((issue) => `${issue.path.join(".") || "root"}: ${issue.message}`)
-      .join(" | ");
+    // Em português e pelo nome da série/jogo/campo: esta mensagem chega à tela na
+    // importação de backup, e "seriesMatches.3.games.0.bans.0.championName: Too small"
+    // não dizia a ninguém o que corrigir.
+    const summary = descreverProblemasDoDataset(parsed.error.issues, json, 20);
     throw new ErroDeRegra(`Validação falhou: ${summary}`);
   }
   return parsed.data;
@@ -152,6 +154,35 @@ export function ehAmbienteDeTeste() {
  * uma trava que dispara sozinha é pior do que trava nenhuma.
  */
 export function problemaDeAmbiente(): string | null {
+  return problemaDeSchema() ?? problemaDeProvedor();
+}
+
+/**
+ * Deploy de PRODUÇÃO na Vercel lendo o arquivo do repositório em vez do Supabase.
+ *
+ * Sem as chaves (variável apagada, renomeada, escopo de ambiente errado) ou com
+ * `DATA_PROVIDER=local` copiado do `.env.example`, o provedor cai para "local" calado: o
+ * público passa a ver a 3ª Edição do `leagueofbronze.json` como se estivesse no ar, e as
+ * gravações do painel falham no disco somente-leitura. Só vale com `VERCEL_ENV=production`
+ * (que a Vercel injeta sozinha): uma prévia de branch sem chaves é escolha, não engano.
+ *
+ * Fica FORA de `createSupabaseAdminClient` de propósito: com o provedor local e as chaves
+ * presentes, a inscrição continua falando com o schema certo, e travá-la só aumentaria o
+ * estrago do engano. Aqui o trabalho é só fazer a faixa vermelha aparecer.
+ */
+function problemaDeProvedor(): string | null {
+  const dominio = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim().toLowerCase();
+  if (!dominio || process.env.VERCEL_ENV !== "production") return null;
+  if (getConfiguredDataProvider() !== "local") return null;
+  return (
+    `Este deploy de produção ("${dominio}") está lendo o arquivo do repositório, e não o ` +
+    `Supabase. Confira SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY e DATA_PROVIDER nas variáveis ` +
+    `deste projeto na Vercel e faça um novo deploy.`
+  );
+}
+
+/** Deploy e schema se contradizem (ver `problemaDeAmbiente`). É o que tranca o banco. */
+function problemaDeSchema(): string | null {
   const dominio = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim().toLowerCase();
   if (!dominio) return null; // fora da Vercel (local, teste automatizado): não opina.
 
@@ -212,7 +243,7 @@ function getDatasetValidationErrorPrefix() {
  */
 export function createSupabaseAdminClient() {
   // Antes de tudo: se o deploy e o schema se contradizem, ninguém fala com o banco.
-  const problema = problemaDeAmbiente();
+  const problema = problemaDeSchema();
   if (problema) throw new Error(problema);
 
   const url = getSupabaseUrl();
@@ -506,7 +537,16 @@ export async function seedDatasetFromLocalSeed(): Promise<TournamentDataset> {
   return seed;
 }
 
-export async function importDatasetFromText(raw: string) {
+/**
+ * Restaura um backup e devolve o dataset JUNTO da versão em que a gravação caiu.
+ *
+ * A rota relia a versão depois de gravar, e entre a gravação e a releitura cabe a gravação
+ * de outra pessoa (um sorteio ao vivo, por exemplo): o painel recebia o dataset importado
+ * carimbado com a versão DELA, e o Salvar seguinte passava na trava e apagava o sorteio.
+ */
+export async function importDatasetFromText(
+  raw: string,
+): Promise<{ dataset: TournamentDataset; versao: number }> {
   let json: unknown;
 
   try {
@@ -515,7 +555,7 @@ export async function importDatasetFromText(raw: string) {
     throw new ErroDeRegra("Arquivo importado não contém JSON válido.");
   }
 
-  return saveDataset(json);
+  return saveDatasetComVersao(json);
 }
 
 // ============================================================
@@ -525,6 +565,8 @@ export async function importDatasetFromText(raw: string) {
 export async function endCurrentTournament(): Promise<{
   dataset: TournamentDataset;
   versao: number;
+  /** A temporada já estava encerrada: só o retrato arquivado foi refeito. */
+  refeito: boolean;
 }> {
   // Ler COM versão e gravar condicionado: encerrar é ler-alterar-gravar (arquiva o retrato
   // do que está no ar), então uma gravação que entre no meio seria perdida em silêncio.
@@ -550,9 +592,23 @@ export async function endCurrentTournament(): Promise<{
   const now = new Date().toISOString();
   const seasonId = current.tournament.seasonId ?? `season-${now.replace(/[:.]/g, "-")}`;
 
+  /*
+   * A DATA DO FIM é a do último jogo disputado, não a do clique em "Encerrar".
+   *
+   * A ordem combinada para novembro é arquivar a 3ª (final em 02/08) e só então começar a
+   * 4ª; com o instante do clique, /temporadas passava a dizer "Encerrada em 15 de nov.".
+   * Sem nenhuma série com resultado, fica o agora. Uma data de jogo no futuro (digitada
+   * errada) também não vale: a temporada não pode ter acabado depois de ser encerrada.
+   */
+  const fimPelosJogos = dataDoFimDaTemporada(current);
+  const fimAgora = fimPelosJogos && fimPelosJogos < now ? fimPelosJogos : now;
+  // Reencerrar não reescreve a data do fim — só o retrato.
+  const endedAtISO = jaEncerrada ? (current.tournament.endedAtISO ?? fimAgora) : fimAgora;
+
   const currentWithId: TournamentDataset = {
     ...current,
-    tournament: { ...current.tournament, seasonId },
+    // `endedAtISO` ANTES de montar o retrato: é dele que `buildArchivedSeason` tira a data.
+    tournament: { ...current.tournament, seasonId, endedAtISO },
   };
 
   const archived = buildArchivedSeason(currentWithId, now);
@@ -562,8 +618,7 @@ export async function endCurrentTournament(): Promise<{
     tournament: {
       ...currentWithId.tournament,
       status: "finished",
-      // Reencerrar não reescreve a data do fim — só o retrato.
-      endedAtISO: jaEncerrada ? (currentWithId.tournament.endedAtISO ?? now) : now,
+      endedAtISO,
     },
     archivedSeasons: [
       ...current.archivedSeasons.filter((season) => season.seasonId !== seasonId),
@@ -571,7 +626,9 @@ export async function endCurrentTournament(): Promise<{
     ],
   };
 
-  return saveDatasetComVersao(updated, { versaoEsperada: versao });
+  const gravado = await saveDatasetComVersao(updated, { versaoEsperada: versao });
+  // `refeito`: a temporada JÁ estava encerrada e o que se fez foi atualizar o retrato.
+  return { ...gravado, refeito: jaEncerrada };
 }
 
 export async function startNewTournament(options: {
@@ -594,7 +651,17 @@ export async function startNewTournament(options: {
     );
   }
 
-  if (options.archiveCurrent && current.tournament.status !== "finished") {
+  /*
+   * Arquivar com a temporada JÁ encerrada REFAZ o retrato (`endCurrentTournament` é
+   * idempotente e preserva a data do fim).
+   *
+   * Antes, com ela encerrada, o arquivamento era pulado em silêncio: uma correção feita
+   * depois de "Encerrar" (o placar da final, o nome de um time) ficava só no dado vivo, a
+   * virada zerava as séries, e o retrato velho virava o único exemplar da temporada. Só
+   * vale com `archiveCurrent` EXPLÍCITO: se o vivo já foi mexido para preparar a próxima
+   * (o nome do torneio, por exemplo), refazer o retrato sem ninguém pedir o corromperia.
+   */
+  if (options.archiveCurrent) {
     // O arquivamento GRAVA, então a versão avança — seguir com a antiga faria a gravação
     // seguinte recusar a si mesma.
     const arquivado = await endCurrentTournament();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Banner, Button, C, SectionHead } from "@/components/admin/ui";
 import type { EstadoPagamento, ItemConferencia } from "@/lib/inscricoes/schema";
@@ -59,6 +59,11 @@ export type ResumoDoRobo = {
 
 export type Inscrito = {
   id: string;
+  /**
+   * A conta de jogador dona da inscrição (`jogador_contas.id`). Vem no `select *` do GET;
+   * nula em inscrição antiga, feita antes das contas. É por ela que a master redefine a senha.
+   */
+  jogador_id?: string | null;
   criado_em: string;
   nick: string;
   tag: string;
@@ -185,6 +190,17 @@ export type PropsSecao = Readonly<{
    * cobre a tela. Opcional porque só ela lê.
    */
   ultimoErro?: string | null;
+  /**
+   * O que a última ação que DEU CERTO respondeu ("Salvo.", o resumo da rodada da Riot, "outra
+   * atualização está rodando"…). Mesmo motivo do `ultimoErro`: quem dispara de dentro da
+   * gaveta não vê o aviso do topo. Nulo enquanto uma ação corre ou se a última falhou.
+   */
+  ultimaMensagem?: string | null;
+  /**
+   * Pode gerar senha provisória de jogador (`users:manage`, só a master). Opcional e falso
+   * por padrão: quem monta o painel diz se a pessoa logada é a master.
+   */
+  podeRedefinirSenha?: boolean;
 }>;
 
 // ---------------------------------------------------------------- contêiner
@@ -197,8 +213,27 @@ type Props = Readonly<{
   podeConferir: boolean;
   podeFinanceiro: boolean;
   podeConfigurar: boolean;
+  /** Só a master gera senha provisória de jogador (ver `PropsSecao`). */
+  podeRedefinirSenha?: boolean;
   render: (props: PropsSecao) => React.ReactNode;
 }>;
+
+/**
+ * A explicação da tela de falha, pelo status da leitura. Uma frase fixa mandando "rodar o
+ * SQL" aparecia também para quem só não tinha o escopo (403) e com o Supabase pausado — e
+ * levava a mexer no banco sem motivo. `0` = nem chegou ao servidor.
+ */
+function explicacaoDaFalha(status: number | null): string {
+  if (status === 401) return "A sessão do painel expirou. Entre de novo.";
+  if (status === 403) {
+    return "Sua conta não tem permissão para ver as inscrições da 4ª Edição (precisa do escopo de conferência ou do financeiro).";
+  }
+  if (status === 0) return "Não deu para falar com o servidor. Confira a conexão e tente de novo.";
+  if (status !== null && status >= 500) {
+    return "Servidor ou banco indisponível. Tente de novo em instantes; se não voltar, confira no Supabase se o projeto está ativo (não pausado). Com o «ref» abaixo dá para achar o erro nos logs da Vercel.";
+  }
+  return "A edição não carregou. O motivo que o servidor deu está logo abaixo.";
+}
 
 export function PainelEdicao({
   secao,
@@ -206,35 +241,65 @@ export function PainelEdicao({
   podeConferir,
   podeFinanceiro,
   podeConfigurar,
+  podeRedefinirSenha = false,
   render,
 }: Props) {
   const [dados, setDados] = useState<DadosEdicao | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
+  /** Status HTTP da última leitura que falhou (0 = rede). Escolhe a explicação da tela de falha. */
+  const [statusDoErro, setStatusDoErro] = useState<number | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [ultimoErro, setUltimoErro] = useState<string | null>(null);
+  const [ultimaMensagem, setUltimaMensagem] = useState<string | null>(null);
+
+  /**
+   * Número da busca mais recente. A busca da troca de aba não trava o «Salvar»: no 4G ela
+   * pode voltar DEPOIS da busca que vem após a ação, com a foto de antes dela — e a resposta
+   * que chegasse por último vencia, devolvendo à tela o que acabou de ser trocado. Só a
+   * busca mais nova escreve na tela.
+   */
+  const buscaAtual = useRef(0);
 
   /** Devolve se a tela ficou com os dados do servidor — quem salvou precisa saber. */
   const carregar = useCallback(async (): Promise<boolean> => {
+    const minha = ++buscaAtual.current;
     setCarregando(true);
+    let status = 0;
     try {
       const r = await fetch("/api/admin/edicao", { cache: "no-store" });
-      const corpo = (await r.json().catch(() => ({}))) as DadosEdicao & { error?: string };
-      if (!r.ok) throw new Error(corpo.error ?? `Falha ${r.status}`);
+      status = r.status;
+      const corpo = (await r.json().catch(() => ({}))) as DadosEdicao & { error?: string; ref?: string };
+      // Uma busca mais nova já saiu e é ela que manda na tela.
+      if (minha !== buscaAtual.current) return true;
+      if (!r.ok) {
+        // O `ref` é o que acha o erro de verdade no log do servidor; sem ele, "não foi
+        // possível carregar" não leva a lugar nenhum.
+        throw new Error(`${corpo.error ?? `Falha ${r.status}`}${corpo.ref ? ` (ref ${corpo.ref})` : ""}`);
+      }
       setDados(corpo);
       setErro(null);
+      setStatusDoErro(null);
       return true;
     } catch (e) {
+      if (minha !== buscaAtual.current) return false;
       setErro(e instanceof Error ? e.message : "Não foi possível carregar a edição.");
+      setStatusDoErro(status);
       return false;
     } finally {
-      setCarregando(false);
+      if (minha === buscaAtual.current) setCarregando(false);
     }
   }, []);
 
+  /*
+   * Busca de novo a cada troca de aba da 4ª. O painel devolve este contêiner na MESMA
+   * posição para as quatro abas, sem `key`: o React reaproveita a instância, e um efeito
+   * que dependesse só de `carregar` (estável) rodava uma vez só — quem passava por
+   * Inscritos, Pagamentos e Times via em todas a foto de quando abriu a primeira.
+   */
   useEffect(() => {
     void carregar();
-  }, [carregar]);
+  }, [carregar, secao]);
 
   /**
    * Executa uma ação e RECARREGA.
@@ -248,6 +313,7 @@ export function PainelEdicao({
     async (acao: AcaoEdicao, corpo?: unknown) => {
       setOcupado(true);
       setUltimoErro(null);
+      setUltimaMensagem(null);
       const falhar = (texto: string) => {
         onAlert("erro", texto);
         setUltimoErro(texto);
@@ -263,6 +329,7 @@ export function PainelEdicao({
           error?: string;
           missing?: string[];
           mensagem?: string;
+          conflito?: boolean;
         };
 
         if (!r.ok) {
@@ -271,7 +338,10 @@ export function PainelEdicao({
           // falhar. Recarregar mostra o que entrou, e a gaveta tira do rascunho o que já está
           // no banco — senão o próximo clique reenviaria por cima do que outra pessoa gravou
           // depois. As outras ações tocam uma linha só: falhou, não gravou nada.
-          if (acao === "inscrito") await carregar();
+          //
+          // O 409 de conflito (a tela mandou o valor que viu, e ele já mudou) recarrega em
+          // qualquer ação: a mensagem manda conferir o valor ATUAL, e ele tem de estar na tela.
+          if (acao === "inscrito" || (r.status === 409 && resposta.conflito)) await carregar();
           return falhar(`${resposta.error ?? "Não foi possível salvar."}${falta}`);
         }
 
@@ -287,7 +357,9 @@ export function PainelEdicao({
         }
         // A rota pode dizer algo além de "Salvo." — o resumo da rodada da Riot, ou que a
         // pessoa acabou de virar apto sozinha.
-        onAlert("ok", resposta.mensagem ?? "Salvo.");
+        const mensagem = resposta.mensagem ?? "Salvo.";
+        onAlert("ok", mensagem);
+        setUltimaMensagem(mensagem);
         return true;
       } catch {
         // A resposta pode ter se perdido DEPOIS de gravar; mesma razão do recarregamento acima.
@@ -310,7 +382,7 @@ export function PainelEdicao({
         <SectionHead
           eyebrow="4ª Edição"
           title="Não foi possível carregar"
-          description="As tabelas da 4ª Edição podem não ter sido criadas ainda. Rode supabase/schema-4a-edicao.sql."
+          description={explicacaoDaFalha(statusDoErro)}
         />
         <Banner tone="danger" title="Falha ao carregar">
           {erro}
@@ -326,7 +398,17 @@ export function PainelEdicao({
 
   return (
     <div key={secao}>
-      {render({ dados, executar, ocupado, podeConferir, podeFinanceiro, podeConfigurar, ultimoErro })}
+      {render({
+        dados,
+        executar,
+        ocupado,
+        podeConferir,
+        podeFinanceiro,
+        podeConfigurar,
+        ultimoErro,
+        ultimaMensagem,
+        podeRedefinirSenha,
+      })}
     </div>
   );
 }

@@ -4,8 +4,10 @@ import { comum } from "@/lib/i18n/messages/comum";
 import { compartilhados } from "@/lib/i18n/messages/compartilhados";
 import { conformidade } from "@/lib/i18n/messages/conformidade";
 import { draft } from "@/lib/i18n/messages/draft";
+import { erro } from "@/lib/i18n/messages/erro";
 import { inscricao } from "@/lib/i18n/messages/inscricao";
 import { legal } from "@/lib/i18n/messages/legal";
+import { metadados } from "@/lib/i18n/messages/metadados";
 import { paginasStats } from "@/lib/i18n/messages/paginas-stats";
 import { paginasCompeticao } from "@/lib/i18n/messages/paginas-competicao";
 import { paginasHome } from "@/lib/i18n/messages/paginas-home";
@@ -26,8 +28,10 @@ export const MESSAGES = {
     compartilhados: compartilhados.pt,
     conformidade: conformidade.pt,
     draft: draft.pt,
+    erro: erro.pt,
     inscricao: inscricao.pt,
     legal: legal.pt,
+    metadados: metadados.pt,
     paginasCompeticao: paginasCompeticao.pt,
     paginasHome: paginasHome.pt,
     paginasRegras: paginasRegras.pt,
@@ -40,8 +44,10 @@ export const MESSAGES = {
     compartilhados: compartilhados.en,
     conformidade: conformidade.en,
     draft: draft.en,
+    erro: erro.en,
     inscricao: inscricao.en,
     legal: legal.en,
+    metadados: metadados.en,
     paginasCompeticao: paginasCompeticao.en,
     paginasHome: paginasHome.en,
     paginasRegras: paginasRegras.en,

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { resolveElo, resolveRole } from "@/lib/design";
 import { LIMITES_INSCRICAO } from "@/lib/inscricoes/passo1";
 import { TURNOS } from "@/lib/inscricoes/turnos";
+import { normalizarChavePix } from "@/lib/pix";
 
 /**
  * Validação da inscrição da 4ª Edição.
@@ -257,6 +258,10 @@ export const conferenciaPatchSchema = z
     estado: z.enum(ESTADOS_CONFERENCIA).optional(),
     observacao: z.string().trim().max(LIMITES_INSCRICAO.texto).optional(),
     retrato: z.record(z.string(), z.unknown()).optional(),
+    // Trava otimista: o estado que a TELA viu. Presente, a gravação só acontece se o banco
+    // ainda tiver esse estado — senão a rota responde 409 e nada muda. Ausente, grava como
+    // sempre gravou (compatível com a tela antiga).
+    estadoAnterior: z.enum(ESTADOS_CONFERENCIA).optional(),
   })
   .refine((d) => d.estado !== undefined || d.observacao !== undefined || d.retrato !== undefined, {
     message: "Nada para gravar.",
@@ -290,7 +295,17 @@ export const pagamentoPatchSchema = z.object({
   inscricaoId: z.string().uuid(),
   estado: z.enum(ESTADOS_PAGAMENTO),
   observacao: z.string().trim().max(LIMITES_INSCRICAO.texto).optional(),
+  // Trava otimista: o estado que a TELA viu (ver `conferenciaPatchSchema`). Sem ela, a fila
+  // do caixa aberta às 9h50 desfazia o «pago» que outro financeiro gravou às 10h05.
+  estadoAnterior: z.enum(ESTADOS_PAGAMENTO).optional(),
 });
+
+/**
+ * Estados em que o dinheiro entrou de fato. Só deles se estorna: marcar «estorno devido»
+ * num pagamento que nunca foi recebido inventava R$ 20 no caixa e punha na lista «a
+ * devolver» quem não pagou (ver `atualizarPagamento`).
+ */
+export const ESTADOS_COM_DINHEIRO: readonly EstadoPagamento[] = ["pago", "estorno_devido", "estornado"];
 
 // ---------------------------------------------------------------- ficha e configuração
 
@@ -301,9 +316,15 @@ export const pagamentoPatchSchema = z.object({
  * continua derivado do elo no servidor (ver `atualizarInscricao`); aceitá-lo aqui
  * abriria pela porta dos fundos exatamente o que o formulário público fecha.
  */
+const SITUACOES = ["pendente", "apto", "recusado", "desistiu", "sobra"] as const;
+
 export const fichaPatchSchema = z.object({
   inscricaoId: z.string().uuid(),
-  situacao: z.enum(["pendente", "apto", "recusado", "desistiu", "sobra"]).optional(),
+  situacao: z.enum(SITUACOES).optional(),
+  // Trava otimista: a situação que a TELA viu. Presente, a ficha inteira só é gravada se o
+  // banco ainda tiver essa situação — senão 409 e nada muda. Não é mudança por si só (ver
+  // `fichaTemMudanca`).
+  situacaoAnterior: z.enum(SITUACOES).optional(),
   observacao: z.string().trim().max(LIMITES_INSCRICAO.texto).nullable().optional(),
   organizador: z.boolean().optional(),
   eloVerificado: z
@@ -349,6 +370,8 @@ const conferenciaDoLoteSchema = z
     item: z.enum(ITENS_CONFERENCIA),
     estado: z.enum(ESTADOS_CONFERENCIA).optional(),
     observacao: z.string().trim().max(LIMITES_INSCRICAO.texto).optional(),
+    // O estado que a gaveta viu (ver `conferenciaPatchSchema`).
+    estadoAnterior: z.enum(ESTADOS_CONFERENCIA).optional(),
   })
   .refine((d) => d.estado !== undefined || d.observacao !== undefined, {
     message: "Item sem nada para gravar.",
@@ -367,14 +390,17 @@ export const inscritoPatchSchema = z
       .optional(),
     ficha: fichaPatchSchema.omit({ inscricaoId: true, entrouNoGrupo: true }).optional(),
   })
-  .refine(
-    (d) =>
-      (d.conferencias?.length ?? 0) > 0 ||
-      Object.values(d.ficha ?? {}).some((valor) => valor !== undefined),
-    { message: "Nada para gravar." },
-  );
+  .refine((d) => (d.conferencias?.length ?? 0) > 0 || fichaTemMudanca(d.ficha), { message: "Nada para gravar." });
 
 export type InscritoPatch = z.infer<typeof inscritoPatchSchema>;
+
+/**
+ * A ficha traz algo para gravar? A `situacaoAnterior` não conta: é a trava, não mudança —
+ * uma ficha só com ela seria uma gravação vazia com linha de auditoria.
+ */
+export function fichaTemMudanca(ficha: Readonly<Record<string, unknown>> | undefined): boolean {
+  return Object.entries(ficha ?? {}).some(([campo, valor]) => campo !== "situacaoAnterior" && valor !== undefined);
+}
 
 /**
  * O porquê de uma recusa do "Salvar tudo", em português e apontando o campo.
@@ -425,7 +451,24 @@ export const configPatchSchema = z.object({
   segundos_por_escolha: z.number().int().min(5).max(600).optional(),
   taxa_centavos: z.number().int().min(0).max(1_000_000).optional(),
   pct_campeao: z.number().int().min(0).max(100).optional(),
-  chave_pix: z.string().trim().max(140).nullable().optional(),
+  // Gravada já no formato do DICT, ou recusada com o motivo (ver `normalizarChavePix`): a
+  // chave vai crua para dentro do QR, e «(11) 98765-4321» gerava um Pix que o banco recusa.
+  // Vazia = sem chave, como nulo.
+  chave_pix: z
+    .string()
+    .trim()
+    .max(140)
+    .transform((valor, ctx) => {
+      if (!valor) return null;
+      const normalizada = normalizarChavePix(valor);
+      if (!normalizada.ok) {
+        ctx.addIssue({ code: "custom", message: normalizada.motivo });
+        return z.NEVER;
+      }
+      return normalizada.chave;
+    })
+    .nullable()
+    .optional(),
   responsavel_financeiro: z.string().trim().max(120).nullable().optional(),
 });
 
@@ -446,18 +489,35 @@ export type EstadoJanela = "aberta" | "ainda_nao_abriu" | "encerrada" | "indispo
  * A chave `inscricoes_abertas` abre; a data de fechamento FECHA sozinha. Antes a data só
  * escolhia o aviso, e a inscrição seguia aberta depois dela até alguém lembrar de
  * desligar a chave — ninguém precisa mais estar acordado na hora do fechamento.
+ *
+ * Chave desligada com a ABERTURA já no passado é «encerrada», e não «ainda não abriu»
+ * (CEN-02): a janela já abriu uma vez, então quem a desligou fechou. Antes disso o
+ * «Fechar inscrições» precisava carimbar a data de fechamento para o site não anunciar
+ * «INSCRIÇÕES EM BREVE» com 30 inscritos — e o carimbo apagava a data planejada, que o
+ * «Abrir» seguinte zerava (DIFF-BE-02). Quem registra a abertura é o próprio
+ * `salvarConfig`, ao abrir. Abertura vazia ou no futuro com a chave desligada: nunca abriu,
+ * «em breve».
  */
 export function estadoDaJanela(
-  config: { inscricoes_abertas: boolean; fechamento_inscricoes: string | null } | null,
+  config: {
+    inscricoes_abertas: boolean;
+    fechamento_inscricoes: string | null;
+    /** Opcional para quem só tem a chave e o fechamento à mão; sem ela, vale como vazia. */
+    abertura_inscricoes?: string | null;
+  } | null,
   agoraMs: number = Date.now(),
 ): EstadoJanela {
   if (!config) return "indisponivel";
 
-  const fim = config.fechamento_inscricoes ? new Date(config.fechamento_inscricoes).getTime() : NaN;
-  const passouDoFechamento = Number.isFinite(fim) && fim <= agoraMs;
+  // Data lixo não decide nada: vale como vazia.
+  const jaPassou = (data: string | null | undefined) => {
+    const ms = data ? new Date(data).getTime() : NaN;
+    return Number.isFinite(ms) && ms <= agoraMs;
+  };
 
-  if (config.inscricoes_abertas) return passouDoFechamento ? "encerrada" : "aberta";
-  return passouDoFechamento ? "encerrada" : "ainda_nao_abriu";
+  if (jaPassou(config.fechamento_inscricoes)) return "encerrada";
+  if (config.inscricoes_abertas) return "aberta";
+  return jaPassou(config.abertura_inscricoes) ? "encerrada" : "ainda_nao_abriu";
 }
 
 // ---------------------------------------------------------------- times

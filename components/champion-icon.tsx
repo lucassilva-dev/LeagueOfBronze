@@ -6,7 +6,15 @@ export function ChampionIcon({
   size = 24,
   showName = false,
   className,
-}: Readonly<{ champion?: string | null; size?: number; showName?: boolean; className?: string }>) {
+  semCampeao = "Campeão não informado",
+}: Readonly<{
+  champion?: string | null;
+  size?: number;
+  showName?: boolean;
+  className?: string;
+  /** Dica (title) do quadradinho sem campeão, no idioma da página (compartilhados.campeaoNaoInformado). */
+  semCampeao?: string;
+}>) {
   const dimension = { width: size, height: size };
   const resolved = resolveChampion(champion);
   const raw = champion?.trim() ?? "";
@@ -24,7 +32,7 @@ export function ChampionIcon({
   ) : (
     <span
       style={dimension}
-      title={raw || "Campeão não informado"}
+      title={raw || semCampeao}
       aria-hidden
       className="inline-flex shrink-0 items-center justify-center rounded-md border border-border/60 bg-panel2/70 text-[11px] font-semibold text-muted"
     >

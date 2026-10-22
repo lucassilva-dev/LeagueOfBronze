@@ -60,7 +60,16 @@ export async function SiteFrame({ children }: SiteFrameProps) {
       ];
 
   return (
-    <div style={{ position: "relative", minHeight: "100vh", color: "#b8ab97", overflowX: "hidden" }}>
+    // O corte lateral mora na classe `lob-raiz` (globals.css), e não aqui: inline só cabe UM
+    // valor, e o certo é `overflow-x: clip` com `hidden` de reserva. `hidden` sozinho faz
+    // deste div um contêiner de rolagem — e aí o <header> sticky gruda NELE, que nunca rola,
+    // e vai embora junto com a página.
+    <div className="lob-raiz" style={{ position: "relative", minHeight: "100vh", color: "#b8ab97" }}>
+      {/* Primeiro Tab da página: quem navega por teclado ou leitor de tela pula o menu.
+          Só aparece com foco (classe em globals.css, por deslocamento — sem opacidade). */}
+      <a href="#conteudo" className="lob-pular">
+        {t.comum.pularParaConteudo}
+      </a>
       {/* Camada de glows bronze + teal + listras diagonais */}
       <div
         style={{
@@ -165,6 +174,7 @@ export async function SiteFrame({ children }: SiteFrameProps) {
           }}
         >
           <div
+            className="lob-cabecalho-linha"
             style={{
               maxWidth: 1280,
               margin: "0 auto",
@@ -177,6 +187,7 @@ export async function SiteFrame({ children }: SiteFrameProps) {
           >
             <Link
               href="/"
+              className="lob-cabecalho-marca"
               style={{ display: "flex", alignItems: "center", gap: 12, textDecoration: "none" }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -185,6 +196,7 @@ export async function SiteFrame({ children }: SiteFrameProps) {
                 alt="League of Bronze"
                 width={44}
                 height={44}
+                className="lob-cabecalho-logo"
                 style={{
                   width: 44,
                   height: 44,
@@ -210,7 +222,7 @@ export async function SiteFrame({ children }: SiteFrameProps) {
               Wrapper sem `position` para não virar o bloco de referência do menu
               hambúrguer, que se posiciona em relação ao <header>.
             */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div className="lob-cabecalho-acoes" style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <MainNav
                 labels={navLabels}
                 ariaLabel={t.comum.navAriaPrincipal}
@@ -235,7 +247,14 @@ export async function SiteFrame({ children }: SiteFrameProps) {
           />
         </header>
 
-        <div style={{ flex: 1 }}>{children}</div>
+        {/*
+          O ÚNICO <main> do site: as páginas e os loading.tsx usam <div> por dentro (dois
+          <main> aninhados é HTML inválido e confunde o leitor de tela). O respiro da âncora
+          é o do cabeçalho sticky, para o "pular para o conteúdo" não parar embaixo dele.
+        */}
+        <main id="conteudo" style={{ flex: 1, scrollMarginTop: 80 }}>
+          {children}
+        </main>
 
         <footer style={{ position: "relative", borderTop: "1px solid rgba(201,138,75,.16)" }}>
           <div
@@ -257,7 +276,9 @@ export async function SiteFrame({ children }: SiteFrameProps) {
                 flexWrap: "wrap",
                 fontSize: 11,
                 letterSpacing: ".10em",
-                color: "#6f6656",
+                // #8f8472 = 5,3:1 sobre #100d07. Os tons de antes (#6f6656, #7d7263) ficavam
+                // abaixo dos 4,5:1 que texto pequeno pede — e aqui mora o aviso obrigatório.
+                color: "#8f8472",
               }}
             >
               <span>{t.comum.rodapeAssinatura}</span>
@@ -286,7 +307,7 @@ export async function SiteFrame({ children }: SiteFrameProps) {
                 gap: 6,
                 fontSize: 11,
                 lineHeight: 1.6,
-                color: "#7d7263",
+                color: "#8f8472",
               }}
             >
               {locale === "en" ? null : (
@@ -294,7 +315,7 @@ export async function SiteFrame({ children }: SiteFrameProps) {
                   {AVISO_RIOT_OFICIAL}
                 </p>
               )}
-              <p style={{ margin: 0, color: locale === "en" ? undefined : "#6f6656" }}>
+              <p style={{ margin: 0 }}>
                 {t.comum.rodapeAviso}{" "}
                 <Link href="/legal" style={{ color: "#c98a4b", textDecoration: "none" }}>
                   {t.comum.rodapeLinkLegal}

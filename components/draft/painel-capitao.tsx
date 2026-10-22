@@ -88,11 +88,45 @@ type RespostaEstado = Readonly<{
   souCapitaoDe: string | null;
   /** Há sessão de jogador? Opcional: servidor antigo não manda. */
   logado?: boolean;
+  /** Logado numa conta SEM inscrição (não é o mesmo que "não capitaneia"). Opcional: servidor antigo. */
+  semInscricao?: boolean;
   /** Hora do servidor na resposta — corrige o relógio do aparelho no cronômetro. */
   agoraServidorISO?: string;
 }>;
 
-type RespostaEscolha = Readonly<{ ok?: boolean; draft?: DraftPublico | null; error?: string }>;
+type RespostaEscolha = Readonly<{
+  ok?: boolean;
+  draft?: DraftPublico | null;
+  /** Recado do servidor, sempre em português. */
+  error?: string;
+  /** O motivo da recusa, para traduzir (`t.erros`). */
+  codigo?: string;
+  params?: Readonly<Record<string, string | number>>;
+}>;
+
+/** Troca cada `{chave}` do texto pelo valor; chave sem valor fica como está. */
+function preencher(modelo: string, valores: Readonly<Record<string, string | number>>) {
+  return modelo.replace(/\{(\w+)\}/g, (inteiro, chave: string) =>
+    Object.hasOwn(valores, chave) ? String(valores[chave]) : inteiro,
+  );
+}
+
+/**
+ * O recado de uma recusa no idioma da tela. O servidor escreve em português; com o site
+ * em inglês, o capitão lia "Não é a vez do seu time." no meio do painel traduzido. Código
+ * desconhecido (servidor mais novo que a tela) cai no texto do servidor.
+ */
+function recadoDaRecusa(corpo: RespostaEscolha, t: Rotulos): string {
+  const erros: Readonly<Record<string, string>> = t.erros;
+  const modelo = corpo.codigo && Object.hasOwn(erros, corpo.codigo) ? erros[corpo.codigo] : undefined;
+  if (modelo !== undefined) return preencher(modelo, corpo.params ?? {});
+  return corpo.error ?? t.erroGenerico;
+}
+
+/** "1 vaga aberta" / "4 vagas abertas" — antes era "4 vaga aberta" (e "4 open slot"). */
+function vagasAbertas(n: number, t: Rotulos) {
+  return preencher(n === 1 ? t.vagaAbertaN : t.vagasAbertasN, { n });
+}
 
 /** Busca sem acento: quem digita "grao" tem de achar "Grão-Mestre". */
 function normalizar(texto: string) {
@@ -306,7 +340,8 @@ export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
   }, [draft?.disponiveis, busca]);
 
   const escolher = useCallback(
-    async (jogadorId: string) => {
+    /** `escolha`: o número da escolha que a tela mostrava no clique (ver a rota). */
+    async (jogadorId: string, escolha: number) => {
       if (escolhendoId) return;
       setEscolhendoId(jogadorId);
       setAviso(null);
@@ -324,7 +359,7 @@ export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
           signal: AbortSignal.timeout(10000),
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ jogadorId }),
+          body: JSON.stringify({ jogadorId, escolha }),
         });
         const corpo = (await resposta.json().catch(() => ({}))) as RespostaEscolha;
         // O 409 vem com o estado fresco justamente para a tela se corrigir na hora, em
@@ -337,14 +372,14 @@ export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
         // Aviso velho é pior que nenhum: sem limpar no sucesso, a tarja de "outra
         // escolha entrou primeiro" ficava na tela rodadas depois, e o capitão a lia
         // como se fosse da tentativa nova.
-        setAviso(resposta.ok ? null : (corpo.error ?? t.erroGenerico));
+        setAviso(resposta.ok ? null : recadoDaRecusa(corpo, t));
       } catch {
         setAviso(t.erroGenerico);
       } finally {
         setEscolhendoId(null);
       }
     },
-    [aceitar, escolhendoId, t.erroGenerico],
+    [aceitar, escolhendoId, t],
   );
 
   // ---------------------------------------------------------------- estados de borda
@@ -393,18 +428,32 @@ export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
     // pessoa a esta mesma tela — então ele some e fica o recado de que a conta não é de
     // capitão (a saída é o botão "sair" do cabeçalho e entrar na conta certa).
     const logado = estado?.logado === true;
+    // Logado numa conta sem inscrição: quase sempre o capitão que criou outra conta. O
+    // recado aponta a saída (a conta da inscrição, ou a mesa escolhendo por ele) em vez de
+    // afirmar que ele não é capitão.
+    const semInscricao = logado && estado?.semInscricao === true;
     return (
       <div className="lob-card lob-fade" style={{ ...CAIXA, display: "grid", gap: 18 }}>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
           {/* O convite é o próprio botão: não há chave de rótulo curto para ele, e
               repetir a frase como texto e como botão seria ruído. Leva ao /entrar, que
               devolve o capitão para cá — /inscricao não tem login quando as inscrições
-              estão fechadas, que é justamente o caso no dia do draft. */}
+              estão fechadas, que é justamente o caso no dia do draft.
+              O rótulo é longo e o .lob-btn-gold não quebra linha: no celular de 320–375px
+              o botão passava da borda do cartão. Aqui ele quebra e fica dentro. */}
           {logado ? null : (
             <Link
               href="/entrar?volta=/capitao"
               className="lob-btn-gold"
-              style={{ padding: "13px 22px", fontSize: 13.5, letterSpacing: ".01em", textAlign: "center" }}
+              style={{
+                padding: "13px 22px",
+                fontSize: 13.5,
+                letterSpacing: ".01em",
+                textAlign: "center",
+                whiteSpace: "normal",
+                maxWidth: "100%",
+                flex: "1 1 auto",
+              }}
             >
               {t.entreParaVer}
             </Link>
@@ -415,8 +464,10 @@ export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
         </div>
 
         <div style={{ borderTop: "1px solid var(--lob-line)", paddingTop: 16, display: "grid", gap: 6 }}>
-          <Etiqueta>{t.naoEhCapitao}</Etiqueta>
-          <p style={{ margin: 0, color: "var(--lob-muted)", maxWidth: "60ch" }}>{t.naoEhCapitaoTexto}</p>
+          <Etiqueta>{semInscricao ? t.semInscricao : t.naoEhCapitao}</Etiqueta>
+          <p style={{ margin: 0, color: "var(--lob-muted)", maxWidth: "60ch" }}>
+            {semInscricao ? t.semInscricaoTexto : t.naoEhCapitaoTexto}
+          </p>
         </div>
       </div>
     );
@@ -437,7 +488,10 @@ export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
             : t.pausadoTexto
         : t.encerradoTexto;
 
-  const podeClicar = minhaVez && vagas > 0 && escolhendoId === null;
+  // Com o relógio em 0:00 não há mais o que clicar: o pedido chegaria depois do prazo, o
+  // auto-pick já teria entrado e o servidor recusaria (ver a rota de escolha).
+  const tempoAcabou = msRestantes !== null && msRestantes <= 0;
+  const podeClicar = minhaVez && vagas > 0 && escolhendoId === null && !tempoAcabou;
 
   return (
     <div className="lob-fade" style={{ display: "grid", gap: 16 }}>
@@ -464,7 +518,9 @@ export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
           gap: 16,
         }}
       >
-        <div style={{ display: "grid", gap: 8, minWidth: 240 }}>
+        {/* Região viva: "É A SUA VEZ" é anunciado pelo leitor de tela quando a vez chega.
+            O relógio fica de fora, senão cada tique seria lido. */}
+        <div role="status" aria-live="polite" style={{ display: "grid", gap: 8, minWidth: 240 }}>
           <Etiqueta>
             {t.rodada} {rodadaAtual} {t.de} {totalRodadas} · {t.escolha}{" "}
             {Math.min(draft.escolhaAtual + 1, draft.totalEscolhas)} {t.de} {draft.totalEscolhas}
@@ -504,9 +560,7 @@ export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
                   {timeDaVez?.nome ?? "—"}
                 </strong>
                 {timeDaVez ? (
-                  <span style={{ color: "var(--lob-muted)", fontSize: 12.5 }}>
-                    {timeDaVez.vagas} {t.vagaAberta}
-                  </span>
+                  <span style={{ color: "var(--lob-muted)", fontSize: 12.5 }}>{vagasAbertas(timeDaVez.vagas, t)}</span>
                 ) : null}
               </div>
             </>
@@ -568,7 +622,7 @@ export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
           </div>
 
           <div className="lob-card-2" style={{ padding: 14, display: "grid", gap: 6, alignContent: "start" }}>
-            <Etiqueta>{t.vagaAberta}</Etiqueta>
+            <Etiqueta>{vagas === 1 ? t.vagaAberta : t.vagasAbertas}</Etiqueta>
             <div
               className="lob-display"
               style={{ fontSize: 34, lineHeight: 1, color: "var(--lob-text)", fontVariantNumeric: "tabular-nums" }}
@@ -789,8 +843,10 @@ export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
                     </span>
                     <button
                       type="button"
-                      onClick={() => void escolher(jogador.id)}
+                      onClick={() => void escolher(jogador.id, draft.escolhaAtual)}
                       disabled={!habilitado}
+                      // Sem isto o leitor de tela lia "ESCOLHER, botão" em cada linha, sem dizer de quem.
+                      aria-label={preencher(t.escolherRotulo, { riotId: jogador.riotId, pontos: jogador.pontos })}
                       className={habilitado ? "lob-btn-gold" : "lob-btn-ghost"}
                       style={{
                         padding: "9px 15px",
@@ -863,7 +919,7 @@ export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
                     {naVez ? <span style={{ fontSize: 10, color: "#f3d69a", marginLeft: "auto" }}>{t.naVez}</span> : null}
                   </div>
                   <div style={{ fontSize: 12, color: "var(--lob-muted)", fontVariantNumeric: "tabular-nums" }}>
-                    {orcamento - time.gasto} {t.pontosLivres} {orcamento} · {time.vagas} {t.vagaAberta}
+                    {orcamento - time.gasto} {t.pontosLivres} {orcamento} · {vagasAbertas(time.vagas, t)}
                   </div>
                 </div>
               );

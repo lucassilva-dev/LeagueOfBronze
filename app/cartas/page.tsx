@@ -1,12 +1,19 @@
+import type { Metadata } from "next";
 import { TcgCard } from "@/components/lob/tcg-card";
 import { Eyebrow, GoldTitle, SectionTitle } from "@/components/lob/ui";
 import { CARDS_BY_ID, CARTAS_ATIVAS } from "@/lib/cards";
+import { metadadosDaPagina } from "@/lib/i18n/metadados";
 import { getMessages } from "@/lib/i18n/server";
 import type { CardId } from "@/lib/schema";
 import { getServerDataset } from "@/lib/server-data";
 import { calculateCardStats } from "@/lib/tournament";
 
 export const dynamic = "force-dynamic";
+
+/** Título e descrição próprios, no idioma da visita (lib/i18n/messages/metadados.ts). */
+export async function generateMetadata(): Promise<Metadata> {
+  return metadadosDaPagina("cartas", "/cartas");
+}
 
 export default async function CartasPage() {
   const { dataset } = await getServerDataset();

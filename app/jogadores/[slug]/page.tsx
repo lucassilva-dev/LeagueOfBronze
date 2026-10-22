@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
@@ -7,6 +8,8 @@ import { semTemporadaAoVivo } from "@/lib/fase-do-site";
 import { EloCrest, RoleIcon } from "@/components/lob/ui";
 import { formatKda } from "@/lib/format";
 import { eloLabel, rotaLabel } from "@/lib/i18n/messages/paginas-home";
+import { metadadosDaPagina, montarMetadados } from "@/lib/i18n/metadados";
+import { nomeDaTemporada } from "@/lib/i18n/nome-da-temporada";
 import { getMessages } from "@/lib/i18n/server";
 import { getOpGgSummonerUrlFromNick } from "@/lib/opgg";
 import { buildDesignPlayers } from "@/lib/roster";
@@ -17,9 +20,27 @@ export const dynamic = "force-dynamic";
 
 type PlayerPageParams = Readonly<{ params: Promise<{ slug: string }> }>;
 
+/** O nick na aba e na prévia do link; sem o jogador (ou com o banco fora), o da seção. */
+export async function generateMetadata({ params }: PlayerPageParams): Promise<Metadata> {
+  const { slug } = await params;
+  try {
+    const [{ metadados, compartilhados }, { dataset }] = await Promise.all([getMessages(), getServerDataset()]);
+    const player = buildDesignPlayers(dataset).find((p) => p.slug === slug);
+    if (player) {
+      return montarMetadados(metadados.jogador, {
+        valores: { jogador: player.displayNick, temporada: nomeDaTemporada(dataset.tournament.name, compartilhados.localeTag) },
+        caminho: `/jogadores/${encodeURIComponent(player.slug)}`,
+      });
+    }
+  } catch {
+    // Banco fora: quem decide o que mostrar é a página (e a app/error.tsx).
+  }
+  return metadadosDaPagina("jogadores");
+}
+
 export default async function PlayerFichaPage({ params }: PlayerPageParams) {
   const { slug } = await params;
-  const { paginasHome: t, paginasStats: ts } = await getMessages();
+  const { paginasHome: t, paginasStats: ts, compartilhados } = await getMessages();
   const { dataset } = await getServerDataset();
   const player = buildDesignPlayers(dataset).find((p) => p.slug === slug);
 
@@ -41,7 +62,7 @@ export default async function PlayerFichaPage({ params }: PlayerPageParams) {
     { label: t.statAbates, val: dash(String(aggregate?.kills ?? 0)) },
     { label: t.statMortes, val: dash(String(aggregate?.deaths ?? 0)) },
     { label: t.statAssistencias, val: dash(String(aggregate?.assists ?? 0)) },
-    { label: t.statKda, val: dash(formatKda(aggregate?.kda ?? 0)) },
+    { label: t.statKda, val: dash(formatKda(aggregate?.kda ?? 0, compartilhados.localeTag)) },
     { label: t.statMvps, val: String(aggregate?.gameMvps ?? 0) },
     { label: t.statWinrate, val: dash(`${Math.round(aggregate?.winRate ?? 0)}%`) },
   ];
@@ -76,7 +97,8 @@ export default async function PlayerFichaPage({ params }: PlayerPageParams) {
             <div style={{ position: "absolute", left: 18, right: 18, bottom: 16 }}>
               <div style={{ fontSize: 11, letterSpacing: ".12em", color: player.teamColor, marginBottom: 5 }}>{player.teamName}</div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
-                <span className="lob-display" style={{ fontSize: "clamp(26px,4.4vw,40px)", lineHeight: 1.08, color: "#f7f1e6", wordBreak: "break-word", textShadow: "0 2px 12px rgba(0,0,0,.8)" }}>{player.displayNick}</span>
+                {/* O nick é o título da página: <h1>, com o mesmo desenho do <span> de antes. */}
+                <h1 className="lob-display" style={{ margin: 0, fontSize: "clamp(26px,4.4vw,40px)", lineHeight: 1.08, color: "#f7f1e6", wordBreak: "break-word", textShadow: "0 2px 12px rgba(0,0,0,.8)" }}>{player.displayNick}</h1>
                 {player.mono ? (
                   <span style={{ padding: "2px 7px", border: "1px solid rgba(70,214,200,.6)", background: "rgba(10,20,19,.5)", color: "#7fe6db", borderRadius: 2, fontSize: 9, fontWeight: 600, letterSpacing: ".10em" }}>MONO</span>
                 ) : null}

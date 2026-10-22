@@ -66,8 +66,88 @@ export function crc16(texto: string): string {
   return crc.toString(16).toUpperCase().padStart(4, "0");
 }
 
+// ---------------------------------------------------------------- chave
+
+/** Os dígitos verificadores de CPF/CNPJ: soma ponderada, resto de 11, "< 2 vira 0". */
+function digitoVerificador(digitos: string, pesos: readonly number[]): number {
+  const soma = pesos.reduce((t, peso, i) => t + Number(digitos[i]) * peso, 0);
+  const resto = soma % 11;
+  return resto < 2 ? 0 : 11 - resto;
+}
+
+function cpfValido(d: string): boolean {
+  if (!/^\d{11}$/.test(d) || /^(\d)\1{10}$/.test(d)) return false;
+  return (
+    digitoVerificador(d, [10, 9, 8, 7, 6, 5, 4, 3, 2]) === Number(d[9]) &&
+    digitoVerificador(d, [11, 10, 9, 8, 7, 6, 5, 4, 3, 2]) === Number(d[10])
+  );
+}
+
+function cnpjValido(d: string): boolean {
+  if (!/^\d{14}$/.test(d) || /^(\d)\1{13}$/.test(d)) return false;
+  return (
+    digitoVerificador(d, [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]) === Number(d[12]) &&
+    digitoVerificador(d, [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]) === Number(d[13])
+  );
+}
+
+const EVP = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export type ChavePixNormalizada = { ok: true; chave: string } | { ok: false; motivo: string };
+
+/**
+ * A chave Pix no formato do DICT — o único que o app do banco aceita dentro do QR.
+ *
+ * O BR Code leva a chave crua (campo 26/01), e o banco procura exatamente aquele texto:
+ * «(11) 98765-4321» ou «123.456.789-09» geravam um QR que o app recusava, e «11987654321»
+ * sem o +55 era procurado como CPF. Aqui só entram transformações sem chute — tirar a
+ * pontuação de CPF/CNPJ e de telefone que já começa com +55, minúsculas em e-mail e chave
+ * aleatória. O que é ambíguo (telefone sem +55, CPF com dígito errado) é RECUSADO com o
+ * motivo, para quem cadastra corrigir — nunca adivinhado.
+ */
+export function normalizarChavePix(bruta: string): ChavePixNormalizada {
+  const chave = bruta.trim();
+  if (!chave) return { ok: false, motivo: "Chave Pix vazia." };
+
+  if (chave.includes("@")) {
+    const email = chave.toLowerCase();
+    if (!EMAIL.test(email) || email.length > 77) return { ok: false, motivo: "Chave Pix: e-mail inválido." };
+    return { ok: true, chave: email };
+  }
+
+  if (EVP.test(chave.toLowerCase())) return { ok: true, chave: chave.toLowerCase() };
+
+  const semPontuacao = chave.replace(/[\s.\-/()]/g, "");
+  if (semPontuacao.startsWith("+")) {
+    if (/^\+55\d{10,11}$/.test(semPontuacao)) return { ok: true, chave: semPontuacao };
+    return {
+      ok: false,
+      motivo: "Chave Pix de telefone: use +55, o DDD e o número, só com dígitos (ex.: +5511987654321).",
+    };
+  }
+
+  if (/^\d+$/.test(semPontuacao)) {
+    if (semPontuacao.length === 11 && cpfValido(semPontuacao)) return { ok: true, chave: semPontuacao };
+    if (semPontuacao.length === 14 && cnpjValido(semPontuacao)) return { ok: true, chave: semPontuacao };
+    return {
+      ok: false,
+      motivo:
+        "Chave Pix: se for telefone, comece com +55 (ex.: +5511987654321); se for CPF ou CNPJ, confira os números.",
+    };
+  }
+
+  return {
+    ok: false,
+    motivo: "Chave Pix inválida: use telefone com +55, CPF/CNPJ, e-mail ou a chave aleatória do banco.",
+  };
+}
+
 export function pixCopiaECola(c: CobrancaPix): string {
-  const chave = c.chave.trim();
+  // A chave cadastrada antes da validação (ver `normalizarChavePix`) ainda pode estar
+  // pontuada: o que dá para normalizar sem chute é normalizado aqui também, no QR.
+  const normalizada = normalizarChavePix(c.chave);
+  const chave = normalizada.ok ? normalizada.chave : c.chave.trim();
   if (!chave) throw new Error("Chave Pix vazia.");
 
   // Conta da chave (26): o identificador do Pix, a chave e, se couber, a descrição.

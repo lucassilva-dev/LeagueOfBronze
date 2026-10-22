@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { PlayerCard } from "@/components/lob/player-card";
 import { EloCrest, RoleIcon } from "@/components/lob/ui";
@@ -27,7 +27,8 @@ export type PlayerPerf = {
 };
 
 // Tiles de performance: mostram "—" enquanto o jogador não entrou em nenhum jogo.
-function buildPerfTiles(perf: PlayerPerf | undefined, t: PaginasHomeTextos) {
+// O KDA sai no formato do idioma da página ("2.08" em inglês, "2,08" em português).
+function buildPerfTiles(perf: PlayerPerf | undefined, t: PaginasHomeTextos, localeTag?: string) {
   const games = perf?.games ?? 0;
   const dash = (value: string) => (games > 0 ? value : "—");
   return [
@@ -36,7 +37,7 @@ function buildPerfTiles(perf: PlayerPerf | undefined, t: PaginasHomeTextos) {
     { label: t.statAbates, val: dash(String(perf?.kills ?? 0)) },
     { label: t.statMortes, val: dash(String(perf?.deaths ?? 0)) },
     { label: t.statAssistencias, val: dash(String(perf?.assists ?? 0)) },
-    { label: t.statKda, val: dash(formatKda(perf?.kda ?? 0)) },
+    { label: t.statKda, val: dash(formatKda(perf?.kda ?? 0, localeTag)) },
     { label: t.statMvps, val: String(perf?.mvps ?? 0) },
     { label: t.statWinrate, val: dash(`${Math.round(perf?.winRate ?? 0)}%`) },
   ];
@@ -48,16 +49,55 @@ function PlayerModal({
   onClose,
   t,
   elos,
+  localeTag,
 }: Readonly<{
   player: DesignPlayer;
   perf?: PlayerPerf;
   onClose: () => void;
   t: PaginasHomeTextos;
   elos?: Record<string, string>;
+  localeTag?: string;
 }>) {
+  const caixa = useRef<HTMLDivElement | null>(null);
+  const botaoFechar = useRef<HTMLButtonElement | null>(null);
+  const idDoNick = useId();
+
+  /*
+   * É um DIÁLOGO de verdade, não só um véu por cima da página: o foco entra nele ao abrir
+   * (no "fechar"), o Tab fica preso dentro dele e, ao fechar, volta para o card que o abriu.
+   * Antes o foco ficava no botão por trás, o Tab percorria a página escondida e o leitor de
+   * tela nem anunciava que algo tinha aberto.
+   */
+  useEffect(() => {
+    const anterior = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    botaoFechar.current?.focus();
+    return () => anterior?.focus();
+  }, []);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab" || !caixa.current) return;
+      const focaveis = [
+        ...caixa.current.querySelectorAll<HTMLElement>(
+          'a[href],button:not([disabled]),input:not([disabled]),select,textarea,[tabindex]:not([tabindex="-1"])',
+        ),
+      ];
+      if (focaveis.length === 0) return;
+      const primeiro = focaveis[0]!;
+      const ultimo = focaveis[focaveis.length - 1]!;
+      const ativo = document.activeElement;
+      const fora = !caixa.current.contains(ativo);
+      if (e.shiftKey && (ativo === primeiro || fora)) {
+        e.preventDefault();
+        ultimo.focus();
+      } else if (!e.shiftKey && (ativo === ultimo || fora)) {
+        e.preventDefault();
+        primeiro.focus();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -69,12 +109,17 @@ function PlayerModal({
       style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, background: "rgba(6,4,2,.82)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", animation: "fadeUp .22s" }}
     >
       <div
+        ref={caixa}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={idDoNick}
         onClick={(e) => e.stopPropagation()}
         className="lob-scroll"
         style={{ position: "relative", width: "min(860px,100%)", maxHeight: "92vh", overflow: "auto", background: "linear-gradient(180deg,#1d1710,#0d0a05)", border: "1px solid rgba(232,184,120,.4)", borderRadius: 8, boxShadow: "0 44px 100px -30px rgba(0,0,0,.95)" }}
       >
         <div style={{ height: 4, background: `linear-gradient(90deg,${player.teamColor},transparent)`, position: "sticky", top: 0, zIndex: 5 }} />
         <button
+          ref={botaoFechar}
           type="button"
           onClick={onClose}
           aria-label={t.jogadorFechar}
@@ -104,7 +149,7 @@ function PlayerModal({
             <div style={{ position: "absolute", left: 18, right: 18, bottom: 16 }}>
               <div style={{ fontSize: 11, letterSpacing: ".12em", color: player.teamColor, marginBottom: 5 }}>{player.teamName}</div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
-                <span className="lob-display" style={{ fontSize: "clamp(26px,4.4vw,40px)", lineHeight: 1.08, color: "#f7f1e6", wordBreak: "break-word", textShadow: "0 2px 12px rgba(0,0,0,.8)" }}>{player.displayNick}</span>
+                <h2 id={idDoNick} className="lob-display" style={{ margin: 0, fontSize: "clamp(26px,4.4vw,40px)", lineHeight: 1.08, color: "#f7f1e6", wordBreak: "break-word", textShadow: "0 2px 12px rgba(0,0,0,.8)" }}>{player.displayNick}</h2>
                 {player.mono ? (
                   <span style={{ padding: "2px 7px", border: "1px solid rgba(70,214,200,.6)", background: "rgba(10,20,19,.5)", color: "#7fe6db", borderRadius: 2, fontSize: 9, fontWeight: 600, letterSpacing: ".10em" }}>MONO</span>
                 ) : null}
@@ -132,7 +177,7 @@ function PlayerModal({
               <div style={{ height: 1, flex: 1, background: "linear-gradient(90deg,rgba(201,138,75,.3),transparent)" }} />
             </div>
             <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
-              {buildPerfTiles(perf, t).map((tile) => (
+              {buildPerfTiles(perf, t, localeTag).map((tile) => (
                 <div key={tile.label} style={{ padding: "13px 6px", textAlign: "center", background: "linear-gradient(180deg,rgba(201,138,75,.08),rgba(201,138,75,.02))", border: "1px solid rgba(201,138,75,.16)", borderRadius: 3 }}>
                   <div className="lob-display" style={{ fontSize: 23, color: "#e6c592", lineHeight: 1 }}>{tile.val}</div>
                   <div style={{ fontSize: 8, letterSpacing: ".04em", color: "#8f8472", marginTop: 5 }}>{tile.label}</div>
@@ -154,12 +199,15 @@ export function JogadoresClient({
   perfByPlayer,
   textos: t,
   elos,
+  localeTag,
 }: Readonly<{
   players: DesignPlayer[];
   perfByPlayer?: Record<string, PlayerPerf>;
   textos: PaginasHomeTextos;
   /** Rótulos de elo por chave, para o alt/title das cristas. */
   elos?: Record<string, string>;
+  /** Idioma da página (compartilhados.localeTag), para o KDA da ficha. */
+  localeTag?: string;
 }>) {
   const [modal, setModal] = useState<DesignPlayer | null>(null);
 
@@ -230,6 +278,7 @@ export function JogadoresClient({
           onClose={() => setModal(null)}
           t={t}
           elos={elos}
+          localeTag={localeTag}
         />
       ) : null}
     </>

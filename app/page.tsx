@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import { HomePreTemporada } from "@/components/home-pre-temporada";
@@ -21,6 +22,12 @@ import { getChampionshipResult } from "@/lib/tournament";
 import { nomeDaTemporada } from "@/lib/i18n/nome-da-temporada";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Título e descrição vêm do layout (são os da home). Aqui só o canônico: aberta pelo
+ * league-of-bronze.vercel.app, a home aponta para o endereço oficial, como as outras páginas.
+ */
+export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 export default async function InicioPage() {
   // Na pré-temporada a home é a porta da inscrição; a home do campeonato abaixo volta
@@ -424,7 +431,9 @@ async function HomeTemporada() {
               {t.homeVerCalendario}
             </Link>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(320px,1fr))", gap: 12 }}>
+          {/* min(100%,320px): num celular de 320px a coluna mínima de 320 não cabia nos 288
+              de conteúdo e o card saía cortado pela borda. Mesmo truque de /calendario e /regras. */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(min(100%,320px),1fr))", gap: 12 }}>
             {preview.map((game) => {
               const played = game.scoreA + game.scoreB > 0;
               const aWon = game.done && game.winnerId === game.teamA.id;

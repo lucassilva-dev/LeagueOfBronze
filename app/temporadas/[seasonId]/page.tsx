@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -16,6 +17,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { CARDS_BY_ID } from "@/lib/cards";
 import { formatDateLabel } from "@/lib/format";
+import { metadadosDaPagina, montarMetadados } from "@/lib/i18n/metadados";
+import { nomeDaTemporada } from "@/lib/i18n/nome-da-temporada";
 import { getMessages } from "@/lib/i18n/server";
 import type { CardId } from "@/lib/schema";
 import { getServerArchivedSeason } from "@/lib/server-data";
@@ -27,6 +30,20 @@ export const dynamic = "force-dynamic";
 type TemporadaPageParams = Readonly<{
   params: Promise<{ seasonId: string }>;
 }>;
+
+/**
+ * A temporada CERTA na aba e na prévia do link: sem isto, o arquivo da 3ª herdava o título
+ * do layout e se anunciava como "4ª Edição".
+ */
+export async function generateMetadata({ params }: TemporadaPageParams): Promise<Metadata> {
+  const { seasonId } = await params;
+  const [{ metadados, compartilhados }, result] = await Promise.all([getMessages(), getServerArchivedSeason(seasonId)]);
+  if (!result) return metadadosDaPagina("temporadas");
+  return montarMetadados(metadados.temporada, {
+    valores: { temporada: nomeDaTemporada(result.archived.name, compartilhados.localeTag) },
+    caminho: `/temporadas/${encodeURIComponent(result.archived.seasonId)}`,
+  });
+}
 
 export default async function TemporadaDetailPage({ params }: TemporadaPageParams) {
   const { seasonId } = await params;
@@ -95,7 +112,7 @@ export default async function TemporadaDetailPage({ params }: TemporadaPageParam
 
       <PageHero
         badge={t.detalheBadge}
-        title={archived.name}
+        title={nomeDaTemporada(archived.name, tc.localeTag)}
         description={`${t.detalheEncerradaEm} ${endedLabel}. ${t.detalheSomenteLeituraTexto}`}
         extra={<Badge variant="bronze">{t.somenteLeitura}</Badge>}
       />

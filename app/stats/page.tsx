@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { DurationRanking } from "@/components/lob/duration-ranking";
 import { RoleBests } from "@/components/lob/role-bests";
 import { StatsToggles } from "@/components/lob/stats-toggles";
@@ -5,6 +6,7 @@ import { Eyebrow, EloCrest, GoldTitle, Pill } from "@/components/lob/ui";
 import { PreTemporadaAviso } from "@/components/pre-temporada-aviso";
 import { semTemporadaAoVivo } from "@/lib/fase-do-site";
 import { ELO_ORDER, eloSvgUrl } from "@/lib/design";
+import { metadadosDaPagina } from "@/lib/i18n/metadados";
 import { getMessages } from "@/lib/i18n/server";
 import { buildDesignPlayers, buildDesignTeams } from "@/lib/roster";
 import { getServerDataset } from "@/lib/server-data";
@@ -12,6 +14,11 @@ import { buildRoleBests, buildStatsRows } from "@/lib/stats-view";
 import { getGameDurations } from "@/lib/tournament";
 
 export const dynamic = "force-dynamic";
+
+/** Título e descrição próprios, no idioma da visita (lib/i18n/messages/metadados.ts). */
+export async function generateMetadata(): Promise<Metadata> {
+  return metadadosDaPagina("stats", "/stats");
+}
 
 function BarRow({ label, color, count, pct, eloKey }: Readonly<{ label: string; color: string; count: number; pct: number; eloKey?: string }>) {
   return (

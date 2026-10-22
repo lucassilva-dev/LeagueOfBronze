@@ -25,6 +25,9 @@ export const inscricao = definir({
     encerradaTitulo: "As inscrições estão encerradas",
     encerradaTexto:
       "A janela desta edição fechou. Se você ficou de fora e quer entrar numa eventual vaga, fale com a organização.",
+    // Com a janela fechada o formulário some, e com ele o "Já tenho conta": quem se
+    // inscreveu e perdeu a sessão precisa de um caminho para a própria inscrição.
+    jaMeInscreviEntrar: "JÁ ME INSCREVI — ENTRAR →",
     jaInscritoTitulo: "Você já está inscrito",
     jaInscritoTexto:
       "A sua inscrição nesta edição já foi enviada. Acompanhe a conferência dos requisitos e o pagamento em Minha inscrição.",
@@ -50,8 +53,10 @@ export const inscricao = definir({
     emailLabel: "E-MAIL",
     emailPlaceholder: "voce@email.com",
     senhaLabel: "CRIE UMA SENHA",
+    // A regra da senha é a de `validatePasswordStrength` (lib/security/password.ts). Dita
+    // aqui, a pessoa a lê ANTES de errar, e não só na mensagem de erro.
     contaAjuda:
-      "É com esse e-mail e senha que você entra no site. Se você for capitão, é assim que abre o seu painel no dia do draft.",
+      "É com esse e-mail e senha que você entra no site. Se você for capitão, é assim que abre o seu painel no dia do draft. A senha precisa ter pelo menos 12 caracteres, misturando letras e números.",
     discordLabel: "USUÁRIO DO DISCORD",
     discordPlaceholder: "seuusuario",
     discordAjuda: "Sua conta da Riot precisa estar vinculada a este Discord (regra 21).",
@@ -89,8 +94,47 @@ export const inscricao = definir({
     entrarTitulo: "Entrar",
     entrarBotao: "ENTRAR",
     entrarAjuda: "Entre para continuar a inscrição com a conta que você já criou.",
+    // O site não envia e-mail: a recuperação é a organização gerar uma senha provisória
+    // pelo painel. Sem esta linha, quem esqueceu a senha não sabia que tinha saída.
+    entrarEsqueceuSenha: "Esqueceu a senha? Fale com a organização no grupo — ela gera uma senha provisória.",
+    // Nome do botão "←" do modo Entrar, para o leitor de tela (senão ele lê "seta").
+    voltarParaCriarConta: "Voltar para criar uma conta",
     logadoComo: "Inscrevendo com a conta",
     sair: "Sair",
+
+    // ---------------------------------------------------------------- troca de senha
+    // Página /conta/senha. Quem recebe uma senha provisória da organização precisa de um
+    // lugar para trocá-la: enquanto ela valer, quem a gerou também entra na conta.
+    contaSenhaTituloAba: "Trocar senha · League of Bronze",
+    contaSenhaTitulo: "Trocar senha",
+    contaSenhaSubtitulo:
+      "Troque a senha da sua conta de jogador. As sessões abertas em outros aparelhos caem; neste você continua conectado.",
+    contaSenhaObrigatoria:
+      "A organização gerou uma senha provisória para você. Troque agora por uma senha só sua — enquanto a provisória valer, quem a gerou também consegue entrar na sua conta.",
+    contaSenhaAtualLabel: "SENHA ATUAL",
+    contaSenhaAtualAjuda: "Se você entrou com a senha provisória da organização, é ela.",
+    contaSenhaNovaLabel: "SENHA NOVA",
+    contaSenhaConfirmarLabel: "REPITA A SENHA NOVA",
+    // A regra é a de `validatePasswordStrength` (lib/security/password.ts): dita ANTES, e
+    // não só no erro depois de enviar.
+    contaSenhaRegra:
+      "A senha nova precisa ter pelo menos 12 caracteres, misturando letras e números, e ser diferente da atual.",
+    contaSenhaBotao: "TROCAR SENHA",
+    contaSenhaEnviando: "TROCANDO…",
+    contaSenhaNaoConfere: "As duas senhas novas não são iguais.",
+    contaSenhaIgual: "A senha nova precisa ser diferente da atual.",
+    contaSenhaAtualIncorreta: "Senha atual incorreta.",
+    contaSenhaEspere: "Muitas tentativas. Espere {minutos} min e tente de novo.",
+    contaSenhaContaMudou:
+      "Sua conta mudou enquanto você trocava a senha — a organização pode ter gerado uma senha provisória. Entre de novo para continuar.",
+    contaSenhaSessaoAcabou: "Sua sessão terminou. Entre de novo para trocar a senha.",
+    contaSenhaEntrarDeNovo: "ENTRAR DE NOVO →",
+    contaSenhaErro: "Não foi possível trocar a senha agora. Tente de novo em instantes.",
+    contaSenhaPronto:
+      "Senha trocada. As sessões abertas em outros aparelhos foram encerradas; aqui você continua conectado.",
+    contaSenhaContinuar: "CONTINUAR →",
+    // A troca é cobrada, mas nunca tranca: no dia do draft o capitão pode deixar para depois.
+    contaSenhaAgoraNao: "Agora não",
 
     // ---------------------------------------------------------------- passo 2
     eloLabel: "ELO ATUAL — FILA SOLO/DUO",
@@ -135,8 +179,11 @@ export const inscricao = definir({
     pixCopiarCodigo: "COPIAR CÓDIGO PIX",
     pixDepoisDoEnvio:
       "Assim que você enviar a inscrição, aparece o QR code do Pix com o valor já preenchido. Pague depois de enviar.",
+    // O aviso oficial de pagamento é o botão JÁ PAGUEI: é ele que tira a pessoa da lista de
+    // "falta pagar" do painel. Mandar avisar no Discord deixava o pagamento "aguardando" e a
+    // pessoa recebia a cobrança do WhatsApp mesmo tendo pago.
     pagamentoAjuda:
-      "Depois de pagar, avise a organização no Discord. A inscrição só é confirmada quando alguém conferir o extrato.",
+      "Depois de pagar, clique em JÁ PAGUEI em Minha inscrição. A inscrição só é confirmada quando alguém conferir o extrato.",
     prazoAviso:
       "Você tem {dias} dias para pagar depois de enviar a inscrição. A vaga só é confirmada depois do pagamento (regra 22).",
     enviar: "ENVIAR INSCRIÇÃO",
@@ -157,12 +204,67 @@ export const inscricao = definir({
     prontoVer: "ACOMPANHAR MINHA INSCRIÇÃO →",
     erroGenerico: "Não foi possível enviar agora. Tente de novo em instantes.",
 
+    /*
+     * Erros das rotas, pelo `codigo` estável que elas devolvem junto do texto. O texto das
+     * rotas de inscrição é fixo em português; a tela usa esta tradução quando conhece o
+     * código e, quando não conhece, mostra o texto que veio.
+     *
+     * Os códigos são os que as rotas emitem: app/api/inscricao/** (precisa_entrar,
+     * formulario_desatualizado, campos_invalidos, ja_inscrito, sem_sessao, sem_inscricao,
+     * pagamento_ja_tratado), app/api/conta/cadastro (indisponivel, campos_invalidos,
+     * senha_*, muitas_tentativas, email_existe) e as regras de `criarInscricao`
+     * (lib/inscricoes/store.ts), que chegam pela rota da inscrição: inscricoes_*,
+     * muitas_inscricoes_origem, riot_id_inexistente, conta_riot_ja_inscrita e
+     * *_ja_inscrito. credenciais_invalidas ainda não vem do login, e a tradução já fica
+     * pronta para quando vier.
+     */
+    erros: {
+      precisa_entrar:
+        "Sua sessão não está mais ativa. Entre de novo para enviar a inscrição — o que você preencheu continua aqui.",
+      formulario_desatualizado:
+        "O formulário de inscrição foi atualizado. Recarregue a página (F5) e preencha de novo — a sua conta continua criada, é só seguir.",
+      campos_invalidos: "Confira os campos destacados.",
+      ja_inscrito: "Você já tem uma inscrição nesta edição. Para corrigir algo nela, fale com a organização.",
+      sem_sessao: "Entre na sua conta primeiro.",
+      sem_inscricao: "Você ainda não tem inscrição nesta edição.",
+      pagamento_ja_tratado: "Esse pagamento já foi tratado pela organização. Fale com ela se algo estiver errado.",
+      indisponivel: "Contas ainda não estão disponíveis.",
+      muitas_tentativas: "Muitas tentativas. Tente novamente mais tarde.",
+      senha_curta: "A senha precisa ter pelo menos 12 caracteres.",
+      senha_longa: "A senha é longa demais (máximo de 200 caracteres).",
+      senha_fraca: "A senha precisa combinar letras e números.",
+      email_existe: "Já existe uma conta com esse e-mail. Entre com ela ou fale com a organização.",
+      credenciais_invalidas: "E-mail ou senha incorretos.",
+      riot_id_inexistente:
+        "Não encontramos esse Riot ID na Riot. Confira o nick e a tag exatamente como aparecem no cliente do LoL (a tag é o que vem depois do #). Se tiver certeza de que está certo, fale com a organização.",
+      inscricoes_encerradas: "As inscrições estão encerradas.",
+      inscricoes_fechadas: "As inscrições não estão abertas no momento.",
+      muitas_inscricoes_origem:
+        "Muitas inscrições enviadas deste dispositivo na última hora. Se precisa inscrever mais alguém, fale com a organização.",
+      conta_riot_ja_inscrita:
+        "Essa conta da Riot já está inscrita. Se foi você, procure a organização em vez de se inscrever de novo.",
+      riot_id_ja_inscrito:
+        "Esse Riot ID já está inscrito. Se foi você, procure a organização em vez de se inscrever de novo.",
+      discord_ja_inscrito:
+        "Esse Discord já está inscrito. Se foi você, procure a organização em vez de se inscrever de novo.",
+      email_ja_inscrito:
+        "Esse e-mail já está inscrito. Se foi você, procure a organização em vez de se inscrever de novo.",
+    },
+
     // ---------------------------------------------------------------- minha inscrição
     minhaTitulo: "MINHA INSCRIÇÃO",
     minhaSubtitulo: "O que a organização já conferiu e o que ainda falta.",
     minhaSemConta: "Entre na sua conta para ver a sua inscrição.",
     minhaSemInscricao: "Você ainda não tem inscrição nesta edição.",
     minhaIrParaInscricao: "FAZER MINHA INSCRIÇÃO →",
+    // Falha ao CARREGAR (servidor ou rede). Antes ela caía em "Entre na sua conta", e o
+    // inscrito achava que tinha perdido a sessão — ou a inscrição.
+    minhaErroCarregar:
+      "Não foi possível carregar a sua inscrição agora. Nada mudou nela — tente de novo em instantes.",
+    tentarDeNovo: "TENTAR DE NOVO",
+    // No lugar de "Aguardando pagamento · R$ 20,00" para quem foi recusado ou desistiu
+    // sem pagar: a cobrança não vale mais (ver `foraDaCobranca`).
+    semCobranca: "Sem cobrança",
     situacaoLabel: "SITUAÇÃO",
     pagamentoLabel: "PAGAMENTO",
     disponibilidadeNaoInformada: "Ainda não informada — fale com a organização.",
@@ -221,6 +323,7 @@ export const inscricao = definir({
     encerradaTitulo: "Sign-ups are closed",
     encerradaTexto:
       "This edition's window has closed. If you missed it and want a spot should one open, talk to the organizers.",
+    jaMeInscreviEntrar: "ALREADY SIGNED UP? SIGN IN →",
     jaInscritoTitulo: "You're already signed up",
     jaInscritoTexto:
       "Your sign-up for this edition has already been sent. Follow the requirement checks and the payment in My sign-up.",
@@ -244,7 +347,7 @@ export const inscricao = definir({
     emailPlaceholder: "you@email.com",
     senhaLabel: "CREATE A PASSWORD",
     contaAjuda:
-      "You sign in with this e-mail and password. If you're a captain, this is how you open your panel on draft day.",
+      "You sign in with this e-mail and password. If you're a captain, this is how you open your panel on draft day. The password needs at least 12 characters, mixing letters and numbers.",
     discordLabel: "DISCORD USERNAME",
     discordPlaceholder: "yourhandle",
     discordAjuda: "Your Riot account must be linked to this Discord (rule 21).",
@@ -273,8 +376,39 @@ export const inscricao = definir({
     entrarTitulo: "Sign in",
     entrarBotao: "SIGN IN",
     entrarAjuda: "Sign in to continue with the account you already created.",
+    entrarEsqueceuSenha:
+      "Forgot your password? Message the organisers in the group — they will generate a temporary one.",
+    voltarParaCriarConta: "Back to creating an account",
     logadoComo: "Signing up with the account",
     sair: "Sign out",
+
+    contaSenhaTituloAba: "Change password · League of Bronze",
+    contaSenhaTitulo: "Change password",
+    contaSenhaSubtitulo:
+      "Change the password of your player account. Sessions open on other devices are signed out; on this one you stay signed in.",
+    contaSenhaObrigatoria:
+      "The organisers generated a temporary password for you. Change it now to one that is only yours — while the temporary one is valid, whoever generated it can also sign in to your account.",
+    contaSenhaAtualLabel: "CURRENT PASSWORD",
+    contaSenhaAtualAjuda: "If you signed in with the organisers' temporary password, that's the one.",
+    contaSenhaNovaLabel: "NEW PASSWORD",
+    contaSenhaConfirmarLabel: "REPEAT THE NEW PASSWORD",
+    contaSenhaRegra:
+      "The new password needs at least 12 characters, mixing letters and numbers, and must differ from the current one.",
+    contaSenhaBotao: "CHANGE PASSWORD",
+    contaSenhaEnviando: "CHANGING…",
+    contaSenhaNaoConfere: "The two new passwords don't match.",
+    contaSenhaIgual: "The new password must differ from the current one.",
+    contaSenhaAtualIncorreta: "Wrong current password.",
+    contaSenhaEspere: "Too many attempts. Wait {minutos} min and try again.",
+    contaSenhaContaMudou:
+      "Your account changed while you were changing the password — the organisers may have generated a temporary one. Sign in again to carry on.",
+    contaSenhaSessaoAcabou: "Your session has ended. Sign in again to change the password.",
+    contaSenhaEntrarDeNovo: "SIGN IN AGAIN →",
+    contaSenhaErro: "We couldn't change the password right now. Try again in a moment.",
+    contaSenhaPronto:
+      "Password changed. Sessions open on other devices were signed out; here you stay signed in.",
+    contaSenhaContinuar: "CONTINUE →",
+    contaSenhaAgoraNao: "Not now",
 
     eloLabel: "CURRENT RANK — SOLO/DUO QUEUE",
     eloAjuda:
@@ -318,7 +452,7 @@ export const inscricao = definir({
     pixDepoisDoEnvio:
       "As soon as you submit your sign-up, the Pix QR code shows up with the amount already filled in. Pay after submitting.",
     pagamentoAjuda:
-      "After paying, tell the organizers on Discord. Sign-up is only confirmed once someone checks the bank statement.",
+      "After paying, click I'VE PAID in My sign-up. Sign-up is only confirmed once someone checks the bank statement.",
     prazoAviso:
       "You have {dias} days to pay after submitting. Your spot is only confirmed after payment (rule 22).",
     enviar: "SUBMIT SIGN-UP",
@@ -337,11 +471,47 @@ export const inscricao = definir({
     prontoVer: "TRACK MY SIGN-UP →",
     erroGenerico: "We couldn't submit right now. Try again in a moment.",
 
+    erros: {
+      precisa_entrar:
+        "Your session is no longer active. Sign in again to submit — everything you filled in is still here.",
+      formulario_desatualizado:
+        "The sign-up form was updated. Reload the page (F5) and fill it in again — your account is still there, just carry on.",
+      campos_invalidos: "Check the highlighted fields.",
+      ja_inscrito: "You already have a sign-up for this edition. To fix anything in it, talk to the organizers.",
+      sem_sessao: "Sign in to your account first.",
+      sem_inscricao: "You don't have a sign-up for this edition yet.",
+      pagamento_ja_tratado: "The organizers have already handled this payment. Talk to them if something looks wrong.",
+      indisponivel: "Accounts are not available yet.",
+      muitas_tentativas: "Too many attempts. Please try again later.",
+      senha_curta: "The password needs at least 12 characters.",
+      senha_longa: "The password is too long (200 characters max).",
+      senha_fraca: "The password must mix letters and numbers.",
+      email_existe: "There's already an account with this e-mail. Sign in with it or talk to the organizers.",
+      credenciais_invalidas: "Wrong e-mail or password.",
+      riot_id_inexistente:
+        "We couldn't find this Riot ID at Riot. Check the name and tag exactly as they show in the LoL client (the tag is what comes after the #). If you're sure it's right, talk to the organizers.",
+      inscricoes_encerradas: "Sign-ups are closed.",
+      inscricoes_fechadas: "Sign-ups aren't open right now.",
+      muitas_inscricoes_origem:
+        "Too many sign-ups sent from this device in the last hour. If you need to sign someone else up, talk to the organizers.",
+      conta_riot_ja_inscrita:
+        "This Riot account is already signed up. If that was you, talk to the organizers instead of signing up again.",
+      riot_id_ja_inscrito:
+        "This Riot ID is already signed up. If that was you, talk to the organizers instead of signing up again.",
+      discord_ja_inscrito:
+        "This Discord is already signed up. If that was you, talk to the organizers instead of signing up again.",
+      email_ja_inscrito:
+        "This e-mail is already signed up. If that was you, talk to the organizers instead of signing up again.",
+    },
+
     minhaTitulo: "MY SIGN-UP",
     minhaSubtitulo: "What the organizers have checked and what is still missing.",
     minhaSemConta: "Sign in to see your sign-up.",
     minhaSemInscricao: "You don't have a sign-up for this edition yet.",
     minhaIrParaInscricao: "SIGN ME UP →",
+    minhaErroCarregar: "We couldn't load your sign-up right now. Nothing changed in it — try again in a moment.",
+    tentarDeNovo: "TRY AGAIN",
+    semCobranca: "No charge",
     situacaoLabel: "STATUS",
     pagamentoLabel: "PAYMENT",
     disponibilidadeNaoInformada: "Not provided yet — talk to the organizers.",

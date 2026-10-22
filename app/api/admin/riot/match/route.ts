@@ -4,11 +4,15 @@ import { respostaDeErro } from "@/lib/security/resposta-erro";
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 
+import { lerConfigOuNulo, pausarRobo, roboPausado } from "@/lib/inscricoes/store";
 import { requireAdmin } from "@/lib/security/route-guard";
 
 export const dynamic = "force-dynamic";
 
 const DEFAULT_RIOT_PLATFORM = "BR1";
+
+/** Mesmo tempo-limite do cliente do robô: a Riot pendurada não pode prender o botão. */
+const TEMPO_LIMITE_MS = 8_000;
 
 const importRiotMatchSchema = z.object({
   matchId: z.string().trim().min(3, "ID da partida obrigatório."),
@@ -160,17 +164,42 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // A chave é a MESMA do robô e do formulário de inscrição. Depois de um 429, a Riot exige
+    // que ninguém consulte até o Retry-After — esta importação inclusive. Sem banco
+    // (desenvolvimento local) não há pausa registrada, e a importação segue.
+    const config = await lerConfigOuNulo();
+    if (config && roboPausado(config, Date.now())) {
+      const segundos = Math.max(1, Math.ceil((new Date(config.riot_pausa_ate!).getTime() - Date.now()) / 1000));
+      return NextResponse.json(
+        { error: mensagemDeRecusaDaRiot(429, String(segundos)) },
+        { status: 429, headers: { "Retry-After": String(segundos) } },
+      );
+    }
+
     const url = `https://${regionalRouting}.api.riotgames.com/lol/match/v5/matches/${encodeURIComponent(
       normalizedMatchId,
     )}`;
 
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        "X-Riot-Token": riotApiKey,
-      },
-      cache: "no-store",
-    });
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "X-Riot-Token": riotApiKey,
+        },
+        cache: "no-store",
+        signal: AbortSignal.timeout(TEMPO_LIMITE_MS),
+      });
+    } catch (erro) {
+      const nome = erro instanceof Error ? erro.name : "";
+      if (nome === "TimeoutError" || nome === "AbortError") {
+        return NextResponse.json(
+          { error: "A Riot não respondeu a tempo. Tente de novo em alguns minutos." },
+          { status: 504 },
+        );
+      }
+      throw erro;
+    }
 
     const raw = (await response.json().catch(() => ({}))) as unknown;
 
@@ -178,6 +207,16 @@ export async function POST(request: NextRequest) {
       const riotError = getRiotApiErrorMessage(raw);
       const retryAfter = response.headers.get("retry-after");
       const status = response.status >= 400 && response.status < 600 ? response.status : 502;
+
+      // Um 429 de verdade pausa TODO mundo que usa a chave (robô, formulário, esta rota),
+      // pelo tempo que a Riot pediu — a pausa fica no banco porque cada execução da Vercel
+      // não enxerga a memória da outra. Falhar ao gravar a pausa não muda a resposta.
+      if (response.status === 429) {
+        const segundos = Number(retryAfter);
+        await pausarRobo(Number.isFinite(segundos) && segundos > 0 ? segundos : 60).catch((erro) =>
+          console.error("[admin/riot/match] falha ao pausar o robô", erro),
+        );
+      }
 
       // Repassa o Retry-After para o painel poder respeitar a espera pedida pela Riot.
       const headers = retryAfter && status === 429 ? { "Retry-After": retryAfter } : undefined;

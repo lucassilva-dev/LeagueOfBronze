@@ -13,7 +13,7 @@ import {
   timeDaVez,
   vezSemSaida,
 } from "@/lib/draft/motor";
-import { datasetDoDraft, problemasDaVirada } from "@/lib/draft/virada";
+import { datasetDoDraft, jogadoresForaDoDraft, listaForaDoDraft, problemasDaVirada } from "@/lib/draft/virada";
 import {
   lerDraftCompleto,
   montarDraftDosAprovados,
@@ -22,7 +22,7 @@ import {
   salvarDraftSeIntacto,
   type MetodoDeCapitao,
 } from "@/lib/draft/store";
-import { registrarAuditoria } from "@/lib/inscricoes/store";
+import { listarInscricoes, registrarAuditoria } from "@/lib/inscricoes/store";
 import { embaralhar, novaSemente } from "@/lib/series/sorteio";
 import { requireAdmin } from "@/lib/security/route-guard";
 import { respostaDeErro } from "@/lib/security/resposta-erro";
@@ -39,6 +39,12 @@ export const dynamic = "force-dynamic";
  *
  * "Montar" é a ação perigosa: ela DESCARTA um draft em andamento. Por isso exige uma
  * confirmação explícita no corpo, e não apenas o escopo.
+ *
+ * "Montar" e "iniciar" também levam no corpo o sorteio que a tela VIU (`sorteioVisto`, a
+ * semente, ou null quando ela não via draft nenhum). Duas pessoas conduzem a mesa ao mesmo
+ * tempo, e um painel carregado antes do sorteio do colega continuava oferecendo «Sortear»:
+ * o clique trocava, na frente do público, o sorteio que a TV acabara de animar. Se o
+ * sorteio de agora não é o que a tela viu, a resposta é 409 e o painel se atualiza.
  */
 
 const METODOS: MetodoDeCapitao[] = ["maior_elo", "manual", "mid", "adc", "pior"];
@@ -52,7 +58,10 @@ export async function GET(request: NextRequest) {
   if (!guarda.ok) return guarda.response;
 
   try {
-    const [{ estado, revisao }, previa] = await Promise.all([lerDraftCompleto(), previaDoDraft()]);
+    // Uma leitura do draft só, usada pelos dois: a prévia precisa dele para dizer quem está
+    // no draft e não é mais apto.
+    const draftLido = lerDraftCompleto();
+    const [{ estado, revisao }, previa] = await Promise.all([draftLido, previaDoDraft(draftLido)]);
     // Leitura não anda o relógio aqui: quem anda é a sondagem pública (/api/draft/estado),
     // que grava condicionado. O painel mostra o que está gravado.
     const semSaida = estado ? vezSemSaida(estado) : null;
@@ -84,16 +93,31 @@ export async function POST(request: NextRequest) {
     jogadorId?: unknown;
     timeId?: unknown;
     escolha?: unknown;
+    sorteioVisto?: unknown;
+    confirmoReaplicar?: unknown;
+    confirmoForaDoDraft?: unknown;
   };
   const autor = guarda.identity.username;
 
   try {
     const { estado, revisao } = await lerDraftCompleto();
+    // Sem o campo (cliente antigo) conta como "não via sorteio nenhum": com um sorteio no
+    // ar, recusa — o lado seguro.
+    const sorteioVisto = typeof corpo?.sorteioVisto === "string" ? corpo.sorteioVisto : null;
+    const sorteioDeAgora = estado?.sorteio?.semente ?? null;
 
     switch (corpo?.acao) {
       case "montar": {
         const metodo = METODOS.find((m) => m === corpo.metodo);
         if (!metodo) return NextResponse.json({ error: "Método de capitão inválido." }, { status: 400 });
+
+        // Vale também com `confirmoDescartar`: a confirmação foi dada sobre o draft que a
+        // tela mostrava, não sobre um sorteio novo que entrou depois.
+        if (sorteioVisto !== sorteioDeAgora) {
+          return painelDesatualizado(
+            "Outro sorteio entrou depois que você abriu o painel. O painel foi atualizado: confira o sorteio que está no ar antes de sortear de novo.",
+          );
+        }
 
         // Um draft já iniciado é histórico ao vivo: refazer apaga escolhas que já
         // foram anunciadas. Exigir a confirmação evita que um clique errado no meio
@@ -137,6 +161,24 @@ export async function POST(request: NextRequest) {
       case "pausar":
       case "retomar": {
         if (!estado) return NextResponse.json({ error: "Monte o draft primeiro." }, { status: 409 });
+
+        if (corpo.acao === "iniciar") {
+          // «Iniciar» só existe antes do apito. Vindo de um painel velho, ele retomava uma
+          // pausa da organização, devolvia o prazo cheio a um time com o tempo já vencido
+          // (sem o auto-pick) ou, com o draft encerrado, estourava em 500.
+          if (estado.fase !== "preparando") {
+            return painelDesatualizado(
+              estado.fase === "encerrado"
+                ? "O draft já terminou. O painel foi atualizado."
+                : "O draft já foi iniciado. O painel foi atualizado.",
+            );
+          }
+          if (sorteioVisto !== sorteioDeAgora) {
+            return painelDesatualizado(
+              "O sorteio mudou depois que você abriu o painel. O painel foi atualizado: confira o sorteio novo antes de iniciar.",
+            );
+          }
+        }
 
         const agora = Date.now();
         const novo =
@@ -208,14 +250,40 @@ export async function POST(request: NextRequest) {
         const problemas = problemasDaVirada(estado);
         const resultado = datasetDoDraft(estado);
 
+        /*
+         * Quem está no draft e a inscrição não é mais `apto` (recusado ou desistente depois
+         * do sorteio, devolvido à sobra ou a pendente). O draft não tira ninguém sozinho e
+         * isto não muda regra nenhuma — o que fazer é decisão da organização. Mas aplicar no
+         * site publica essa pessoa num time, então a virada só segue com a confirmação
+         * explícita no corpo (`confirmoForaDoDraft: true`, booleano, não "sim").
+         */
+        const foraDoDraft = jogadoresForaDoDraft(estado, await listarInscricoes());
+
         if (corpo.acao === "prever") {
           // Só olha. A organização confere os elencos antes de qualquer escrita no
           // dataset público — que é de onde o site inteiro lê.
-          return NextResponse.json({ ok: true, problemas, ...resultado });
+          return NextResponse.json({ ok: true, problemas, foraDoDraft, ...resultado });
+        }
+
+        const foraSemConfirmacao = foraDoDraft.length > 0 && corpo.confirmoForaDoDraft !== true;
+        if (foraSemConfirmacao) {
+          problemas.push(
+            `Não estão mais aptos na inscrição: ${listaForaDoDraft(foraDoDraft)}. Para aplicar mesmo assim, confirme.`,
+          );
         }
 
         if (problemas.length > 0) {
-          return NextResponse.json({ error: "O draft ainda não está pronto para virar.", problemas }, { status: 409 });
+          return NextResponse.json(
+            {
+              error:
+                foraSemConfirmacao && problemas.length === 1
+                  ? "Há jogadores no draft que não estão mais aptos. Confirme para aplicar mesmo assim."
+                  : "O draft ainda não está pronto para virar.",
+              problemas,
+              ...(foraSemConfirmacao ? { foraDoDraft, precisaConfirmarForaDoDraft: true } : {}),
+            },
+            { status: 409 },
+          );
         }
 
         // Com versão: a virada substitui times e jogadores a partir do que leu, então uma
@@ -265,6 +333,30 @@ export async function POST(request: NextRequest) {
           resultado.teams.some((time) => time.id === linha.teamId),
         );
 
+        /*
+         * Reaplicar troca `teams` e `players` INTEIROS pela saída do draft. Entre a virada e
+         * o calendário a organização edita o site (foto do jogador, nome escolhido pelo
+         * time), e um segundo clique em «Aplicar no site» apagava isso calado. O id de cada
+         * time no site sai do nome fixo da posição (lib/draft/times.ts → virada.ts), igual
+         * em qualquer draft com o mesmo número de times; então o mesmo conjunto no ar quer
+         * dizer "já aplicado" — inclusive de um draft refeito, que também apagaria as
+         * edições. Só segue com a confirmação explícita no corpo.
+         */
+        const idsNoAr = dataset.teams.map((t) => t.id).sort();
+        const idsDoDraft = resultado.teams.map((t) => t.id).sort();
+        const jaAplicado =
+          idsNoAr.length > 0 && idsNoAr.length === idsDoDraft.length && idsNoAr.every((id, i) => id === idsDoDraft[i]);
+        if (jaAplicado && corpo.confirmoReaplicar !== true) {
+          return NextResponse.json(
+            {
+              error:
+                "O draft já foi aplicado no site. Aplicar de novo substitui times e jogadores inteiros e apaga o que foi editado depois (fotos dos jogadores, nomes dos times). Confirme para reaplicar.",
+              precisaConfirmar: true,
+            },
+            { status: 409 },
+          );
+        }
+
         try {
           await saveDataset(
             {
@@ -292,7 +384,12 @@ export async function POST(request: NextRequest) {
         await registrarAuditoria({
           autor,
           acao: "draft_virado_para_o_dataset",
-          detalhe: { times: resultado.teams.length, jogadores: resultado.players.length },
+          detalhe: {
+            times: resultado.teams.length,
+            jogadores: resultado.players.length,
+            // Aplicado com a confirmação: fica registrado quem não era mais apto.
+            ...(foraDoDraft.length > 0 ? { confirmadoForaDoDraft: foraDoDraft } : {}),
+          },
         });
 
         return NextResponse.json({ ok: true, ...resultado });
@@ -385,4 +482,9 @@ function conflito() {
     { error: "O draft mudou enquanto você agia. Recarregue e tente de novo." },
     { status: 409 },
   );
+}
+
+/** A tela agiu sobre um draft que não é mais o de agora. O painel relê o estado ao receber. */
+function painelDesatualizado(error: string) {
+  return NextResponse.json({ error, desatualizado: true }, { status: 409 });
 }

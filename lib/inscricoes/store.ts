@@ -4,10 +4,12 @@
 import "server-only";
 
 import { createSupabaseAdminClient, isSupabaseConfigured } from "@/lib/data-store";
+import { ErroDeConflito } from "@/lib/inscricoes/conflito";
 import { foraDaCobranca } from "@/lib/inscricoes/pagamento";
 import {
   contaParaTimes,
   distribuirTimes,
+  ESTADOS_COM_DINHEIRO,
   estadoDaJanela,
   linhaDeInscricao,
   pontosDoElo,
@@ -20,7 +22,7 @@ import { criarClienteRiot } from "@/lib/riot/cliente";
 import { AUTOR_RIOT, type DecisaoDoRobo } from "@/lib/riot/decidir";
 import { ErroDeRegra } from "@/lib/security/erros";
 
-export { AUTOR_RIOT, AUTOR_SISTEMA };
+export { AUTOR_RIOT, AUTOR_SISTEMA, ErroDeConflito };
 
 /**
  * Acesso às tabelas da 4ª Edição.
@@ -187,15 +189,80 @@ export async function lerConfigOuNulo(): Promise<EdicaoConfig | null> {
   }
 }
 
-export async function salvarConfig(patch: Partial<EdicaoConfig>): Promise<EdicaoConfig> {
-  const { data, error } = await createSupabaseAdminClient()
+/** Duas datas da configuração são o mesmo instante? (A mesma hora escrita com outro fuso é a mesma.) */
+function mesmoInstante(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return !a && !b;
+  const ma = new Date(a).getTime();
+  const mb = new Date(b).getTime();
+  return Number.isFinite(ma) && Number.isFinite(mb) ? ma === mb : a === b;
+}
+
+/**
+ * Grava a configuração da edição. Além do update, três coisas que não podem depender de a
+ * tela lembrar:
+ *
+ *  1. **Fechar é fechar, sem apagar o planejado.** «Fechar inscrições» e «Abrir» mandam só
+ *     a chave, e a data de fechamento NÃO é tocada por eles: a planejada (15/11, digamos)
+ *     sobrevive a fechar em 25/10 e reabrir em 27/10, e fecha a janela sozinha no dia. Antes,
+ *     fechar carimbava «agora» por cima dela e reabrir zerava o carimbo — a janela ficava
+ *     aberta para sempre, cobrando Pix depois do draft (DIFF-BE-02). O que impede o site de
+ *     anunciar «EM BREVE» depois de fechar (CEN-02) é a leitura: chave desligada com a
+ *     abertura no passado é «encerrada» (`estadoDaJanela`). Para isso a abertura precisa
+ *     estar registrada: abrir (ou fechar uma janela aberta) sem abertura no passado grava
+ *     agora como abertura — o registro de quando o formulário abriu. Data enviada junto
+ *     vale como veio. Reabrir com o fechamento já vencido deixa a janela «encerrada»; a
+ *     tela avisa e pede para adiar ou apagar a data.
+ *  2. **Início novo, contagem nova.** A contagem de partidas do item (e) é da janela do
+ *     início antigo; mudar o início zera a contagem para o robô recontar na janela nova.
+ *  3. **Auditoria.** Quem mudou o quê, com o valor de antes — abrir/fechar, taxa, datas,
+ *     teto de times mudam o formulário público, o robô e o draft.
+ */
+export async function salvarConfig(patch: Partial<EdicaoConfig>, autor: string = AUTOR_SISTEMA): Promise<EdicaoConfig> {
+  const cliente = createSupabaseAdminClient();
+  const antes = await lerConfig();
+  const agoraMs = Date.now();
+  const efetivo: Partial<EdicaoConfig> = { ...patch };
+
+  if (patch.inscricoes_abertas !== undefined && patch.abertura_inscricoes === undefined) {
+    const aberturaMs = antes.abertura_inscricoes ? new Date(antes.abertura_inscricoes).getTime() : NaN;
+    const aberturaRegistrada = Number.isFinite(aberturaMs) && aberturaMs <= agoraMs;
+    const abrindo = patch.inscricoes_abertas && !antes.inscricoes_abertas;
+    const fechandoAberta = !patch.inscricoes_abertas && antes.inscricoes_abertas;
+    if ((abrindo || fechandoAberta) && !aberturaRegistrada) {
+      efetivo.abertura_inscricoes = new Date(agoraMs).toISOString();
+    }
+  }
+
+  // ANTES do update: se zerar falhar, nada foi gravado e a pessoa tenta de novo. Na ordem
+  // inversa, a configuração ficava salva com a contagem velha — e salvar de novo já não
+  // zeraria, porque o início gravado seria o novo.
+  if (efetivo.inicio_campeonato !== undefined && !mesmoInstante(antes.inicio_campeonato, efetivo.inicio_campeonato)) {
+    const { error: erroContagem } = await cliente
+      .from("inscricoes")
+      .update({ riot_partidas_janela: null })
+      .not("riot_partidas_janela", "is", null);
+    if (erroContagem) throw new Error(`Falha ao zerar a contagem de partidas do item (e): ${erroContagem.message}`);
+  }
+
+  const { data, error } = await cliente
     .from("edicao_config")
-    .update({ ...patch, atualizado_em: new Date().toISOString() })
+    .update({ ...efetivo, atualizado_em: new Date(agoraMs).toISOString() })
     .eq("id", 1)
     .select("*")
     .single<EdicaoConfig>();
 
   if (error) throw new Error(`Falha ao salvar a configuração: ${error.message}`);
+
+  const chaves = Object.keys(efetivo) as (keyof EdicaoConfig)[];
+  await registrarAuditoria({
+    autor,
+    acao: "config",
+    detalhe: {
+      antes: Object.fromEntries(chaves.map((k) => [k, antes[k] ?? null])),
+      depois: Object.fromEntries(chaves.map((k) => [k, efetivo[k] ?? null])),
+    },
+  });
+
   return data;
 }
 
@@ -216,11 +283,14 @@ export async function criarInscricao(
   const config = await lerConfig();
   // A data de fechamento também fecha — não só a chave. Antes a data só escolhia o aviso,
   // e a inscrição seguia aberta depois dela até alguém lembrar de desligar.
+  //
+  // Cada regra daqui sai com um `codigo` estável (ver `ErroDeRegra`): o texto é fixo em
+  // português, e o formulário traduz pelo código (`inscricao.erros` no dicionário).
   const janela = estadoDaJanela(config, Date.now());
   if (janela !== "aberta") {
-    throw new ErroDeRegra(
-      janela === "encerrada" ? "As inscrições estão encerradas." : "As inscrições não estão abertas no momento.",
-    );
+    throw janela === "encerrada"
+      ? new ErroDeRegra("As inscrições estão encerradas.", "inscricoes_encerradas")
+      : new ErroDeRegra("As inscrições não estão abertas no momento.", "inscricoes_fechadas");
   }
 
   const cliente = createSupabaseAdminClient();
@@ -240,6 +310,7 @@ export async function criarInscricao(
     if ((count ?? 0) >= LIMITE_POR_ORIGEM_HORA) {
       throw new ErroDeRegra(
         "Muitas inscrições enviadas deste dispositivo na última hora. Se precisa inscrever mais alguém, fale com a organização.",
+        "muitas_inscricoes_origem",
       );
     }
   }
@@ -253,7 +324,10 @@ export async function criarInscricao(
       .eq("jogador_id", dono.jogadorId);
     if (erroJa) throw new Error(`Falha ao conferir a inscrição existente: ${erroJa.message}`);
     if ((count ?? 0) > 0) {
-      throw new ErroDeRegra("Você já tem uma inscrição nesta edição. Para corrigir algo nela, fale com a organização.");
+      throw new ErroDeRegra(
+        "Você já tem uma inscrição nesta edição. Para corrigir algo nela, fale com a organização.",
+        "ja_inscrito",
+      );
     }
   }
 
@@ -262,7 +336,26 @@ export async function criarInscricao(
   if (conta.tipo === "nao_encontrado") {
     throw new ErroDeRegra(
       `Não encontramos o Riot ID ${dados.nick}#${dados.tag} na Riot. Confira o nick e a tag exatamente como aparecem no cliente do LoL (a tag é o que vem depois do #). Se tiver certeza de que está certo, fale com a organização.`,
+      "riot_id_inexistente",
     );
+  }
+
+  // A mesma CONTA já inscrita com outra grafia. O índice único é sobre o Riot ID escrito, e a
+  // Riot acha "betyclarao#br1" e "Bety Clarão#BR1" como a mesma conta (sem acento, espaço nem
+  // caixa): o PUUID é o que identifica a conta. Sem índice único no banco de propósito — o
+  // PUUID muda com a chave da API e o robô o regrava; uma colisão lá derrubaria a rodada.
+  if (conta.tipo === "ok") {
+    const { count, error: erroConta } = await cliente
+      .from("inscricoes")
+      .select("id", { count: "exact", head: true })
+      .eq("puuid", conta.puuid);
+    if (erroConta) throw new Error(`Falha ao conferir a conta da Riot: ${erroConta.message}`);
+    if ((count ?? 0) > 0) {
+      throw new ErroDeRegra(
+        "Essa conta da Riot já está inscrita. Se foi você, procure a organização em vez de se inscrever de novo.",
+        "conta_riot_ja_inscrita",
+      );
+    }
   }
 
   const linha = {
@@ -282,12 +375,12 @@ export async function criarInscricao(
     // 23505 = violação de índice único. Traduzimos para o campo que a pessoa
     // consegue corrigir, em vez de devolver o nome do índice.
     if (error.code === "23505") {
-      const alvo = error.message.includes("riot_id")
-        ? "Esse Riot ID já está inscrito."
+      const [alvo, codigo] = error.message.includes("riot_id")
+        ? ["Esse Riot ID já está inscrito.", "riot_id_ja_inscrito"]
         : error.message.includes("discord")
-          ? "Esse Discord já está inscrito."
-          : "Esse e-mail já está inscrito.";
-      throw new ErroDeRegra(`${alvo} Se foi você, procure a organização em vez de se inscrever de novo.`);
+          ? ["Esse Discord já está inscrito.", "discord_ja_inscrito"]
+          : ["Esse e-mail já está inscrito.", "email_ja_inscrito"];
+      throw new ErroDeRegra(`${alvo} Se foi você, procure a organização em vez de se inscrever de novo.`, codigo);
     }
     throw new Error(`Falha ao gravar a inscrição: ${error.message}`);
   }
@@ -344,25 +437,38 @@ async function conferirContaNaRiot(
  *
  * Qualquer falha aqui deixa passar SEM consultar: o freio existe para proteger a cota, e
  * na dúvida não gastamos cota — mas também não barramos a inscrição de ninguém.
+ *
+ * Grava ANTES de liberar e reconta DEPOIS de gravar. Contar e só então gravar deixava uma
+ * rajada simultânea inteira passar: os 40 envios contavam zero ao mesmo tempo, os 40
+ * consultavam a Riot, metade levava 429 e o robô ficava pausado. Recontando com a própria
+ * linha já gravada, a k-ésima tentativa enxerga pelo menos k linhas — no máximo o teto
+ * passa. (Na rajada perfeita pode passar menos; aí a inscrição segue sem conferir, como
+ * quando a Riot está fora do ar.) A primeira contagem só evita gravar linha à toa quando o
+ * teto já foi batido.
  */
 async function podeConsultarARiot(dono: { jogadorId: string; ipHash: string }): Promise<boolean> {
   try {
     const cliente = createSupabaseAdminClient();
     const desde = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { count, error } = await cliente
-      .from("inscricao_consultas_riot")
-      .select("id", { count: "exact", head: true })
-      // Os dois valores são gerados no servidor (UUID da sessão e hash hexadecimal do IP).
-      .or(`jogador_id.eq.${dono.jogadorId},ip_hash.eq.${dono.ipHash}`)
-      .gte("ocorrido_em", desde);
-    if (error) throw new Error(error.message);
-    if ((count ?? 0) >= CONSULTAS_RIOT_POR_HORA) return false;
+    const contar = async () => {
+      const { count, error } = await cliente
+        .from("inscricao_consultas_riot")
+        .select("id", { count: "exact", head: true })
+        // Os dois valores são gerados no servidor (UUID da sessão e hash hexadecimal do IP).
+        .or(`jogador_id.eq.${dono.jogadorId},ip_hash.eq.${dono.ipHash}`)
+        .gte("ocorrido_em", desde);
+      if (error) throw new Error(error.message);
+      return count ?? 0;
+    };
+
+    if ((await contar()) >= CONSULTAS_RIOT_POR_HORA) return false;
 
     const { error: erroRegistro } = await cliente
       .from("inscricao_consultas_riot")
       .insert({ jogador_id: dono.jogadorId, ip_hash: dono.ipHash });
     if (erroRegistro) throw new Error(erroRegistro.message);
-    return true;
+
+    return (await contar()) <= CONSULTAS_RIOT_POR_HORA;
   } catch (erro) {
     console.error("[inscricoes] freio de consultas à Riot indisponível", erro);
     return false;
@@ -467,6 +573,12 @@ export async function minhaInscricao(jogadorId: string): Promise<MinhaInscricao 
       .returns<{ item: ItemConferencia; estado: string; observacao: string | null }[]>(),
   ]);
 
+  // Falha de leitura NÃO é "sem pagamento" nem "sem requisitos": engolida, a tela escondia o
+  // Pix, o «JÁ PAGUEI» e a lista de requisitos sem aviso — e o jogador não tinha motivo
+  // para recarregar. Estourando, a rota responde erro e a tela diz que não carregou.
+  if (pag.error) throw new Error(`Falha ao ler o pagamento: ${pag.error.message}`);
+  if (conf.error) throw new Error(`Falha ao ler os requisitos: ${conf.error.message}`);
+
   return {
     riotId: inscricao.riot_id,
     /*
@@ -564,6 +676,8 @@ export type PatchInscricao = {
   entrouNoGrupo?: string | null;
   disponibilidade?: string[];
   nomeReal?: string;
+  /** Trava otimista: a situação que a tela viu. Ausente = grava sem conferir (como antes). */
+  situacaoAnterior?: Inscricao["situacao"];
 };
 
 export async function atualizarInscricao(
@@ -640,14 +754,22 @@ export async function atualizarInscricao(
     }
   }
 
-  const { error } = await createSupabaseAdminClient()
-    .from("inscricoes")
-    .update(linha)
-    .eq("id", inscricaoId);
+  let gravacao = createSupabaseAdminClient().from("inscricoes").update(linha).eq("id", inscricaoId);
+  // Na MESMA instrução, para não haver janela entre conferir e gravar.
+  if (patch.situacaoAnterior !== undefined) gravacao = gravacao.eq("situacao", patch.situacaoAnterior);
+  const { data, error } = await gravacao.select("id");
 
   if (error) throw new Error(`Falha ao salvar a ficha: ${error.message}`);
+  if (patch.situacaoAnterior !== undefined && (data?.length ?? 0) === 0) {
+    throw new ErroDeConflito(
+      "A situação desta inscrição mudou desde que você abriu a ficha (outra pessoa ou a promoção automática gravou antes). Nada foi gravado na ficha: confira o valor atual e salve de novo.",
+    );
+  }
 
-  await registrarAuditoria({ inscricaoId, autor, acao: "ficha", detalhe: patch });
+  // A trava não é mudança: fica fora do registro do que foi alterado.
+  const mudancas: Record<string, unknown> = { ...patch };
+  delete mudancas.situacaoAnterior;
+  await registrarAuditoria({ inscricaoId, autor, acao: "ficha", detalhe: mudancas });
 }
 
 /**
@@ -725,12 +847,14 @@ export async function atualizarConferencia(args: {
   estado?: string;
   observacao?: string;
   retrato?: Record<string, unknown>;
+  /** Trava otimista: o estado que a tela viu. Ausente = grava sem conferir (como antes). */
+  estadoAnterior?: string;
   autor: string;
 }): Promise<void> {
   const cliente = createSupabaseAdminClient();
   const agora = new Date().toISOString();
 
-  const { error } = await cliente
+  let gravacao = cliente
     .from("inscricao_conferencias")
     .update({
       // `undefined` sai do JSON do update: a coluna fica como está.
@@ -750,8 +874,17 @@ export async function atualizarConferencia(args: {
     })
     .eq("inscricao_id", args.inscricaoId)
     .eq("item", args.item);
+  // Na MESMA instrução: a gaveta aberta antes de outro organizador recusar o (A) não pode
+  // devolvê-lo a «ok» pelo atalho sem nem ver a recusa.
+  if (args.estadoAnterior !== undefined) gravacao = gravacao.eq("estado", args.estadoAnterior);
+  const { data, error } = await gravacao.select("inscricao_id");
 
   if (error) throw new Error(`Falha ao gravar a conferência: ${error.message}`);
+  if (args.estadoAnterior !== undefined && (data?.length ?? 0) === 0) {
+    throw new ErroDeConflito(
+      `O requisito (${args.item.toUpperCase()}) mudou desde que você abriu a ficha (outra pessoa ou o robô da Riot gravou antes). Nada foi gravado nele: confira o valor atual e salve de novo.`,
+    );
+  }
 
   await registrarAuditoria({
     inscricaoId: args.inscricaoId,
@@ -771,6 +904,8 @@ export async function atualizarPagamento(args: {
   inscricaoId: string;
   estado: EstadoPagamento;
   observacao?: string;
+  /** Trava otimista: o estado que a tela viu. Ausente = grava sem conferir (como antes). */
+  estadoAnterior?: EstadoPagamento;
   autor: string;
 }): Promise<void> {
   const cliente = createSupabaseAdminClient();
@@ -780,7 +915,32 @@ export async function atualizarPagamento(args: {
   // "estornado" são atos da organização e registram quem fez.
   const daOrganizacao = args.estado !== "declarado" && args.estado !== "aguardando";
 
-  const { error } = await cliente
+  let esperado = args.estadoAnterior;
+
+  // Estorno só de dinheiro que entrou. Sem isto, «aguardando → estorno devido» por engano
+  // subia «recebido» e «em caixa» em R$ 20 que nunca existiram, punha na lista «a devolver»
+  // quem não pagou, e a conta do caixa continuava fechando (ela é uma identidade).
+  if (args.estado === "estorno_devido" || args.estado === "estornado") {
+    const { data: atual, error: erroLeitura } = await cliente
+      .from("inscricao_pagamentos")
+      .select("estado")
+      .eq("inscricao_id", args.inscricaoId)
+      .maybeSingle<{ estado: EstadoPagamento }>();
+
+    if (erroLeitura) throw new Error(`Falha ao ler o pagamento: ${erroLeitura.message}`);
+    if (!atual) throw new ErroDeRegra("Pagamento não encontrado.");
+    if (esperado !== undefined && atual.estado !== esperado) throw conflitoNoPagamento();
+    if (!ESTADOS_COM_DINHEIRO.includes(atual.estado)) {
+      throw new ErroDeRegra(
+        "Só dá para estornar um pagamento que foi recebido. Confirme o «pago» antes — ou, se o dinheiro nunca entrou, use «Cancelado».",
+      );
+    }
+    // A gravação fica presa ao estado que acabou de ser conferido: se ele mudar entre a
+    // leitura e o update, nada é gravado.
+    esperado = atual.estado;
+  }
+
+  let gravacao = cliente
     .from("inscricao_pagamentos")
     .update({
       estado: args.estado,
@@ -796,8 +956,11 @@ export async function atualizarPagamento(args: {
       atualizado_em: agora,
     })
     .eq("inscricao_id", args.inscricaoId);
+  if (esperado !== undefined) gravacao = gravacao.eq("estado", esperado);
+  const { data, error } = await gravacao.select("inscricao_id");
 
   if (error) throw new Error(`Falha ao gravar o pagamento: ${error.message}`);
+  if (esperado !== undefined && (data?.length ?? 0) === 0) throw conflitoNoPagamento();
 
   await registrarAuditoria({
     inscricaoId: args.inscricaoId,
@@ -805,6 +968,12 @@ export async function atualizarPagamento(args: {
     acao: "pagamento",
     detalhe: { estado: args.estado },
   });
+}
+
+function conflitoNoPagamento(): ErroDeConflito {
+  return new ErroDeConflito(
+    "O pagamento mudou desde que você abriu a tela (outra pessoa da organização ou o próprio jogador gravou antes). Nada foi gravado: confira o estado atual e decida de novo.",
+  );
 }
 
 /**
@@ -908,6 +1077,27 @@ export function panorama(
     config.max_times ?? null,
   );
 
+  const donoDe = (p: Pagamento) => inscricoes.find((i) => i.id === p.inscricao_id);
+  // Recusado ou desistente que não pagou não é "a receber": a cobrança morreu com a
+  // inscrição. Fica fora da conta do caixa sem gravar nada (ver `foraDaCobranca`).
+  const caixa = fecharCaixa(
+    pagamentos.filter((p) => {
+      const dono = donoDe(p);
+      return !dono || !foraDaCobranca(dono.situacao, p.estado);
+    }),
+  );
+  // «A receber» é cobrança VIVA: nem organizador (não paga — o caso dele é o alerta
+  // «organizador_cobrado», até alguém isentar) nem recusado/desistente que declarou (o
+  // alerta «recusado_declarado» pede conferir o extrato antes de devolver). Só este número
+  // muda: tirar o organizador do caixa inteiro zeraria a linha «isento».
+  caixa.aReceber = pagamentos
+    .filter((p) => {
+      if (p.estado !== "aguardando" && p.estado !== "declarado") return false;
+      const dono = donoDe(p);
+      return !dono || (!dono.organizador && contaParaTimes(dono.situacao));
+    })
+    .reduce((t, p) => t + p.valor_centavos, 0);
+
   return {
     inscritos: inscricoes.length,
     elegiveis: elegiveis.length,
@@ -918,14 +1108,7 @@ export function panorama(
     times,
     vagas,
     sobra,
-    // Recusado ou desistente que não pagou não é "a receber": a cobrança morreu com a
-    // inscrição. Fica fora da conta do caixa sem gravar nada (ver `foraDaCobranca`).
-    caixa: fecharCaixa(
-      pagamentos.filter((p) => {
-        const dono = inscricoes.find((i) => i.id === p.inscricao_id);
-        return !dono || !foraDaCobranca(dono.situacao, p.estado);
-      }),
-    ),
+    caixa,
   };
 }
 
@@ -938,6 +1121,13 @@ export function panorama(
  * e com aspas o nome do autor nunca é lido como parte dela.
  */
 export const FILTRO_ITEM_DO_ROBO = `conferido_por.is.null,conferido_por.eq."${AUTOR_RIOT}"`;
+/**
+ * O (e) também é do robô quando está «não avaliável» e sem observação — falta de base, não
+ * veredicto (ver `itemEhDoRobo`). Mesma condição na gravação: se um organizador deu
+ * veredicto ou escreveu uma observação no meio da rodada, o WHERE não casa mais. (A
+ * observação vazia é gravada como nulo: ver `atualizarConferencia`.)
+ */
+export const FILTRO_ITEM_E_DO_ROBO = `${FILTRO_ITEM_DO_ROBO},and(estado.eq.nao_avaliavel,observacao.is.null)`;
 /** O elo só é do robô se ninguém da organização travou. */
 export const FILTRO_ELO_DO_ROBO = "elo_fonte.is.null,elo_fonte.eq.riot";
 
@@ -1002,7 +1192,7 @@ export async function aplicarSincronizacao(
       })
       .eq("inscricao_id", inscricaoId)
       .eq("item", item.item)
-      .or(FILTRO_ITEM_DO_ROBO)
+      .or(item.item === "e" ? FILTRO_ITEM_E_DO_ROBO : FILTRO_ITEM_DO_ROBO)
       .select("inscricao_id");
 
     if (error) throw new Error(`Falha ao gravar o requisito ${item.item}: ${error.message}`);
@@ -1169,9 +1359,20 @@ export async function reavaliarPendentes(opcoes: { simular?: boolean } = {}): Pr
       agoraMs,
     });
     if (sugerida !== "apto") continue;
+    if (opcoes.simular) {
+      promovidos.push(i.riot_id);
+      continue;
+    }
     // O lote acima foi lido de uma vez e envelhece enquanto o laço anda. Quem é candidato
     // é reavaliado com leitura FRESCA antes de ser promovido.
-    if (opcoes.simular || (await reavaliarSituacao(i.id, "rotina_diaria"))) promovidos.push(i.riot_id);
+    //
+    // Uma falha num inscrito (a rede piscou) não pode impedir a promoção dos seguintes: a
+    // rotina é a rede de segurança das promoções que falharam, e só roda uma vez por dia.
+    try {
+      if (await reavaliarSituacao(i.id, "rotina_diaria")) promovidos.push(i.riot_id);
+    } catch (erro) {
+      console.error(`[inscricoes] falha ao reavaliar ${i.riot_id}`, erro);
+    }
   }
   return promovidos;
 }

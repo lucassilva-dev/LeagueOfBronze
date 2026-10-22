@@ -43,6 +43,7 @@ import {
 import { RoleIcon } from "@/components/lob/ui";
 import { resolveElo, resolveRole } from "@/lib/design";
 import type { DraftPublico, PreviaDoDraft } from "@/lib/draft/store";
+import { listaForaDoDraft } from "@/lib/draft/virada";
 
 /**
  * Draft ao vivo — a mesa da organização.
@@ -456,7 +457,12 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
   const [ocupado, setOcupado] = useState(false);
   const [metodo, setMetodo] = useState<"maior_elo" | "manual">("maior_elo");
   const [manuais, setManuais] = useState<string[]>([]);
-  const [confirmoDescartar, setConfirmoDescartar] = useState(false);
+  /**
+   * «Sortear de novo APAGA o draft» marcado — guardado junto do sorteio que estava na tela.
+   * Se outro sorteio entrar enquanto a caixa está marcada, ela desmarca sozinha: a
+   * confirmação era sobre o draft visto, não sobre o novo.
+   */
+  const [descarteConfirmado, setDescarteConfirmado] = useState<{ sorteioId: string | null } | null>(null);
   /**
    * O jogador marcado para "escolher pelo time" vale só para a escolha em que foi marcado.
    * Guardado junto do número da escolha: virou a vez, a seleção some sozinha — sem isso o
@@ -472,6 +478,14 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
   const [verJogadores, setVerJogadores] = useState<boolean | null>(null);
   const [previsao, setPrevisao] = useState<PrevisaoDaVirada | null>(null);
   const [confirmoVirada, setConfirmoVirada] = useState(false);
+  /** O servidor avisou que o draft já está no site: reaplicar exige a segunda confirmação. */
+  const [pedeReaplicar, setPedeReaplicar] = useState(false);
+  const [confirmoReaplicar, setConfirmoReaplicar] = useState(false);
+  /**
+   * A lista de "fora do draft" que a pessoa confirmou ao aplicar (a chave dela). Guardar a
+   * lista, e não um booleano, faz a confirmação cair sozinha se mais alguém sair depois.
+   */
+  const [foraConfirmado, setForaConfirmado] = useState<string | null>(null);
   const [confirmoCalendario, setConfirmoCalendario] = useState(false);
   const [posicoes, setPosicoes] = useState<{ posicao: number; nome: string }[] | null>(null);
   const [agora, setAgora] = useState(() => Date.now());
@@ -485,7 +499,10 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
       const r = await fetch("/api/admin/draft", { cache: "no-store" });
       const corpo = (await r.json().catch(() => ({}))) as RespostaDoPainel & { missing?: string[] };
       if (!r.ok) throw new Error(corpo.error ?? `Falha ${r.status}`);
-      setDados(corpo);
+      // Leitura que saiu antes da última ação e chegou depois não volta o quadro no tempo.
+      setDados((atual) =>
+        atual?.draft && corpo.draft && corpo.draft.revisao < atual.draft.revisao ? atual : corpo,
+      );
       setErro(null);
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível carregar o draft.");
@@ -540,13 +557,30 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
     };
   }, [aoVivo, carregar]);
 
+  /*
+   * Fora do ao vivo (sem draft, sorteado, encerrado) a tela também se atualiza: com duas
+   * pessoas na mesa, o painel parado em "sem draft" continuava oferecendo «Sortear» depois
+   * do sorteio do colega, e em "sorteado" continuava oferecendo «Iniciar» depois do início.
+   * Aqui não há relógio para andar, então basta reler o painel, mais devagar.
+   */
+  useEffect(() => {
+    if (aoVivo) return;
+    const id = window.setInterval(() => void carregar(), 5000);
+    return () => window.clearInterval(id);
+  }, [aoVivo, carregar]);
+
   useEffect(() => {
     if (!aoVivo) return;
     const id = window.setInterval(() => setAgora(Date.now() + defasagem.current), 500);
     return () => window.clearInterval(id);
   }, [aoVivo]);
 
-  const agir = async (corpo: Record<string, unknown>, ok: string): Promise<Record<string, unknown> | null> => {
+  const agir = async (
+    corpo: Record<string, unknown>,
+    ok: string,
+    /** Chamado com a resposta de uma recusa, antes do aviso — para a tela reagir a ela. */
+    aoRecusar?: (resposta: Record<string, unknown>) => void,
+  ): Promise<Record<string, unknown> | null> => {
     setOcupado(true);
     try {
       const r = await fetch("/api/admin/draft", {
@@ -559,6 +593,7 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
         problemas?: string[];
       };
       if (!r.ok) {
+        aoRecusar?.(resposta);
         const extra = Array.isArray(resposta.problemas) && resposta.problemas.length ? ` ${resposta.problemas.join(" ")}` : "";
         onAlert("erro", `${resposta.error ?? "Não foi possível concluir."}${extra}`);
         await carregar();
@@ -602,6 +637,9 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
 
   const podeSortear = podeConduzir && !ocupado && previa.impedimentos.length === 0 && previa.times > 0;
   const precisaConfirmarDescarte = Boolean(draft && draft.fase !== "preparando");
+  /** O sorteio que esta tela está mostrando — vai no pedido de «Sortear» e de «Iniciar». */
+  const sorteioVisto = draft?.sorteioId ?? null;
+  const confirmoDescartar = descarteConfirmado !== null && descarteConfirmado.sorteioId === sorteioVisto;
   const manuaisOk = manuais.length === previa.times;
   const metodoOk = metodo === "manual" ? manuaisOk : capitaesPelaRegra.length === previa.times;
   const timeDaVez = draft?.times.find((t) => t.id === draft.timeDaVezId) ?? null;
@@ -614,6 +652,14 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
   const capitaesSemConta = (draft?.times ?? [])
     .map((t) => ({ time: t, jogador: previa.jogadores.find((j) => j.riotId === t.capitaoRiotId) }))
     .filter((x) => x.jogador && !x.jogador.temConta);
+  /**
+   * Quem está no draft e a inscrição não é mais `apto` (recusado ou desistente depois do
+   * sorteio, devolvido à sobra ou a pendente). Só aviso: o draft não tira ninguém sozinho, e
+   * o que fazer é decisão da organização. Aplicar no site pede a confirmação desta lista.
+   */
+  const foraDoDraft = draft ? (previa.foraDoDraft ?? []) : [];
+  const chaveDoFora = foraDoDraft.map((f) => `${f.riotId}:${f.situacao}`).join("|");
+  const confirmoFora = foraDoDraft.length > 0 && foraConfirmado === chaveDoFora;
 
   const alternarManual = (id: string) =>
     setManuais((atual) => (atual.includes(id) ? atual.filter((x) => x !== id) : [...atual, id]));
@@ -676,7 +722,7 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
           tone="gold"
           fullWidth={compacto}
           disabled={!podeConduzir || ocupado}
-          onClick={() => void agir({ acao: "iniciar" }, "Draft iniciado. O relógio está correndo.")}
+          onClick={() => void agir({ acao: "iniciar", sorteioVisto }, "Draft iniciado. O relógio está correndo.")}
         >
           {compacto ? <Play size={17} aria-hidden /> : null}
           Iniciar o draft
@@ -878,6 +924,14 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
         </Banner>
       ) : null}
 
+      {foraDoDraft.length > 0 ? (
+        <Banner tone="danger" title={`${foraDoDraft.length} jogador(es) do draft não estão mais aptos`}>
+          {listaForaDoDraft(foraDoDraft)}. A inscrição mudou depois do sorteio, e o draft não tira ninguém sozinho:
+          quem está no pool ainda pode ser escolhido, e quem está num elenco vai junto para o site na virada. O que
+          fazer é decisão da organização. «Aplicar no site» pede uma confirmação a mais.
+        </Banner>
+      ) : null}
+
       {/* No celular, com o draft sorteado, o que se usa ao vivo vem logo abaixo do placar. */}
       {mesaNoTopo ? (
         <div style={{ display: "grid", gap: 14, marginBottom: 8 }}>
@@ -993,7 +1047,11 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
         ) : null}
 
         {precisaConfirmarDescarte ? (
-          <Check checked={confirmoDescartar} onChange={setConfirmoDescartar} tone="danger">
+          <Check
+            checked={confirmoDescartar}
+            onChange={(v) => setDescarteConfirmado(v ? { sorteioId: sorteioVisto } : null)}
+            tone="danger"
+          >
             Já houve escolhas neste draft. Entendo que sortear de novo APAGA o draft atual.
           </Check>
         ) : null}
@@ -1010,10 +1068,11 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
                   metodo,
                   capitaes: metodo === "manual" ? manuais : undefined,
                   confirmoDescartar: precisaConfirmarDescarte ? confirmoDescartar : undefined,
+                  sorteioVisto,
                 },
                 "Capitães e ordem sorteados. Confira na transmissão.",
               ).then((r) => {
-                if (r) setConfirmoDescartar(false);
+                if (r) setDescarteConfirmado(null);
               })
             }
           >
@@ -1288,15 +1347,58 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
         <Check checked={confirmoVirada} onChange={setConfirmoVirada}>
           Conferi os elencos e a 4ª Edição já foi iniciada em Torneio.
         </Check>
+        {foraDoDraft.length > 0 ? (
+          <>
+            <Banner tone="danger" title="Há jogadores no draft que não estão mais aptos">
+              {listaForaDoDraft(foraDoDraft)}. Aplicar agora publica essas pessoas nos times do site.
+            </Banner>
+            <Check checked={confirmoFora} onChange={(v) => setForaConfirmado(v ? chaveDoFora : null)} tone="danger">
+              Sei que {foraDoDraft.length === 1 ? "esse jogador não está mais apto" : "esses jogadores não estão mais aptos"}{" "}
+              e quero aplicar o draft mesmo assim.
+            </Check>
+          </>
+        ) : null}
+        {pedeReaplicar ? (
+          <>
+            <Banner tone="danger" title="Este draft já está aplicado no site">
+              Aplicar de novo substitui times e jogadores inteiros pela saída do draft e apaga o que a organização
+              editou depois da primeira aplicação: fotos dos jogadores e nomes escolhidos pelos times.
+            </Banner>
+            <Check checked={confirmoReaplicar} onChange={setConfirmoReaplicar} tone="danger">
+              Entendo que reaplicar apaga as fotos e os nomes editados no site depois da primeira aplicação.
+            </Check>
+          </>
+        ) : null}
         <div>
           <Button
             tone="gold"
             fullWidth={compacto}
-            disabled={!podeConduzir || ocupado || draft?.fase !== "encerrado" || !confirmoVirada}
+            disabled={
+              !podeConduzir ||
+              ocupado ||
+              draft?.fase !== "encerrado" ||
+              !confirmoVirada ||
+              (pedeReaplicar && !confirmoReaplicar) ||
+              (foraDoDraft.length > 0 && !confirmoFora)
+            }
             onClick={() =>
-              void agir({ acao: "virar" }, "Times e jogadores aplicados no site.").then((r) => {
+              void agir(
+                {
+                  acao: "virar",
+                  confirmoReaplicar: pedeReaplicar && confirmoReaplicar ? true : undefined,
+                  confirmoForaDoDraft: confirmoFora ? true : undefined,
+                },
+                "Times e jogadores aplicados no site.",
+                // O servidor recusa reaplicar sem a segunda confirmação: a tela passa a pedi-la.
+                (resposta) => {
+                  if (resposta.precisaConfirmar === true) setPedeReaplicar(true);
+                },
+              ).then((r) => {
                 if (r) {
                   setConfirmoVirada(false);
+                  setPedeReaplicar(false);
+                  setConfirmoReaplicar(false);
+                  setForaConfirmado(null);
                   onDatasetMudou();
                 }
               })

@@ -156,6 +156,15 @@ export function criarClienteRiot(opcoes: OpcoesDoCliente = {}): ClienteRiot {
 
     const desde = agora() - ultimaChamada[rota];
     if (ultimaChamada[rota] > 0 && desde < intervaloMs) await dormir(intervaloMs - desde);
+
+    // O prazo de quem chamou vale para CADA chamada, não só para a espera da cota. Antes ele
+    // só era conferido entre um inscrito e outro: com a Riot lenta mas respondendo (7,9 s,
+    // abaixo do tempo-limite), o último inscrito do botão do painel fazia 6 chamadas depois
+    // do prazo e a função passava dos 60 s da Vercel — trava presa e gravação pela metade.
+    // Prazo vencido = paramos nós, como na cota (`proprio`): nada de pausar o robô.
+    const restanteMs = opcoes.prazoMs !== undefined ? opcoes.prazoMs - agora() : Infinity;
+    if (restanteMs <= 0) return { tipo: "limite", esperarSegundos: 60, proprio: true };
+
     ultimaChamada[rota] = agora();
     chamadas += 1;
 
@@ -165,15 +174,15 @@ export function criarClienteRiot(opcoes: OpcoesDoCliente = {}): ClienteRiot {
         method: "GET",
         headers: { "X-Riot-Token": chave },
         cache: "no-store",
-        signal: AbortSignal.timeout(timeoutMs),
+        signal: AbortSignal.timeout(Math.max(1, Math.min(timeoutMs, restanteMs))),
       });
     } catch (erro) {
       const nome = erro instanceof Error ? erro.name : "";
-      return {
-        tipo: "erro",
-        status: 0,
-        mensagem: nome === "TimeoutError" || nome === "AbortError" ? "tempo esgotado" : "falha de rede",
-      };
+      const tempoEsgotado = nome === "TimeoutError" || nome === "AbortError";
+      // Quem cortou foi o NOSSO prazo (mais curto que o tempo-limite normal), não a Riot:
+      // paramos nós, como acima — sem marcar "a consulta falhou" no inscrito.
+      if (tempoEsgotado && restanteMs < timeoutMs) return { tipo: "limite", esperarSegundos: 60, proprio: true };
+      return { tipo: "erro", status: 0, mensagem: tempoEsgotado ? "tempo esgotado" : "falha de rede" };
     }
 
     const quase =

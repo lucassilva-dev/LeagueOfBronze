@@ -48,12 +48,18 @@ export function MainNav({ labels, ariaLabel, abrirMenu }: MainNavProps) {
    * É a mesma regra que vale para as animações deste projeto: o estado de repouso, o que
    * sai do servidor, tem de ser o CERTO. Com media query, o navegador acerta na primeira
    * pintura e sem script nenhum.
+   *
+   * O PONTO DA TROCA depende de quantos itens há. Os 5 da pré-temporada cabem a partir de
+   * 1060px; os 9 da temporada, com o nome de quem está logado ao lado, passavam da borda
+   * até ~1130px e cortavam o botão da conta. As classes ficam escritas por inteiro (nada de
+   * montar `min-[${n}px]`) porque o Tailwind só gera o que encontra literalmente no código.
    */
+  const largo = labels.length > 6;
   return (
     <>
       <nav
         aria-label={ariaLabel}
-        className="hidden min-[1060px]:flex"
+        className={largo ? "hidden min-[1200px]:flex" : "hidden min-[1060px]:flex"}
         style={{ alignItems: "center", gap: 2 }}
       >
         {labels.map((item) => {
@@ -102,7 +108,10 @@ export function MainNav({ labels, ariaLabel, abrirMenu }: MainNavProps) {
         })}
       </nav>
 
-      <div className="min-[1060px]:hidden">
+      {/* Também é <nav>: no celular a de cima está escondida, e sem isto os links do menu
+          ficavam num div comum, fora de qualquer região de navegação. As duas nunca
+          aparecem juntas, então o leitor de tela sempre encontra uma só. */}
+      <nav aria-label={ariaLabel} className={largo ? "min-[1200px]:hidden" : "min-[1060px]:hidden"}>
       <button
         type="button"
         aria-label={abrirMenu}
@@ -128,6 +137,7 @@ export function MainNav({ labels, ariaLabel, abrirMenu }: MainNavProps) {
       </button>
       {menuOpen ? (
         <div
+          className="lob-menu-movel"
           style={{
             position: "absolute",
             left: 0,
@@ -170,7 +180,7 @@ export function MainNav({ labels, ariaLabel, abrirMenu }: MainNavProps) {
           })}
         </div>
       ) : null}
-      </div>
+      </nav>
     </>
   );
 }

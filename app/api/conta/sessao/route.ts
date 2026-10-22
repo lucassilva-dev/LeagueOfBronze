@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-import { getJogadorIdentity } from "@/lib/jogadores/auth";
+import {
+  JOGADOR_COOKIE,
+  atributosDoCookie,
+  getJogadorIdentity,
+  renovarCookieDeJogador,
+} from "@/lib/jogadores/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +20,13 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   const jogador = await getJogadorIdentity(request);
 
+  // Renovação deslizante (ver `renovarCookieDeJogador`): só para identidade conferida.
+  const renovado = jogador ? await renovarCookieDeJogador(request.cookies.get(JOGADOR_COOKIE)?.value) : null;
+
   const resposta = NextResponse.json({ jogador });
+  if (renovado) {
+    resposta.cookies.set({ name: renovado.name, value: renovado.value, ...atributosDoCookie(renovado.maxAge) });
+  }
   // Sessão nunca pode ficar em cache — nem no navegador, nem na borda da Vercel.
   resposta.headers.set("Cache-Control", "no-store, private");
   return resposta;

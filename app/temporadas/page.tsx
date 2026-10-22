@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Crown } from "lucide-react";
 
@@ -7,10 +8,17 @@ import { PageShell } from "@/components/page-shell";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { formatDateLabel } from "@/lib/format";
+import { metadadosDaPagina } from "@/lib/i18n/metadados";
+import { nomeDaTemporada } from "@/lib/i18n/nome-da-temporada";
 import { getMessages } from "@/lib/i18n/server";
 import { getServerArchivedSeasons } from "@/lib/server-data";
 
 export const dynamic = "force-dynamic";
+
+/** Título e descrição próprios, no idioma da visita (lib/i18n/messages/metadados.ts). */
+export async function generateMetadata(): Promise<Metadata> {
+  return metadadosDaPagina("temporadas", "/temporadas");
+}
 
 export default async function TemporadasPage() {
   const seasons = await getServerArchivedSeasons();
@@ -46,7 +54,7 @@ export default async function TemporadasPage() {
                 </div>
 
                 <h2 className="mt-3 font-heading text-xl font-semibold tracking-tight">
-                  {season.name}
+                  {nomeDaTemporada(season.name, tc.localeTag)}
                 </h2>
 
                 <div className="mt-3 flex items-center gap-2 text-sm">

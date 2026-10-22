@@ -116,9 +116,22 @@ export function janelaDoItemE(inicioCampeonato: string | null): { inicioMs: numb
   return { inicioMs: fimMs - 10 * DIA_MS, fimMs };
 }
 
-/** O item ainda é do robô: ninguém escreveu nele, ou quem escreveu foi o próprio robô. */
+/**
+ * O item ainda é do robô: ninguém escreveu nele, ou quem escreveu foi o próprio robô.
+ *
+ * Exceção: o (e) em «não avaliável» SEM observação. Esse estado quer dizer "ainda não há
+ * data nem janela para medir" — é falta de base, não veredicto. O atalho «Pendentes →
+ * Cumpre» da gaveta o grava com o nome do organizador antes de a janela abrir, e sem esta
+ * exceção o robô nunca mais contaria as partidas daquela pessoa: a regra 4 de ~30 inscritos
+ * teria de ser conferida à mão, sem o número na tela. Quando a janela abre e a Riot conta, o
+ * item é avaliável e volta ao robô. Com observação escrita, foi alguém decidindo de
+ * propósito (e explicando por quê): continua do humano, como qualquer outro estado no (e).
+ * A mesma condição está no filtro da gravação (`FILTRO_ITEM_E_DO_ROBO`).
+ */
 export function itemEhDoRobo(c: ConferenciaParaRobo | undefined): boolean {
-  return !!c && (c.conferido_por === null || c.conferido_por === AUTOR_RIOT);
+  if (!c) return false;
+  if (c.conferido_por === null || c.conferido_por === AUTOR_RIOT) return true;
+  return c.item === "e" && c.estado === "nao_avaliavel" && !c.observacao;
 }
 
 export function decidirSincronizacao(args: {
@@ -127,6 +140,12 @@ export function decidirSincronizacao(args: {
   riot: DadosRiot;
   config: ConfigParaRobo;
   agoraMs: number;
+  /**
+   * A conta que a Riot devolveu já é de OUTRA inscrição ativa, feita antes desta (mesmo
+   * PUUID com outra grafia do Riot ID: o índice do banco não pega acento nem espaço). O (m)
+   * desta fica em risco em vez de «confirmada» — e ela não vira apto sozinha.
+   */
+  contaEmOutraInscricao?: boolean;
 }): DecisaoDoRobo {
   const { inscrito, conferencias, riot, config, agoraMs } = args;
   const agoraIso = new Date(agoraMs).toISOString();
@@ -211,7 +230,13 @@ export function decidirSincronizacao(args: {
   colunasRiot.riot_status = status;
 
   // ------------------------------------------------ item m (regra 12)
-  if (trocouDeNick) {
+  if (args.contaEmOutraInscricao) {
+    quer(
+      "m",
+      "risco",
+      "Esta conta da Riot já aparece em outra inscrição desta edição. Fale com a organização: cada conta entra uma vez só.",
+    );
+  } else if (trocouDeNick) {
     quer(
       "m",
       "risco",
@@ -279,9 +304,13 @@ export function precisaContarPartidas(args: {
 }): { inicioS: number; fimS: number } | null {
   const janela = janelaDoItemE(args.inicioCampeonato);
   if (!janela || args.agoraMs < janela.inicioMs) return null;
-  // Janela fechada há mais de 2 dias: a contagem já é definitiva, não gasta cota.
-  if (args.agoraMs > janela.fimMs + 2 * DIA_MS && args.partidasGravadas !== null) return null;
   // Dentro da janela a contagem só cresce: quem já bateu o mínimo não precisa de outra consulta.
+  //
+  // Quem está ABAIXO do mínimo é recontado todo dia, mesmo com a janela já fechada (sempre a
+  // janela inteira, até o início). Havia aqui um atalho "fechou há mais de 2 dias, a contagem
+  // é definitiva" — e definitiva virava a última contagem que DEU CERTO, mesmo parcial: com
+  // duas rodadas seguidas falhando depois do início, o 2 de 5 de véspera congelava em
+  // «risco». Custa 1 chamada por dia por pessoa abaixo do mínimo.
   if (args.partidasGravadas !== null && args.partidasGravadas >= args.minimo) return null;
   return { inicioS: janela.inicioMs / 1000, fimS: Math.min(args.agoraMs, janela.fimMs) / 1000 };
 }

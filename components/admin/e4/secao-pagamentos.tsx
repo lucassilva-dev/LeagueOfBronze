@@ -98,12 +98,19 @@ function moeda(centavos: number): string {
   return (centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+/*
+ * Datas sempre no fuso de Brasília, como a mensagem de cobrança e a gaveta do inscrito. No
+ * fuso do computador, um organizador em Manaus via «20 de out.» na tabela para o prazo que
+ * a cobrança do WhatsApp chama de «21/10».
+ */
+const FUSO = "America/Sao_Paulo";
+
 function dataHora(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
   return Number.isNaN(d.getTime())
     ? "—"
-    : d.toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+    : d.toLocaleString("pt-BR", { timeZone: FUSO, day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
 function dataCurta(iso: string | null): string {
@@ -111,7 +118,7 @@ function dataCurta(iso: string | null): string {
   const d = new Date(iso);
   return Number.isNaN(d.getTime())
     ? "—"
-    : d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
+    : d.toLocaleDateString("pt-BR", { timeZone: FUSO, day: "2-digit", month: "short", year: "numeric" });
 }
 
 function emMs(iso: string | null): number | null {
@@ -168,8 +175,42 @@ type Linha = Readonly<{
   fora: boolean;
 }>;
 
-/** Os alertas que são do caixa — os de requisito ficam na aba Inscritos. */
-const ALERTAS_DO_CAIXA = new Set(["organizador_cobrado", "recusado_pago", "recusado_declarado", "desistiu_com_pagamento"]);
+/**
+ * Os alertas que são do caixa — os de requisito ficam na aba Inscritos. O «apto sem
+ * pagamento» é dos dois: o sistema só promove, então um «pago» desfeito depois da promoção
+ * (ou um Apto marcado à mão) deixava a pessoa apta, rumo ao draft, sem nada apontar aqui.
+ */
+const ALERTAS_DO_CAIXA = new Set([
+  "apto_sem_pagamento",
+  "organizador_cobrado",
+  "recusado_pago",
+  "recusado_declarado",
+  "desistiu_com_pagamento",
+]);
+
+/**
+ * Trocas pelo <select> que pedem confirmação: as que mexem no caixa (ou desfazem um «pago»).
+ *
+ * O <select> nativo grava a cada `change`, e no Chrome/Edge do Windows a seta ↓ num select
+ * focado troca a opção SEM abrir a lista: navegando a tabela pelo teclado, «Declarado»
+ * virava «Pago» com o nome de quem estava ali na auditoria — e a rota ainda pode promover a
+ * pessoa a Apto, o que nenhuma troca de volta desfaz.
+ */
+const ESTADOS_QUE_MEXEM_NO_CAIXA: ReadonlySet<EstadoPagamento> = new Set<EstadoPagamento>([
+  "pago",
+  "isento",
+  "estorno_devido",
+  "estornado",
+]);
+
+function confirmaTroca(nome: string, de: EstadoPagamento, para: EstadoPagamento): boolean {
+  if (!ESTADOS_QUE_MEXEM_NO_CAIXA.has(para) && de !== "pago") return true;
+  const efeito =
+    para === "pago" ? " Isso afirma que o dinheiro está no extrato, e pode promover a pessoa a Apto." : "";
+  return window.confirm(
+    `Mudar o pagamento de ${nome} de «${ROTULO_PAGAMENTO[de]}» para «${ROTULO_PAGAMENTO[para]}»?${efeito}`,
+  );
+}
 
 const ROTULO_DA_ACAO: Record<NonNullable<Alerta["acaoPagamento"]>, string> = {
   isento: "Isentar",
@@ -315,6 +356,7 @@ function DetalheDoPagamento({
   onEstado,
   travado,
   motivo,
+  erro,
 }: Readonly<{
   linha: Linha;
   observacao: string;
@@ -322,6 +364,8 @@ function DetalheDoPagamento({
   onEstado: (estado: EstadoPagamento) => void;
   travado: boolean;
   motivo: string | undefined;
+  /** Por que a última troca feita AQUI falhou. A folha cobre o aviso do topo da página. */
+  erro: string | null;
 }>) {
   const { pagamento, inscrito, nome, fora } = linha;
   const gravada = pagamento.observacao?.trim();
@@ -382,9 +426,9 @@ function DetalheDoPagamento({
         />
       </Field>
 
-      {/* Mesma regra da tabela do monitor: sem diálogo, porque toda transição é reversível e
-          fica na auditoria. O <select> nativo já pede dois toques deliberados (abrir e
-          escolher) — uma fileira de botões de estado mudaria o caixa com um toque perdido. */}
+      {/* Mesma regra da tabela do monitor: o que mexe no caixa pede confirmação
+          (`confirmaTroca`) — a folha também abre num navegador estreito, com teclado. O <select>
+          nativo, e não uma fileira de botões de estado, que mudaria o caixa com um toque perdido. */}
       <Field
         label="Alterar estado"
         hint={
@@ -408,13 +452,18 @@ function DetalheDoPagamento({
           ))}
         </Select>
       </Field>
+      {erro ? (
+        <p role="alert" style={{ margin: "-8px 0 0", fontSize: 12.5, lineHeight: 1.55, color: C.dangerSoft }}>
+          {erro}
+        </p>
+      ) : null}
     </div>
   );
 }
 
 // ---------------------------------------------------------------- seção
 
-export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: PropsSecao) {
+export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro, ultimoErro = null }: PropsSecao) {
   const { config, panorama, pagamentos, inscritos, conferencias } = dados;
   const caixa = panorama.caixa;
   const compacto = useCompacto();
@@ -452,6 +501,8 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: Pr
   const [rascunhoObs, setRascunhoObs] = useState<Record<string, string>>({});
   /** O pagamento aberto na folha do celular (id da inscrição). No monitor fica sempre nulo. */
   const [abertoId, setAbertoId] = useState<string | null>(null);
+  /** A última troca feita pela folha falhou: o motivo (`ultimoErro`) aparece dentro dela. */
+  const [falhouNaFolha, setFalhouNaFolha] = useState(false);
 
   const travado = !podeFinanceiro || ocupado;
   const motivo = podeFinanceiro ? undefined : ESCOPO_FALTANDO;
@@ -493,8 +544,13 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: Pr
       if (linha.pagamento.estado !== "aguardando" || linha.venceMs === null) continue;
       // Fora do campeonato ou da organização: não se cobra (o alerta do caixa cuida do segundo).
       if (linha.fora || linha.inscrito?.organizador) continue;
-      // `ceil` de propósito: faltando 3 horas, o texto certo é "vence em 1 dia", não "0".
-      const dias = Math.ceil((linha.venceMs - agoraMs) / DIA_MS);
+      // A favor do prazo, `ceil` de propósito: faltando 3 horas, o texto certo é "vence em 1
+      // dia", não "0". Passado o prazo, é vencido desde o primeiro instante: o `ceil` de 20 h
+      // de atraso dava -0, que não é `< 0`, e a pessoa saía como «vence hoje», em âmbar.
+      const dias =
+        linha.venceMs > agoraMs
+          ? Math.ceil((linha.venceMs - agoraMs) / DIA_MS)
+          : -Math.max(1, Math.floor((agoraMs - linha.venceMs) / DIA_MS));
       if (dias <= JANELA_DE_AVISO) fora.push({ linha, dias });
     }
     return fora.sort((a, b) => a.dias - b.dias);
@@ -526,10 +582,23 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: Pr
   }, [linhas, conferencias, config, agoraMs]);
 
   const copiarLista = async () => {
-    const texto = listaDeQuemFaltaPagar(
-      devendo.map((l) => ({ riotId: l.nome, venceEm: l.pagamento.vence_em })),
-      config.taxa_centavos,
-    );
+    // O valor de CADA pagamento, e não a taxa da configuração: a taxa vale para inscrição
+    // nova, e quem já se inscreveu deve o que ficou gravado na inscrição dele — é o que a
+    // cobrança individual e o Pix pedem. Com valores diferentes (a taxa mudou no meio das
+    // inscrições), sai uma lista por valor, para ninguém ler um preço que não é o seu.
+    const porValor = new Map<number, { riotId: string; venceEm: string | null }[]>();
+    for (const l of devendo) {
+      const doValor = porValor.get(l.pagamento.valor_centavos) ?? [];
+      doValor.push({ riotId: l.nome, venceEm: l.pagamento.vence_em });
+      porValor.set(l.pagamento.valor_centavos, doValor);
+    }
+    const texto =
+      porValor.size === 0
+        ? listaDeQuemFaltaPagar([], config.taxa_centavos)
+        : [...porValor]
+            .sort(([a], [b]) => a - b)
+            .map(([valor, doValor]) => listaDeQuemFaltaPagar(doValor, valor))
+            .join("\n\n");
     try {
       await navigator.clipboard.writeText(texto);
       setCopiado("ok");
@@ -586,22 +655,26 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: Pr
   const fecharFolha = () => {
     const id = abertoId;
     setAbertoId(null);
+    setFalhouNaFolha(false);
     requestAnimationFrame(() => {
       const alvo = (id ? document.getElementById(`pagamento-${id}`) : null) ?? document.getElementById(contagemId);
       alvo?.focus();
     });
   };
 
-  /**
+  /*
    * O estorno NÃO é descontado de novo aqui.
    *
    * Os estados são exclusivos: quem foi estornado deixou de ser "pago", então
    * `arrecadado` (a soma dos "pago") já está limpo. Uma versão anterior fazia
    * `arrecadado - estornado` e mostrava R$ 160 onde havia R$ 180 — descontava o mesmo
-   * dinheiro duas vezes. A identidade que fecha é a de baixo, e ela é conferida na tela.
+   * dinheiro duas vezes.
+   *
+   * Não há mais o banner «O caixa não fecha»: `recebido − estornado − a devolver` é, por
+   * construção (`fecharCaixa`), sempre igual ao arrecadado — o verificador nunca acusava nada.
+   * O furo que ele parecia vigiar (estornar quem nunca pagou, inflando «Recebido» e «Em
+   * caixa») agora é recusado no servidor (`atualizarPagamento`).
    */
-  const identidade = caixa.recebido - caixa.estornado - caixa.aDevolver;
-  const caixaFecha = identidade === caixa.arrecadado;
   // 100% do arrecadado vira prêmio: o campeão fica com `pct_campeao` e o vice com o
   // resto. A organização não fica com nada — o vice é a SUBTRAÇÃO, e não um segundo
   // arredondamento, para os dois somarem exatamente o arrecadado.
@@ -616,7 +689,11 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: Pr
     { label: `Prêmio do campeão (${config.pct_campeao}%)`, value: moeda(premioCampeao), detail: "sobre o arrecadado" },
     { label: `Prêmio do vice (${100 - config.pct_campeao}%)`, value: moeda(premioVice), detail: "o restante do arrecadado" },
     { label: "Em caixa", value: moeda(caixa.emCaixa), detail: "recebido − estornado" },
-    { label: "A receber", value: moeda(caixa.aReceber), detail: "aguardando + declarado (sem recusados e desistentes)" },
+    {
+      label: "A receber",
+      value: moeda(caixa.aReceber),
+      detail: "aguardando + declarado (sem organizadores, recusados e desistentes)",
+    },
   ];
   const metricasMiudas: ReadonlyArray<{ label: string; value: string; detail: string }> = [
     { label: "Recebido (bruto)", value: moeda(caixa.recebido), detail: "tudo que um dia entrou" },
@@ -625,7 +702,9 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: Pr
     { label: "Isento", value: moeda(caixa.isento), detail: "organizadores desta edição" },
   ];
 
-  const salvar = async (inscricaoId: string, estado: EstadoPagamento) => {
+  /** Devolve se gravou — a folha do celular precisa saber para mostrar o motivo da falha. */
+  const salvar = async (pagamento: Pagamento, estado: EstadoPagamento): Promise<boolean> => {
+    const inscricaoId = pagamento.inscricao_id;
     const obs = (rascunhoObs[inscricaoId] ?? "").trim();
     // O servidor grava `observacao ?? null`: mandar vazio APAGA a observação anterior.
     // Por isso o campo só viaja quando alguém realmente digitou alguma coisa.
@@ -633,13 +712,23 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: Pr
       inscricaoId,
       estado,
       observacao: obs.length > 0 ? obs : undefined,
+      // O estado que ESTA tela mostrava. Se outro financeiro (ou o jogador, no «Já paguei»)
+      // gravou antes, o servidor responde 409 sem gravar e a tela recarrega: uma fila velha
+      // não devolve a «aguardando» o «pago» que outra pessoa acabou de confirmar.
+      estadoAnterior: pagamento.estado,
     });
-    if (!ok) return;
+    if (!ok) return false;
     setRascunhoObs((atual) => {
       const proximo = { ...atual };
       delete proximo[inscricaoId];
       return proximo;
     });
+    return true;
+  };
+
+  const salvarDaFolha = async (pagamento: Pagamento, estado: EstadoPagamento) => {
+    setFalhouNaFolha(false);
+    setFalhouNaFolha(!(await salvar(pagamento, estado)));
   };
 
   const escreverObs = (id: string, texto: string) =>
@@ -696,14 +785,6 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: Pr
         </Banner>
       ) : null}
 
-      {!caixaFecha ? (
-        <Banner tone="danger" title="O caixa não fecha">
-          recebido − estornado − a devolver dá {moeda(identidade)}, mas o arrecadado está em{" "}
-          {moeda(caixa.arrecadado)}. Enquanto os dois discordarem, não use nenhum dos dois para
-          prometer premiação — avise quem cuida do financeiro.
-        </Banner>
-      ) : null}
-
       {/* ------------------------------------------------------------ caixa */}
 
       <BlockTitle>O caixa</BlockTitle>
@@ -740,20 +821,11 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: Pr
       )}
 
       <Card padding="14px 16px" style={{ marginTop: 12 }}>
-        <p style={{ margin: 0, fontSize: 12.5, color: C.ink3, lineHeight: 1.7 }}>
-          A conta que precisa fechar:{" "}
-          <span style={{ color: C.ink, ...tabular }}>
-            {moeda(caixa.recebido)} − {moeda(caixa.estornado)} − {moeda(caixa.aDevolver)} ={" "}
-            <strong style={{ color: caixaFecha ? C.okSoft : C.dangerSoft }}>
-              {moeda(caixa.arrecadado)}
-            </strong>
-          </span>
-          .
-        </p>
-        <p style={{ margin: "6px 0 0", fontSize: 12, color: C.ink4, lineHeight: 1.7 }}>
+        <p style={{ margin: 0, fontSize: 12, color: C.ink4, lineHeight: 1.7 }}>
           O estorno sai da conta UMA vez. Quem foi estornado já deixou de ser &ldquo;pago&rdquo;, então
           o arrecadado nunca desconta o estorno de novo. O isento não entra em nenhum lado: esse
-          dinheiro nunca existiu.
+          dinheiro nunca existiu. E só se estorna o que foi recebido — para quem nunca pagou, o
+          estado certo é &ldquo;Cancelado&rdquo;.
         </p>
       </Card>
 
@@ -785,7 +857,7 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: Pr
                         fullWidth
                         disabled={travado}
                         title={motivo}
-                        onClick={() => void salvar(linha.pagamento.inscricao_id, alerta.acaoPagamento!)}
+                        onClick={() => void salvar(linha.pagamento, alerta.acaoPagamento!)}
                       >
                         {ROTULO_DA_ACAO[alerta.acaoPagamento]}
                       </Button>
@@ -804,7 +876,7 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: Pr
                         tone="gold"
                         disabled={travado}
                         title={motivo}
-                        onClick={() => void salvar(linha.pagamento.inscricao_id, alerta.acaoPagamento!)}
+                        onClick={() => void salvar(linha.pagamento, alerta.acaoPagamento!)}
                       >
                         {ROTULO_DA_ACAO[alerta.acaoPagamento]}
                       </Button>
@@ -880,7 +952,7 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: Pr
                       fullWidth
                       disabled={travado}
                       title={motivo ?? "Eu abri o extrato e o dinheiro está lá."}
-                      onClick={() => void salvar(id, "pago")}
+                      onClick={() => void salvar(pagamento, "pago")}
                     >
                       Confirmar recebido
                     </Button>
@@ -889,7 +961,7 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: Pr
                       fullWidth
                       disabled={travado}
                       title={motivo ?? "Volta para aguardando: o jogador declarou, mas não achei no extrato."}
-                      onClick={() => void salvar(id, "aguardando")}
+                      onClick={() => void salvar(pagamento, "aguardando")}
                     >
                       Não encontrei
                     </Button>
@@ -938,7 +1010,7 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: Pr
                       tone="gold"
                       disabled={travado}
                       title={motivo ?? "Eu abri o extrato e o dinheiro está lá."}
-                      onClick={() => void salvar(id, "pago")}
+                      onClick={() => void salvar(pagamento, "pago")}
                     >
                       Confirmar recebido
                     </Button>
@@ -946,7 +1018,7 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: Pr
                       tone="danger"
                       disabled={travado}
                       title={motivo ?? "Volta para aguardando: o jogador declarou, mas não achei no extrato."}
-                      onClick={() => void salvar(id, "aguardando")}
+                      onClick={() => void salvar(pagamento, "aguardando")}
                     >
                       Não encontrei
                     </Button>
@@ -1133,7 +1205,7 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: Pr
                     tone="gold"
                     disabled={travado}
                     title={motivo ?? "Marque só depois de o PIX de volta ter saído."}
-                    onClick={() => void salvar(pagamento.inscricao_id, "estornado")}
+                    onClick={() => void salvar(pagamento, "estornado")}
                   >
                     Devolvi
                   </Button>
@@ -1249,7 +1321,10 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: Pr
                     abreDialogo
                     selecionado={abertoId === id}
                     rotuloAlvo={`Abrir o pagamento de ${nome}`}
-                    onClick={() => setAbertoId(id)}
+                    onClick={() => {
+                      setAbertoId(id);
+                      setFalhouNaFolha(false);
+                    }}
                     inicio={<SeloDoEstado estado={pagamento.estado} />}
                     titulo={nome}
                     subtitulo={linhaMiuda ? <span style={tabular}>{linhaMiuda}</span> : undefined}
@@ -1355,16 +1430,19 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: Pr
                       )}
                     </td>
                     <td style={{ ...td, minWidth: 210 }}>
-                      {/* Sem diálogo de confirmação: toda transição aqui é reversível e fica na
-                          auditoria com autor e hora. O que exige cuidado — dizer que o dinheiro
-                          entrou — tem botão próprio lá em cima, não um item de lista. */}
+                      {/* O que mexe no caixa (ou desfaz um «pago») pede confirmação: a seta do
+                          teclado troca a opção deste <select> sem abrir a lista (ver
+                          `confirmaTroca`). O resto grava direto e fica na auditoria. Dizer que o
+                          dinheiro entrou continua tendo botão próprio lá em cima. Cancelado, o
+                          <select> controlado volta sozinho ao estado gravado. */}
                       <Select
                         value={pagamento.estado}
                         disabled={travado}
                         ariaLabel={`Estado do pagamento de ${nome}`}
                         onChange={(v) => {
                           const proximo = comoEstado(v);
-                          if (proximo && proximo !== pagamento.estado) void salvar(id, proximo);
+                          if (!proximo || proximo === pagamento.estado) return;
+                          if (confirmaTroca(nome, pagamento.estado, proximo)) void salvar(pagamento, proximo);
                         }}
                       >
                         {ESTADOS_PAGAMENTO.map((e) => (
@@ -1405,9 +1483,14 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro }: Pr
             linha={linhaAberta}
             observacao={rascunhoObs[linhaAberta.pagamento.inscricao_id] ?? ""}
             onObservacao={(texto) => escreverObs(linhaAberta.pagamento.inscricao_id, texto)}
-            onEstado={(estado) => void salvar(linhaAberta.pagamento.inscricao_id, estado)}
+            onEstado={(estado) => {
+              if (confirmaTroca(linhaAberta.nome, linhaAberta.pagamento.estado, estado)) {
+                void salvarDaFolha(linhaAberta.pagamento, estado);
+              }
+            }}
             travado={travado}
             motivo={motivo}
+            erro={falhouNaFolha && !ocupado ? (ultimoErro ?? "Não foi possível salvar.") : null}
           />
         ) : null}
       </Folha>

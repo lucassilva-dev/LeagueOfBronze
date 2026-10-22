@@ -779,6 +779,28 @@ export function ListRow({
 // ---------------------------------------------------------------- download sem sair da página
 
 /**
+ * "YYYY-MM-DD-HH-mm-ss" no relógio de Brasília — o mesmo carimbo do nome que o servidor
+ * manda no Content-Disposition. Com `toISOString()` (UTC) o backup das 22:30 de 21/11 saía
+ * datado de 22/11, e quem procurava o do dia 21 não achava.
+ */
+export function carimboDeBrasilia(agora: Date): string {
+  const partes: Record<string, string> = {};
+  for (const parte of new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(agora)) {
+    partes[parte.type] = parte.value;
+  }
+  return `${partes.year}-${partes.month}-${partes.day}-${partes.hour}-${partes.minute}-${partes.second}`;
+}
+
+/**
  * Transforma uma resposta já baixada em arquivo salvo, devolvendo o nome usado.
  *
  * Existe porque "Exportar backup" era um `<a href="/api/admin/export">`: uma NAVEGAÇÃO. Se o
@@ -789,7 +811,7 @@ export function ListRow({
 export async function baixarBackupDoServidor(response: Response): Promise<string> {
   const disposicao = response.headers.get("Content-Disposition") ?? "";
   const casado = /filename="?([^";]+)"?/i.exec(disposicao);
-  const nome = casado?.[1] ?? `leagueofbronze-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  const nome = casado?.[1] ?? `leagueofbronze-backup-${carimboDeBrasilia(new Date())}.json`;
 
   const blob = await response.blob();
   const url = URL.createObjectURL(blob);

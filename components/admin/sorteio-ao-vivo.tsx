@@ -314,7 +314,10 @@ function PainelDeLado({
   azul,
   compacto = false,
 }: Readonly<{ nome: string; cor: string; azul: boolean; compacto?: boolean }>) {
-  const corDoLado = azul ? cor : VERMELHO;
+  // O LADO manda na cor: azul é sempre azul. Com a cor do time no lugar, um time vermelho
+  // (o Carmesim) que ganhava o azul aparecia com os dois cartões vermelhos e o selo "LADO
+  // AZUL" em vermelho — na tela projetada. A cor do time fica só no nome.
+  const corDoLado = azul ? AZUL : VERMELHO;
   return (
     <div
       style={{
@@ -335,7 +338,7 @@ function PainelDeLado({
           fontSize: 11,
           fontWeight: 700,
           letterSpacing: ".20em",
-          background: azul ? cor : "rgba(255,93,93,.14)",
+          background: azul ? AZUL : "rgba(255,93,93,.14)",
           color: azul ? "#0b0804" : VERMELHO,
           border: azul ? "1px solid transparent" : `1px solid ${VERMELHO}`,
         }}
@@ -354,7 +357,8 @@ function PainelDeLado({
           overflowWrap: "anywhere",
         }}
       >
-        {nome}
+        {/* A cor do time é detalhe: um traço embaixo do nome, sem competir com a do lado. */}
+        <span style={{ borderBottom: `3px solid ${cor}`, paddingBottom: 2 }}>{nome}</span>
       </div>
       {azul ? (
         <div style={{ fontSize: 11.5, color: AZUL, marginTop: 6, letterSpacing: ".08em" }}>
@@ -579,7 +583,7 @@ type Tela =
       itens: readonly ItemDaRoda[];
       resposta: RespostaSorteio;
     }
-  | { fase: "erro"; serieId: string; mensagem: string };
+  | { fase: "erro"; serieId: string; mensagem: string; status?: number };
 
 const REPOUSO: Tela = { fase: "repouso" };
 
@@ -902,8 +906,9 @@ export function SorteioAoVivo({
 
         if (!resposta.ok || !dados?.ok || !dados.sorteio) {
           const referencia = dados?.ref ? ` (ref ${dados.ref})` : "";
-          throw new Error(
-            `${dados?.error ?? `Falha no sorteio (HTTP ${resposta.status}).`}${referencia}`,
+          throw Object.assign(
+            new Error(`${dados?.error ?? `Falha no sorteio (HTTP ${resposta.status}).`}${referencia}`),
+            { status: resposta.status },
           );
         }
 
@@ -957,6 +962,7 @@ export function SorteioAoVivo({
           fase: "erro",
           serieId,
           mensagem: falha instanceof Error ? falha.message : "Falha no sorteio.",
+          status: typeof (falha as { status?: unknown })?.status === "number" ? (falha as { status: number }).status : undefined,
         });
       }
     })();
@@ -1039,7 +1045,11 @@ export function SorteioAoVivo({
     <>
       {telaAtual.fase === "erro" ? (
         <Banner tone="danger" title="O sorteio não aconteceu">
-          {telaAtual.mensagem} Nada foi gravado nesta tentativa — pode sortear de novo.
+          {/* 404 = a série não está gravada no site (criada ou alterada só no rascunho): tentar
+              de novo daria o mesmo erro a cada giro, com a roda projetada. */}
+          {telaAtual.status === 404
+            ? `${telaAtual.mensagem} Nada foi gravado. Feche, salve a série no painel e sorteie depois.`
+            : `${telaAtual.mensagem} Nada foi gravado nesta tentativa — pode sortear de novo.`}
         </Banner>
       ) : null}
 

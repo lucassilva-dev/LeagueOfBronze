@@ -104,9 +104,10 @@ function instanteDaSerie(iso: string): number | null {
  *
  * Comparar o texto só funciona com todas no mesmo fuso. "2026-11-20T23:30:00.000Z"
  * (20:30 em Brasília) e "2026-11-20T21:00:00-03:00" saíam em ordem trocada, porque
- * "T23" vem depois de "T21" na comparação de texto — e a numeração "JOGO N" vem desta
- * ordem. Sem hora em uma delas, vale o dia (em Brasília) e, no mesmo dia, a sem hora
- * vem antes; é uma ordem total, então o `sort` não fica instável.
+ * "T23" vem depois de "T21" na comparação de texto — e a ordem do calendário (e, nas
+ * temporadas sem id numerado, o "JOGO N") vem daqui. Sem hora em uma delas, vale o dia
+ * (em Brasília) e, no mesmo dia, a sem hora vem antes; é uma ordem total, então o `sort`
+ * não fica instável.
  */
 export function compararDatasDeSerie(a: string, b: string): number {
   const instanteA = instanteDaSerie(a);
@@ -119,12 +120,36 @@ export function compararDatasDeSerie(a: string, b: string): number {
   return instanteA === null ? -1 : 1;
 }
 
+/** `4a-jogo-07` → 7: o número que está na URL /partidas/4a-jogo-07. */
+const ID_NUMERADO = /^4a-jogo-(\d+)$/;
+
+/**
+ * O "JOGO N" de cada série da fase de pontos: o número do ID quando TODAS as séries têm
+ * o id numerado da 4ª (`4a-jogo-NN`, sem repetir número); senão, a posição cronológica.
+ *
+ * Numerar pela posição renumerava o calendário inteiro a cada remarcação: a 4a-jogo-03
+ * levada para a reserva de 28/11 virava "JOGO 15", a 4a-jogo-04 virava "JOGO 3", e um
+ * aviso no grupo do tipo "Jogo 5 às 15h30" passava a apontar para outra série — e para
+ * outro link. A ORDEM na tela continua cronológica; só o número fica preso à série.
+ *
+ * Temporadas antigas (`serie-14`) e uma série avulsa criada à mão não têm o padrão, e aí
+ * vale a posição para todas: misturar os dois critérios repetiria números.
+ */
+function numerosDosJogos(ordenadas: readonly TournamentDataset["seriesMatches"][number][]): number[] {
+  const pelosIds = ordenadas.map((series) => Number(ID_NUMERADO.exec(series.id)?.[1] ?? Number.NaN));
+  const todosNumerados =
+    pelosIds.every((n) => Number.isInteger(n) && n > 0) && new Set(pelosIds).size === pelosIds.length;
+  return todosNumerados ? pelosIds : ordenadas.map((_, index) => index + 1);
+}
+
 export function buildRegularGames(dataset: TournamentDataset): CalGame[] {
   const teamsById = new Map(dataset.teams.map((team) => [team.id, team]));
-  return dataset.seriesMatches
+  const ordenadas = dataset.seriesMatches
     .filter((series) => (series.stage ?? "REGULAR_SEASON") === "REGULAR_SEASON")
     .slice()
-    .sort((a, b) => compararDatasDeSerie(a.date, b.date))
+    .sort((a, b) => compararDatasDeSerie(a.date, b.date));
+  const numeros = numerosDosJogos(ordenadas);
+  return ordenadas
     .map((series, index) => {
       const parts = parseParts(series.date);
       const teamA = teamsById.get(series.teamAId);
@@ -133,7 +158,7 @@ export function buildRegularGames(dataset: TournamentDataset): CalGame[] {
       const score = getSeriesScore(series, dataset);
       return {
         id: series.id,
-        n: index + 1,
+        n: numeros[index]!,
         dateKey: parts.dateKey,
         dateLabel: parts.dateLabel,
         turno: parts.turno,

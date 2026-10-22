@@ -142,13 +142,20 @@ describe("Pagamentos no celular", () => {
     fireEvent.change(within(folha).getByRole("textbox", { name: "Observação do pagamento de Jogadora1#BR1" }), {
       target: { value: "PIX conferido no extrato" },
     });
-    fireEvent.change(within(folha).getByRole("combobox", { name: "Estado do pagamento de Jogadora1#BR1" }), {
-      target: { value: "pago" },
-    });
+    // «Pago» mexe no caixa: a troca pelo <select> pede confirmação (P4A-10).
+    const confirmar = vi.spyOn(window, "confirm").mockReturnValue(true);
+    try {
+      fireEvent.change(within(folha).getByRole("combobox", { name: "Estado do pagamento de Jogadora1#BR1" }), {
+        target: { value: "pago" },
+      });
+    } finally {
+      confirmar.mockRestore();
+    }
     expect(executar).toHaveBeenCalledWith("pagamento", {
       inscricaoId: "a1",
       estado: "pago",
       observacao: "PIX conferido no extrato",
+      estadoAnterior: "aguardando",
     });
   });
 
@@ -160,7 +167,12 @@ describe("Pagamentos no celular", () => {
       </ModoCompacto>,
     );
     fireEvent.click(screen.getByRole("button", { name: "Confirmar recebido" }));
-    expect(executar).toHaveBeenCalledWith("pagamento", { inscricaoId: "d1", estado: "pago", observacao: undefined });
+    expect(executar).toHaveBeenCalledWith("pagamento", {
+      inscricaoId: "d1",
+      estado: "pago",
+      observacao: undefined,
+      estadoAnterior: "declarado",
+    });
   });
 });
 

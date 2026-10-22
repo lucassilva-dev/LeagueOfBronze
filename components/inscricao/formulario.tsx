@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { cloneElement, isValidElement, useEffect, useId, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 
@@ -68,6 +68,32 @@ const CHAVES_ROTA = ["TOPO", "SELVA", "MEIO", "ATIRADOR", "SUPORTE"] as const;
 
 type Problema = { campo: string; mensagem: string };
 
+/** O que as rotas de conta e de inscrição devolvem — sucesso ou erro, no mesmo formato. */
+type Resposta = {
+  error?: string;
+  /** Código estável do erro: é por ele que a tela traduz (`t.erros`). */
+  codigo?: string;
+  problemas?: Problema[];
+  jogador?: { displayName: string; email: string };
+  /** 401 do envio: a sessão caiu entre abrir a página e enviar. */
+  precisaEntrar?: boolean;
+  /** 409 do envio: esta conta já tem inscrição (o envio anterior chegou). */
+  jaInscrito?: boolean;
+};
+
+/*
+ * Botão de rótulo longo dentro de cartão. `.lob-btn-gold` não quebra linha, e
+ * "ACOMPANHAR MINHA INSCRIÇÃO →" tem ~288px: num celular de 320px a área útil do cartão
+ * é ~226px, e o fim do rótulo era cortado pela borda da tela. Aqui ele quebra em duas
+ * linhas só quando não cabe — e a seta fica presa à última palavra (`setaPresa`).
+ */
+const BOTAO_QUE_QUEBRA: React.CSSProperties = { whiteSpace: "normal", maxWidth: "100%", textAlign: "center" };
+
+/** Troca o espaço antes da "→" final por um inseparável: a seta nunca desce sozinha. */
+function setaPresa(rotulo: string) {
+  return rotulo.replace(/\s+→$/, "\u00a0→");
+}
+
 function moeda(centavos: number) {
   return (centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
@@ -114,6 +140,61 @@ export default function FormularioInscricao({ t, config, elos, jogadorInicial }:
   }
 
   /*
+   * O texto de erro das rotas é fixo em português. Quando a rota manda um `codigo` que o
+   * dicionário conhece, a tela mostra a tradução; senão, o texto que veio. Os avisos de
+   * campo que repetem o mesmo texto (o cadastro manda a regra da senha nos dois lugares)
+   * são traduzidos junto.
+   */
+  function textoDoErro(dados: Resposta): string | undefined {
+    const codigo = dados.codigo;
+    if (codigo && Object.hasOwn(t.erros, codigo)) return t.erros[codigo as keyof Rotulos["erros"]];
+    return dados.error;
+  }
+
+  function problemasDoServidor(dados: Resposta): Problema[] {
+    const traduzido = textoDoErro(dados);
+    return (dados.problemas ?? []).map((p) =>
+      traduzido && dados.error && p.mensagem === dados.error ? { ...p, mensagem: traduzido } : p,
+    );
+  }
+
+  /*
+   * A página decide "logado ou não" lendo o cookie NO SERVIDOR, e o cookie da sessão é
+   * SameSite=Strict: quem chega por um link de outro site (WhatsApp Web, Discord no
+   * navegador) abre a página SEM o cookie e via "crie sua conta" estando logado — e, se
+   * já inscrito, refazia os três passos para ouvir "já inscrito" no fim. Daqui de dentro a
+   * pergunta já parte do próprio site, e o cookie vai junto.
+   *
+   * Só pergunta quem a página tratou como visitante. Na falha, segue como visitante: o
+   * servidor confere a sessão de novo em cada passo.
+   */
+  useEffect(() => {
+    if (jogadorInicial) return;
+    let vivo = true;
+    void (async () => {
+      try {
+        const r = await fetch("/api/inscricao/minha", { cache: "no-store", signal: AbortSignal.timeout(10000) });
+        if (!r.ok) return;
+        const corpo = (await r.json()) as {
+          jogador?: { displayName: string; email: string } | null;
+          inscricao?: unknown;
+        };
+        const conta = corpo.jogador;
+        if (!vivo || !conta) return;
+        setJogador((atual) => atual ?? conta);
+        // Para o login já vir preenchido se a sessão cair antes do envio (o 401 do envio).
+        setEmail((atual) => atual || conta.email);
+        if (corpo.inscricao) setJaInscrito(true);
+      } catch {
+        // Visitante continua visitante.
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [jogadorInicial]);
+
+  /*
    * NUNCA lança.
    *
    * As três chamadas desta tela seguem `setEnviando(true)` → `await postar(...)` →
@@ -127,12 +208,6 @@ export default function FormularioInscricao({ t, config, elos, jogadorInicial }:
    * uma saída só, e o `status: 0` distingue "não chegou ao servidor" de um 4xx real.
    */
   async function postar(url: string, corpo: unknown) {
-    type Resposta = {
-      error?: string;
-      problemas?: Problema[];
-      jogador?: { displayName: string; email: string };
-    };
-
     try {
       const r = await fetch(url, {
         method: "POST",
@@ -194,12 +269,12 @@ export default function FormularioInscricao({ t, config, elos, jogadorInicial }:
     // caso de quem começou a inscrição, fechou a aba e voltou depois.
     if (r.status === 409) {
       setModoEntrar(true);
-      setErro(r.dados.error ?? null);
+      setErro(textoDoErro(r.dados) ?? null);
       return;
     }
 
-    setProblemas(r.dados.problemas ?? []);
-    setErro(r.dados.error ?? t.erroGenerico);
+    setProblemas(problemasDoServidor(r.dados));
+    setErro(textoDoErro(r.dados) ?? t.erroGenerico);
   }
 
   /** Na dúvida (falha de rede), `false`: o servidor recusa a duplicata de qualquer jeito. */
@@ -242,7 +317,7 @@ export default function FormularioInscricao({ t, config, elos, jogadorInicial }:
       setPasso(2);
       return;
     }
-    setErro(r.dados.error ?? t.erroGenerico);
+    setErro(textoDoErro(r.dados) ?? t.erroGenerico);
   }
 
   // ------------------------------------------------------------------ passo 2
@@ -295,8 +370,40 @@ export default function FormularioInscricao({ t, config, elos, jogadorInicial }:
       setPronto(t.prontoTitulo);
       return;
     }
-    setProblemas(r.dados.problemas ?? []);
-    setErro(r.dados.error ?? t.erroGenerico);
+
+    // A sessão caiu entre abrir a página e enviar (venceu, ou a pessoa saiu em outra aba).
+    // Sem isto a tela seguia dizendo "Inscrevendo com a conta X", sem campo de senha, e
+    // o CONTINUAR do passo 1 pulava direto para o passo 2: o 401 se repetia em laço, e
+    // recarregar apagava tudo. Aqui ela volta ao passo 1 já no modo Entrar; os campos
+    // ficam no estado, e depois do login `entrar()` a leva adiante para reenviar.
+    if (r.status === 401 && r.dados.precisaEntrar) {
+      setJogador(null);
+      avisarSessaoMudou();
+      setModoEntrar(true);
+      setPasso(1);
+      setErro(textoDoErro(r.dados) ?? t.erroGenerico);
+      return;
+    }
+
+    // O envio anterior chegou ao servidor, mas a resposta se perdeu: em vez de erro, o
+    // cartão "Você já está inscrito", com o caminho para Minha inscrição (onde o Pix
+    // aparece, se ainda houver o que pagar).
+    if (r.status === 409 && r.dados.jaInscrito) {
+      setJaInscrito(true);
+      return;
+    }
+
+    setProblemas(problemasDoServidor(r.dados));
+    setErro(textoDoErro(r.dados) ?? t.erroGenerico);
+  }
+
+  /** Enter ou o botão principal: a ação é sempre a do passo em que a pessoa está. */
+  function aoEnviarFormulario(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (enviando) return;
+    if (passo === 1) void (modoEntrar ? entrar() : avancarDoPasso1());
+    else if (passo === 2) avancarDoPasso2();
+    else void enviar();
   }
 
   // ------------------------------------------------------------------ recibo
@@ -338,8 +445,8 @@ export default function FormularioInscricao({ t, config, elos, jogadorInicial }:
         ) : null}
 
         <div style={{ textAlign: "center" }}>
-          <Link className="lob-btn-gold" href="/minha-inscricao">
-            {t.prontoVer}
+          <Link className="lob-btn-gold" href="/minha-inscricao" style={BOTAO_QUE_QUEBRA}>
+            {setaPresa(t.prontoVer)}
           </Link>
         </div>
       </div>
@@ -355,8 +462,8 @@ export default function FormularioInscricao({ t, config, elos, jogadorInicial }:
         <p style={{ margin: "12px auto 22px", maxWidth: "52ch", color: "var(--lob-muted)" }}>
           {t.jaInscritoTexto}
         </p>
-        <Link className="lob-btn-gold" href="/minha-inscricao">
-          {t.prontoVer}
+        <Link className="lob-btn-gold" href="/minha-inscricao" style={BOTAO_QUE_QUEBRA}>
+          {setaPresa(t.prontoVer)}
         </Link>
       </div>
     );
@@ -374,7 +481,11 @@ export default function FormularioInscricao({ t, config, elos, jogadorInicial }:
           const n = i + 1;
           const atual = n === passo;
           return (
-            <li key={rotulo} style={{ display: "flex", alignItems: "center", gap: 8, flex: "1 1 180px" }}>
+            <li
+              key={rotulo}
+              aria-current={atual ? "step" : undefined}
+              style={{ display: "flex", alignItems: "center", gap: 8, flex: "1 1 180px" }}
+            >
               <span
                 aria-hidden
                 style={{
@@ -407,7 +518,13 @@ export default function FormularioInscricao({ t, config, elos, jogadorInicial }:
         })}
       </ol>
 
-      <div className="lob-card-2" style={{ padding: "26px 24px" }}>
+      {/*
+        Um <form> de verdade: Enter (ou "Ir" no teclado do celular) faz o mesmo que o botão
+        principal do passo — antes não havia formulário, e Enter não avançava nem entrava.
+        `noValidate`: a conferência é a nossa (e a do servidor); a do navegador barraria o
+        e-mail com um balão próprio antes de o nosso aviso aparecer.
+      */}
+      <form className="lob-card-2" style={{ padding: "26px 24px" }} onSubmit={aoEnviarFormulario} noValidate>
         {passo === 1 && (
           <Passo1
             t={t}
@@ -446,7 +563,9 @@ export default function FormularioInscricao({ t, config, elos, jogadorInicial }:
             t={t}
             config={config}
             resumo={{
-              riotId: `${nick}#${tag.toUpperCase()}`,
+              // As mesmas limpezas do passo 1 e do servidor: "#br1" colado do cliente
+              // virava "Nick##BR1" aqui, com cara de Riot ID errado.
+              riotId: `${nick.trim()}#${tag.trim().replace(/^#/, "").toUpperCase()}`,
               elo: eloEscolhido?.rotulo ?? "",
               rota1: rota1 ? t.rotas[rota1 as keyof typeof t.rotas] : "",
               rota2: rota2 ? t.rotas[rota2 as keyof typeof t.rotas] : "",
@@ -498,13 +617,13 @@ export default function FormularioInscricao({ t, config, elos, jogadorInicial }:
           )}
 
           {passo === 1 && modoEntrar && (
-            <button type="button" className="lob-btn-gold" onClick={entrar} disabled={enviando}>
+            <button type="submit" className="lob-btn-gold" disabled={enviando}>
               {enviando ? t.enviando : t.entrarBotao}
             </button>
           )}
 
           {passo === 1 && !modoEntrar && (
-            <button type="button" className="lob-btn-gold" onClick={avancarDoPasso1} disabled={enviando}>
+            <button type="submit" className="lob-btn-gold" disabled={enviando}>
               {enviando ? t.enviando : t.continuar}
             </button>
           )}
@@ -517,51 +636,76 @@ export default function FormularioInscricao({ t, config, elos, jogadorInicial }:
             //
             // O botão fica HABILITADO e diz o que falta ao ser clicado: desabilitado, ele
             // ficava cinza sem explicação — o caso típico era esquecer de marcar um turno.
-            <button type="button" className="lob-btn-gold" onClick={avancarDoPasso2}>
+            <button type="submit" className="lob-btn-gold">
               {t.continuar}
             </button>
           )}
 
           {passo === 3 && (
-            <button type="button" className="lob-btn-gold" onClick={enviar} disabled={enviando}>
+            <button type="submit" className="lob-btn-gold" disabled={enviando}>
               {enviando ? t.enviando : t.enviar}
             </button>
           )}
         </div>
-      </div>
+      </form>
     </div>
   );
 }
 
 // ---------------------------------------------------------------- peças
 
+/**
+ * Um campo com título, ajuda e aviso de erro.
+ *
+ * Acessibilidade: o aviso de erro é `role="alert"` (o leitor de tela o anuncia quando o
+ * CONTINUAR falha — antes, para quem não vê, o botão "não fazia nada") e o controle ganha
+ * `aria-invalid` e `aria-describedby` apontando para o aviso ou a ajuda. A ajuda e o erro
+ * ficam FORA do `<label>`: dentro dele, o texto entrava no nome do campo e era lido duas
+ * vezes.
+ */
 function Campo({
   label,
   hint,
   erro,
   children,
 }: Readonly<{ label: string; hint?: string; erro?: string; children: React.ReactNode }>) {
+  const idDoTexto = useId();
+  const texto = erro || hint;
+  // O filho é sempre um controle só (input ou select).
+  const controle = isValidElement<{ "aria-invalid"?: boolean; "aria-describedby"?: string }>(children)
+    ? cloneElement(children, {
+        "aria-invalid": erro ? true : undefined,
+        "aria-describedby": texto ? idDoTexto : undefined,
+      })
+    : children;
+
   return (
-    <label style={{ display: "block", minWidth: 0 }}>
-      <span
-        style={{
-          display: "block",
-          fontSize: 10,
-          letterSpacing: ".16em",
-          textTransform: "uppercase",
-          color: "var(--lob-bronze)",
-          marginBottom: 6,
-        }}
-      >
-        {label}
-      </span>
-      {children}
-      {erro ? (
-        <span style={{ display: "block", marginTop: 5, fontSize: 11.5, color: "#f0a79e" }}>{erro}</span>
-      ) : hint ? (
-        <span style={{ display: "block", marginTop: 5, fontSize: 11.5, color: "var(--lob-muted)" }}>{hint}</span>
+    <div style={{ minWidth: 0 }}>
+      <label style={{ display: "block" }}>
+        <span
+          style={{
+            display: "block",
+            fontSize: 10,
+            letterSpacing: ".16em",
+            textTransform: "uppercase",
+            color: "var(--lob-bronze)",
+            marginBottom: 6,
+          }}
+        >
+          {label}
+        </span>
+        {controle}
+      </label>
+      {texto ? (
+        <span
+          id={idDoTexto}
+          role={erro ? "alert" : undefined}
+          style={{ display: "block", marginTop: 5, fontSize: 11.5, color: erro ? "#f0a79e" : "var(--lob-muted)" }}
+        >
+          {texto}
+        </span>
       ) : null}
-    </label>
+    </div>
   );
 }
 
@@ -667,7 +811,13 @@ function Passo1({
             />
           </Campo>
         </Grade>
-        <button type="button" className="lob-btn-ghost" onClick={onEntrarModo} style={{ fontSize: 12 }}>
+        <button
+          type="button"
+          className="lob-btn-ghost"
+          onClick={onEntrarModo}
+          aria-label={t.voltarParaCriarConta}
+          style={{ fontSize: 12 }}
+        >
           ←
         </button>
       </>
@@ -678,10 +828,18 @@ function Passo1({
     <>
       <Grade colunas="1fr 120px">
         <Campo label={t.nickLabel} erro={problemaDe("nick")}>
+          {/*
+            Nick, tag e Discord sem corretor nem maiúscula automática: no celular o corretor
+            trocava uma palavra do nick ("Bety" → "Beth") ao apertar espaço — e, com a
+            consulta à Riot pulada, o nick errado era gravado.
+          */}
           <input
             style={entradaEstilo}
             value={campos.nick}
             placeholder={t.nickPlaceholder}
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             onChange={(e) => setters.setNick(e.target.value)}
           />
         </Campo>
@@ -690,6 +848,9 @@ function Passo1({
             style={entradaEstilo}
             value={campos.tag}
             placeholder={t.tagPlaceholder}
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             onChange={(e) => setters.setTag(e.target.value)}
           />
         </Campo>
@@ -759,6 +920,9 @@ function Passo1({
             style={entradaEstilo}
             value={campos.discord}
             placeholder={t.discordPlaceholder}
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             onChange={(e) => setters.setDiscord(e.target.value)}
           />
         </Campo>
@@ -767,6 +931,8 @@ function Passo1({
             style={entradaEstilo}
             value={campos.whatsapp}
             placeholder={t.whatsappPlaceholder}
+            inputMode="tel"
+            autoComplete="tel"
             onChange={(e) => setters.setWhatsapp(e.target.value)}
           />
         </Campo>

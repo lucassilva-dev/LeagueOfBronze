@@ -1,9 +1,13 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ChampionIcon } from "@/components/champion-icon";
 import { EloCrest, RoleIcon } from "@/components/lob/ui";
 import { formatKda, formatSeriesDateLabel } from "@/lib/format";
+import { eloLabel, rotaLabel } from "@/lib/i18n/messages/paginas-home";
+import { metadadosDaPagina, montarMetadados } from "@/lib/i18n/metadados";
+import { nomeDaTemporada } from "@/lib/i18n/nome-da-temporada";
 import { getMessages } from "@/lib/i18n/server";
 import { buildDesignPlayers } from "@/lib/roster";
 import { getServerArchivedSeason } from "@/lib/server-data";
@@ -13,12 +17,26 @@ export const dynamic = "force-dynamic";
 
 type PageParams = Readonly<{ params: Promise<{ seasonId: string; playerSlug: string }> }>;
 
+/** O nick e a temporada CERTA (não a do layout, "4ª Edição") na aba e na prévia do link. */
+export async function generateMetadata({ params }: PageParams): Promise<Metadata> {
+  const { seasonId, playerSlug } = await params;
+  const [{ metadados, compartilhados }, result] = await Promise.all([getMessages(), getServerArchivedSeason(seasonId)]);
+  const player = result ? buildDesignPlayers(result.dataset).find((p) => p.slug === playerSlug) : undefined;
+  if (!result || !player) return metadadosDaPagina("temporadas");
+  return montarMetadados(metadados.temporadaJogador, {
+    valores: { jogador: player.displayNick, temporada: nomeDaTemporada(result.archived.name, compartilhados.localeTag) },
+    caminho: `/temporadas/${encodeURIComponent(result.archived.seasonId)}/jogadores/${encodeURIComponent(player.slug)}`,
+  });
+}
+
 export default async function TemporadaJogadorPage({ params }: PageParams) {
   const { seasonId, playerSlug } = await params;
   const result = await getServerArchivedSeason(seasonId);
   if (!result) notFound();
 
-  const { paginasRegras: t, paginasStats: ts, compartilhados: tc } = await getMessages();
+  // `paginasHome` traduz rota e elo (as constantes de lib/design são em português), como a
+  // ficha ao vivo já faz.
+  const { paginasRegras: t, paginasStats: ts, compartilhados: tc, paginasHome: tHome } = await getMessages();
   const { archived, dataset } = result;
   const player = buildDesignPlayers(dataset).find((p) => p.slug === playerSlug);
   if (!player) notFound();
@@ -33,7 +51,7 @@ export default async function TemporadaJogadorPage({ params }: PageParams) {
     { label: t.tileAbates, val: dash(String(aggregate?.kills ?? 0)) },
     { label: t.tileMortes, val: dash(String(aggregate?.deaths ?? 0)) },
     { label: t.tileAssistencias, val: dash(String(aggregate?.assists ?? 0)) },
-    { label: t.tileKda, val: dash(formatKda(aggregate?.kda ?? 0)) },
+    { label: t.tileKda, val: dash(formatKda(aggregate?.kda ?? 0, tc.localeTag)) },
     { label: t.tileMvps, val: String(aggregate?.gameMvps ?? 0) },
     { label: t.tileWinrate, val: dash(`${Math.round(aggregate?.winRate ?? 0)}%`) },
   ];
@@ -43,7 +61,7 @@ export default async function TemporadaJogadorPage({ params }: PageParams) {
       <Link href={`/temporadas/${seasonId}/times/${player.teamSlug}`} className="lob-btn-ghost" style={{ padding: "9px 16px", fontSize: 11.5, letterSpacing: ".12em", marginBottom: 26 }}>
         {t.voltarElenco}
       </Link>
-      <div style={{ fontSize: 11, letterSpacing: ".14em", color: "#8f8472", margin: "18px 0 0" }}>{archived.name} · {t.somenteLeituraMinusculo}</div>
+      <div style={{ fontSize: 11, letterSpacing: ".14em", color: "#8f8472", margin: "18px 0 0" }}>{nomeDaTemporada(archived.name, tc.localeTag)} · {t.somenteLeituraMinusculo}</div>
       <div className="lob-fade" style={{ marginTop: 10, position: "relative", background: "linear-gradient(180deg,#1d1710,#0d0a05)", border: "1px solid rgba(232,184,120,.4)", borderRadius: 8, overflow: "hidden", boxShadow: "0 44px 100px -30px rgba(0,0,0,.6)" }}>
         <div style={{ height: 4, background: `linear-gradient(90deg,${player.teamColor},transparent)` }} />
         <div style={{ display: "flex", flexWrap: "wrap" }}>
@@ -57,14 +75,15 @@ export default async function TemporadaJogadorPage({ params }: PageParams) {
             ) : null}
             <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "linear-gradient(180deg,rgba(8,6,3,.45) 0%,transparent 24%,transparent 44%,rgba(13,10,5,.96) 100%)" }} />
             <div style={{ position: "absolute", top: 14, left: 14, display: "flex", flexDirection: "column", gap: 7 }}>
-              <span style={{ alignSelf: "flex-start", padding: "4px 10px", borderRadius: 2, background: player.roleMeta.color, color: "#120d06", fontWeight: 700, fontSize: 10.5, letterSpacing: ".08em" }}>{player.roleMeta.label}</span>
+              <span style={{ alignSelf: "flex-start", padding: "4px 10px", borderRadius: 2, background: player.roleMeta.color, color: "#120d06", fontWeight: 700, fontSize: 10.5, letterSpacing: ".08em" }}>{rotaLabel(tHome, player.roleMeta.short, player.roleMeta.label)}</span>
             </div>
             <div style={{ position: "absolute", top: 12, right: 12 }}>
               <EloCrest elo={player.elo} size={52} title={false} labels={ts.elos} />
             </div>
             <div style={{ position: "absolute", left: 18, right: 18, bottom: 16 }}>
               <div style={{ fontSize: 11, letterSpacing: ".12em", color: player.teamColor, marginBottom: 5 }}>{player.teamName}</div>
-              <span className="lob-display" style={{ fontSize: "clamp(26px,4.4vw,40px)", lineHeight: 1.08, color: "#f7f1e6", wordBreak: "break-word", textShadow: "0 2px 12px rgba(0,0,0,.8)" }}>{player.displayNick}</span>
+              {/* O nick é o título da página: <h1>, com o mesmo desenho do <span> de antes. */}
+              <h1 className="lob-display" style={{ margin: 0, fontSize: "clamp(26px,4.4vw,40px)", lineHeight: 1.08, color: "#f7f1e6", wordBreak: "break-word", textShadow: "0 2px 12px rgba(0,0,0,.8)" }}>{player.displayNick}</h1>
             </div>
           </div>
           <div style={{ flex: "1.25 1 320px", padding: "26px 26px 24px", minWidth: 290, display: "flex", flexDirection: "column" }}>
@@ -72,11 +91,11 @@ export default async function TemporadaJogadorPage({ params }: PageParams) {
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 16 }}>
               <span className="lob-pill" style={{ fontSize: 11.5 }}>
                 <RoleIcon role={player.role1} size={14} color={player.roleMeta.color} />
-                {player.roleMeta.label}
+                {rotaLabel(tHome, player.roleMeta.short, player.roleMeta.label)}
               </span>
               <span className="lob-pill" style={{ fontSize: 11.5 }}>
                 <EloCrest elo={player.elo} size={20} title={false} labels={ts.elos} />
-                {player.eloMeta?.label ?? player.elo}
+                {eloLabel(tHome, player.eloMeta?.key, player.eloMeta?.label ?? player.elo)}
               </span>
             </div>
             <div style={{ marginTop: 22, display: "flex", alignItems: "center", gap: 10 }}>
@@ -119,9 +138,9 @@ export default async function TemporadaJogadorPage({ params }: PageParams) {
                 <div key={`${h.seriesId}-${h.gameIndex}-${i}`} style={{ display: "grid", gridTemplateColumns: "104px 1fr 150px 96px 64px 60px", alignItems: "center", gap: 8, padding: "10px 16px", borderTop: "1px solid rgba(201,138,75,.10)" }}>
                   <span style={{ fontSize: 11.5, color: "#b8ab97" }}>{formatSeriesDateLabel(h.date, tc.localeTag)}</span>
                   <span style={{ fontSize: 12.5, color: "#e6ddcd" }}>vs {h.opponentTeamName} · {t.jogoAbreviacao}{h.gameIndex}</span>
-                  <span><ChampionIcon champion={h.champion} size={20} showName /></span>
+                  <span><ChampionIcon champion={h.champion} size={20} showName semCampeao={tc.campeaoNaoInformado} /></span>
                   <span style={{ fontSize: 12.5, color: "#e6ddcd" }}>{h.kills}/{h.deaths}/{h.assists}</span>
-                  <span className="lob-display" style={{ textAlign: "right", fontSize: 14, color: "#e6c592" }}>{formatKda((h.kills + h.assists) / Math.max(1, h.deaths))}</span>
+                  <span className="lob-display" style={{ textAlign: "right", fontSize: 14, color: "#e6c592" }}>{formatKda((h.kills + h.assists) / Math.max(1, h.deaths), tc.localeTag)}</span>
                   <span style={{ textAlign: "right", fontSize: 13 }}>{h.mvp ? "⭐" : "—"}</span>
                 </div>
               ))}

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Crown } from "lucide-react";
@@ -22,6 +23,8 @@ import { ChampionIcon } from "@/components/champion-icon";
 import { SeriesLiveDraw } from "@/components/series-live-draw";
 import { formatKda, formatSeriesDateLabel } from "@/lib/format";
 import type { Messages } from "@/lib/i18n/messages";
+import { metadadosDaPagina, montarMetadados } from "@/lib/i18n/metadados";
+import { nomeDaTemporada } from "@/lib/i18n/nome-da-temporada";
 import { getMessages } from "@/lib/i18n/server";
 import { getServerDataset } from "@/lib/server-data";
 import {
@@ -405,6 +408,28 @@ function GameDetailsCard({
       </div>
     </Card>
   );
+}
+
+/** Os dois times na aba e na prévia do link; sem a série (ou com o banco fora), o da seção. */
+export async function generateMetadata({ params }: PartidaDetalhePageParams): Promise<Metadata> {
+  const { id } = await params;
+  try {
+    const [{ metadados, compartilhados }, { dataset, indexes }] = await Promise.all([getMessages(), getServerDataset()]);
+    const series = getSeriesById(dataset, id);
+    if (series) {
+      return montarMetadados(metadados.serie, {
+        valores: {
+          timeA: indexes.teamsById.get(series.teamAId)?.name ?? series.teamAId,
+          timeB: indexes.teamsById.get(series.teamBId)?.name ?? series.teamBId,
+          temporada: nomeDaTemporada(dataset.tournament.name, compartilhados.localeTag),
+        },
+        caminho: `/partidas/${encodeURIComponent(series.id)}`,
+      });
+    }
+  } catch {
+    // Banco fora: quem decide o que mostrar é a página (e a app/error.tsx).
+  }
+  return metadadosDaPagina("partidas");
 }
 
 export default async function PartidaDetalhePage({ params }: PartidaDetalhePageParams) {

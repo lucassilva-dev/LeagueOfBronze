@@ -23,6 +23,7 @@ import {
   tabular,
 } from "@/components/admin/ui";
 import { distribuirTimes, estadoDaJanela } from "@/lib/inscricoes/schema";
+import { normalizarChavePix } from "@/lib/pix";
 
 /**
  * Configuração da 4ª Edição: a chave das inscrições e os parâmetros que o formulário
@@ -80,7 +81,7 @@ const DATAS = [
     chave: "abertura_inscricoes",
     rotulo: "Abertura das inscrições",
     efeito:
-      "Só registro de quando o formulário abriu. Não é âncora de item nenhum: a regra 1 da 4ª não pede tempo mínimo no grupo.",
+      "Quando o formulário abriu — o sistema grava sozinho na primeira vez que se abre. É ela que faz o site dizer «encerradas» (e não «em breve») depois de fechar. Não é âncora de item nenhum: a regra 1 da 4ª não pede tempo mínimo no grupo.",
   },
   {
     chave: "fechamento_inscricoes",
@@ -137,7 +138,8 @@ const NUMEROS = [
     rotulo: "Prazo de pagamento (dias)",
     min: 1,
     max: 365,
-    efeito: "Contado do envio da inscrição; é o que gera o vencimento de cada pagamento.",
+    efeito:
+      "Contado do envio da inscrição; gera o vencimento do pagamento de quem se inscrever DAQUI EM DIANTE. Pagamentos já criados mantêm o vencimento que tinham.",
   },
   {
     chave: "segundos_por_escolha",
@@ -257,26 +259,64 @@ function semear(config: EdicaoConfig): Rascunho {
 
 const textoOuNulo = (v: string): string | null => (v.trim() === "" ? null : v.trim());
 
+/**
+ * A chave Pix vale pela forma do DICT, não pelo texto: o servidor grava normalizado, então
+ * «529.982.247-25» colado por cima de «52998224725» (ou um e-mail com maiúscula) é a MESMA
+ * chave. Comparar o texto cru deixava a tela presa em «alterações não salvas» depois de
+ * salvar, com o «Salvar» ligado para sempre.
+ */
+function mesmaChavePix(a: string | null, b: string | null): boolean {
+  if (a === b) return true;
+  if (a === null || b === null) return false;
+  const na = normalizarChavePix(a);
+  const nb = normalizarChavePix(b);
+  return na.ok && nb.ok && na.chave === nb.chave;
+}
+
+/** Mesmos valores, campo a campo. A semente vem em objeto novo a cada busca da edição. */
+function mesmosValores(a: Rascunho, b: Rascunho): boolean {
+  return (Object.keys(a) as ChaveRascunho[]).every((chave) => a[chave] === b[chave]);
+}
+
+/**
+ * O rascunho depois de uma recarga que trouxe valores NOVOS do servidor. Campo que o servidor
+ * mudou vem do servidor — inclusive o que a pessoa acabou de salvar, que volta já normalizado.
+ * Campo que o servidor não mudou fica como está no rascunho, com a edição da pessoa se houver.
+ */
+function remesclar(rascunho: Rascunho, anterior: Rascunho, nova: Rascunho): Rascunho {
+  const resultado: Record<ChaveRascunho, string> = { ...rascunho };
+  for (const chave of Object.keys(nova) as ChaveRascunho[]) {
+    if (nova[chave] !== anterior[chave]) resultado[chave] = nova[chave];
+  }
+  return resultado;
+}
+
 // ---------------------------------------------------------------- seção
 
-export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar }: PropsSecao) {
+export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar, ultimoErro = null }: PropsSecao) {
   const { config, panorama } = dados;
   const bloqueado = !podeConfigurar;
   const semEscopo = bloqueado ? "Alterar a configuração exige o escopo de master." : undefined;
 
   /**
-   * A semente é derivada de `dados.config` e o rascunho é RESSINCRONIZADO quando ela muda.
-   * Sem isso o formulário continuaria mostrando o valor antigo depois de salvar — o contêiner
-   * recarrega tudo a cada ação, então `config` é objeto novo a cada salvamento.
+   * A semente é derivada de `dados.config` e o rascunho é RESSINCRONIZADO quando ela muda
+   * de VALOR. Sem isso o formulário continuaria mostrando o valor antigo depois de salvar.
    *
-   * O ajuste é feito DURANTE A RENDER, comparando a semente com a que gerou o rascunho atual,
+   * Comparar pela identidade não serve: o contêiner busca a edição de novo a cada ação E a
+   * cada troca de aba, e a aba nova aparece antes de a busca voltar. Quem entrava em
+   * Configuração e digitava a chave Pix via o campo voltar ao valor gravado quando a resposta
+   * chegava — com a MESMA configuração (DIFF-UI-03). Agora: busca com os mesmos valores não
+   * toca no rascunho; busca com valores novos traz só os campos que o servidor mudou e
+   * preserva o que a pessoa editou nos outros (`remesclar`).
+   *
+   * O ajuste é feito DURANTE A RENDER, comparando com a config que gerou o rascunho atual,
    * e não num useEffect: `react-hooks/set-state-in-effect` proíbe setState síncrono dentro de
    * efeito (renderiza duas vezes em cascata). Este é o padrão que a própria documentação do
    * React indica para "recomeçar o estado quando uma prop muda" — o React reexecuta o
    * componente na hora, sem pintar a tela intermediária.
    */
   const semente = useMemo(() => semear(config), [config]);
-  const [semeadoDe, setSemeadoDe] = useState<Rascunho>(semente);
+  const [configDe, setConfigDe] = useState<EdicaoConfig>(config);
   const [rascunho, setRascunho] = useState<Rascunho>(semente);
   const [confirmandoAbertura, setConfirmandoAbertura] = useState(false);
 
@@ -306,12 +346,16 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar }: 
     return () => vigia.disconnect();
   }, [compacto]);
 
-  if (semeadoDe !== semente) {
-    setSemeadoDe(semente);
-    setRascunho(semente);
-    // Semente nova = recarga do servidor. Uma confirmação de abertura armada antes disso já
-    // não corresponde ao que está na tela; desarmar é mais seguro do que manter.
-    setConfirmandoAbertura(false);
+  if (configDe !== config) {
+    const anterior = semear(configDe);
+    const mudouValor = !mesmosValores(anterior, semente);
+    setConfigDe(config);
+    if (mudouValor) setRascunho((atual) => remesclar(atual, anterior, semente));
+    // O servidor mudou algo (ou a chave das inscrições virou): uma confirmação de abertura
+    // armada antes disso já não corresponde ao que está na tela; desarmar é mais seguro.
+    if (mudouValor || configDe.inscricoes_abertas !== config.inscricoes_abertas) {
+      setConfirmandoAbertura(false);
+    }
   }
 
   const editar = (chave: ChaveRascunho, valor: string) =>
@@ -368,7 +412,7 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar }: 
     else if (centavos !== config.taxa_centavos) p.taxa_centavos = centavos;
 
     const pix = textoOuNulo(rascunho.chave_pix);
-    if (pix !== textoOuNulo(config.chave_pix ?? "")) p.chave_pix = pix;
+    if (!mesmaChavePix(pix, textoOuNulo(config.chave_pix ?? ""))) p.chave_pix = pix;
 
     const responsavel = textoOuNulo(rascunho.responsavel_financeiro);
     if (responsavel !== textoOuNulo(config.responsavel_financeiro ?? "")) {
@@ -382,8 +426,20 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar }: 
   const podeSalvar = alterado && problemas.length === 0 && !bloqueado && !ocupado;
   const camposAlterados = Object.keys(corpo).length;
 
+  /**
+   * O último «Salvar» DESTA aba falhou: o motivo do servidor (a chave Pix ambígua, uma data
+   * fora de ordem) aparece também junto do botão. No monitor o aviso do topo fica fora da
+   * tela de quem salvou lá embaixo. É estado daqui, e não só o `ultimoErro` do contêiner,
+   * porque o contêiner é o mesmo nas quatro abas e o erro podia ser de outra.
+   */
+  const [salvarFalhou, setSalvarFalhou] = useState(false);
+
   /** O mesmo envio para o botão do fim e para a barra do celular: um diff só, uma regra só. */
-  const salvarConfig = () => void executar("config", corpo);
+  const enviarConfig = async () => {
+    setSalvarFalhou(false);
+    setSalvarFalhou(!(await executar("config", corpo)));
+  };
+  const salvarConfig = () => void enviarConfig();
   const tituloDoSalvar =
     semEscopo ??
     (problemas.length > 0
@@ -493,8 +549,8 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar }: 
           encerradaPelaData
             ? "A chave está ligada, mas a data de fechamento já passou: o formulário recusa inscrições. Para reabrir, apague ou adie a data de fechamento abaixo."
             : abertas
-            ? "Qualquer pessoa com o link consegue se inscrever agora. Fechar é reversível e não apaga nada do que já entrou."
-            : "Com as inscrições fechadas, /inscricao mostra a página de espera e o servidor recusa o envio. Ao abrir, o formulário fica público na hora."
+            ? "Qualquer pessoa com o link consegue se inscrever agora. Fechar é reversível e não apaga nada do que já entrou, nem a data de fechamento planejada: o site passa a dizer «encerradas»."
+            : "Com as inscrições fechadas, o servidor recusa o envio e /inscricao avisa: «encerradas» se elas já abriram alguma vez, «em breve» se ainda não. Ao abrir, o formulário fica público na hora."
         }
       >
         {/* No celular os botões ocupam a largura do cartão e empilham: "Confirmar abertura?"
@@ -552,8 +608,9 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar }: 
 
         {alterado ? (
           <p style={{ margin: 0, fontSize: 12, color: C.warnSoft, lineHeight: 1.6 }}>
-            Há alterações não salvas nos blocos abaixo. Abrir ou fechar recarrega os dados da
-            edição e descarta esse rascunho — salve antes.
+            Há alterações não salvas nos blocos abaixo. Abrir ou fechar grava só a chave: o
+            rascunho continua na tela até você salvar no fim da página (fechar marca a data de
+            fechamento, e esse campo passa a mostrar a data gravada).
           </p>
         ) : null}
       </ActionCard>
@@ -699,9 +756,11 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar }: 
       <BlockTitle>Dinheiro</BlockTitle>
 
       <FieldGrid min={215}>
+        {/* O valor de cada pagamento é gravado na inscrição (gatilho do banco): mudar a taxa
+            não muda o que quem já se inscreveu deve — nem a cobrança, nem o Pix dele. */}
         <Field
           label="Taxa de inscrição (R$)"
-          hint="Editada em reais; o banco guarda centavos. Use vírgula: 20,00."
+          hint="Use vírgula: 20,00. Vale para inscrições novas: pagamentos já criados mantêm o valor que tinham."
         >
           <Input
             value={rascunho.taxa_reais}
@@ -726,7 +785,12 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar }: 
           />
         </Field>
 
-        <Field label="Chave Pix" hint="É o que o jogador vê na hora de pagar.">
+        {/* O servidor normaliza a chave no formato do DICT (é ela que vai dentro do QR) e
+            recusa a ambígua dizendo por quê — o motivo sai no aviso do topo. */}
+        <Field
+          label="Chave Pix"
+          hint="É o que o jogador vê na hora de pagar. Telefone com +55 (ex.: +5511987654321), CPF/CNPJ só números, e-mail ou chave aleatória."
+        >
           <Input
             value={rascunho.chave_pix}
             onChange={(v) => editar("chave_pix", v)}
@@ -759,7 +823,7 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar }: 
         <Metric
           label="Ainda a receber"
           value={emReais(panorama.caixa.aReceber)}
-          detail="Aguardando + declarado"
+          detail="Aguardando + declarado (sem organizadores, recusados e desistentes)"
           small
         />
         <Metric label={`Campeão (${premiacao.pct}%)`} value={emReais(premiacao.campeao)} small />
@@ -792,6 +856,14 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar }: 
               ))}
             </ul>
           </Banner>
+        ) : null}
+
+        {/* Sem `role="alert"`: o aviso do topo já foi anunciado; aqui é a mesma frase, à vista.
+            Some quando outra ação do painel roda (o contêiner zera o `ultimoErro`). */}
+        {salvarFalhou && ultimoErro && !ocupado ? (
+          <p style={{ margin: "0 0 10px", fontSize: 12.5, lineHeight: 1.6, color: C.dangerSoft }}>
+            Não salvou: {ultimoErro}
+          </p>
         ) : null}
 
         {compacto ? (
@@ -831,9 +903,11 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar }: 
 
       {/*
        * A barra presa do celular. `fixed`, e não `sticky`: `sticky` gruda no ancestral com
-       * overflow mais próximo, e o invólucro do site tem `overflow-x: hidden` — a barra
-       * poderia ficar grudada num contêiner que não rola. `fixed` só exige que nenhum
-       * ancestral tenha `transform`, a mesma condição de que a doca já depende.
+       * overflow mais próximo, e o invólucro do site tinha `overflow-x: hidden` — a barra
+       * podia ficar grudada num contêiner que não rola. Hoje ele usa `overflow-x: clip`
+       * (`.lob-raiz` em app/globals.css), que não vira contêiner de rolagem, mas no Safari
+       * < 16 o `hidden` de reserva ainda vale. `fixed` só exige que nenhum ancestral tenha
+       * `transform`, a mesma condição de que a doca já depende.
        *
        * Fica logo acima da doca (78px + área segura, o mesmo respiro que o shell dá ao
        * <body> por causa dela) e embaixo das folhas e do aviso flutuante: um erro de

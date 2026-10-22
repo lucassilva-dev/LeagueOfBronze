@@ -2,7 +2,7 @@ export default function Loading() {
   const skeletonCards = ["loading-card-1", "loading-card-2", "loading-card-3"];
 
   return (
-    <main className="mx-auto min-h-screen max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+    <div className="mx-auto min-h-screen max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
       <div className="glass-panel rounded-3xl p-6">
         <div className="skeleton h-8 w-56 rounded-lg" />
         <div className="mt-4 grid gap-4 md:grid-cols-3">
@@ -15,6 +15,6 @@ export default function Loading() {
           ))}
         </div>
       </div>
-    </main>
+    </div>
   );
 }
