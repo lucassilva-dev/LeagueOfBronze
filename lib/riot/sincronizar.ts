@@ -13,6 +13,7 @@ import {
   type EdicaoConfig,
   type Inscricao,
 } from "@/lib/inscricoes/store";
+import { contaParaTimes } from "@/lib/inscricoes/schema";
 import { chaveDaRiot, criarClienteRiot, type ClienteRiot, type RespostaRiot } from "@/lib/riot/cliente";
 import {
   decidirSincronizacao,
@@ -201,10 +202,11 @@ export async function sincronizarComRiot(opcoes: {
   try {
     const [inscricoes, conferencias] = await Promise.all([listarInscricoes(), listarConferencias()]);
 
-    // Recusado e desistente saem da fila: não gastam cota e ninguém mexe no que é deles.
+    // Recusado, desistente e excluído saem da fila: não gastam cota e ninguém mexe no que
+    // é deles.
     const fila = inscricoes
       .filter((i) => (opcoes.inscricaoId ? i.id === opcoes.inscricaoId : true))
-      .filter((i) => i.situacao !== "recusado" && i.situacao !== "desistiu")
+      .filter((i) => contaParaTimes(i.situacao))
       .sort(
         (a, b) =>
           (a.riot_sincronizado_em ?? "").localeCompare(b.riot_sincronizado_em ?? "") ||
@@ -217,7 +219,7 @@ export async function sincronizarComRiot(opcoes: {
     // rodada: quem se inscreveu com a Riot fora do ar só ganha o PUUID aqui, e é aqui que se
     // descobre que "SAMUEL VENÂNCIO" e "SAMUEL VENANCIO" são a mesma conta. A inscrição mais
     // nova é a repetida — a mais antiga segue normal.
-    const ativos = inscricoes.filter((i) => i.situacao !== "recusado" && i.situacao !== "desistiu");
+    const ativos = inscricoes.filter((i) => contaParaTimes(i.situacao));
     const contaDe = new Map<string, string | null>(ativos.map((i) => [i.id, i.puuid ?? null]));
     const veioAntes = (a: Inscricao, b: Inscricao) =>
       a.criado_em < b.criado_em || (a.criado_em === b.criado_em && a.id < b.id);

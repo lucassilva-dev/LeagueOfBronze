@@ -146,6 +146,7 @@ export type ForaDoDraft = { riotId: string; situacao: SituacaoForaDoDraft };
 const COMO_FICOU: Record<SituacaoForaDoDraft, string> = {
   recusado: "recusado",
   desistiu: "desistiu",
+  excluido: "excluído",
   sobra: "na sobra",
   pendente: "voltou a pendente",
   sem_inscricao: "inscrição não encontrada",

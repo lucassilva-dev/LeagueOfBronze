@@ -316,7 +316,9 @@ export const ESTADOS_COM_DINHEIRO: readonly EstadoPagamento[] = ["pago", "estorn
  * continua derivado do elo no servidor (ver `atualizarInscricao`); aceitá-lo aqui
  * abriria pela porta dos fundos exatamente o que o formulário público fecha.
  */
-const SITUACOES = ["pendente", "apto", "recusado", "desistiu", "sobra"] as const;
+// "excluido" é o apagar da organização: a linha fica no banco (auditoria, caixa), mas sai
+// da lista de Inscritos e de toda conta. Desfaz escolhendo outra situação.
+const SITUACOES = ["pendente", "apto", "recusado", "desistiu", "sobra", "excluido"] as const;
 
 export const fichaPatchSchema = z.object({
   inscricaoId: z.string().uuid(),
@@ -523,8 +525,8 @@ export function estadoDaJanela(
 // ---------------------------------------------------------------- times
 
 /**
- * Quem entra na CONTA de times e vagas: todo inscrito, menos quem foi recusado ou
- * desistiu.
+ * Quem entra na CONTA de times e vagas: todo inscrito, menos quem foi recusado, desistiu
+ * ou foi excluído pela organização.
  *
  * Decisão do Lucas (2026-10-06): "a gente não contabiliza só se for reprovado — os que
  * estão aguardando já são elegíveis". Contar só aprovados fazia o painel dizer "0 times"
@@ -534,7 +536,7 @@ export function estadoDaJanela(
  * (`montarDraftDosAprovados`): pendente não é sorteado — tem de ser conferido antes.
  */
 export function contaParaTimes(situacao: string): boolean {
-  return situacao !== "recusado" && situacao !== "desistiu";
+  return situacao !== "recusado" && situacao !== "desistiu" && situacao !== "excluido";
 }
 
 /**

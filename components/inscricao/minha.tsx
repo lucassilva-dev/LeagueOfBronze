@@ -90,6 +90,7 @@ const TOM_SITUACAO: Record<string, keyof typeof TOM> = {
   pendente: "espera",
   recusado: "ruim",
   desistiu: "ruim",
+  excluido: "ruim",
 };
 
 const TOM_PAGAMENTO: Record<string, keyof typeof TOM> = {

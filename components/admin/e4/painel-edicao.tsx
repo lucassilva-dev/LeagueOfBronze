@@ -82,7 +82,7 @@ export type Inscrito = {
   disponibilidade?: string[] | null;
   quer_capitao: boolean;
   entrou_no_grupo: string | null;
-  situacao: "pendente" | "apto" | "recusado" | "desistiu" | "sobra";
+  situacao: "pendente" | "apto" | "recusado" | "desistiu" | "sobra" | "excluido";
   organizador: boolean;
   observacao: string | null;
   /** `riot` = o robô atualiza; `organizacao` = travado à mão; nulo = ninguém confirmou ainda. */
@@ -138,11 +138,13 @@ export type Caixa = {
 
 export type Panorama = {
   inscritos: number;
-  /** Quem entra na conta de times e vagas: todo inscrito menos recusado e desistente. */
+  /** Quem entra na conta de times e vagas: todo inscrito menos recusado, desistente e excluído. */
   elegiveis: number;
   aprovados: number;
   pendentes: number;
   recusados: number;
+  /** Excluídos pela organização: fora da lista de Inscritos, só no filtro «Excluído». */
+  excluidos?: number;
   times: number;
   vagas: number;
   sobra: number;

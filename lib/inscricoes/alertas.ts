@@ -71,7 +71,7 @@ export function alertasDoInscrito(args: {
 }): Alerta[] {
   const { inscrito: i, conferencias, pagamento, config, agoraMs } = args;
   const alertas: Alerta[] = [];
-  const fora = i.situacao === "recusado" || i.situacao === "desistiu";
+  const fora = i.situacao === "recusado" || i.situacao === "desistiu" || i.situacao === "excluido";
 
   // ------------------------------------------------ Riot
   if (i.riot_id_atual && !mesmoRiotId(i.riot_id_atual, i.riot_id)) {
@@ -107,7 +107,8 @@ export function alertasDoInscrito(args: {
         (i.id === undefined || o.id !== i.id) &&
         o.puuid === i.puuid &&
         o.situacao !== "recusado" &&
-        o.situacao !== "desistiu",
+        o.situacao !== "desistiu" &&
+        o.situacao !== "excluido",
     );
     if (outras.length > 0) {
       alertas.push({
@@ -181,17 +182,20 @@ export function alertasDoInscrito(args: {
       acaoPagamento: "isento",
     });
   }
-  if (i.situacao === "recusado" && estado === "pago") {
+  // Excluir não apaga o dinheiro: quem foi excluído com pagamento recebe o mesmo aviso
+  // de quem foi recusado.
+  const recusadoOuExcluido = i.situacao === "recusado" ? "Recusado" : i.situacao === "excluido" ? "Excluído" : null;
+  if (recusadoOuExcluido && estado === "pago") {
     alertas.push({
       codigo: "recusado_pago",
-      texto: "Recusado com pagamento recebido — o valor precisa ser devolvido.",
+      texto: `${recusadoOuExcluido} com pagamento recebido — o valor precisa ser devolvido.`,
       acaoPagamento: "estorno_devido",
     });
   }
-  if (i.situacao === "recusado" && estado === "declarado") {
+  if (recusadoOuExcluido && estado === "declarado") {
     alertas.push({
       codigo: "recusado_declarado",
-      texto: "Recusado, mas disse que pagou — confira o extrato antes de devolver.",
+      texto: `${recusadoOuExcluido}, mas disse que pagou — confira o extrato antes de devolver.`,
     });
   }
   if (i.situacao === "desistiu" && (estado === "pago" || estado === "declarado")) {

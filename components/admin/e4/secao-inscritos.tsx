@@ -153,7 +153,7 @@ const ESTADOS_NA_TELA: readonly EstadoConferencia[] = (() => {
   return [...preferidos, ...ESTADOS_CONFERENCIA.filter((e) => !preferidos.includes(e))];
 })();
 
-const SITUACOES = ["pendente", "apto", "recusado", "desistiu", "sobra"] as const;
+const SITUACOES = ["pendente", "apto", "recusado", "desistiu", "sobra", "excluido"] as const;
 
 const ROTULO_SITUACAO: Record<Inscrito["situacao"], string> = {
   pendente: "Pendente",
@@ -161,6 +161,7 @@ const ROTULO_SITUACAO: Record<Inscrito["situacao"], string> = {
   recusado: "Recusado",
   desistiu: "Desistiu",
   sobra: "Sobra",
+  excluido: "Excluído",
 };
 
 const TOM_SITUACAO: Record<Inscrito["situacao"], TomChip> = {
@@ -169,7 +170,15 @@ const TOM_SITUACAO: Record<Inscrito["situacao"], TomChip> = {
   recusado: "danger",
   desistiu: "off",
   sobra: "warn",
+  excluido: "danger",
 };
+
+/**
+ * O "apagar" da organização. A linha continua no banco — auditoria, caixa, e a conta do
+ * jogador segue barrada de se inscrever de novo —, mas some da lista: só o filtro
+ * «Excluído» a mostra. Desfaz escolhendo outra situação.
+ */
+const EXCLUIDO = "excluido";
 
 const DIA_MS = 24 * 60 * 60 * 1000;
 
@@ -593,7 +602,9 @@ const OPCOES_DE_SITUACAO: readonly Opcao<Inscrito["situacao"]>[] = SITUACOES.map
   dica:
     s === "sobra"
       ? "Aprovado que ficou de fora quando os times fecharam — não é fila com ordem."
-      : undefined,
+      : s === EXCLUIDO
+        ? "Some da lista de inscritos (fica só no filtro «Excluído») e sai de times, caixa e robô da Riot. Para desfazer, escolha outra situação."
+        : undefined,
 }));
 
 // ---------------------------------------------------------------- um requisito
@@ -1670,7 +1681,17 @@ function GavetaInscrito({
           ariaLabel="Situação do inscrito"
         />
       </div>
-      {aptoComItemRuim ? (
+      {situacao === EXCLUIDO && mudouNaFicha.situacao ? (
+        <p role="alert" style={{ margin: "-4px 0 10px", fontSize: 11.5, color: C.warnSoft }}>
+          Ao salvar, <b>{inscrito.nick}</b> some da lista de inscritos e sai de times, caixa e robô da Riot. Fica no
+          filtro «Excluído», e dá para desfazer escolhendo outra situação.
+        </p>
+      ) : situacao === EXCLUIDO ? (
+        <p style={{ margin: "-4px 0 10px", fontSize: 11.5, color: C.ink3 }}>
+          Inscrição excluída: não aparece na lista nem entra em conta nenhuma. Para restaurar, escolha outra situação e
+          salve.
+        </p>
+      ) : aptoComItemRuim ? (
         <p role="alert" style={{ margin: "-4px 0 10px", fontSize: 11.5, color: C.warnSoft }}>
           Este inscrito continua <b>Apto</b> — se o requisito marcado agora o tira do campeonato, ajuste a
           situação também.
@@ -2297,11 +2318,12 @@ export function SecaoInscritos({
   const contagemPorElo = useMemo(() => {
     const mapa = new Map<string, number>();
     for (const i of inscritos) {
+      if (i.situacao === EXCLUIDO && filtroSituacao !== EXCLUIDO) continue;
       const chave = resolveElo(eloExibido(i).bruto)?.key;
       if (chave) mapa.set(chave, (mapa.get(chave) ?? 0) + 1);
     }
     return mapa;
-  }, [inscritos]);
+  }, [inscritos, filtroSituacao]);
 
   const visiveis = useMemo(() => {
     const termo = busca.trim().toLowerCase();
@@ -2319,7 +2341,8 @@ export function SecaoInscritos({
     };
 
     return ordenados.filter((i) => {
-      if (filtroSituacao !== "todos" && i.situacao !== filtroSituacao) return false;
+      // Excluído só aparece quando se filtra por ele: em «Todas» ele some, como apagado.
+      if (filtroSituacao === "todos" ? i.situacao === EXCLUIDO : i.situacao !== filtroSituacao) return false;
       if (soPendencia && !temPendencia(i.id)) return false;
       if (soAlerta && !alertasPorInscrito.has(i.id)) return false;
       if (filtroElos.size > 0 && !filtroElos.has(resolveElo(eloExibido(i).bruto)?.key ?? "")) return false;
@@ -2445,7 +2468,7 @@ export function SecaoInscritos({
               <option value="todos">Todas</option>
               {SITUACOES.map((s) => (
                 <option key={s} value={s}>
-                  {ROTULO_SITUACAO[s]}
+                  {s === EXCLUIDO && panorama.excluidos ? `${ROTULO_SITUACAO[s]} (${panorama.excluidos})` : ROTULO_SITUACAO[s]}
                 </option>
               ))}
             </Select>
@@ -2529,7 +2552,9 @@ export function SecaoInscritos({
           tabIndex={-1}
           style={{ margin: "12px 0 10px", fontSize: 11.5, color: C.ink4, outline: "none", ...tabular }}
         >
-          Mostrando {visiveis.length} de {inscritos.length}. Clique em alguém para conferir.
+          Mostrando {visiveis.length} de{" "}
+          {filtroSituacao === EXCLUIDO ? inscritos.length : inscritos.filter((i) => i.situacao !== EXCLUIDO).length}.
+          Clique em alguém para conferir.
         </p>
 
         {visiveis.length === 0 ? (

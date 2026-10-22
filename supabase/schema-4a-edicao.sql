@@ -128,7 +128,7 @@ create table if not exists public.inscricoes (
   -- "sobra" = aprovado, mas ficou de fora quando os times fecharam (resto da
   -- divisão por jogadores_por_time). Não é fila com ordem — a organização decide.
   situacao        text not null default 'pendente'
-                  check (situacao in ('pendente','apto','recusado','desistiu','sobra')),
+                  check (situacao in ('pendente','apto','recusado','desistiu','sobra','excluido')),
   organizador     boolean not null default false,
   observacao      text,
 
@@ -516,3 +516,22 @@ $teto$;
 
 comment on column public.edicao_config.max_times is
   'Teto de times da edicao. Nulo = sem teto (times = elegiveis / jogadores_por_time). Com teto, quem passa de max_times x jogadores_por_time vira sobra/reserva.';
+
+-- ---------------------------------------------------------------- inscrição excluída (2026-10-22)
+-- "Excluir" um inscrito é apagar sem apagar: a linha fica (auditoria, caixa, a conta do
+-- jogador continua barrada de se inscrever de novo), mas some da lista de Inscritos — só o
+-- filtro «Excluído» a mostra — e sai de toda conta (times, caixa, robô da Riot). Desfaz
+-- escolhendo outra situação na gaveta.
+do $excluido$
+declare s text;
+begin
+  foreach s in array array['public', 'lob_teste'] loop
+    continue when not exists (select 1 from pg_namespace where nspname = s);
+    execute format($sql$
+      alter table %1$I.inscricoes drop constraint if exists inscricoes_situacao_check;
+      alter table %1$I.inscricoes add constraint inscricoes_situacao_check
+        check (situacao in ('pendente','apto','recusado','desistiu','sobra','excluido'));
+    $sql$, s);
+  end loop;
+end
+$excluido$;

@@ -224,7 +224,15 @@ const TITULO_FORA =
 /** A situação da inscrição por trás do pagamento — ou o aviso de que ela não veio. */
 function ChipDaInscricao({ inscrito }: Readonly<{ inscrito: Inscrito | null }>) {
   return inscrito ? (
-    <Chip tone={inscrito.situacao === "apto" ? "ok" : inscrito.situacao === "recusado" ? "danger" : "neutro"}>
+    <Chip
+      tone={
+        inscrito.situacao === "apto"
+          ? "ok"
+          : inscrito.situacao === "recusado" || inscrito.situacao === "excluido"
+            ? "danger"
+            : "neutro"
+      }
+    >
       {inscrito.situacao}
     </Chip>
   ) : (
@@ -514,7 +522,11 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro, ulti
   }, [inscritos]);
 
   const linhas = useMemo<Linha[]>(() => {
-    const lista = pagamentos.map((pagamento) => {
+    // Excluído some do caixa como some de Inscritos — a não ser que haja dinheiro no meio
+    // (pago, declarado, estorno): aí a linha fica, para ninguém perder a devolução de vista.
+    const semDinheiro = (p: Pagamento) => p.estado === "aguardando" || p.estado === "cancelado";
+    const daLista = pagamentos.filter((p) => !(fichaDe.get(p.inscricao_id)?.situacao === "excluido" && semDinheiro(p)));
+    const lista = daLista.map((pagamento) => {
       const inscrito = fichaDe.get(pagamento.inscricao_id) ?? null;
       return {
         pagamento,

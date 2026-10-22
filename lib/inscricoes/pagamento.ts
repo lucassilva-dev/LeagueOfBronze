@@ -9,7 +9,7 @@ export function inscricaoEsperaPagamento(
 ): boolean {
   // Recusar ou registrar desistência mexe só na ficha — o pagamento continua "aguardando"
   // até alguém cancelar à mão. Para quem está fora, a cobrança não vale mais.
-  if (inscricao.situacao === "recusado" || inscricao.situacao === "desistiu") return false;
+  if (estaFora(inscricao.situacao)) return false;
   return inscricao.pagamento?.estado === "aguardando";
 }
 
@@ -23,5 +23,10 @@ export function inscricaoEsperaPagamento(
  * financeiro ter clicado.
  */
 export function foraDaCobranca(situacao: string, estadoDoPagamento: string | null | undefined): boolean {
-  return (situacao === "recusado" || situacao === "desistiu") && estadoDoPagamento === "aguardando";
+  return estaFora(situacao) && estadoDoPagamento === "aguardando";
+}
+
+/** Recusado, desistente ou excluído pela organização: não joga mais esta edição. */
+function estaFora(situacao: string): boolean {
+  return situacao === "recusado" || situacao === "desistiu" || situacao === "excluido";
 }

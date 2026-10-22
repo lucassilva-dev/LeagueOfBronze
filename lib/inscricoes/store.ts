@@ -118,7 +118,7 @@ export type Inscricao = ColunasRiot & {
   disponibilidade: string[];
   quer_capitao: boolean;
   entrou_no_grupo: string | null;
-  situacao: "pendente" | "apto" | "recusado" | "desistiu" | "sobra";
+  situacao: "pendente" | "apto" | "recusado" | "desistiu" | "sobra" | "excluido";
   organizador: boolean;
   observacao: string | null;
   /**
@@ -1069,8 +1069,9 @@ export function panorama(
   // dois como sobra, o total de aprovados cairia e a divisão mudaria de resposta.
   const aprovados = inscricoes.filter((i) => i.situacao === "apto" || i.situacao === "sobra");
   const recusados = inscricoes.filter((i) => i.situacao === "recusado").length;
-  // A divisão conta todo mundo que ainda pode jogar — pendente incluso. Só recusado e
-  // desistente saem (ver `contaParaTimes`).
+  const excluidos = inscricoes.filter((i) => i.situacao === "excluido").length;
+  // A divisão conta todo mundo que ainda pode jogar — pendente incluso. Só recusado,
+  // desistente e excluído saem (ver `contaParaTimes`).
   const elegiveis = inscricoes.filter((i) => contaParaTimes(i.situacao));
   const { times, vagas, sobra } = distribuirTimes(
     elegiveis.length,
@@ -1101,12 +1102,13 @@ export function panorama(
 
   return {
     // Recusado não conta como inscrito (pedido do Lucas, 22/10): ele continua na lista e
-    // tem o próprio número em `recusados`.
-    inscritos: inscricoes.length - recusados,
+    // tem o próprio número em `recusados`. Excluído também não — esse nem aparece na lista.
+    inscritos: inscricoes.length - recusados - excluidos,
     elegiveis: elegiveis.length,
     aprovados: aprovados.length,
     pendentes: inscricoes.filter((i) => i.situacao === "pendente").length,
     recusados,
+    excluidos,
     // O número de times é derivado, limitado pelo teto `max_times` quando houver.
     times,
     vagas,

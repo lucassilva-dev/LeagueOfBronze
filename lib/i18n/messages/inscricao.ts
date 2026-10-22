@@ -283,6 +283,7 @@ export const inscricao = definir({
       recusado: "Recusado",
       desistiu: "Desistiu",
       sobra: "Aprovado, fora dos times",
+      excluido: "Inscrição cancelada pela organização",
     },
     pagamentos: {
       aguardando: "Aguardando pagamento",
@@ -530,6 +531,7 @@ export const inscricao = definir({
       recusado: "Rejected",
       desistiu: "Withdrew",
       sobra: "Approved, outside the teams",
+      excluido: "Registration cancelled by the organizers",
     },
     pagamentos: {
       aguardando: "Awaiting payment",
