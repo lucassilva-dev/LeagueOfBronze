@@ -142,7 +142,8 @@ describe("panorama", () => {
       config,
     );
 
-    expect(p).toMatchObject({ inscritos: 13, elegiveis: 11, aprovados: 10, pendentes: 1, recusados: 1, times: 2 });
+    // 13 fichas, mas o recusado não conta como inscrito; o desistente ainda conta.
+    expect(p).toMatchObject({ inscritos: 12, elegiveis: 11, aprovados: 10, pendentes: 1, recusados: 1, times: 2 });
   });
 
   it("pendente já conta para times e vagas — só recusado e desistente saem", () => {

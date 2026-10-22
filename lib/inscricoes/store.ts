@@ -1068,6 +1068,7 @@ export function panorama(
   // os times fecharam. Contar só os "apto" faria a conta se mover sozinha: ao marcar
   // dois como sobra, o total de aprovados cairia e a divisão mudaria de resposta.
   const aprovados = inscricoes.filter((i) => i.situacao === "apto" || i.situacao === "sobra");
+  const recusados = inscricoes.filter((i) => i.situacao === "recusado").length;
   // A divisão conta todo mundo que ainda pode jogar — pendente incluso. Só recusado e
   // desistente saem (ver `contaParaTimes`).
   const elegiveis = inscricoes.filter((i) => contaParaTimes(i.situacao));
@@ -1099,11 +1100,13 @@ export function panorama(
     .reduce((t, p) => t + p.valor_centavos, 0);
 
   return {
-    inscritos: inscricoes.length,
+    // Recusado não conta como inscrito (pedido do Lucas, 22/10): ele continua na lista e
+    // tem o próprio número em `recusados`.
+    inscritos: inscricoes.length - recusados,
     elegiveis: elegiveis.length,
     aprovados: aprovados.length,
     pendentes: inscricoes.filter((i) => i.situacao === "pendente").length,
-    recusados: inscricoes.filter((i) => i.situacao === "recusado").length,
+    recusados,
     // O número de times é derivado, limitado pelo teto `max_times` quando houver.
     times,
     vagas,
