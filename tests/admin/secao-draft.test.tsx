@@ -5,12 +5,25 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { SecaoDraft } from "@/components/admin/e4/secao-draft";
 import { calcularTabela, retratoDaTabela } from "@/lib/draft/precos";
 import type { DraftPublico, PreviaDoDraft } from "@/lib/draft/store";
-import { TITULARES_4A } from "../draft/_pool-4a";
+import { POOL_4A_40 } from "../draft/_pool-4a";
 
 /**
  * A mesa do draft no painel. Antes dela a rota /api/admin/draft existia, mas nenhuma tela
  * a chamava — sortear, iniciar e aplicar o draft exigiam montar a requisição à mão.
  */
+
+/** O formato da 4ª: 40 pessoas, 8 times de 5, orçamento 30. */
+const FORMATO_40 = { times: 8, jogadoresPorTime: 5, orcamentoPorTime: 30 } as const;
+
+/** A conferência como o servidor a manda com o pool real: 40 aptos para 8 times. */
+const CONFERENCIA_40: Partial<PreviaDoDraft> = {
+  config: { jogadoresPorTime: 5, maxTimes: 8, orcamentoPorTime: 30, segundosPorEscolha: 60 },
+  times: 8,
+  vagas: 40,
+  aprovados: 40,
+  aptos: 40,
+  totalDePontos: 240,
+};
 
 afterEach(() => {
   cleanup();
@@ -74,40 +87,48 @@ describe("a mesa do draft", () => {
   });
 
   it("com a tabela do servidor: as linhas, o total exato com ✓, o erro e como foi calculada", async () => {
-    const tabela = retratoDaTabela(calcularTabela({ pool: TITULARES_4A, times: 6, jogadoresPorTime: 5, orcamentoPorTime: 30 }));
-    responder({ draft: null, sorteio: null, semSaida: null, previa: previa({ tabela, fechaComOsCapitaesDaRegra: true }) });
+    // A tabela do pool real: 40 pessoas, 8 times, curvatura 0,1.
+    const tabela = retratoDaTabela(calcularTabela({ pool: POOL_4A_40, ...FORMATO_40 }));
+    responder({ draft: null, sorteio: null, semSaida: null, previa: previa({ ...CONFERENCIA_40, tabela, fechaComOsCapitaesDaRegra: true }) });
     renderizar();
     await screen.findByText("Tabela de pontos desta edição");
     const texto = document.body.textContent ?? "";
-    expect(texto).toContain("180 de 180 (6 × 30) ✓");
+    expect(texto).toContain("240 de 240 (8 × 30) ✓");
     expect(texto).toContain("200–299 PDL");
     expect(texto).toContain("Como foi calculada");
     expect(texto).toContain(`${tabela.erroMaximoEmDegraus.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} divisão`);
-    expect(texto).toContain("1,08 divisão");
-    expect(texto).toContain("exato: 6 × 30 = 180");
+    expect(texto).toContain("1,73 divisão");
+    expect(texto).toContain("exato: 8 × 30 = 240");
     expect(texto).toContain("os degraus de cima valem um pouco mais");
-    expect(texto).toContain("arredondados para a soma dar exatamente 6 × 30 = 180");
+    expect(texto).toContain("arredondados para a soma dar exatamente 8 × 30 = 240");
     expect(texto).not.toMatch(/média \+ 15%/);
-    // 18 linhas de preço, uma por classe.
+    // 21 linhas de preço, uma por classe (do Ferro ao Mestre 200–299 PDL).
     const linhas = [...document.querySelectorAll("table")].find((t) => t.textContent?.includes("Pela reta"));
-    expect(linhas?.querySelectorAll("tbody tr")).toHaveLength(18);
+    expect(linhas?.querySelectorAll("tbody tr")).toHaveLength(21);
   });
 
   it("aptos ≠ vagas (pool incompleto): a tabela aparece, mas sem ✓ e sem «exato», e a tela explica", async () => {
     const tabela = {
-      ...retratoDaTabela(calcularTabela({ pool: TITULARES_4A, times: 6, jogadoresPorTime: 5, orcamentoPorTime: 30 })),
+      ...retratoDaTabela(calcularTabela({ pool: POOL_4A_40, ...FORMATO_40 })),
       poolIncompleto: true,
     };
     responder({
       draft: null,
       sorteio: null,
       semSaida: null,
-      previa: previa({ tabela, aptos: 36, impedimentos: ["Há 36 aprovados para 30 vagas."], fechaComOsCapitaesDaRegra: null }),
+      previa: previa({
+        ...CONFERENCIA_40,
+        tabela,
+        aptos: 42,
+        aprovados: 42,
+        impedimentos: ["Há 42 aprovados para 40 vagas."],
+        fechaComOsCapitaesDaRegra: null,
+      }),
     });
     renderizar();
     await screen.findByText("Tabela de pontos desta edição");
     const texto = document.body.textContent ?? "";
-    expect(texto).toContain("180 de 180 (6 × 30) · pool incompleto");
+    expect(texto).toContain("240 de 240 (8 × 30) · pool incompleto");
     expect(texto).not.toContain("✓");
     expect(texto).not.toContain("exato:");
     expect(texto).not.toContain("soma dar exatamente");
@@ -115,23 +136,33 @@ describe("a mesa do draft", () => {
   });
 
   it("a conta desceu a curvatura: o motivo aparece, e não há aviso de que os elencos não fecham", async () => {
+    // O Mestre #1 com 550 PDL: com 0,1 ele custaria 20 (o teto de uma escolha é 19), e a conta
+    // desce para 0,075 (lib/draft/tabela-que-fecha.ts).
+    const pool = POOL_4A_40.map((j) => (j.posicao === 1 ? { ...j, pdl: 550 } : j));
     const tabela = {
-      ...retratoDaTabela(calcularTabela({ pool: TITULARES_4A, times: 6, jogadoresPorTime: 5, orcamentoPorTime: 30, curvatura: 0.0625 })),
-      queda: { curvaturaPedida: 0.075, motivo: "A curvatura caiu de 0,075 para 0,0625: com 0,075, o Mestre · 400–499 PDL custaria 19." },
+      ...retratoDaTabela(calcularTabela({ pool, ...FORMATO_40, curvatura: 0.075 })),
+      queda: {
+        curvaturaPedida: 0.1,
+        motivo:
+          "A curvatura caiu de 0,1 para 0,075: com 0,1, o Mestre · 500–599 PDL custaria 20 e nenhum time conseguiria pagá-lo (cabem no máximo 19 numa escolha).",
+      },
     };
-    responder({ draft: null, sorteio: null, semSaida: null, previa: previa({ tabela, fechaComOsCapitaesDaRegra: true }) });
+    responder({ draft: null, sorteio: null, semSaida: null, previa: previa({ ...CONFERENCIA_40, tabela, fechaComOsCapitaesDaRegra: true }) });
     renderizar();
     await screen.findByText("Tabela de pontos desta edição");
-    expect(screen.getByText(/A curvatura caiu de 0,075 para 0,0625/)).toBeTruthy();
+    expect(screen.getByText(/A curvatura caiu de 0,1 para 0,075/)).toBeTruthy();
     expect(screen.queryByText("Com os capitães da regra, os elencos não fecham")).toBeNull();
   });
 
   it("como foi calculada: sem curvatura não fala em degraus que valem mais; com folga não fala em soma exata", async () => {
-    const tabela = retratoDaTabela(
-      calcularTabela({ pool: TITULARES_4A, times: 6, jogadoresPorTime: 5, orcamentoPorTime: 30, curvatura: 0, somaMaxima: 178 }),
-    );
-    expect(tabela).toMatchObject({ curvatura: 0, soma: 178, folga: 2 });
-    responder({ draft: null, sorteio: null, semSaida: null, previa: previa({ tabela, fechaComOsCapitaesDaRegra: true }) });
+    const tabela = retratoDaTabela(calcularTabela({ pool: POOL_4A_40, ...FORMATO_40, curvatura: 0, somaMaxima: 238 }));
+    expect(tabela).toMatchObject({ curvatura: 0, soma: 238, folga: 2 });
+    responder({
+      draft: null,
+      sorteio: null,
+      semSaida: null,
+      previa: previa({ ...CONFERENCIA_40, totalDePontos: 238, tabela, fechaComOsCapitaesDaRegra: true }),
+    });
     renderizar();
     await screen.findByText("Tabela de pontos desta edição");
     const texto = document.body.textContent ?? "";
@@ -140,7 +171,7 @@ describe("a mesa do draft", () => {
     expect(texto).toContain("todo degrau vale o mesmo");
     expect(texto).not.toContain("soma dar exatamente");
     expect(texto).not.toContain("exato:");
-    expect(texto).toContain("arredondados para a soma ficar em 178, 2 abaixo de 6 × 30 = 180");
+    expect(texto).toContain("arredondados para a soma ficar em 238, 2 abaixo de 8 × 30 = 240");
   });
 
   it("sem time fechado ainda, a tabela não existe — e a tela diz isso", async () => {
@@ -150,7 +181,7 @@ describe("a mesa do draft", () => {
   });
 
   it("capitães da regra que não fecham os elencos: aviso, e «Sortear» pela regra apagado", async () => {
-    const tabela = retratoDaTabela(calcularTabela({ pool: TITULARES_4A, times: 6, jogadoresPorTime: 5, orcamentoPorTime: 30 }));
+    const tabela = retratoDaTabela(calcularTabela({ pool: POOL_4A_40, ...FORMATO_40 }));
     responder({
       draft: null,
       sorteio: null,

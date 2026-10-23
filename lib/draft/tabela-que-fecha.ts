@@ -16,8 +16,9 @@ import { elencosFecham, ORCAMENTO_DA_MONTAGEM } from "@/lib/draft/viabilidade";
  * time termina o draft com o orçamento inteiro — e os elencos precisam se repartir em somas
  * exatas. Com a curvatura padrão há pools em que isso não existe com os capitães que vão
  * jogar: o caso que preocupa na 4ª é o Mestre do topo subir de PDL até o congelamento
- * (com 400 PDL ele passaria a custar 19, e nenhum time consegue pagar mais de 18 numa
- * escolha). Antes, a montagem simplesmente recusava o sorteio.
+ * (com 40 jogadores e curvatura 0,1 ele fecha até 399 PDL; com 450 a repartição deixa de
+ * fechar, e com 550 ele custaria mais do que qualquer time consegue pagar numa escolha).
+ * Antes, a montagem simplesmente recusava o sorteio.
  *
  * Agora quem calcula a tabela com os capitães — a prévia do servidor (capitães da regra), a
  * montagem (capitães escolhidos) e a prévia do painel — desce sozinho, nesta ordem, e fica
@@ -110,7 +111,7 @@ export function tabelaQueFecha(params: {
   return { ...pedida, fecha: false, queda: null };
 }
 
-/** "0,075", "0,0625", "0": a curvatura escrita como a organização lê. */
+/** "0,1", "0,0875", "0": a curvatura escrita como a organização lê. */
 export function curvaturaEscrita(curvatura: number): string {
   return String(Math.round(curvatura * 1e6) / 1e6).replace(".", ",");
 }

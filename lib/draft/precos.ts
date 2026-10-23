@@ -5,9 +5,9 @@ import { ELO_ORDER, resolveElo } from "@/lib/design";
  *
  * Até a 3ª Edição o preço de cada elo era fixo (Prata 3, Ouro 4 … Mestre 10, em
  * lib/design.ts) e o orçamento por time era "a média + 15%". Com o orçamento fixo em 30 e
- * um pool que muda a cada edição, isso deixava a conta solta: na 4ª os 30 titulares
- * somavam 173 para um teto de 180, e os 7 pontos de folga são justamente o que permite um
- * time terminar o draft mais forte que outro.
+ * um pool que muda a cada edição, isso deixava a conta solta: na 4ª (40 jogadores, 8 times)
+ * a tabela fixa soma 231 para um teto de 240, e os 9 pontos de folga são justamente o que
+ * permite um time terminar o draft mais forte que outro.
  *
  * A ideia que governa este arquivo, em uma frase: **se a soma dos preços de quem joga é
  * exatamente `times × orçamento`, todo time termina o draft gastando o orçamento inteiro —
@@ -43,10 +43,10 @@ import { ELO_ORDER, resolveElo } from "@/lib/design";
  * da regra. O motor do draft confere isso na montagem (`estadoFecha`); a prévia do draft
  * avisa antes; e quem calcula a tabela com os capitães (lib/draft/tabela-que-fecha.ts) desce
  * a curvatura e, no limite, a soma, até achar uma que feche. Medido com a granularidade
- * "divisao" e os capitães da regra: o pool real da 4ª e as 180 trocas de um titular por um
- * reserva fecham com 0,075; nos 200 pools sorteados pelo gerador dos testes (Ferro a
- * Mestre), 19 não fecham com 0,075, 19 com 0,05 e 23 com c = 0; com "elo", que tem poucos
- * preços distintos, 98 a 99 das 180 trocas não fecham — por isso o padrão é "divisao".
+ * "divisao" e os capitães da regra: o pool real da 4ª (40 jogadores) fecha direto com 0,1,
+ * e 105 de 105 pools parecidos também; com 30 jogadores, 165 das 180 trocas de um titular
+ * por um reserva fechavam direto com 0,1 (todas com 0,075). Com "elo", que tem poucos
+ * preços distintos, mais da metade das trocas não fechava — por isso o padrão é "divisao".
  * Pools estreitos (todos Platina) quase nunca fecham a soma exata, em qualquer curvatura.
  *
  * O preço é por CLASSE (elo + divisão, ou só o elo), nunca por pessoa: dois jogadores na
@@ -63,15 +63,19 @@ export type Granularidade = "elo" | "divisao";
 export const GRANULARIDADE_PADRAO: Granularidade = "divisao";
 
 /**
- * A CURVATURA da régua, por degrau (divisão): 0,075 por divisão, 0,3 por elo.
+ * A CURVATURA da régua, por degrau (divisão): 0,1 por divisão, 0,4 por elo.
  *
  * A direção é firme no histórico (2ª e 3ª, 76 partidas: em nenhuma reamostragem a escada
- * reta foi a melhor), mas o tamanho não. 0,075 é o MAIOR valor que manteve o draft seguro na
- * simulação: monta no pool real e em 100% das 180 trocas titular↔reserva, com 0 travamentos
- * em ~5.800 drafts. 0,1 já travava 8% dos drafts ao vivo. Se a soma exata não fechar com os
- * capitães, quem calcula a tabela desce a curvatura sozinho (ver lib/draft/tabela-que-fecha.ts).
+ * reta foi a melhor), mas o tamanho não. Com o formato da 4ª — 40 jogadores, 8 times — e a
+ * busca de viabilidade atual, 0,1 é o maior valor que mantém o draft seguro na simulação:
+ * monta direto no pool real e em 105 de 105 pools parecidos, 0 travamentos em 26 mil drafts,
+ * ~11 escolhíveis por vez; e deixa os times mais próximos que 0,075 em 92% das reamostragens
+ * do histórico. (Com 30 jogadores escolhemos 0,075 porque 0,1 travava 8% dos drafts — culpa
+ * da busca antiga, que estourava o limite de passos; a busca atual não estoura.) 0,1125 já
+ * falha em 1/3 dos pools parecidos. Se a soma exata não fechar com os capitães, quem calcula
+ * a tabela desce a curvatura sozinho (ver lib/draft/tabela-que-fecha.ts).
  */
-export const CURVATURA_PADRAO = 0.075;
+export const CURVATURA_PADRAO = 0.1;
 
 /** O valor de uma força na régua curvada. Ferro IV (força 0) vale 0. */
 export function valorDaForca(forca: number, curvatura: number = CURVATURA_PADRAO): number {

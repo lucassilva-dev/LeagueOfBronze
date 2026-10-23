@@ -253,7 +253,7 @@ describe("a busca de viabilidade com a tabela de soma exata", () => {
     });
   }
 
-  it("1ª escolha do pool real, com 0,075 (a padrão) e com 0,1: nenhuma sondagem indeterminada", () => {
+  it("1ª escolha do pool de 30, com 0,075 (a padrão de antes) e com 0,1 (a de hoje): nenhuma sondagem indeterminada", () => {
     for (const curvatura of [0.075, 0.1]) {
       const respostas = sondagensDaVez(iniciarDraft(draftDoPoolReal(curvatura), T0));
       expect(respostas.length).toBeGreaterThan(5);

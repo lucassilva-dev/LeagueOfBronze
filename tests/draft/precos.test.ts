@@ -26,24 +26,33 @@ import {
 } from "@/lib/draft/precos";
 import { ORCAMENTO_DA_MONTAGEM } from "@/lib/draft/viabilidade";
 import { ELO_ORDER, resolveElo } from "@/lib/design";
-import { POOL_4A, RESERVAS_4A, TITULARES_4A, type JogadorDoPool } from "./_pool-4a";
+import { POOL_4A, POOL_4A_40, RESERVAS_4A, TITULARES_4A, type JogadorDoPool } from "./_pool-4a";
 
 /**
  * A tabela de pontos automática (lib/draft/precos.ts).
  *
- * O que está em jogo: na 3ª o preço era fixo por elo e o orçamento "a média + 15%", e os 30
- * titulares da 4ª somavam 173 para um teto de 180 — 7 pontos de folga, que é exatamente o
- * que deixa um time terminar o draft mais forte que outro. A tabela automática promete soma
- * EXATA (todo time gasta os 30) e preço que nunca desce quando o elo sobe. Estes testes
- * conferem a promessa com o pool real, contra força bruta, em pools sorteados e num draft
- * inteiro rodado pelo motor de verdade.
+ * O que está em jogo: na 3ª o preço era fixo por elo e o orçamento "a média + 15%", e os 40
+ * da 4ª somam 231 para um teto de 240 (na primeira lista, de 30, eram 173 para 180) — pontos
+ * de folga, que é exatamente o que deixa um time terminar o draft mais forte que outro. A
+ * tabela automática promete soma EXATA (todo time gasta os 30) e preço que nunca desce quando
+ * o elo sobe. Estes testes conferem a promessa com o pool real (40 pessoas, 8 times), contra
+ * força bruta, em pools sorteados e num draft inteiro rodado pelo motor de verdade.
  */
 
-const DA_4A = { times: 6, jogadoresPorTime: 5, orcamentoPorTime: 30 } as const;
+/** O formato da 4ª: 40 pessoas, 8 times de 5, orçamento 30. */
+const FORMATO_40 = { times: 8, jogadoresPorTime: 5, orcamentoPorTime: 30 } as const;
+/** O formato da primeira lista (30 pessoas, 6 times): o dos testes de propriedade com pools de 30. */
+const FORMATO_30 = { times: 6, jogadoresPorTime: 5, orcamentoPorTime: 30 } as const;
 const T0 = Date.parse("2026-11-15T20:00:00.000Z");
 
+/** A tabela que a organização vai ver: os 40 da 4ª, 8 times, curvatura padrão (0,1). */
 function tabelaDa4a(granularidade?: Granularidade): TabelaDePontos {
-  return calcularTabela({ pool: TITULARES_4A, ...DA_4A, granularidade });
+  return calcularTabela({ pool: POOL_4A_40, ...FORMATO_40, granularidade });
+}
+
+/** A tabela da primeira lista de 22/10 (30 titulares, 6 times). */
+function tabelaDos30(granularidade?: Granularidade): TabelaDePontos {
+  return calcularTabela({ pool: TITULARES_4A, ...FORMATO_30, granularidade });
 }
 
 const precoPorRotulo = (t: TabelaDePontos) => Object.fromEntries(t.linhas.map((l) => [l.classe.rotulo, l.pontos]));
@@ -115,14 +124,160 @@ function maiorSomaAlcancavel(quantos: readonly number[], alvo: number): number {
 
 // ---------------------------------------------------------------- o pool real
 
-describe("a tabela da 4ª com o pool real (22/10)", () => {
+describe("a tabela da 4ª com o pool real (22/10 à noite: 40 pessoas, 8 times)", () => {
+  it("com a tabela fixa da 3ª, os 40 somam 231 para 240 — 9 pontos de folga que dão vantagem", () => {
+    expect(POOL_4A_40).toHaveLength(40);
+    expect(POOL_4A_40.every((j) => !j.reserva)).toBe(true);
+    expect(POOL_4A_40.reduce((s, j) => s + resolveElo(j.elo)!.pts, 0)).toBe(231);
+  });
+
+  it("por divisão: soma exatamente 240 e sai a tabela que a organização vai ver (curvatura 0,1)", () => {
+    const t = tabelaDa4a("divisao");
+    expect(t.curvatura).toBe(0.1);
+    expect(precoPorRotulo(t)).toEqual({
+      Ferro: 1, // o Ferro sem leitura da Riot: meio do elo, e o mais fraco do pool
+      "Prata III": 2,
+      Prata: 2, // o Prata sem leitura da Riot: meio do elo
+      "Prata I": 2,
+      "Ouro IV": 3,
+      "Ouro III": 3,
+      "Ouro II": 3,
+      "Ouro I": 4,
+      "Platina IV": 4,
+      "Platina III": 4,
+      "Platina II": 5,
+      "Platina I": 5,
+      "Esmeralda IV": 6,
+      "Esmeralda III": 6,
+      "Esmeralda II": 7,
+      "Esmeralda I": 8,
+      "Diamante IV": 9,
+      "Diamante III": 9,
+      "Diamante II": 10,
+      "Mestre · 0–99 PDL": 12,
+      "Mestre · 200–299 PDL": 15,
+    });
+    expect(t.linhas.reduce((s, l) => s + l.quantos, 0)).toBe(40);
+    expect(t).toMatchObject({ times: 8, alvo: 240, soma: 240, folga: 0 });
+    expect(t.erroMaximoEmDegraus).toBeCloseTo(1.73, 2);
+    // A reta: o mais fraco (o Ferro) custa 1 e o jogador médio custa 30 ÷ 5 = 6.
+    expect(t.reta.precoMedio).toBe(6);
+    expect(t.linhas[0]!.ideal).toBeCloseTo(1, 10);
+    // E a soma dos ideais é o alvo: com a soma exata, gastar 30 é ter o mesmo VALOR médio.
+    expect(t.linhas.reduce((s, l) => s + l.quantos * l.ideal, 0)).toBeCloseTo(240, 9);
+  });
+
+  it("com curvatura 0 (o fim da queda automática) sai a escada reta", () => {
+    const t = calcularTabela({ pool: POOL_4A_40, ...FORMATO_40, curvatura: 0 });
+    expect(t.linhas.map((l) => l.pontos)).toEqual([1, 3, 3, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6, 7, 7, 7, 8, 8, 8, 9, 9]);
+    expect(t).toMatchObject({ soma: 240, folga: 0 });
+    expect(t.erroMaximoEmDegraus).toBeCloseTo(1.83, 2);
+  });
+
+  it("só por elo: também soma 240, com um preço por elo", () => {
+    const t = tabelaDa4a("elo");
+    // O Ferro sozinho custa 2 (ideal 1): a soma exata com preços que nunca descem pede isso.
+    expect(precoPorRotulo(t)).toEqual({ Ferro: 2, Prata: 2, Ouro: 3, Platina: 5, Esmeralda: 6, Diamante: 9, Mestre: 13 });
+    expect(t).toMatchObject({ soma: 240, folga: 0 });
+  });
+
+  it("o preço de cada titular sai da linha dele, e a soma por jogador é a da tabela", () => {
+    const t = tabelaDa4a();
+    expect(POOL_4A_40.reduce((s, j) => s + precoNaTabela(t, j), 0)).toBe(240);
+  });
+
+  it("a ordem da lista não muda nada, e a mesma entrada dá a mesma tabela", () => {
+    const t = tabelaDa4a();
+    expect(calcularTabela({ pool: embaralhado(POOL_4A_40, 7), ...FORMATO_40 })).toEqual(t);
+    expect(calcularTabela({ pool: embaralhado(POOL_4A_40, 99), ...FORMATO_40 })).toEqual(t);
+    expect(tabelaDa4a()).toEqual(t);
+  });
+
+  it("reservas recebem o preço da reta, preso entre as linhas vizinhas", () => {
+    // A fila de reserva dos 40 ainda não existe: estes são inscritos hipotéticos a partir do 41º.
+    const t = tabelaDa4a();
+    const lido = (elo: string, divisao: string, pdl = 50): EloDoJogador => ({ elo, eloRiot: elo, divisao, pdl });
+    const reservas: EloDoJogador[] = [
+      lido("Diamante", "I"), // entre Diamante II (10) e Mestre 0–99 (12)
+      lido("Mestre", "I", 150), // Mestre 100–199: entre Mestre 0–99 (12) e Mestre 200–299 (15)
+      lido("Prata", "II"), // entre o Prata sem leitura (2) e Prata I (2)
+      { elo: "Platina" }, // sem leitura, meio do elo: entre Platina III (4) e Platina II (5)
+      lido("Esmeralda", "III"), // já tem linha
+      lido("Ferro", "IV"), // abaixo de todo mundo, nunca menos que 1
+      lido("Mestre", "I", 350), // Mestre 300–399: acima de todo mundo, só a reta
+    ];
+    expect(reservas.map((r) => precoNaTabela(t, r))).toEqual([11, 14, 2, 4, 6, 1, 17]);
+
+    for (const reserva of reservas) {
+      const forca = classeDoElo(reserva).forca;
+      const abaixo = t.linhas.filter((l) => l.classe.forca <= forca).at(-1);
+      const acima = t.linhas.find((l) => l.classe.forca >= forca);
+      const p = precoNaTabela(t, reserva);
+      if (abaixo) expect(p).toBeGreaterThanOrEqual(abaixo.pontos);
+      if (acima) expect(p).toBeLessThanOrEqual(acima.pontos);
+      expect(p).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it("mesma força em elos diferentes (Mestre 450 e Grão-Mestre 470): a linha é a do maior elo, em qualquer ordem", () => {
+    // Mestre 400–499 e Grão-Mestre 400–499 têm a mesma força (32,5) e caem na mesma linha. A
+    // linha ficava com quem aparecesse primeiro na lista — a tabela publicada mudava com a ordem.
+    const semOsDoisMestres = TITULARES_4A.filter((j) => j.elo !== "Mestre");
+    const mestre: EloDoJogador = { elo: "Mestre", eloRiot: "Mestre", divisao: "I", pdl: 450 };
+    const grao: EloDoJogador = { elo: "Grão-Mestre", eloRiot: "Grão-Mestre", divisao: "I", pdl: 470 };
+    const a = calcularTabela({ pool: [...semOsDoisMestres, mestre, grao], ...FORMATO_30 });
+    const b = calcularTabela({ pool: [...semOsDoisMestres, grao, mestre], ...FORMATO_30 });
+    const c = calcularTabela({ pool: [grao, ...embaralhado(semOsDoisMestres, 3), mestre], ...FORMATO_30 });
+    expect(JSON.stringify(b)).toBe(JSON.stringify(a));
+    expect(JSON.stringify(c)).toBe(JSON.stringify(a));
+    expect(a.linhas.at(-1)).toMatchObject({ quantos: 2, classe: { chave: "grao-mestre-400", rotulo: "Grão-Mestre · 400–499 PDL" } });
+    expect(precoNaTabela(a, mestre)).toBe(precoNaTabela(a, grao));
+  });
+
+  it("o retrato é dado puro: vai e volta por JSON e não carrega ninguém", () => {
+    const retrato = retratoDaTabela(tabelaDa4a());
+    expect(JSON.parse(JSON.stringify(retrato))).toEqual(retrato);
+    expect(retrato.linhas.map((l) => l.rotulo)).toContain("Mestre · 200–299 PDL");
+    expect(retrato.linhas.reduce((s, l) => s + l.pontos * l.quantos, 0)).toBe(retrato.soma);
+    expect(Object.keys(retrato.linhas[0]!).sort()).toEqual(["chave", "elo", "forca", "ideal", "pontos", "quantos", "rotulo"]);
+    expect(retrato.linhas[0]).toMatchObject({ rotulo: "Ferro", elo: "Ferro" });
+    expect(retrato.linhas[1]).toMatchObject({ rotulo: "Prata III", elo: "Prata" });
+  });
+
+  it("a tabela volta do retrato e dá o mesmo preço a qualquer jogador, do pool ou de fora", () => {
+    const t = tabelaDa4a();
+    const devolta = tabelaDoRetrato(JSON.parse(JSON.stringify(retratoDaTabela(t))));
+    // Os 40 e, de fora, a primeira lista (com leituras que não estão nos 40, como Diamante I).
+    for (const j of [...POOL_4A_40, ...POOL_4A]) expect(precoNaTabela(devolta, j)).toBe(precoNaTabela(t, j));
+    // A escada inteira, de Ferro IV ao Mestre 900.
+    for (const meta of ELO_ORDER.slice(0, 7)) {
+      for (const divisao of ROMANOS) {
+        const j = { elo: meta.label, eloRiot: meta.label, divisao };
+        expect(precoNaTabela(devolta, j)).toBe(precoNaTabela(t, j));
+      }
+    }
+    for (let pdl = 0; pdl < 1000; pdl += 100) {
+      const j = { elo: "Mestre", eloRiot: "Mestre", divisao: "I", pdl };
+      expect(precoNaTabela(devolta, j)).toBe(precoNaTabela(t, j));
+    }
+  });
+});
+
+/*
+ * A primeira lista de 22/10 (30 titulares, 6 times), com a curvatura de antes (0,075): as
+ * tabelas que a organização conferiu quando o formato ainda era de 6 times. Ficam como
+ * registro e como conferência da conta com curvatura explícita.
+ */
+describe("a primeira lista de 22/10 (30 titulares, 6 times), com a curvatura de antes", () => {
+  const ANTES = 0.075;
+
   it("com a tabela fixa da 3ª, os 30 titulares somavam 173 para 180 — a folga que dá vantagem", () => {
     expect(TITULARES_4A).toHaveLength(30);
     expect(TITULARES_4A.reduce((s, j) => s + resolveElo(j.elo)!.pts, 0)).toBe(173);
   });
 
-  it("por divisão: soma exatamente 180 e sai a tabela que a organização conferiu (curvatura 0,075)", () => {
-    const t = tabelaDa4a("divisao");
+  it("por divisão, com 0,075: soma exatamente 180 e sai a tabela que a organização conferiu", () => {
+    const t = calcularTabela({ pool: TITULARES_4A, ...FORMATO_30, curvatura: ANTES });
     expect(t.curvatura).toBe(0.075);
     expect(precoPorRotulo(t)).toEqual({
       "Prata III": 1,
@@ -150,36 +305,23 @@ describe("a tabela da 4ª com o pool real (22/10)", () => {
     // A reta: o mais fraco (Prata III) custa 1 e o jogador médio custa 30 ÷ 5 = 6.
     expect(t.reta.precoMedio).toBe(6);
     expect(t.linhas[0]!.ideal).toBeCloseTo(1, 10);
-    // E a soma dos ideais é o alvo: com a soma exata, gastar 30 é ter o mesmo VALOR médio.
     expect(t.linhas.reduce((s, l) => s + l.quantos * l.ideal, 0)).toBeCloseTo(180, 9);
   });
 
   it("com curvatura 0 sai a escada reta que a organização conferiu antes", () => {
-    const t = calcularTabela({ pool: TITULARES_4A, ...DA_4A, curvatura: 0 });
+    const t = calcularTabela({ pool: TITULARES_4A, ...FORMATO_30, curvatura: 0 });
     expect(t.linhas.map((l) => l.pontos)).toEqual([1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 7, 7, 8, 8, 9, 9, 11, 12]);
     expect(t.erroMaximoEmDegraus).toBeCloseTo(1.12, 2);
   });
 
-  it("só por elo: também soma 180, com um preço por elo", () => {
-    const t = tabelaDa4a("elo");
+  it("só por elo, com 0,075: também soma 180, com um preço por elo", () => {
+    const t = calcularTabela({ pool: TITULARES_4A, ...FORMATO_30, granularidade: "elo", curvatura: ANTES });
     expect(precoPorRotulo(t)).toEqual({ Prata: 1, Ouro: 2, Platina: 5, Esmeralda: 7, Diamante: 10, Mestre: 12 });
     expect(t).toMatchObject({ soma: 180, folga: 0 });
   });
 
-  it("o preço de cada titular sai da linha dele, e a soma por jogador é a da tabela", () => {
-    const t = tabelaDa4a();
-    expect(TITULARES_4A.reduce((s, j) => s + precoNaTabela(t, j), 0)).toBe(180);
-  });
-
-  it("a ordem da lista não muda nada, e a mesma entrada dá a mesma tabela", () => {
-    const t = tabelaDa4a();
-    expect(calcularTabela({ pool: embaralhado(TITULARES_4A, 7), ...DA_4A })).toEqual(t);
-    expect(calcularTabela({ pool: embaralhado(TITULARES_4A, 99), ...DA_4A })).toEqual(t);
-    expect(tabelaDa4a()).toEqual(t);
-  });
-
-  it("reservas recebem o preço da reta, preso entre as linhas vizinhas", () => {
-    const t = tabelaDa4a();
+  it("a fila de reserva de verdade, com 0,075: preço da reta, preso entre as linhas vizinhas", () => {
+    const t = calcularTabela({ pool: TITULARES_4A, ...FORMATO_30, curvatura: ANTES });
     const preco = (posicao: number) => precoNaTabela(t, POOL_4A.find((j) => j.posicao === posicao)!);
     expect(preco(30)).toBe(5); // Platina I: entre Platina II (5) e Esmeralda IV (6)
     expect(preco(32)).toBe(12); // Diamante I: entre Diamante III (10) e Mestre 0–99 (13)
@@ -199,45 +341,11 @@ describe("a tabela da 4ª com o pool real (22/10)", () => {
     }
   });
 
-  it("mesma força em elos diferentes (Mestre 450 e Grão-Mestre 470): a linha é a do maior elo, em qualquer ordem", () => {
-    // Mestre 400–499 e Grão-Mestre 400–499 têm a mesma força (32,5) e caem na mesma linha. A
-    // linha ficava com quem aparecesse primeiro na lista — a tabela publicada mudava com a ordem.
-    const semOsDoisMestres = TITULARES_4A.filter((j) => j.elo !== "Mestre");
-    const mestre: EloDoJogador = { elo: "Mestre", eloRiot: "Mestre", divisao: "I", pdl: 450 };
-    const grao: EloDoJogador = { elo: "Grão-Mestre", eloRiot: "Grão-Mestre", divisao: "I", pdl: 470 };
-    const a = calcularTabela({ pool: [...semOsDoisMestres, mestre, grao], ...DA_4A });
-    const b = calcularTabela({ pool: [...semOsDoisMestres, grao, mestre], ...DA_4A });
-    const c = calcularTabela({ pool: [grao, ...embaralhado(semOsDoisMestres, 3), mestre], ...DA_4A });
-    expect(JSON.stringify(b)).toBe(JSON.stringify(a));
-    expect(JSON.stringify(c)).toBe(JSON.stringify(a));
-    expect(a.linhas.at(-1)).toMatchObject({ quantos: 2, classe: { chave: "grao-mestre-400", rotulo: "Grão-Mestre · 400–499 PDL" } });
-    expect(precoNaTabela(a, mestre)).toBe(precoNaTabela(a, grao));
-  });
-
-  it("o retrato é dado puro: vai e volta por JSON e não carrega ninguém", () => {
-    const retrato = retratoDaTabela(tabelaDa4a());
-    expect(JSON.parse(JSON.stringify(retrato))).toEqual(retrato);
-    expect(retrato.linhas.map((l) => l.rotulo)).toContain("Mestre · 200–299 PDL");
-    expect(retrato.linhas.reduce((s, l) => s + l.pontos * l.quantos, 0)).toBe(retrato.soma);
-    expect(Object.keys(retrato.linhas[0]!).sort()).toEqual(["chave", "elo", "forca", "ideal", "pontos", "quantos", "rotulo"]);
-    expect(retrato.linhas[0]).toMatchObject({ rotulo: "Prata III", elo: "Prata" });
-  });
-
-  it("a tabela volta do retrato e dá o mesmo preço a qualquer jogador, do pool ou de fora", () => {
-    const t = tabelaDa4a();
-    const devolta = tabelaDoRetrato(JSON.parse(JSON.stringify(retratoDaTabela(t))));
-    for (const j of POOL_4A) expect(precoNaTabela(devolta, j)).toBe(precoNaTabela(t, j));
-    // A escada inteira, de Ferro IV ao Mestre 900.
-    for (const meta of ELO_ORDER.slice(0, 7)) {
-      for (const divisao of ROMANOS) {
-        const j = { elo: meta.label, eloRiot: meta.label, divisao };
-        expect(precoNaTabela(devolta, j)).toBe(precoNaTabela(t, j));
-      }
-    }
-    for (let pdl = 0; pdl < 1000; pdl += 100) {
-      const j = { elo: "Mestre", eloRiot: "Mestre", divisao: "I", pdl };
-      expect(precoNaTabela(devolta, j)).toBe(precoNaTabela(t, j));
-    }
+  it("com a curvatura de hoje (0,1), a mesma lista também soma 180", () => {
+    const t = tabelaDos30();
+    expect(t.curvatura).toBe(0.1);
+    expect(t).toMatchObject({ alvo: 180, soma: 180, folga: 0 });
+    expect(precoPorRotulo(t)).toMatchObject({ "Prata III": 1, "Mestre · 0–99 PDL": 15, "Mestre · 200–299 PDL": 18 });
   });
 });
 
@@ -300,7 +408,7 @@ describe("a classe de preço de um jogador", () => {
 
 describe("bordas da tabela", () => {
   it("todos do mesmo elo: uma linha só, cada um custa a média (6)", () => {
-    const t = calcularTabela({ pool: Array.from({ length: 30 }, () => ({ elo: "Ouro" })), ...DA_4A });
+    const t = calcularTabela({ pool: Array.from({ length: 30 }, () => ({ elo: "Ouro" })), ...FORMATO_30 });
     expect(t.linhas).toHaveLength(1);
     expect(t.linhas[0]).toMatchObject({ quantos: 30, pontos: 6 });
     expect(t).toMatchObject({ soma: 180, folga: 0, erroMaximoEmDegraus: 0 });
@@ -309,7 +417,7 @@ describe("bordas da tabela", () => {
 
   it("orçamento que não divide (31, todos iguais): a soma fica abaixo do alvo, nunca acima", () => {
     // Cada um teria de custar 6,2. Inteiro, 30 × 6 = 180 ≤ 186; 30 × 7 = 210 estoura.
-    const t = calcularTabela({ pool: Array.from({ length: 30 }, () => ({ elo: "Ouro" })), ...DA_4A, orcamentoPorTime: 31 });
+    const t = calcularTabela({ pool: Array.from({ length: 30 }, () => ({ elo: "Ouro" })), ...FORMATO_30, orcamentoPorTime: 31 });
     expect(t.alvo).toBe(186);
     expect(t.linhas[0]!.pontos).toBe(6);
     expect(t.soma).toBe(180);
@@ -321,8 +429,8 @@ describe("bordas da tabela", () => {
     // O Prata sem leitura (posição 16) sai e entra o reserva Ferro sem leitura.
     const ferro = RESERVAS_4A.find((j) => j.elo === "Ferro")!;
     const pool = TITULARES_4A.map((j) => (j.posicao === 16 ? { ...ferro, reserva: false } : j));
-    const t = calcularTabela({ pool, ...DA_4A });
-    const real = tabelaDa4a();
+    const t = calcularTabela({ pool, ...FORMATO_30 });
+    const real = tabelaDos30();
 
     expect(t.linhas[0]).toMatchObject({ quantos: 1, pontos: 1 });
     expect(t.linhas[0]!.classe.rotulo).toBe("Ferro");
@@ -334,14 +442,14 @@ describe("bordas da tabela", () => {
   });
 
   it("pool vazio: nenhuma linha, soma zero, e qualquer um custa 1", () => {
-    const t = calcularTabela({ pool: [], ...DA_4A });
+    const t = calcularTabela({ pool: [], ...FORMATO_30 });
     expect(t).toMatchObject({ linhas: [], alvo: 180, soma: 0, folga: 180 });
     expect(precoNaTabela(t, { elo: "Desafiante" })).toBe(1);
   });
 
   it("zero times (ou zero jogadores por time): não há tabela", () => {
-    expect(calcularTabela({ pool: TITULARES_4A, ...DA_4A, times: 0 })).toMatchObject({ linhas: [], alvo: 0, soma: 0, folga: 0 });
-    expect(calcularTabela({ pool: TITULARES_4A, ...DA_4A, jogadoresPorTime: 0 }).linhas).toEqual([]);
+    expect(calcularTabela({ pool: TITULARES_4A, ...FORMATO_30, times: 0 })).toMatchObject({ linhas: [], alvo: 0, soma: 0, folga: 0 });
+    expect(calcularTabela({ pool: TITULARES_4A, ...FORMATO_30, jogadoresPorTime: 0 }).linhas).toEqual([]);
   });
 
   it("reserva com a reta fora das vizinhas: o preço fica preso entre as linhas (tabela montada à mão)", () => {
@@ -374,7 +482,7 @@ describe("bordas da tabela", () => {
   });
 
   it("orçamento menor que um ponto por jogador: todo mundo no mínimo, e a folga negativa acusa", () => {
-    const t = calcularTabela({ pool: TITULARES_4A, ...DA_4A, orcamentoPorTime: 4 });
+    const t = calcularTabela({ pool: TITULARES_4A, ...FORMATO_30, orcamentoPorTime: 4 });
     expect(t.linhas.every((l) => l.pontos === 1)).toBe(true);
     expect(t.soma).toBe(30);
     expect(t.folga).toBe(-6);
@@ -518,7 +626,7 @@ describe("o arredondamento contra força bruta", () => {
     // Antes: 1,7 s e ~1 GB com 600; 234 s e 2,8 GB com 999 — no navegador e na sondagem do painel.
     for (const orcamento of [300, 600, 999]) {
       const inicio = performance.now();
-      const t = calcularTabela({ pool: TITULARES_4A, ...DA_4A, orcamentoPorTime: orcamento });
+      const t = calcularTabela({ pool: TITULARES_4A, ...FORMATO_30, orcamentoPorTime: orcamento });
       expect(performance.now() - inicio, `orçamento ${orcamento}`).toBeLessThan(1000);
       expect(t).toMatchObject({ soma: 6 * orcamento, folga: 0 });
       for (let i = 1; i < t.linhas.length; i++) expect(t.linhas[i]!.pontos).toBeGreaterThanOrEqual(t.linhas[i - 1]!.pontos);
@@ -547,7 +655,7 @@ describe("propriedades em pools sorteados (semente fixa)", () => {
   it("soma == alvo sempre que alcançável; nunca passa do alvo; preço ≥ 1 e nunca desce com a força", () => {
     for (const { semente, granularidade } of casos) {
       const pool = poolSorteado(semente);
-      const t = calcularTabela({ pool, ...DA_4A, granularidade });
+      const t = calcularTabela({ pool, ...FORMATO_30, granularidade });
       const contexto = `semente ${semente} (${granularidade})`;
 
       expect(t.soma, contexto).toBeLessThanOrEqual(t.alvo);
@@ -569,13 +677,13 @@ describe("propriedades em pools sorteados (semente fixa)", () => {
 
   it("por divisão, todos os pools sorteados fecham a soma exata", () => {
     for (const { semente, granularidade } of casos.filter((c) => c.granularidade === "divisao")) {
-      expect(calcularTabela({ pool: poolSorteado(semente), ...DA_4A, granularidade }).folga, `semente ${semente}`).toBe(0);
+      expect(calcularTabela({ pool: poolSorteado(semente), ...FORMATO_30, granularidade }).folga, `semente ${semente}`).toBe(0);
     }
   });
 
   it("o custo nunca é pior que o de arredondar cada um para o mais próximo, quando esse arredondamento já fecha", () => {
     for (const { semente, granularidade } of casos) {
-      const t = calcularTabela({ pool: poolSorteado(semente), ...DA_4A, granularidade });
+      const t = calcularTabela({ pool: poolSorteado(semente), ...FORMATO_30, granularidade });
       const ingenuos = t.linhas.map((l) => Math.max(1, Math.round(l.ideal)));
       const somaIngenua = t.linhas.reduce((s, l, i) => s + l.quantos * ingenuos[i]!, 0);
       const monotono = ingenuos.every((p, i) => i === 0 || p >= ingenuos[i - 1]!);
@@ -587,7 +695,7 @@ describe("propriedades em pools sorteados (semente fixa)", () => {
 
   it("reserva sorteada: preço entre as linhas vizinhas, e nunca desce com a força", () => {
     for (const { semente, granularidade } of casos.slice(0, 40)) {
-      const t = calcularTabela({ pool: poolSorteado(semente), ...DA_4A, granularidade });
+      const t = calcularTabela({ pool: poolSorteado(semente), ...FORMATO_30, granularidade });
       const reservas = poolSorteado(semente + 1, 12).sort((a, b) => classeDoElo(a, granularidade).forca - classeDoElo(b, granularidade).forca);
       let anterior = 0;
       for (const reserva of reservas) {
@@ -606,12 +714,12 @@ describe("propriedades em pools sorteados (semente fixa)", () => {
 
 // ---------------------------------------------------------------- o draft com estes preços
 
-describe("o draft da 4ª montado com a tabela automática", () => {
+describe("o draft da 4ª montado com a tabela automática (40 pessoas, 8 times)", () => {
   const id = (j: JogadorDoPool) => `j${String(j.posicao).padStart(2, "0")}`;
 
   function draftDa4a(): { estado: EstadoDraft; tabela: TabelaDePontos } {
     const tabela = tabelaDa4a();
-    const jogadores: JogadorDoDraft[] = TITULARES_4A.map((j) => ({
+    const jogadores: JogadorDoDraft[] = POOL_4A_40.map((j) => ({
       id: id(j),
       riotId: `Jogador${j.posicao}#BR1`,
       pontos: precoNaTabela(tabela, j),
@@ -621,12 +729,12 @@ describe("o draft da 4ª montado com a tabela automática", () => {
       timeId: null,
     }));
     const ranking = rankingDeCapitaes(
-      TITULARES_4A.map((j) => ({ id: id(j), riotId: `Jogador${j.posicao}#BR1`, organizador: j.organizador, elo: j.elo, eloRiot: j.eloRiot, divisao: j.divisao, pdl: j.pdl })),
-      6,
+      POOL_4A_40.map((j) => ({ id: id(j), riotId: `Jogador${j.posicao}#BR1`, organizador: j.organizador, elo: j.elo, eloRiot: j.eloRiot, divisao: j.divisao, pdl: j.pdl })),
+      8,
     );
     expect(ranking.empateNoCorte).toBeNull();
-    // Os seis maiores elos fora da organização: o Mestre 21 PDL e cinco Diamantes.
-    expect(ranking.escolhidos.sort()).toEqual(["j04", "j05", "j08", "j22", "j28", "j29"]);
+    // Os oito maiores elos fora da organização: os dois Mestres (32 e 21 PDL) e seis Diamantes.
+    expect(ranking.escolhidos.sort()).toEqual(["j04", "j05", "j08", "j28", "j29", "j32", "j37", "j39"]);
     const estado = montarDraft({
       times: ranking.escolhidos.map((capitaoId, i) => ({ id: `time-${i + 1}`, nome: `T${i + 1}`, cor: "#fff", capitaoId })),
       jogadores,
@@ -642,7 +750,7 @@ describe("o draft da 4ª montado com a tabela automática", () => {
     expect(e.fase).toBe("encerrado");
     // A régua que a soma exata iguala é a de VALOR (curvada), não a de força em degraus: com
     // curvatura, dois times com 30 cada podem diferir em divisões somadas mais que isso.
-    const valorPorId = new Map(TITULARES_4A.map((j) => [id(j), valorDaForca(classeDoElo(j).forca, tabela.curvatura)]));
+    const valorPorId = new Map(POOL_4A_40.map((j) => [id(j), valorDaForca(classeDoElo(j).forca, tabela.curvatura)]));
     const valores: number[] = [];
     for (const t of e.times) {
       const elenco = e.jogadores.filter((j) => j.timeId === t.id);
@@ -665,7 +773,8 @@ describe("o draft da 4ª montado com a tabela automática", () => {
   it("um draft inteiro só de auto-pick (o relógio estoura toda vez) chega ao fim sem travar", () => {
     const { estado, tabela } = draftDa4a();
     let e = iniciarDraft(estado, T0);
-    for (let k = 1; k <= 24 && e.fase === "rodando"; k++) e = alcancarORelogio(e, T0 + k * 60_000 + 1);
+    // 8 times × 4 escolhas = 32.
+    for (let k = 1; k <= 32 && e.fase === "rodando"; k++) e = alcancarORelogio(e, T0 + k * 60_000 + 1);
     expect(e.motivoDaPausa).toBeUndefined();
     conferirFim(e, tabela);
   });

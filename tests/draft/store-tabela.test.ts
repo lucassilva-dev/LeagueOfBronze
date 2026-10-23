@@ -4,11 +4,12 @@ import { estadoFecha } from "@/lib/draft/motor";
 import { calcularTabela } from "@/lib/draft/precos";
 import { ORCAMENTO_DA_MONTAGEM } from "@/lib/draft/viabilidade";
 import { resolveElo } from "@/lib/design";
-import { POOL_4A, type JogadorDoPool } from "./_pool-4a";
+import { POOL_4A_40, type JogadorDoPool } from "./_pool-4a";
 
 /**
  * A tabela automática ligada ao draft de verdade (lib/draft/store.ts): a prévia do painel
- * e a montagem do sorteio, contra um banco falso com o pool real da 4ª.
+ * e a montagem do sorteio, contra um banco falso com o pool real da 4ª (40 pessoas, 8 times
+ * de 5, orçamento 30, curvatura padrão 0,1).
  *
  * O que se prova aqui é a ligação, que os testes do núcleo (precos.test.ts) não alcançam:
  *  - o preço que entra no draft é o da tabela automática, não a coluna `pontos` do banco
@@ -68,20 +69,29 @@ function congelada(j: JogadorDoPool): Partial<Linha> {
 beforeEach(() => {
   banco.config = {
     jogadores_por_time: 5,
-    max_times: 6,
+    max_times: 8,
     orcamento_por_time: 30,
     segundos_por_escolha: 60,
     inscricoes_abertas: false,
     fechamento_inscricoes: null,
   };
-  banco.inscritos = POOL_4A.map((j) => inscricao(j));
+  banco.inscritos = POOL_4A_40.map((j) => inscricao(j));
 });
 
 /**
- * Um pool de 30 sem empate no corte em que a tabela fecha a soma (180) mas os capitães da
- * regra não deixam os elencos fecharem: Prata e Ouro apertados, preços 1, 2, 4, 5, 7, 9 e
- * 10 — capitães a 10, 10, 9, 9, 9, 9, e não há como cada time somar exatamente o resto.
- * Achado por busca em pools sorteados; mantido aqui como está.
+ * Dois inscritos além dos 40 (hipotéticos), para os casos com sobra e com aptos ≠ vagas. O
+ * 41º é um Diamante I: se jogasse, seria capitão pela regra (acima do Diamante II).
+ */
+const ALEM_DOS_40: JogadorDoPool[] = [
+  { posicao: 41, elo: "Diamante", eloRiot: "Diamante", divisao: "I", pdl: 97, organizador: false, rota1: "TOP", rota2: "MID", reserva: true },
+  { posicao: 42, elo: "Ouro", eloRiot: "Ouro", divisao: "III", pdl: 20, organizador: false, rota1: "SUP", rota2: "ADC", reserva: true },
+];
+
+/**
+ * Um pool de 30 (6 times) sem empate no corte em que a tabela fecha a soma (180) mas os
+ * capitães da regra não deixam os elencos fecharem: Prata e Ouro apertados, preços 1, 2, 4,
+ * 5, 7, 9 e 10 (os mesmos com 0,075 e com 0,1) — capitães a 10, 10, 9, 9, 9, 9, e não há como
+ * cada time somar exatamente o resto. Achado por busca em pools sorteados; mantido aqui como está.
  */
 const ELOS_QUE_NAO_FECHAM: [string, string, number][] = [
   ["Ouro", "II", 1], ["Prata", "I", 4], ["Ouro", "III", 7], ["Prata", "II", 10], ["Ouro", "III", 13],
@@ -131,7 +141,8 @@ const POOL_SO_PLATINA: Linha[] = ELOS_SO_PLATINA.map(([elo, divisao, pdl], k) =>
 const pontosDe = (previa: Awaited<ReturnType<typeof previaDoDraft>>) =>
   Object.fromEntries(previa.jogadores.map((j) => [j.riotId, j.pontos]));
 
-const CAPITAES_DA_REGRA = ["insc-4", "insc-5", "insc-8", "insc-22", "insc-28", "insc-29"];
+/** Os 8 maiores elos fora da organização: os dois Mestres (#32 e #4) e seis Diamantes. */
+const CAPITAES_DA_REGRA = ["insc-4", "insc-5", "insc-8", "insc-28", "insc-29", "insc-32", "insc-37", "insc-39"];
 
 describe("a prévia do draft com a tabela automática", () => {
   it("o preço de cada um é o da tabela automática, não a coluna `pontos` (tabela da 3ª)", async () => {
@@ -139,13 +150,14 @@ describe("a prévia do draft com a tabela automática", () => {
     const pontos = pontosDe(previa);
 
     expect(previa.impedimentos).toEqual([]);
-    expect(pontos["Jogador1#BR1"]).toBe(16); // Mestre 208 PDL — na 3ª valia 10
-    expect(pontos["Jogador4#BR1"]).toBe(13); // Mestre 21 PDL
-    expect(pontos["Jogador24#BR1"]).toBe(1); // Prata III — na 3ª valia 3
-    expect(pontos["Jogador16#BR1"]).toBe(1); // Prata sem leitura: meio do elo
-    expect(pontos["Jogador13#BR1"]).toBe(5); // Platina II
-    expect(previa.totalDePontos).toBe(180);
-    expect(previa.jogadores).toHaveLength(30);
+    expect(pontos["Jogador1#BR1"]).toBe(15); // Mestre 208 PDL — na 3ª valia 10
+    expect(pontos["Jogador4#BR1"]).toBe(12); // Mestre 21 PDL
+    expect(pontos["Jogador24#BR1"]).toBe(2); // Prata III — na 3ª valia 3
+    expect(pontos["Jogador16#BR1"]).toBe(2); // Prata sem leitura: meio do elo
+    expect(pontos["Jogador13#BR1"]).toBe(5); // Platina I
+    expect(pontos["Jogador35#BR1"]).toBe(1); // Ferro sem leitura: o mais fraco custa 1
+    expect(previa.totalDePontos).toBe(240);
+    expect(previa.jogadores).toHaveLength(40);
   });
 
   it("devolve a tabela desta edição, e nada da regra antiga (média + 15%)", async () => {
@@ -153,10 +165,10 @@ describe("a prévia do draft com a tabela automática", () => {
     // Nulo, e não ausente: o painel de antes do deploy testa `!== null` e, sem a chave,
     // mostrava "O orçamento configurado (30) não é o da regra (undefined)".
     expect(previa.orcamentoSugerido).toBeNull();
-    expect(previa.tabela).toMatchObject({ granularidade: "divisao", curvatura: 0.075, alvo: 180, soma: 180, folga: 0, times: 6, queda: null });
+    expect(previa.tabela).toMatchObject({ granularidade: "divisao", curvatura: 0.1, alvo: 240, soma: 240, folga: 0, times: 8, queda: null });
     expect(previa.tabela!.poolIncompleto).toBeUndefined();
-    expect(previa.tabela!.linhas.map((l) => [l.rotulo, l.quantos, l.pontos])).toContainEqual(["Mestre · 200–299 PDL", 1, 16]);
-    expect(previa.tabela!.erroMaximoEmDegraus).toBeCloseTo(1.08, 2);
+    expect(previa.tabela!.linhas.map((l) => [l.rotulo, l.quantos, l.pontos])).toContainEqual(["Mestre · 200–299 PDL", 1, 15]);
+    expect(previa.tabela!.erroMaximoEmDegraus).toBeCloseTo(1.73, 2);
     // Serializável: é o que a rota manda em JSON.
     expect(JSON.parse(JSON.stringify(previa.tabela))).toEqual(previa.tabela);
   });
@@ -171,11 +183,11 @@ describe("a prévia do draft com a tabela automática", () => {
     const antes = await previaDoDraft(SEM_DRAFT);
 
     // Congela todo mundo com a leitura do dia e, DEPOIS, o robô lê outra coisa: o Diamante IV
-    // 5 PDL (último capitão) cai para Esmeralda, a Prata III sobe para Prata I e o Mestre de
-    // 208 PDL vai a 650.
-    banco.inscritos = POOL_4A.map((j) => {
+    // 34 PDL (#5, último capitão) cai para Esmeralda, a Prata III sobe para Prata I e o Mestre
+    // de 208 PDL vai a 650.
+    banco.inscritos = POOL_4A_40.map((j) => {
       const linha = inscricao(j, congelada(j));
-      if (j.posicao === 22) return { ...linha, elo_riot: "Esmeralda", riot_divisao: "I", riot_pdl: 90 };
+      if (j.posicao === 5) return { ...linha, elo_riot: "Esmeralda", riot_divisao: "I", riot_pdl: 90 };
       if (j.posicao === 24) return { ...linha, riot_divisao: "I", riot_pdl: 10 };
       if (j.posicao === 1) return { ...linha, riot_pdl: 650 };
       return linha;
@@ -189,11 +201,11 @@ describe("a prévia do draft com a tabela automática", () => {
   });
 
   it("o corte dos capitães também é o do congelamento: a leitura de hoje não troca quem capitaneia", async () => {
-    // A posição 15 vira um Diamante IV de 3 PDL, logo abaixo do último capitão (Diamante IV,
-    // 5 PDL). Congelados os dois, a Riot passa a mostrar a 15 com 90 PDL: pela leitura de hoje
-    // ela tomaria a vaga de capitão; pela fotografia do congelamento, não.
-    const p15 = { ...POOL_4A.find((j) => j.posicao === 15)!, elo: "Diamante", eloRiot: "Diamante", divisao: "IV", pdl: 3 };
-    banco.inscritos = POOL_4A.map((j) => {
+    // A posição 15 vira um Diamante IV de 30 PDL, logo abaixo do último capitão (#5, Diamante
+    // IV, 34 PDL). Congelados os dois, a Riot passa a mostrar a 15 com 90 PDL: pela leitura de
+    // hoje ela tomaria a vaga de capitão; pela fotografia do congelamento, não.
+    const p15 = { ...POOL_4A_40.find((j) => j.posicao === 15)!, elo: "Diamante", eloRiot: "Diamante", divisao: "IV", pdl: 30 };
+    banco.inscritos = POOL_4A_40.map((j) => {
       const base = j.posicao === 15 ? p15 : j;
       const linha = inscricao(base, congelada(base));
       return j.posicao === 15 ? { ...linha, riot_pdl: 90 } : linha;
@@ -204,19 +216,19 @@ describe("a prévia do draft com a tabela automática", () => {
     expect(previa.capitaesPelaRegra).not.toContain("insc-15");
 
     // Sem congelar, a mesma leitura troca o capitão — a diferença é a fotografia.
-    banco.inscritos = POOL_4A.map((j) => (j.posicao === 15 ? inscricao(p15, { riot_pdl: 90 }) : inscricao(j)));
+    banco.inscritos = POOL_4A_40.map((j) => (j.posicao === 15 ? inscricao(p15, { riot_pdl: 90 }) : inscricao(j)));
     expect((await previaDoDraft(SEM_DRAFT)).capitaesPelaRegra).toContain("insc-15");
   });
 
   it("sem congelar, a mesma leitura nova da Riot muda o preço (é por isso que se congela)", async () => {
-    banco.inscritos = POOL_4A.map((j) => (j.posicao === 24 ? inscricao(j, { riot_divisao: "I", riot_pdl: 10 }) : inscricao(j)));
+    banco.inscritos = POOL_4A_40.map((j) => (j.posicao === 24 ? inscricao(j, { riot_divisao: "I", riot_pdl: 10 }) : inscricao(j)));
     const previa = await previaDoDraft(SEM_DRAFT);
     expect(previa.tabela!.linhas.find((l) => l.rotulo === "Prata I")!.quantos).toBe(2);
   });
 
   it("congelado sem divisão (leitura de outro tier, ou congelado antes da migração): meio do elo", async () => {
     // O Ouro I 82 PDL (posição 9) foi congelado sem divisão; o robô hoje diz Ouro I.
-    banco.inscritos = POOL_4A.map((j) =>
+    banco.inscritos = POOL_4A_40.map((j) =>
       j.posicao === 9 ? inscricao(j, { elo_congelado: "Ouro", divisao_congelada: null, pdl_congelado: null }) : inscricao(j),
     );
     const previa = await previaDoDraft(SEM_DRAFT);
@@ -226,7 +238,7 @@ describe("a prévia do draft com a tabela automática", () => {
   });
 
   it("elo que a tabela não reconhece vira impedimento, e a prévia continua de pé", async () => {
-    banco.inscritos = POOL_4A.map((j) => (j.posicao === 7 ? inscricao(j, { elo_verificado: "Lata" }) : inscricao(j)));
+    banco.inscritos = POOL_4A_40.map((j) => (j.posicao === 7 ? inscricao(j, { elo_verificado: "Lata" }) : inscricao(j)));
     const previa = await previaDoDraft(SEM_DRAFT);
     expect(previa.impedimentos.some((p) => p.includes("Jogador7#BR1") && p.includes("Lata"))).toBe(true);
     expect(previa.fechaComOsCapitaesDaRegra).toBeNull();
@@ -239,8 +251,9 @@ describe("a prévia do draft com a tabela automática", () => {
     // Nenhuma curvatura fecha com a soma exata; com a soma 1 ponto abaixo de 180, fecha.
     expect(previa.fechaComOsCapitaesDaRegra).toBe(true);
     expect(previa.tabela).toMatchObject({ curvatura: 0, soma: 179, folga: 1 });
-    expect(previa.tabela!.queda).toMatchObject({ curvaturaPedida: 0.075 });
-    expect(previa.tabela!.queda!.motivo).toContain("A curvatura caiu de 0,075 para 0 e a soma ficou 1 ponto abaixo de 180 (179)");
+    expect(previa.tabela).toMatchObject({ times: 6, alvo: 180 });
+    expect(previa.tabela!.queda).toMatchObject({ curvaturaPedida: 0.1 });
+    expect(previa.tabela!.queda!.motivo).toContain("A curvatura caiu de 0,1 para 0 e a soma ficou 1 ponto abaixo de 180 (179)");
     expect(previa.totalDePontos).toBe(179);
   });
 
@@ -251,15 +264,16 @@ describe("a prévia do draft com a tabela automática", () => {
     expect(previa.empateNoCorte).toBeNull();
     expect(previa.fechaComOsCapitaesDaRegra).toBe(false);
     // A tabela mostrada é a pedida, sem queda.
-    expect(previa.tabela).toMatchObject({ curvatura: 0.075, folga: 0, queda: null });
+    expect(previa.tabela).toMatchObject({ curvatura: 0.1, folga: 0, queda: null });
   });
 
   it("aptos ≠ vagas: a tabela vem marcada como pool incompleto (a tela não a mostra como fechada)", async () => {
-    // 36 aprovados como apto, nenhum marcado como sobra: o pool do sorteio ainda não existe.
-    banco.inscritos = POOL_4A.map((j) => inscricao(j, { situacao: "apto" }));
+    // 42 aprovados como apto (os 40 e mais dois), nenhum marcado como sobra: o pool do sorteio
+    // ainda não existe.
+    banco.inscritos = [...POOL_4A_40, ...ALEM_DOS_40].map((j) => inscricao(j, { situacao: "apto" }));
     const previa = await previaDoDraft(SEM_DRAFT);
-    expect(previa.aptos).toBe(36);
-    expect(previa.vagas).toBe(30);
+    expect(previa.aptos).toBe(42);
+    expect(previa.vagas).toBe(40);
     expect(previa.impedimentos.length).toBeGreaterThan(0);
     expect(previa.tabela!.poolIncompleto).toBe(true);
     expect(previa.fechaComOsCapitaesDaRegra).toBeNull();
@@ -270,32 +284,33 @@ describe("a prévia do draft com a tabela automática", () => {
  * A queda automática (lib/draft/tabela-que-fecha.ts) ligada à prévia e à montagem.
  *
  * O risco que a simulação apontou: o Mestre do topo (organizador, 208 PDL) subir até o
- * congelamento. Com 400 PDL ele custaria 19 com a curvatura 0,075, e nenhum time paga mais de
- * 18 numa escolha — o sorteio era recusado. Agora a conta desce para 0,0625 sozinha.
+ * congelamento. Com 8 times e a curvatura 0,1 ele fecha até 399 PDL; com 400 a 499 ele
+ * custaria 19 e não existe repartição dos outros que feche os 8 elencos — o sorteio era
+ * recusado. Agora a conta desce para 0,0875 sozinha.
  */
 describe("a queda automática da curvatura", () => {
-  const MESTRE_450 = () => POOL_4A.map((j) => inscricao(j.posicao === 1 ? { ...j, pdl: 450 } : j));
+  const MESTRE_450 = () => POOL_4A_40.map((j) => inscricao(j.posicao === 1 ? { ...j, pdl: 450 } : j));
 
-  it("Mestre #1 com 450 PDL: a prévia desce para 0,0625, explica, e os capitães da regra fecham", async () => {
+  it("Mestre #1 com 450 PDL: a prévia desce para 0,0875, explica, e os capitães da regra fecham", async () => {
     banco.inscritos = MESTRE_450();
     const previa = await previaDoDraft(SEM_DRAFT);
     expect(previa.fechaComOsCapitaesDaRegra).toBe(true);
-    expect(previa.tabela).toMatchObject({ curvatura: 0.0625, soma: 180, folga: 0 });
+    expect(previa.tabela).toMatchObject({ curvatura: 0.0875, soma: 240, folga: 0 });
     expect(previa.tabela!.queda).toEqual({
-      curvaturaPedida: 0.075,
+      curvaturaPedida: 0.1,
       motivo:
-        "A curvatura caiu de 0,075 para 0,0625: com 0,075, o Mestre · 400–499 PDL custaria 19 e nenhum time conseguiria pagá-lo (cabem no máximo 18 numa escolha).",
+        "A curvatura caiu de 0,1 para 0,0875: com 0,1, não existe divisão dos outros jogadores que feche os elencos de todos os capitães (cada time precisa terminar com os 30 pontos certinhos).",
     });
     expect(pontosDe(previa)["Jogador1#BR1"]).toBe(17);
-    expect(previa.totalDePontos).toBe(180);
+    expect(previa.totalDePontos).toBe(240);
   });
 
   it("Mestre #1 com 450 PDL: a montagem usa a mesma tabela e grava a queda no retrato", async () => {
     banco.inscritos = MESTRE_450();
     const estado = await montarDraftDosAprovados({ metodo: "maior_elo" });
     expect(estado.jogadores.find((j) => j.riotId === "Jogador1#BR1")!.pontos).toBe(17);
-    expect(estado.jogadores.reduce((s, j) => s + j.pontos, 0)).toBe(180);
-    expect(estado.tabelaDePontos).toMatchObject({ curvatura: 0.0625, folga: 0, queda: { curvaturaPedida: 0.075 } });
+    expect(estado.jogadores.reduce((s, j) => s + j.pontos, 0)).toBe(240);
+    expect(estado.tabelaDePontos).toMatchObject({ curvatura: 0.0875, folga: 0, queda: { curvaturaPedida: 0.1 } });
     expect(estadoFecha(estado, ORCAMENTO_DA_MONTAGEM)).toBe(true);
     // A prévia e a montagem dão o mesmo preço a todo mundo.
     const previa = await previaDoDraft(SEM_DRAFT);
@@ -321,7 +336,7 @@ describe("a queda automática da curvatura", () => {
   it("capitães à mão também ganham a queda: a tabela é a que fecha com OS ESCOLHIDOS", async () => {
     banco.inscritos = MESTRE_450();
     const estado = await montarDraftDosAprovados({ metodo: "manual", capitaesManuais: CAPITAES_DA_REGRA });
-    expect(estado.tabelaDePontos!.curvatura).toBe(0.0625);
+    expect(estado.tabelaDePontos!.curvatura).toBe(0.0875);
   });
 });
 
@@ -357,27 +372,31 @@ describe("o draft público leva a classe e a tabela do sorteio", () => {
 
 describe("a montagem do sorteio com a tabela automática", () => {
   it("o pool entra com os preços da tabela, e o retrato dela fica gravado no estado", async () => {
+    // Os 40 e dois aprovados na sobra (42 aprovados: 8 times, 40 vagas).
+    banco.inscritos = [...POOL_4A_40, ...ALEM_DOS_40].map((j) => inscricao(j));
     const estado = await montarDraftDosAprovados({ metodo: "maior_elo" });
 
     const preco = Object.fromEntries(estado.jogadores.map((j) => [j.riotId, j.pontos]));
-    expect(preco["Jogador1#BR1"]).toBe(16);
-    expect(preco["Jogador24#BR1"]).toBe(1);
-    expect(estado.jogadores.reduce((s, j) => s + j.pontos, 0)).toBe(180);
-    expect(estado.tabelaDePontos).toMatchObject({ alvo: 180, soma: 180, folga: 0 });
-    expect(estado.tabelaDePontos!.linhas.reduce((s, l) => s + l.quantos * l.pontos, 0)).toBe(180);
+    expect(preco["Jogador1#BR1"]).toBe(15);
+    expect(preco["Jogador24#BR1"]).toBe(2);
+    expect(estado.jogadores).toHaveLength(40);
+    expect(estado.jogadores.reduce((s, j) => s + j.pontos, 0)).toBe(240);
+    expect(estado.tabelaDePontos).toMatchObject({ times: 8, alvo: 240, soma: 240, folga: 0 });
+    expect(estado.tabelaDePontos!.linhas.reduce((s, l) => s + l.quantos * l.pontos, 0)).toBe(240);
     expect([...estado.times.map((t) => t.capitaoId)].sort()).toEqual([...CAPITAES_DA_REGRA].sort());
     expect(estadoFecha(estado, ORCAMENTO_DA_MONTAGEM)).toBe(true);
-    // Reserva (sobra) não entra no pool.
-    expect(estado.jogadores.some((j) => j.riotId === "Jogador32#BR1")).toBe(false);
+    // Reserva (sobra) não entra no pool — nem o Diamante I, que pelo elo seria capitão.
+    expect(estado.jogadores.some((j) => j.riotId === "Jogador41#BR1")).toBe(false);
+    expect(estado.jogadores.some((j) => j.riotId === "Jogador42#BR1")).toBe(false);
   });
 
   it("congelado: o sorteio usa a fotografia do congelamento, não a leitura de hoje", async () => {
-    banco.inscritos = POOL_4A.map((j) => {
+    banco.inscritos = POOL_4A_40.map((j) => {
       const linha = inscricao(j, congelada(j));
       return j.posicao === 1 ? { ...linha, riot_pdl: 650 } : linha;
     });
     const estado = await montarDraftDosAprovados({ metodo: "maior_elo" });
-    expect(estado.jogadores.find((j) => j.riotId === "Jogador1#BR1")!.pontos).toBe(16);
+    expect(estado.jogadores.find((j) => j.riotId === "Jogador1#BR1")!.pontos).toBe(15);
   });
 
   it("os capitães não fecham nem com a queda: recusa explicando a soma exata, sem sugerir média + 15%", async () => {
@@ -400,7 +419,7 @@ describe("a montagem do sorteio com a tabela automática", () => {
   });
 
   it("elo que a tabela não reconhece trava o sorteio com o nome de quem corrigir", async () => {
-    banco.inscritos = POOL_4A.map((j) => (j.posicao === 7 ? inscricao(j, { elo_verificado: "Lata" }) : inscricao(j)));
+    banco.inscritos = POOL_4A_40.map((j) => (j.posicao === 7 ? inscricao(j, { elo_verificado: "Lata" }) : inscricao(j)));
     await expect(montarDraftDosAprovados({ metodo: "maior_elo" })).rejects.toThrow(/Jogador7#BR1/);
   });
 });

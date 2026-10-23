@@ -20,11 +20,15 @@ import type { DraftPublico } from "@/lib/draft/store";
  * PRÉVIA com a mesma função do servidor.
  *
  * Pool de um time só, com a leitura da Riot de cada um:
- *   Prata III, Ouro IV, Ouro II, Platina I, Diamante IV  (os 5 aptos)
+ *   Prata III, Ouro IV, Ouro II, Platina III, Diamante IV  (os 5 aptos)
  *   Ouro I  (aprovado na sobra)
- * Tabela automática (curvatura 0,075): 1, 3, 4, 8, 14 (soma 30). O Ouro I, fora do pool, custa 5
+ * Tabela automática (curvatura 0,1): 1, 3, 4, 6, 16 (soma 30). O Ouro I, fora do pool, custa 5
  * pela reta.
  * Na tabela fixa todos os Ouros valiam 4 e o Diamante 8.
+ *
+ * (Com a curvatura 0,075 o pool tinha um Platina I. Com 0,1 e o Platina I, o Ouro I da sobra
+ * passaria a custar 4, o mesmo que o Ouro II, e o cenário do substituto sumiria; com o
+ * Platina III ele volta a custar 5 — e, depois da desistência, a prévia volta a dar 3 aos dois.)
  */
 
 afterEach(() => {
@@ -69,7 +73,7 @@ const UM_TIME: Inscrito[] = [
   inscrito("PrataIII", "Prata", "III"),
   inscrito("OuroIV", "Ouro", "IV"),
   inscrito("OuroII", "Ouro", "II"),
-  inscrito("PlatinaI", "Platina", "I"),
+  inscrito("PlatinaIII", "Platina", "III"),
   inscrito("DiamanteIV", "Diamante", "IV"),
   inscrito("OuroI", "Ouro", "I", { situacao: "sobra" }),
 ];
@@ -149,8 +153,8 @@ describe("Times e vagas: a prévia da tabela automática", () => {
       ["PrataIII", "1"],
       ["OuroIV", "3"],
       ["OuroII", "4"],
-      ["PlatinaI", "8"],
-      ["DiamanteIV", "14"],
+      ["PlatinaIII", "6"],
+      ["DiamanteIV", "16"],
     ]);
   });
 
@@ -184,8 +188,8 @@ describe("Inscritos: «Pontos no draft» é a prévia da tabela, não a tabela f
   it("a coluna Pts da lista mostra o preço da prévia", () => {
     render(<SecaoInscritos {...props} dados={dados(UM_TIME)} />);
     const linha = (nick: string) => document.getElementById(`inscrito-${nick}`)!.closest("tr")!;
-    // O Diamante IV custa 14 na prévia (8 na tabela fixa); o Ouro I da sobra, 5 (4 na fixa).
-    expect(within(linha("DiamanteIV")).queryByText("14")).toBeTruthy();
+    // O Diamante IV custa 16 na prévia (8 na tabela fixa); o Ouro I da sobra, 5 (4 na fixa).
+    expect(within(linha("DiamanteIV")).queryByText("16")).toBeTruthy();
     expect(within(linha("DiamanteIV")).queryByText("8")).toBeNull();
     expect(within(linha("OuroI")).queryByText("5")).toBeTruthy();
   });
@@ -196,7 +200,7 @@ describe("Inscritos: «Pontos no draft» é a prévia da tabela, não a tabela f
     abrirContato();
     const rotulo = screen.getByText("Pontos no draft");
     const cartao = rotulo.parentElement!;
-    expect(cartao.textContent).toContain("14");
+    expect(cartao.textContent).toContain("16");
     expect(cartao.textContent).toContain("prévia da tabela automática");
     expect(cartao.textContent).not.toContain("derivado do elo");
   });
@@ -239,8 +243,8 @@ describe("Inscritos: «Pontos no draft» é a prévia da tabela, não a tabela f
 /*
  * Regra 6 depois do sorteio: a tabela do SORTEIO, não a prévia recalculada.
  *
- * Draft sorteado com os 5 de UM_TIME (Prata III 1, Ouro IV 3, Ouro II 4, Platina I 8,
- * Diamante IV 14; o Ouro I da sobra custa 5 pela reta). Depois a Prata III desiste: a prévia
+ * Draft sorteado com os 5 de UM_TIME (Prata III 1, Ouro IV 3, Ouro II 4, Platina III 6,
+ * Diamante IV 16; o Ouro I da sobra custa 5 pela reta). Depois a Prata III desiste: a prévia
  * passa a usar os 5 de elo mais baixo, e nela o Ouro II e o Ouro I custam 3 — o Ouro I passaria
  * a poder substituir o Ouro II. Pela tabela do sorteio, não pode (5 > 4).
  */
@@ -248,7 +252,7 @@ describe("Times e vagas: a regra 6 depois do sorteio usa a tabela do sorteio", (
   function draftSorteado(): DraftPublico {
     const titulares = UM_TIME.filter((i) => i.situacao === "apto");
     const tabela = calcularTabela({ pool: titulares.map(eloDoJogadorDaInscricao), times: 1, jogadoresPorTime: 5, orcamentoPorTime: 30 });
-    const preco = { PrataIII: 1, OuroIV: 3, OuroII: 4, PlatinaI: 8, DiamanteIV: 14 } as Record<string, number>;
+    const preco = { PrataIII: 1, OuroIV: 3, OuroII: 4, PlatinaIII: 6, DiamanteIV: 16 } as Record<string, number>;
     return {
       revisao: 7,
       fase: "encerrado",
