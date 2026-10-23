@@ -4,11 +4,12 @@ import { notFound } from "next/navigation";
 
 import { ChampionIcon } from "@/components/champion-icon";
 import { EloCrest, RoleIcon } from "@/components/lob/ui";
+import { textosElenco } from "@/components/lob/textos-elenco";
 import { formatKda, formatSeriesDateLabel } from "@/lib/format";
 import { eloLabel, rotaLabel } from "@/lib/i18n/messages/paginas-home";
 import { metadadosDaPagina, montarMetadados } from "@/lib/i18n/metadados";
 import { nomeDaTemporada } from "@/lib/i18n/nome-da-temporada";
-import { getMessages } from "@/lib/i18n/server";
+import { getLocale, getMessages } from "@/lib/i18n/server";
 import { buildDesignPlayers } from "@/lib/roster";
 import { getServerArchivedSeason } from "@/lib/server-data";
 import { calculatePlayerAggregates, getPlayerGameHistory } from "@/lib/tournament";
@@ -37,9 +38,11 @@ export default async function TemporadaJogadorPage({ params }: PageParams) {
   // `paginasHome` traduz rota e elo (as constantes de lib/design são em português), como a
   // ficha ao vivo já faz.
   const { paginasRegras: t, paginasStats: ts, compartilhados: tc, paginasHome: tHome } = await getMessages();
+  const te = textosElenco[await getLocale()];
   const { archived, dataset } = result;
-  const player = buildDesignPlayers(dataset).find((p) => p.slug === playerSlug);
+  const player = buildDesignPlayers(dataset, { reserva: te.reserva }).find((p) => p.slug === playerSlug);
   if (!player) notFound();
+  const nomeDaEdicao = nomeDaTemporada(archived.name, tc.localeTag);
 
   const aggregate = calculatePlayerAggregates(dataset).find((a) => a.playerId === player.id);
   const history = getPlayerGameHistory(dataset, player.id);
@@ -58,10 +61,11 @@ export default async function TemporadaJogadorPage({ params }: PageParams) {
 
   return (
     <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "44px clamp(16px,4vw,24px) 96px" }}>
-      <Link href={`/temporadas/${seasonId}/times/${player.teamSlug}`} className="lob-btn-ghost" style={{ padding: "9px 16px", fontSize: 11.5, letterSpacing: ".12em", marginBottom: 26 }}>
-        {t.voltarElenco}
+      {/* O reserva não tem elenco para onde voltar: a volta é para a temporada. */}
+      <Link href={player.reserva ? `/temporadas/${seasonId}` : `/temporadas/${seasonId}/times/${player.teamSlug}`} className="lob-btn-ghost" style={{ padding: "9px 16px", fontSize: 11.5, letterSpacing: ".12em", marginBottom: 26 }}>
+        {player.reserva ? `← ${t.voltarPara} ${nomeDaEdicao}` : t.voltarElenco}
       </Link>
-      <div style={{ fontSize: 11, letterSpacing: ".14em", color: "#8f8472", margin: "18px 0 0" }}>{nomeDaTemporada(archived.name, tc.localeTag)} · {t.somenteLeituraMinusculo}</div>
+      <div style={{ fontSize: 11, letterSpacing: ".14em", color: "#8f8472", margin: "18px 0 0" }}>{nomeDaEdicao} · {t.somenteLeituraMinusculo}</div>
       <div className="lob-fade" style={{ marginTop: 10, position: "relative", background: "linear-gradient(180deg,#1d1710,#0d0a05)", border: "1px solid rgba(232,184,120,.4)", borderRadius: 8, overflow: "hidden", boxShadow: "0 44px 100px -30px rgba(0,0,0,.6)" }}>
         <div style={{ height: 4, background: `linear-gradient(90deg,${player.teamColor},transparent)` }} />
         <div style={{ display: "flex", flexWrap: "wrap" }}>
@@ -81,7 +85,10 @@ export default async function TemporadaJogadorPage({ params }: PageParams) {
               <EloCrest elo={player.elo} size={52} title={false} labels={ts.elos} />
             </div>
             <div style={{ position: "absolute", left: 18, right: 18, bottom: 16 }}>
-              <div style={{ fontSize: 11, letterSpacing: ".12em", color: player.teamColor, marginBottom: 5 }}>{player.teamName}</div>
+              <div style={{ fontSize: 11, letterSpacing: ".12em", color: player.teamColor, marginBottom: 5 }}>
+                {player.teamName}
+                {player.saiu ? ` · ${te.saiuDoTime}` : ""}
+              </div>
               {/* O nick é o título da página: <h1>, com o mesmo desenho do <span> de antes. */}
               <h1 className="lob-display" style={{ margin: 0, fontSize: "clamp(26px,4.4vw,40px)", lineHeight: 1.08, color: "#f7f1e6", wordBreak: "break-word", textShadow: "0 2px 12px rgba(0,0,0,.8)" }}>{player.displayNick}</h1>
             </div>
@@ -137,7 +144,10 @@ export default async function TemporadaJogadorPage({ params }: PageParams) {
               {history.map((h, i) => (
                 <div key={`${h.seriesId}-${h.gameIndex}-${i}`} style={{ display: "grid", gridTemplateColumns: "104px 1fr 150px 96px 64px 60px", alignItems: "center", gap: 8, padding: "10px 16px", borderTop: "1px solid rgba(201,138,75,.10)" }}>
                   <span style={{ fontSize: 11.5, color: "#b8ab97" }}>{formatSeriesDateLabel(h.date, tc.localeTag)}</span>
-                  <span style={{ fontSize: 12.5, color: "#e6ddcd" }}>vs {h.opponentTeamName} · {t.jogoAbreviacao}{h.gameIndex}</span>
+                  <span style={{ fontSize: 12.5, color: "#e6ddcd" }}>
+                    vs {h.opponentTeamName} · {t.jogoAbreviacao}{h.gameIndex}
+                    {h.substituto ? <span title={te.substitutoTitulo} style={{ color: "#a98a5f" }}> · {te.substitutoCurto}</span> : null}
+                  </span>
                   <span><ChampionIcon champion={h.champion} size={20} showName semCampeao={tc.campeaoNaoInformado} /></span>
                   <span style={{ fontSize: 12.5, color: "#e6ddcd" }}>{h.kills}/{h.deaths}/{h.assists}</span>
                   <span className="lob-display" style={{ textAlign: "right", fontSize: 14, color: "#e6c592" }}>{formatKda((h.kills + h.assists) / Math.max(1, h.deaths), tc.localeTag)}</span>

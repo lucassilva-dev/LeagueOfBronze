@@ -7,7 +7,7 @@ import { Eyebrow, GoldTitle, Pill } from "@/components/lob/ui";
 import { metadadosDaPagina } from "@/lib/i18n/metadados";
 import { getMessages } from "@/lib/i18n/server";
 import { nomeDaTemporada } from "@/lib/i18n/nome-da-temporada";
-import { buildDesignPlayers } from "@/lib/roster";
+import { buildDesignPlayersDoElenco } from "@/lib/roster";
 import { getServerDataset } from "@/lib/server-data";
 import { calculatePlayerAggregates } from "@/lib/tournament";
 
@@ -22,7 +22,9 @@ export default async function JogadoresPage() {
   const { paginasHome: t, paginasStats: ts, compartilhados } = await getMessages();
   const { dataset } = await getServerDataset();
   if (semTemporadaAoVivo(dataset)) return <PreTemporadaAviso pagina="jogadores" />;
-  const players = buildDesignPlayers(dataset);
+  // O elenco de HOJE: sem o reserva (que ainda não tem time) e sem quem saiu de vez — os
+  // dois continuam com ficha, aberta pelas partidas em que jogaram.
+  const players = buildDesignPlayersDoElenco(dataset);
 
   const perfByPlayer: Record<string, PlayerPerf> = {};
   for (const agg of calculatePlayerAggregates(dataset)) {

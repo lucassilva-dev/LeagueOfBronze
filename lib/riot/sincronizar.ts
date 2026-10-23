@@ -17,6 +17,7 @@ import { contaParaTimes } from "@/lib/inscricoes/schema";
 import { chaveDaRiot, criarClienteRiot, type ClienteRiot, type RespostaRiot } from "@/lib/riot/cliente";
 import {
   decidirSincronizacao,
+  precisaConferirRemakes,
   precisaContarPartidas,
   type DadosRiot,
   type DecisaoDoRobo,
@@ -144,7 +145,24 @@ export async function consultarInscrito(
     const r = await cliente.idsDePartidas(conta.puuid, { fila: FILA_SOLO_DUO_PARTIDAS, ...janela });
     if (r.tipo === "ok") {
       // Só partidas do servidor do campeonato.
-      riot.partidasNaJanela = r.dados.filter((id) => id.toUpperCase().startsWith(`${PLATAFORMA_DO_CAMPEONATO.toUpperCase()}_`)).length;
+      const ids = r.dados.filter((id) => id.toUpperCase().startsWith(`${PLATAFORMA_DO_CAMPEONATO.toUpperCase()}_`));
+
+      // Remake não conta (regra 4). O detalhe custa 1 chamada por partida: só é buscado
+      // quando o desconto pode mudar o veredicto (entre o mínimo e o mínimo + 2). Qualquer
+      // parada no meio — 429, cota, prazo da rodada — para a consulta inteira, como nas
+      // outras chamadas: uma contagem SEM o desconto nunca é gravada, porque quem chega ao
+      // mínimo não é recontado. Partida que a Riot não acha (404) conta, como contava antes.
+      let remakes = 0;
+      if (precisaConferirRemakes(ids.length, config.min_ranqueadas)) {
+        for (const id of ids) {
+          const detalhe = await cliente.detalheDaPartida(id);
+          if (detalhe.tipo === "ok") {
+            if (detalhe.dados.remake) remakes += 1;
+          } else if (detalhe.tipo !== "nao_encontrado") return falha(detalhe);
+        }
+        riot.remakesNaJanela = remakes;
+      }
+      riot.partidasNaJanela = ids.length - remakes;
     } else if (r.tipo !== "nao_encontrado") return falha(r);
   }
 

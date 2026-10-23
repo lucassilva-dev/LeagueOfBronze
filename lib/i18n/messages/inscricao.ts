@@ -186,6 +186,24 @@ export const inscricao = definir({
       "Depois de pagar, clique em JÁ PAGUEI em Minha inscrição. A inscrição só é confirmada quando alguém conferir o extrato.",
     prazoAviso:
       "Você tem {dias} dias para pagar depois de enviar a inscrição. A vaga só é confirmada depois do pagamento (regra 22).",
+    // Prazo único dos titulares (`prazo_pagamento_ate`, D3). A data sai formatada no fuso de
+    // Brasília pela tela, no idioma dela.
+    prazoAvisoData:
+      "O prazo para pagar vai até {data}. A vaga só é confirmada depois do pagamento (regra 22).",
+    // Depois do prazo único: quem vira titular tem 48 h a partir do envio (D4).
+    prazoAvisoHoras:
+      "Você tem {horas} horas a partir do envio para pagar. A vaga só é confirmada depois do pagamento (regra 22).",
+    // Vagas cheias (D1/D2): quem se inscreve agora entra na fila de reserva, e reserva só paga
+    // se for chamado — por isso o passo 3 e o recibo NÃO mostram o Pix a quem cai na fila.
+    vagasCheiasTitulo: "VAGAS CHEIAS — FILA DE RESERVA",
+    vagasCheiasTexto:
+      "As {vagas} vagas desta edição já estão preenchidas. Se enviar agora, você entra na fila de reserva, na posição {posicao} — a fila segue a ordem de inscrição. Reserva não paga agora: só paga se for chamado, quando alguém à frente sair.",
+    reservaRecebidaTexto:
+      "As vagas estão cheias: você entrou na fila de reserva, na posição {posicao}. Não pague agora — reserva só paga se for chamado. Se alguém à frente sair, você passa a titular e o prazo para pagar aparece em Minha inscrição.",
+    // Recibo sem o lugar na fila (o cálculo falhou): sem Pix, o caminho é Minha inscrição.
+    reciboSemFila: "Acompanhe em Minha inscrição: é lá que aparecem o Pix e o prazo para pagar.",
+    // Tag de idioma das datas desta área (prazo de pagamento). O fuso é sempre o de Brasília.
+    localeDatas: "pt-BR",
     enviar: "ENVIAR INSCRIÇÃO",
     enviando: "ENVIANDO…",
 
@@ -276,6 +294,23 @@ export const inscricao = definir({
     jaPagueiAjuda:
       "Isto avisa a organização. A confirmação só acontece quando alguém abrir o extrato.",
     declarado: "Você avisou que pagou. Aguardando a conferência da organização.",
+    // Fila de reserva (D1/D2) e o recado da organização (G).
+    filaLabel: "FILA DE RESERVA",
+    filaPosicao: "Posição {posicao}",
+    minhaReserva: "Você está na fila de reserva (posição {posicao}) — só paga se for chamado.",
+    minhaReservaAjuda:
+      "A fila segue a ordem de inscrição. Se alguém à frente sair, você passa a titular: o prazo para pagar aparece aqui e a organização avisa.",
+    // Situação «sobra»: a organização tirou a pessoa das vagas, e a fila não a chama sozinha.
+    minhaSobraAjuda:
+      "A organização tirou você das vagas: você fica no fim da fila e não é chamado sozinho quando alguém sai. Se a organização decidir chamar você, o prazo para pagar aparece aqui e ela avisa.",
+    // O lugar na fila não pôde ser lido agora: na dúvida, nada de Pix (pode ser reserva).
+    filaIndefinida:
+      "Não deu para conferir agora se você está nas vagas ou na fila de reserva. Por isso o Pix não aparece aqui por enquanto — tente de novo em instantes.",
+    filaIndefinidaPagamento: "A conferir",
+    reservaSemCobranca: "Só paga se for chamado",
+    reservaComPagamento:
+      "Seu pagamento ficou registrado. Se você não for chamado até o fim do campeonato, a organização devolve o valor.",
+    recadoLabel: "RECADO DA ORGANIZAÇÃO",
 
     situacoes: {
       pendente: "Em análise",
@@ -456,6 +491,16 @@ export const inscricao = definir({
       "After paying, click I'VE PAID in My sign-up. Sign-up is only confirmed once someone checks the bank statement.",
     prazoAviso:
       "You have {dias} days to pay after submitting. Your spot is only confirmed after payment (rule 22).",
+    prazoAvisoData: "You have until {data} to pay. Your spot is only confirmed after payment (rule 22).",
+    prazoAvisoHoras:
+      "You have {horas} hours from submitting to pay. Your spot is only confirmed after payment (rule 22).",
+    vagasCheiasTitulo: "SPOTS FULL — WAITING LIST",
+    vagasCheiasTexto:
+      "All {vagas} spots in this edition are taken. If you submit now, you join the waiting list at position {posicao} — the list follows sign-up order. Waiting-list players don't pay now: you only pay if you're called up, when someone ahead of you drops out.",
+    reservaRecebidaTexto:
+      "The spots are full: you're on the waiting list at position {posicao}. Don't pay now — waiting-list players only pay if called up. If someone ahead drops out, you become a starter and the payment deadline shows up in My sign-up.",
+    reciboSemFila: "Follow it in My sign-up: that's where the Pix and the payment deadline show up.",
+    localeDatas: "en-US",
     enviar: "SUBMIT SIGN-UP",
     enviando: "SUBMITTING…",
 
@@ -524,6 +569,20 @@ export const inscricao = definir({
     jaPagueiAjuda:
       "This notifies the organizers. Confirmation only happens once someone opens the bank statement.",
     declarado: "You reported the payment. Waiting for the organizers to check it.",
+    filaLabel: "WAITING LIST",
+    filaPosicao: "Position {posicao}",
+    minhaReserva: "You're on the waiting list (position {posicao}) — you only pay if you're called up.",
+    minhaReservaAjuda:
+      "The list follows sign-up order. If someone ahead of you drops out, you become a starter: the payment deadline shows up here and the organizers let you know.",
+    minhaSobraAjuda:
+      "The organizers took you out of the starting spots: you stay at the end of the list and aren't called up automatically when someone drops out. If the organizers decide to call you up, the payment deadline shows up here and they let you know.",
+    filaIndefinida:
+      "We couldn't check right now whether you're in a starting spot or on the waiting list. That's why the Pix doesn't show up here for now — try again in a moment.",
+    filaIndefinidaPagamento: "To be checked",
+    reservaSemCobranca: "Pays only if called up",
+    reservaComPagamento:
+      "Your payment is on record. If you're not called up by the end of the tournament, the organizers refund it.",
+    recadoLabel: "MESSAGE FROM THE ORGANIZERS",
 
     situacoes: {
       pendente: "Under review",

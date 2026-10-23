@@ -985,6 +985,9 @@ function AdminTabContent({
           podeLados={podeLados}
           podeCartas={podeCartas}
           podeRiot={podeRiot}
+          // Regra 6: os pontos do substituto vêm das inscrições, que só conferir ou
+          // financeiro leem. Sem nenhum dos dois, o painel avisa para conferir à mão.
+          podeVerPrecos={podeConferir || podeFinanceiro}
         />
       );
     case "backup":

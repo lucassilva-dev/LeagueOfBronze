@@ -141,7 +141,7 @@ describe("Times e vagas: a prévia da tabela automática", () => {
     expect(screen.getByText("prévia")).toBeTruthy();
     expect(screen.getByText("A conta fecha")).toBeTruthy();
     expect(texto).toContain("30 de 30 (1 × 30) ✓");
-    expect(texto).toContain("Calculada com os 5 elegíveis que não estão marcados como sobra");
+    expect(texto).toContain("Calculada com os 5 titulares — quem não está na fila de reserva nem marcado como sobra");
     expect(texto).not.toContain("Cabe no orçamento");
 
     const tabela = [...document.querySelectorAll("table")].find((t) => t.textContent?.includes("Pela reta"))!;

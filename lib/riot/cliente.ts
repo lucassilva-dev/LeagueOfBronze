@@ -69,6 +69,21 @@ const invocadorSchema = z.object({ summonerLevel: z.number() });
 
 const idsDePartidaSchema = z.array(z.string());
 
+/**
+ * Do detalhe da partida (match-v5), só o que o robô usa: se ela terminou em remake. A Riot
+ * marca o remake ("early surrender") em cada participante (`gameEndedInEarlySurrender`); a
+ * leitura aceita também o mesmo campo direto no `info`. Tudo opcional: campo que a Riot
+ * deixe de mandar vira "não foi remake" — a partida conta, como contava antes da regra.
+ */
+const partidaSchema = z.object({
+  info: z.object({
+    gameEndedInEarlySurrender: z.boolean().nullish(),
+    participants: z.array(z.object({ gameEndedInEarlySurrender: z.boolean().nullish() })).nullish(),
+  }),
+});
+
+export type DetalheDaPartida = { remake: boolean };
+
 export type OpcoesDoCliente = {
   /** Sem chave, nenhuma chamada sai: tudo devolve `sem_chave`. */
   chave?: string;
@@ -94,6 +109,8 @@ export type ClienteRiot = {
     puuid: string,
     filtro: { fila: number; inicioS: number; fimS: number },
   ): Promise<RespostaRiot<string[]>>;
+  /** Detalhe de uma partida pelo id ("BR1_…"): por enquanto, só se ela terminou em remake. */
+  detalheDaPartida(idDaPartida: string): Promise<RespostaRiot<DetalheDaPartida>>;
   /** Preenchido depois de um 429 ou de chave recusada: nada mais sai para a rede. */
   readonly parado: RespostaRiot<never> | null;
   readonly chamadas: number;
@@ -250,6 +267,14 @@ export function criarClienteRiot(opcoes: OpcoesDoCliente = {}): ClienteRiot {
         `/lol/match/v5/matches/by-puuid/${p(puuid)}/ids?queue=${f.fila}&startTime=${Math.floor(f.inicioS)}&endTime=${Math.floor(f.fimS)}&start=0&count=100`,
         (b) => idsDePartidaSchema.parse(b),
       ),
+    detalheDaPartida: (id) =>
+      chamar("americas", `/lol/match/v5/matches/${p(id)}`, (b) => {
+        const { info } = partidaSchema.parse(b);
+        const remake =
+          info.gameEndedInEarlySurrender === true ||
+          (info.participants ?? []).some((jogador) => jogador.gameEndedInEarlySurrender === true);
+        return { remake };
+      }),
     get parado() {
       return parado;
     },

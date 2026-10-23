@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Banner, Button, C, SectionHead } from "@/components/admin/ui";
+import type { Fila } from "@/lib/inscricoes/fila";
 import type { EstadoPagamento, ItemConferencia } from "@/lib/inscricoes/schema";
 
 /**
@@ -36,6 +37,12 @@ export type EdicaoConfig = {
   min_ranqueadas: number;
   dias_no_grupo: number;
   prazo_pagamento_dias: number;
+  /**
+   * Prazo ÚNICO de pagamento dos titulares (D3: fim de 31/10/2026 em Brasília). Nulo = o
+   * prazo em dias contado do envio. Ausente (`undefined`) = o banco ainda não tem a coluna
+   * (a leitura é `select *`): a tela não deixa editar até a migração.
+   */
+  prazo_pagamento_ate?: string | null;
   segundos_por_escolha: number;
   taxa_centavos: number;
   pct_campeao: number;
@@ -92,7 +99,13 @@ export type Inscrito = {
   entrou_no_grupo: string | null;
   situacao: "pendente" | "apto" | "recusado" | "desistiu" | "sobra" | "excluido";
   organizador: boolean;
+  /** NOTA INTERNA da organização: o jogador nunca lê (decisão G, 2026-10-22). */
   observacao: string | null;
+  /**
+   * «Recado para o jogador»: o único texto da ficha que aparece em Minha inscrição. Ausente
+   * (`undefined`) = o banco ainda não tem a coluna — a gaveta não deixa escrever até a migração.
+   */
+  recado_jogador?: string | null;
   /** `riot` = o robô atualiza; `organizacao` = travado à mão; nulo = ninguém confirmou ainda. */
   elo_fonte?: "riot" | "organizacao" | null;
   /** Falso quando a organização segurou a pessoa: o sistema não a promove a apto sozinho. */
@@ -111,6 +124,13 @@ export type Inscrito = {
   riot_sincronizado_em?: string | null;
   riot_status?: "ok" | "sem_ranque_solo" | "riot_id_inexistente" | "outro_servidor" | "erro" | null;
   riot_erro?: string | null;
+  /**
+   * Ciência da organização nos alertas: código → { texto, por, em }. Quem lê é
+   * `separarPorCiencia`/`cienciaDoAlerta` (lib/inscricoes/alertas.ts), que não confiam no
+   * formato. Ausente (`undefined`) = o banco ainda não tem a coluna: nenhum alerta tem
+   * ciência, e o «Dar ciência» fica travado até a migração.
+   */
+  alertas_cientes?: unknown;
 };
 
 export type Conferencia = {
@@ -142,9 +162,17 @@ export type Caixa = {
   arrecadado: number;
   aReceber: number;
   isento: number;
+  /**
+   * Pago por quem está na fila de reserva (D2): fica na conta, FORA do arrecadado (do prêmio),
+   * e volta para o jogador se ele não for chamado. Opcional: servidor de antes da fila.
+   */
+  aDevolverSeNaoJogar?: number;
 };
 
 export type Panorama = {
+  /** Quantos são titulares e quantos esperam na fila de reserva (D1). Opcionais: servidor de antes da fila. */
+  titulares?: number;
+  reservas?: number;
   inscritos: number;
   /** Quem entra na conta de times e vagas: todo inscrito menos recusado, desistente e excluído. */
   elegiveis: number;
@@ -175,6 +203,17 @@ export type DadosEdicao = {
   pagamentos: Pagamento[];
   panorama: Panorama;
   auditoria: Auditoria[];
+  /**
+   * Titulares, fila de reserva e o lugar de cada inscrito (`montarFila`, D1), montados no
+   * servidor. Opcional: sem ele (servidor de antes da fila, testes) a tela monta a mesma fila
+   * com a mesma função pura — ver `useFila` em fila-no-painel.tsx.
+   */
+  fila?: Fila;
+  /**
+   * Falhas de login recentes (janela do limitador, 15 min) por id da inscrição — só quem tem
+   * alguma. `null` = a leitura falhou; ausente = servidor de antes do «Liberar login» (F).
+   */
+  falhasDeLogin?: Record<string, number> | null;
 };
 
 export type AcaoEdicao =
@@ -184,7 +223,13 @@ export type AcaoEdicao =
   | "inscrito"
   | "pagamento"
   | "congelar"
-  | "sincronizar_riot";
+  | "sincronizar_riot"
+  /** D5: o titular que perdeu o prazo vira desistente e o 1º da fila é chamado. */
+  | "passar_vaga"
+  /** F: as falhas recentes da conta deixam de contar contra ela. */
+  | "liberar_login"
+  /** «Dar ciência» de um alerta (ou desfazer, com `desfazer: true`). */
+  | "alerta_ciencia";
 
 /** O que toda seção recebe. */
 export type PropsSecao = Readonly<{
@@ -243,6 +288,31 @@ function explicacaoDaFalha(status: number | null): string {
     return "Servidor ou banco indisponível. Tente de novo em instantes; se não voltar, confira no Supabase se o projeto está ativo (não pausado). Com o «ref» abaixo dá para achar o erro nos logs da Vercel.";
   }
   return "A edição não carregou. O motivo que o servidor deu está logo abaixo.";
+}
+
+/**
+ * O texto do sucesso de uma ação: a `mensagem` da rota (ou "Salvo."), mais quem foi chamado
+ * da fila de reserva (D4) e o aviso de quando o prazo da fila não foi alinhado. O «passar a
+ * vaga» já manda a frase completa, com os nomes — `chamados` vem em lista e não é recontado.
+ */
+export function mensagemDoSucesso(
+  resposta: Readonly<{ mensagem?: string; chamados?: unknown; avisoFila?: string }>,
+): string {
+  const partes = [resposta.mensagem ?? "Salvo."];
+  const chamados = typeof resposta.chamados === "number" ? resposta.chamados : 0;
+  if (chamados > 0) {
+    partes.push(
+      chamados === 1
+        ? "1 inscrito foi chamado da fila de reserva — o prazo de pagamento dele já vale."
+        : `${chamados} inscritos foram chamados da fila de reserva — o prazo de pagamento deles já vale.`,
+    );
+  }
+  if (resposta.avisoFila) {
+    // O aviso já começa com "Salvo, mas…": no lugar do "Salvo." genérico, não depois dele.
+    if (partes[0] === "Salvo.") partes.shift();
+    partes.push(resposta.avisoFila);
+  }
+  return partes.join(" ");
 }
 
 export function PainelEdicao({
@@ -340,6 +410,10 @@ export function PainelEdicao({
           missing?: string[];
           mensagem?: string;
           conflito?: boolean;
+          /** Quantos a gravação chamou da fila de reserva (ficha, inscrito, config). */
+          chamados?: unknown;
+          /** Gravou, mas o prazo da fila não foi alinhado (ver `alinharFila` na rota). */
+          avisoFila?: string;
         };
 
         if (!r.ok) {
@@ -365,10 +439,12 @@ export function PainelEdicao({
         if (!(await carregar())) {
           return falhar("Salvo — mas a tela não conseguiu se atualizar. Recarregue a página antes de continuar.");
         }
-        // A rota pode dizer algo além de "Salvo." — o resumo da rodada da Riot, ou que a
-        // pessoa acabou de virar apto sozinha.
-        const mensagem = resposta.mensagem ?? "Salvo.";
-        onAlert("ok", mensagem);
+        // A rota pode dizer algo além de "Salvo." — o resumo da rodada da Riot, que a pessoa
+        // acabou de virar apto sozinha, ou quem foi chamado da fila de reserva.
+        const mensagem = mensagemDoSucesso(resposta);
+        // O aviso da fila é sucesso com pendência ("salvo, mas o prazo não foi alinhado"): sai
+        // no tom de erro, para ninguém passar por cima, mas a ação gravou — devolve `true`.
+        onAlert(resposta.avisoFila ? "erro" : "ok", mensagem);
         setUltimaMensagem(mensagem);
         return true;
       } catch {

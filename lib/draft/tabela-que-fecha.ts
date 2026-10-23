@@ -189,6 +189,12 @@ export function capitaesFecham(params: {
   const doCapitao = new Set(capitaes);
   const times = capitaes.map((id) => ({ vagas: jogadoresPorTime - 1, folga: orcamentoPorTime - (precoDe.get(id) ?? 0) }));
   const custos = [...precoDe].filter(([id]) => !doCapitao.has(id)).map(([, p]) => p);
+  // Menos jogadores do que vagas (titular ainda não apto na hora de sortear, decisão C4): a
+  // ordem perde as escolhas que faltam (lib/draft/motor.ts, `ajustarOrdemAoPool`). Cada uma
+  // entra aqui como um "fantasma" de 0 ponto — o time que o leva termina com a vaga aberta —,
+  // a mesma conta do motor. Sem isso, nenhuma tabela fecharia com um titular a menos.
+  const vagasNoTotal = times.reduce((soma, t) => soma + Math.max(0, t.vagas), 0);
+  for (let falta = vagasNoTotal - custos.length; falta > 0; falta--) custos.push(0);
   const chave = [
     jogadoresPorTime,
     orcamentoPorTime,

@@ -89,6 +89,13 @@ describe("semTemporadaAoVivo", () => {
     expect(semTemporadaAoVivo({ ...MANTIDOS, archivedSeasons: [] }, "pre_temporada")).toBe(false);
   });
 
+  it("um reserva NOVO, sem time (regra 6), não deixa o dataset passar por mantido", () => {
+    // Sem time e fora do arquivo: `get` devolvia undefined dos dois lados e o reserva
+    // "casava" com um jogador arquivado que não existe.
+    const comReserva = { ...MANTIDOS, players: [...MANTIDOS.players, { id: "reserva-novo", reserva: true }] };
+    expect(semTemporadaAoVivo(comReserva, "pre_temporada")).toBe(false);
+  });
+
   it("com o campeonato no ar, times sem série ainda são a temporada — o calendário só não começou", () => {
     expect(semTemporadaAoVivo(MANTIDOS, "temporada")).toBe(false);
   });

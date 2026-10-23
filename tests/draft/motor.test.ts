@@ -251,26 +251,51 @@ describe("cronômetro e auto-pick", () => {
     expect(a?.riotId).toBe("Jog001#BR1");
   });
 
-  it("recupera o atraso: várias escolhas vencidas de uma vez", () => {
-    // Em serverless ninguém garante que o servidor acordou a cada 60s. Sem isto o
-    // draft "voltaria no tempo" ao ser acordado depois de uma pausa longa.
-    const draft = iniciarDraft(draftDe(2, 20), T0);
-    const muitoDepois = alcancarORelogio(draft, T0 + 10 * 60_000);
+  it("capitão ausente com a sala sondando: uma escolha automática por vez, cada uma no seu prazo", () => {
+    // Decisão C3 (2026-10-22): o ausente comum continua levando a escolha automática normal.
+    // A sondagem chega alguns segundos depois de cada prazo, e o draft anda uma por vez.
+    let draft = iniciarDraft(draftDe(2, 20), T0);
+    for (let k = 1; k <= 4; k++) draft = alcancarORelogio(draft, T0 + k * 60_000 + 2_000);
 
-    expect(muitoDepois.escolhaAtual).toBeGreaterThan(1);
-    expect(muitoDepois.historico.every((e) => e.automatica)).toBe(true);
+    expect(draft.fase).toBe("rodando");
+    expect(draft.escolhaAtual).toBe(4);
+    expect(draft.historico.every((e) => e.automatica)).toBe(true);
+    // Datada no prazo que venceu, não na hora da sondagem.
+    expect(draft.historico.map((e) => e.emISO)).toEqual(
+      [1, 2, 3, 4].map((k) => new Date(T0 + k * 60_000).toISOString()),
+    );
   });
 
   it("o prazo seguinte parte do que venceu, não de agora — dois espectadores convergem", () => {
-    // Se partisse de "agora", quem sondou aos 61s e quem sondou aos 200s chegariam a
-    // estados diferentes a partir do mesmo histórico.
+    // Se partisse de "agora", quem sondou aos 61 s e quem sondou aos 115 s chegariam a
+    // estados diferentes a partir do mesmo histórico (prazos seguintes diferentes).
     const draft = iniciarDraft(draftDe(2, 20), T0);
     const cedo = alcancarORelogio(draft, T0 + 61_000);
-    const tarde = alcancarORelogio(draft, T0 + 200_000);
+    const tarde = alcancarORelogio(draft, T0 + 115_000);
 
-    // Quem olhou mais tarde vê mais escolhas, mas as que os dois têm são idênticas.
-    expect(tarde.escolhaAtual).toBeGreaterThan(cedo.escolhaAtual);
-    expect(tarde.historico.slice(0, cedo.historico.length)).toEqual(cedo.historico);
+    expect(cedo.escolhaAtual).toBe(1);
+    expect(tarde).toEqual(cedo);
+    expect(tarde.prazoISO).toBe(new Date(T0 + 120_000).toISOString());
+  });
+
+  it("queda: mais de UMA escolha inteira sem ninguém sondar PAUSA por atraso, sem escolher nada", () => {
+    // Decisão C3 (2026-10-22): antes o freio só puxava com 10 escolhas de atraso, e uma queda
+    // de alguns minutos voltava com vários times sorteados por auto-pick de uma vez.
+    const draft = iniciarDraft(draftDe(2, 20), T0);
+    // 60 s de prazo + mais de 60 s de atraso.
+    const voltou = alcancarORelogio(draft, T0 + 60_000 + 60_001);
+
+    expect(voltou.fase).toBe("pausado");
+    expect(voltou.motivoDaPausa).toBe("atraso");
+    expect(voltou.historico).toHaveLength(0);
+    expect(voltou.prazoISO).toBeNull();
+  });
+
+  it("atraso de exatamente uma escolha ainda é escolha automática (o freio é para o que passa disso)", () => {
+    const draft = iniciarDraft(draftDe(2, 20), T0);
+    const noLimite = alcancarORelogio(draft, T0 + 60_000 + 59_999);
+    expect(noLimite.fase).toBe("rodando");
+    expect(noLimite.historico).toHaveLength(1);
   });
 
   it("atraso grande demais PAUSA em vez de sortear o draft inteiro sozinho", () => {

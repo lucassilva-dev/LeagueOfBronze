@@ -1,3 +1,4 @@
+import { montarFila } from "@/lib/inscricoes/fila";
 import { contaParaTimes, distribuirTimes } from "@/lib/inscricoes/schema";
 import { rankingDeCapitaes } from "@/lib/draft/capitaes";
 import { eloDoJogadorDaInscricao, temEloReconhecido, type CamposDeElo } from "@/lib/draft/elo-da-inscricao";
@@ -15,22 +16,26 @@ import { tabelaQueFecha } from "@/lib/draft/tabela-que-fecha";
  * A PRÉVIA da tabela de pontos no painel (abas Times e vagas e Inscritos).
  *
  * A tabela oficial é a da conferência do draft (`previaDoDraft`, no servidor): calculada
- * com os `apto`, que só fecham quando a organização termina a conferência e marca a sobra.
- * Antes disso o painel ainda precisa de um número — para planejar, para mostrar na ficha e
- * para a regra do substituto — e mostrar a tabela fixa da 3ª (coluna `pontos`) seria
- * mostrar um preço que o draft não usa. Então o painel calcula a mesma tabela, com a mesma
- * função (lib/draft/precos.ts, pura), sobre a melhor previsão de quem joga:
+ * com os titulares da fila que estão `apto`, que só fecham quando a organização termina a
+ * conferência. Antes disso o painel ainda precisa de um número — para planejar, para mostrar
+ * na ficha e para a regra do substituto — e mostrar a tabela fixa da 3ª (coluna `pontos`)
+ * seria mostrar um preço que o draft não usa. Então o painel calcula a mesma tabela, com a
+ * mesma função (lib/draft/precos.ts, pura), sobre a melhor previsão de quem joga:
  *
- *  - "titulares": os elegíveis que NÃO estão marcados como sobra, quando são exatamente as
- *    vagas. É o pool que o draft vai usar assim que a conferência acabar. Com os capitães da
- *    regra definidos, é a tabela que fecha com eles (lib/draft/tabela-que-fecha.ts) — a mesma
- *    queda de curvatura que o servidor faz, para os dois lados mostrarem o mesmo preço.
+ *  - "titulares": os TITULARES da fila (`montarFila`, lib/inscricoes/fila.ts — a mesma do
+ *    formulário, da Minha inscrição e do draft: organizadores e os primeiros por ordem de
+ *    inscrição até as vagas; quem está em «sobra» vai para a reserva), quando são exatamente
+ *    as vagas. É o pool que o draft vai usar assim que a conferência acabar (ATUALIZAÇÃO de
+ *    23/10, item 3a: antes eram "os elegíveis que não estão na sobra", e com mais inscritos
+ *    que vagas a prévia caía nos mais fracos). Com os capitães da regra definidos, é a tabela
+ *    que fecha com eles (lib/draft/tabela-que-fecha.ts) — a mesma queda de curvatura que o
+ *    servidor faz, para os dois lados mostrarem o mesmo preço.
  *  - "mais_fracos": senão, os `vagas` de elo mais baixo entre os elegíveis — o mesmo cenário
  *    "mais barato possível" que a conta de orçamento desta aba sempre usou.
  *
- * Elegível é quem ainda pode jogar (`contaParaTimes`: todos menos recusado e desistente), a
- * mesma conta do número de times. Quem está fora do pool (sobra, fila de reserva) recebe o
- * preço da reta, preso entre as linhas vizinhas (`precoNaTabela`).
+ * Elegível é quem ainda pode jogar (`contaParaTimes`: todos menos recusado, desistente e
+ * excluído), a mesma conta do número de times. Quem está fora do pool (fila de reserva)
+ * recebe o preço da reta, preso entre as linhas vizinhas (`precoNaTabela`).
  *
  * Depois do sorteio vale outra coisa: a TABELA DO SORTEIO (`precosDoSorteio`), com os
  * preços que o draft usou — uma desistência depois do draft não pode mudar o preço de
@@ -40,9 +45,14 @@ import { tabelaQueFecha } from "@/lib/draft/tabela-que-fecha";
 export type InscricaoDaPrevia = CamposDeElo & {
   id: string;
   situacao: string;
-  /** Para o corte dos capitães da regra (organizador não capitaneia) e o casamento com o draft. */
+  /**
+   * Para o corte dos capitães da regra (organizador não capitaneia), o casamento com o draft e
+   * a fila (organizador é sempre titular).
+   */
   organizador?: boolean;
   riot_id?: string;
+  /** A ordem de inscrição, que decide quem é titular na fila. Ausente vai para o fim. */
+  criado_em?: string | null;
 };
 
 export type OrigemDaPrevia = "titulares" | "mais_fracos" | "sorteio";
@@ -99,13 +109,16 @@ export function previaDosPrecos(params: {
 
   // Sem elo legível não há preço: fica fora da conta (a aba avisa a ficha a corrigir).
   const comPreco = elegiveis.filter((i) => temEloReconhecido(i));
-  const foraDaSobra = comPreco.filter((i) => i.situacao !== "sobra");
+  // Os titulares da fila, com o mesmo teto do número de times (`max_times × jogadores`).
+  const fila = montarFila(inscritos, { max_times: maxTimes, jogadores_por_time: jogadoresPorTime });
+  const titular = new Set(fila.titulares);
+  const titulares = comPreco.filter((i) => titular.has(i.id));
 
   let origem: OrigemDaPrevia;
   let pool: InscricaoDaPrevia[];
-  if (foraDaSobra.length === vagas) {
+  if (titulares.length === vagas) {
     origem = "titulares";
-    pool = foraDaSobra;
+    pool = titulares;
   } else {
     origem = "mais_fracos";
     pool = [...comPreco]

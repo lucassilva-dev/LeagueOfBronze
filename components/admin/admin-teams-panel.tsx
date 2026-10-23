@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 import { Plus, Trash2, Undo2 } from "lucide-react";
 
 import type { Team, TournamentDataset } from "@/lib/schema";
+import { elencoAtivo } from "@/lib/tournament";
 import { createBlankTeam, slugifyValue, type MutateDraft } from "@/components/admin/shared";
 import { ICONE_DA_SECAO } from "@/components/admin/icones-admin";
 import { useCompacto } from "@/components/admin/responsivo";
@@ -770,7 +771,8 @@ export function AdminTeamsPanel({
               {ordenados.map((team) => {
                 const ativo = selectedId === team.id;
                 const cor = teamColor(team.id);
-                const elenco = draft.players.filter((p) => p.teamId === team.id).length;
+                // O elenco de HOJE: quem saiu de vez fica no cadastro (histórico), mas não conta.
+                const elenco = elencoAtivo(draft, team.id).length;
                 return (
                   <li key={team.id}>
                     <CartaoLinha
@@ -865,7 +867,7 @@ export function AdminTeamsPanel({
                   {ordenados.map((team) => {
                     const ativo = selectedId === team.id;
                     const cor = teamColor(team.id);
-                    const elenco = draft.players.filter((p) => p.teamId === team.id).length;
+                    const elenco = elencoAtivo(draft, team.id).length;
                     return (
                       <button
                         key={team.id}

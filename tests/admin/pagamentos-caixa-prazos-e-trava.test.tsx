@@ -225,9 +225,12 @@ describe("os números do caixa", () => {
     expect(screen.queryByText(/O caixa não fecha/)).toBeNull();
   });
 
-  it("«A receber» diz o que soma: sem organizadores, recusados e desistentes", () => {
+  it("«A receber» diz o que soma: sem organizadores, recusados, desistentes e fila de reserva", () => {
     montar(dados());
-    expect(screen.getByText("aguardando + declarado (sem organizadores, recusados e desistentes)")).toBeTruthy();
+    // Com teto de vagas há fila, e reserva só paga se for chamado (D2): também fica de fora.
+    expect(
+      screen.getByText("aguardando + declarado (sem organizadores, recusados, desistentes e fila de reserva)"),
+    ).toBeTruthy();
   });
 
   it("Apto sem pagamento confirmado aparece nas pendências do caixa", () => {

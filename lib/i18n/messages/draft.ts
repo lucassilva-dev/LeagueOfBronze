@@ -28,7 +28,7 @@ export const draft = definir({
     pausado: "Draft pausado",
     pausadoTexto: "A organização interrompeu o relógio. Ninguém escolhe enquanto isso.",
     pausadoAtrasoTexto:
-      "O relógio parou sozinho: ficou muito tempo sem ninguém acompanhando o draft. A organização retoma em instantes.",
+      "O relógio parou sozinho: a conexão caiu por mais de uma escolha inteira. A organização retoma quando todos estiverem de volta.",
     pausadoSemJogadorTexto:
       "O relógio parou sozinho: o time da vez não tem jogador que caiba no orçamento. A organização está resolvendo.",
     encerrado: "Draft encerrado",
@@ -93,6 +93,7 @@ export const draft = definir({
       sem_escolha: "Não há escolha em andamento.",
       nao_e_a_vez: "Não é a vez do seu time.",
       fora_do_pool: "Jogador não está no pool.",
+      saiu_do_pool: "{riotId} saiu do draft depois do sorteio e não pode mais ser escolhido. Escolha outro jogador.",
       ja_escolhido: "Esse jogador já foi escolhido.",
       elenco_completo: "Seu elenco já está completo.",
       acima_do_teto:
@@ -125,6 +126,8 @@ export const draft = definir({
     escolhaLivre: "ESCOLHA LIVRE",
     poolDisponivel: "POOL DISPONÍVEL",
     poolNota: "quem escolhe é o capitão, pelo painel dele",
+    saiuDoDraft: "SAIU DO DRAFT",
+    saiuDoDraftNota: "saiu depois do sorteio · não pode mais ser escolhido",
     modoTv: "MODO TV",
     sairDaTv: "SAIR DA TV",
     escolhido: "ESCOLHIDO",
@@ -149,7 +152,7 @@ export const draft = definir({
     pausado: "Draft paused",
     pausadoTexto: "The organizers stopped the clock. Nobody picks in the meantime.",
     pausadoAtrasoTexto:
-      "The clock stopped on its own: nobody was following the draft for too long. The organizers will resume it shortly.",
+      "The clock stopped on its own: the connection dropped for more than one full pick. The organizers will resume once everyone is back.",
     pausadoSemJogadorTexto:
       "The clock stopped on its own: the team on the clock has no player that fits its budget. The organizers are sorting it out.",
     encerrado: "Draft finished",
@@ -210,6 +213,7 @@ export const draft = definir({
       sem_escolha: "There's no pick in progress.",
       nao_e_a_vez: "It's not your team's turn.",
       fora_do_pool: "That player isn't in the pool.",
+      saiu_do_pool: "{riotId} left the draft after the draw and can no longer be picked. Pick someone else.",
       ja_escolhido: "That player has already been picked.",
       elenco_completo: "Your roster is already full.",
       acima_do_teto:
@@ -240,6 +244,8 @@ export const draft = definir({
     escolhaLivre: "FREE PICK",
     poolDisponivel: "AVAILABLE POOL",
     poolNota: "the captain picks, from their own panel",
+    saiuDoDraft: "LEFT THE DRAFT",
+    saiuDoDraftNota: "left after the draw · can no longer be picked",
     modoTv: "TV MODE",
     sairDaTv: "EXIT TV",
     escolhido: "PICKED",

@@ -35,6 +35,10 @@ export async function GET(request: NextRequest) {
     // A situação também conta: recusar ou registrar desistência mexe só na ficha, e o
     // pagamento continua "aguardando". Sem isto, quem foi recusado recebia o QR com o
     // valor preenchido — um convite a pagar o que a organização teria de estornar.
+    //
+    // E a fila: reserva só paga se for chamado (D2). Quem está na fila não recebe a chave —
+    // `inscricao.fila` entra na mesma regra que a tela usa. Na dúvida (a fila não pôde ser
+    // lida, `fila.tipo === "indefinido"`), também não: pode ser reserva.
     const devendo = inscricao !== null && inscricaoEsperaPagamento(inscricao);
     const chave = devendo ? ((await lerConfigOuNulo())?.chave_pix ?? null) : null;
 

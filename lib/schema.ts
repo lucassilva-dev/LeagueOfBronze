@@ -128,12 +128,46 @@ function validateDatasetUniqueness(
   );
 }
 
+/**
+ * Time do jogador: obrigatório, a não ser para o RESERVA (regra 6 da 4ª Edição).
+ *
+ * O reserva é quem ficou na fila e entra no dataset sem time, para poder substituir
+ * jogo a jogo. As duas marcas não convivem: quando ele herda a vaga de quem saiu de vez,
+ * recebe o `teamId` e perde o `reserva` NA MESMA gravação. Um reserva com time seria
+ * ambíguo — titular para o elenco público ou não? — e por isso é recusado.
+ */
 function validatePlayerTeamReferences(
   dataset: DatasetCore,
   ctx: z.RefinementCtx,
   teamIds: Set<string>,
 ) {
   for (const [index, player] of dataset.players.entries()) {
+    // Aqui, e não num `.refine` do campo, para a mensagem dizer QUEM: a recusa de um
+    // refine de campo chega ao painel só como "precisa ser uma data válida".
+    if (player.saiuEm !== undefined && Number.isNaN(Date.parse(player.saiuEm))) {
+      addCustomIssue(
+        ctx,
+        ["players", index, "saiuEm"],
+        `Jogador ${player.nick} tem uma data de saída do time inválida (${player.saiuEm}).`,
+      );
+    }
+    if (player.teamId === undefined) {
+      if (player.reserva === true) continue;
+      addCustomIssue(
+        ctx,
+        ["players", index, "teamId"],
+        `Jogador ${player.nick} está sem time e não é reserva: escolha o time ou marque como reserva.`,
+      );
+      continue;
+    }
+    if (player.reserva === true) {
+      addCustomIssue(
+        ctx,
+        ["players", index, "reserva"],
+        `Jogador ${player.nick} é reserva e não pode ter time: quem herda a vaga recebe o time e deixa de ser reserva.`,
+      );
+      continue;
+    }
     if (teamIds.has(player.teamId)) continue;
     addCustomIssue(
       ctx,
@@ -164,7 +198,7 @@ function validateGameReferences(
   seriesIndex: number,
   gameIndex: number,
   ctx: z.RefinementCtx,
-  playerIds: Set<string>,
+  playersById: Map<string, Player>,
 ) {
   const allowedWinners = new Set([series.teamAId, series.teamBId]);
 
@@ -176,7 +210,7 @@ function validateGameReferences(
     );
   }
 
-  if (!playerIds.has(game.mvpPlayerId)) {
+  if (!playersById.has(game.mvpPlayerId)) {
     addCustomIssue(
       ctx,
       ["seriesMatches", seriesIndex, "games", gameIndex, "mvpPlayerId"],
@@ -186,7 +220,16 @@ function validateGameReferences(
 
   const statsPlayerIds = new Set<string>();
   for (const [statIndex, stats] of game.statsByPlayer.entries()) {
-    if (!playerIds.has(stats.playerId)) {
+    validateTimeDaLinha(
+      stats,
+      playersById.get(stats.playerId),
+      allowedWinners,
+      ctx,
+      ["seriesMatches", seriesIndex, "games", gameIndex, "statsByPlayer", statIndex, "teamId"],
+      `Jogo ${gameIndex + 1} da série ${series.id}`,
+    );
+
+    if (!playersById.has(stats.playerId)) {
       addCustomIssue(
         ctx,
         [
@@ -220,6 +263,44 @@ function validateGameReferences(
     }
 
     statsPlayerIds.add(stats.playerId);
+  }
+}
+
+/**
+ * O time pelo qual a linha jogou (substituto avulso, regra 6).
+ *
+ * `teamId` na linha só pode ser um dos dois times da série. E o jogador SEM time (o
+ * reserva) precisa dele: sem isso não haveria como saber de que lado contar os abates, a
+ * vitória e o MVP daquele jogo.
+ *
+ * O caso "linha sem `teamId` de jogador cujo time não está na série" NÃO é recusado aqui
+ * de propósito: o dado real tem sobras assim (jogador trocado de time depois de jogar), e
+ * o schema roda em toda leitura — a agregação simplesmente não conta essas linhas.
+ */
+function validateTimeDaLinha(
+  stats: PlayerGameStats,
+  player: Player | undefined,
+  timesDaSerie: ReadonlySet<string>,
+  ctx: z.RefinementCtx,
+  path: IssuePath,
+  rotuloDoJogo: string,
+) {
+  const nick = player?.nick ?? stats.playerId;
+  if (stats.teamId !== undefined) {
+    if (timesDaSerie.has(stats.teamId)) return;
+    addCustomIssue(
+      ctx,
+      path,
+      `${rotuloDoJogo}: a linha de ${nick} diz que ele jogou por um time que não disputa a série (${stats.teamId}).`,
+    );
+    return;
+  }
+  if (player && player.teamId === undefined) {
+    addCustomIssue(
+      ctx,
+      path,
+      `${rotuloDoJogo}: ${nick} é reserva (sem time), então a linha dele precisa dizer por qual time jogou.`,
+    );
   }
 }
 
@@ -262,12 +343,21 @@ function validateSeriesGameLimit(
   );
 }
 
+/**
+ * W.O. — inclusive no MEIO da série ("jogos valem, W.O. completa", decisão de 22/10/2026).
+ *
+ * A série pode ter `walkoverWinnerTeamId` junto com jogos já disputados, desde que esses
+ * jogos ainda não tivessem decidido a série: W.O. depois de 2x0 numa MD3 não completa
+ * nada, só apagaria um resultado que já existe. O placar oficial é montado por
+ * `placarComWalkover` (lib/tournament.ts).
+ */
 function validateWalkoverSeries(
   series: SeriesMatch,
   seriesIndex: number,
   ctx: z.RefinementCtx,
+  vitoriasParaFechar: number,
 ) {
-  if (!series.walkoverWinnerTeamId) return false;
+  if (!series.walkoverWinnerTeamId) return;
 
   const allowedWinners = new Set([series.teamAId, series.teamBId]);
 
@@ -279,22 +369,26 @@ function validateWalkoverSeries(
     );
   }
 
-  if (series.games.length > 0) {
+  let placarA = 0;
+  let placarB = 0;
+  for (const jogo of series.games) {
+    if (jogo.winnerTeamId === series.teamAId) placarA += 1;
+    else if (jogo.winnerTeamId === series.teamBId) placarB += 1;
+  }
+  if (placarA >= vitoriasParaFechar || placarB >= vitoriasParaFechar) {
     addCustomIssue(
       ctx,
-      ["seriesMatches", seriesIndex, "games"],
-      `Série ${series.id} marcada como W.O. não pode ter jogos registrados.`,
+      ["seriesMatches", seriesIndex, "walkoverWinnerTeamId"],
+      `Série ${series.id} já estava decidida pelos jogos lançados (${placarA}x${placarB}), então não pode receber W.O.`,
     );
   }
-
-  return true;
 }
 
 function validateSeriesReferences(
   dataset: DatasetCore,
   ctx: z.RefinementCtx,
   teamIds: Set<string>,
-  playerIds: Set<string>,
+  playersById: Map<string, Player>,
 ) {
   for (const [seriesIndex, series] of dataset.seriesMatches.entries()) {
     const seriesFormat = series.format ?? dataset.tournament.format;
@@ -302,13 +396,11 @@ function validateSeriesReferences(
 
     validateSeriesTeams(series, seriesIndex, ctx, teamIds);
     validateSeriesGameLimit(series, seriesIndex, ctx, maxGames, seriesFormat);
+    validateWalkoverSeries(series, seriesIndex, ctx, seriesFormat === "BO5" ? 3 : 2);
 
-    if (validateWalkoverSeries(series, seriesIndex, ctx)) {
-      continue;
-    }
-
+    // Os jogos de uma série com W.O. também são validados: eles VALEM (W.O. no meio).
     for (const [gameIndex, game] of series.games.entries()) {
-      validateGameReferences(game, series, seriesIndex, gameIndex, ctx, playerIds);
+      validateGameReferences(game, series, seriesIndex, gameIndex, ctx, playersById);
     }
   }
 }
@@ -345,7 +437,12 @@ export const playerSchema = z.object({
   id: limitado(LIMITES.id),
   nick: limitado(LIMITES.nick),
   slug: limitado(LIMITES.slug),
-  teamId: limitado(LIMITES.id),
+  /**
+   * Time do jogador. Só pode faltar no RESERVA (`reserva: true`) — ver
+   * `validatePlayerTeamReferences`. Quem saiu de vez (`saiuEm`) CONTINUA com o time: é por
+   * ele que as linhas antigas de K/D/A (sem `teamId` próprio) seguem contando.
+   */
+  teamId: limitado(LIMITES.id).optional(),
   role1: limitado(LIMITES.rota),
   role2: z.string().trim().max(LIMITES.rota).optional(),
   elo: limitado(LIMITES.elo),
@@ -363,10 +460,28 @@ export const playerSchema = z.object({
    * snapshots arquivados, que usam este mesmo schema.
    */
   captain: z.boolean().optional(),
+  /**
+   * Reserva oficial (regra 6 da 4ª Edição): está no campeonato SEM time, para substituir
+   * jogo a jogo, e não aparece em elenco nenhum. Quando herda a vaga de quem saiu de vez,
+   * recebe o `teamId` e perde esta marca na mesma gravação.
+   */
+  reserva: z.boolean().optional(),
+  /**
+   * Quando o titular saiu DE VEZ (ISO). Some do elenco público — times, PTS do elenco,
+   * Multi OP.GG, a contagem de 5 — mas o K/D/A dele continua nas partidas e na ficha, e
+   * por isso o jogador não é apagado nem perde o `teamId`. Ver `elencoAtivo`.
+   */
+  saiuEm: limitado(LIMITES.iso).optional(),
 });
 
 export const playerGameStatsSchema = z.object({
   playerId: limitado(LIMITES.id),
+  /**
+   * O time pelo qual a pessoa jogou ESTE jogo — o substituto avulso (regra 6). Só pode ser
+   * um dos dois times da série. Sem ele vale o time do jogador; o reserva (sem time) é
+   * obrigado a ter. Toda agregação lê `timeDaLinha` (lib/tournament.ts).
+   */
+  teamId: limitado(LIMITES.id).optional(),
   champion: z.string().trim().max(LIMITES.campeao).optional(),
   kills: z.number().int().min(0).max(999),
   deaths: z.number().int().min(0).max(999),
@@ -479,11 +594,11 @@ function refineDatasetIntegrity(dataset: DatasetCore, ctx: z.RefinementCtx) {
   validateDatasetUniqueness(dataset, ctx);
 
   const teamIds = new Set(dataset.teams.map((team) => team.id));
-  const playerIds = new Set(dataset.players.map((player) => player.id));
+  const playersById = new Map(dataset.players.map((player) => [player.id, player]));
 
   validatePlayerTeamReferences(dataset, ctx, teamIds);
   validateStandingsSeedReferences(dataset, ctx, teamIds);
-  validateSeriesReferences(dataset, ctx, teamIds, playerIds);
+  validateSeriesReferences(dataset, ctx, teamIds, playersById);
 }
 
 // Snapshot de uma temporada arquivada: é um dataset completo, porém SEM o campo
@@ -555,7 +670,9 @@ export type StartTournamentInput = z.infer<typeof startTournamentSchema>;
  * ganhos na tabela — o 2º e o 3º critérios do desempate. Quase sempre é erro de digitação
  * (o vencedor do jogo 2 marcado errado, ou o jogo da série seguinte lançado nesta).
  *
- * W.O. fica de fora: série de W.O. com jogo registrado já é recusada pelo schema.
+ * W.O. fica de fora: a série com W.O. pode ter jogos (W.O. no meio), mas o schema já
+ * recusa W.O. numa série que os jogos lançados tinham decidido — e um jogo a mais depois
+ * do W.O. que feche a série cai na mesma recusa.
  */
 export function jogoDepoisDaDecisao(
   serie: SeriesMatch,
@@ -634,6 +751,8 @@ const NOME_DO_CAMPO: Record<string, string> = {
   slug: "endereço (slug)",
   imageUrl: "imagem",
   teamId: "time",
+  reserva: "reserva",
+  saiuEm: "saída do time",
   role1: "rota principal",
   role2: "rota secundária",
   elo: "elo",

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 import { ChampionIcon } from "@/components/champion-icon";
+import { textosElenco } from "@/components/lob/textos-elenco";
 import { PageHero } from "@/components/page-hero";
 import { PageShell } from "@/components/page-shell";
 import { Badge } from "@/components/ui/badge";
@@ -20,11 +21,9 @@ import { getCardTitle } from "@/lib/cards";
 import { formatKda, formatSeriesDateLabel } from "@/lib/format";
 import { metadadosDaPagina, montarMetadados } from "@/lib/i18n/metadados";
 import { nomeDaTemporada } from "@/lib/i18n/nome-da-temporada";
-import { getMessages } from "@/lib/i18n/server";
+import { getLocale, getMessages } from "@/lib/i18n/server";
 import { getServerArchivedSeason } from "@/lib/server-data";
 import {
-  elencoDaSerie,
-  getGameMvpPlayerId,
   getGameTeamKills,
   getSeriesById,
   getSeriesFormatLabel,
@@ -34,6 +33,8 @@ import {
   getSeriesGamesWithTeamRows,
   getSeriesWinnerTeamId,
   isWalkoverSeries,
+  jogosDeWalkoverDaSerie,
+  mvpDoJogo,
 } from "@/lib/tournament";
 import type { CardId } from "@/lib/schema";
 
@@ -65,6 +66,7 @@ export default async function TemporadaPartidaPage({ params }: PageParams) {
   if (!result) notFound();
 
   const { paginasRegras: t, compartilhados: tc, paginasStats: ts } = await getMessages();
+  const te = textosElenco[await getLocale()];
   const { archived, dataset, indexes } = result;
   const series = getSeriesById(dataset, seriesId);
   if (!series) notFound();
@@ -80,6 +82,8 @@ export default async function TemporadaPartidaPage({ params }: PageParams) {
   const score = getSeriesScore(series, dataset);
   const gameRows = getSeriesGamesWithTeamRows(series, dataset);
   const isWO = isWalkoverSeries(series);
+  // W.O. no meio da série: os jogos que o W.O. completou, depois dos disputados.
+  const walkoverGames = gameRows.length > 0 ? jogosDeWalkoverDaSerie(series, dataset) : [];
   const winnerTeamId = getSeriesWinnerTeamId(series, dataset);
   const winnerName = winnerTeamId ? indexes.teamsById.get(winnerTeamId)?.name ?? winnerTeamId : null;
   const seriesMvp = getSeriesMvp(series, dataset);
@@ -135,7 +139,7 @@ export default async function TemporadaPartidaPage({ params }: PageParams) {
         </Card>
       ) : null}
 
-      {!isWO && gameRows.length > 0 ? (
+      {gameRows.length > 0 ? (
         <Card className="p-5">
           <p className="text-xs uppercase tracking-[0.14em] text-muted">{t.abatesPorTime}</p>
           <div className="mt-3 grid grid-cols-2 gap-3">
@@ -179,8 +183,7 @@ export default async function TemporadaPartidaPage({ params }: PageParams) {
         ) : (
           gameRows.map(({ game, gameIndex, teamARows, teamBRows }) => {
             const winnerName = indexes.teamsById.get(game.winnerTeamId)?.name ?? game.winnerTeamId;
-            const gameMvpNick =
-              indexes.playersById.get(getGameMvpPlayerId(game, elencoDaSerie(series, dataset)))?.nick ?? "—";
+            const gameMvpNick = indexes.playersById.get(mvpDoJogo(game, series, indexes.playersById))?.nick ?? "—";
             const kills = getGameTeamKills(game, series, dataset);
             const blocks = [
               { teamName: teamAName, rows: teamARows },
@@ -241,6 +244,11 @@ export default async function TemporadaPartidaPage({ params }: PageParams) {
                                   <TableCell className="min-w-[150px] font-semibold">
                                     <Link href={`/temporadas/${seasonId}/jogadores/${indexes.playersById.get(row.playerId)?.slug ?? row.playerId}`} className="hover:text-accent">
                                       {row.playerNick}
+                                      {row.substituto ? (
+                                        <Badge variant="outline" className="ml-2 align-middle text-[10px]" title={te.substitutoTitulo}>
+                                          {te.substitutoCurto}
+                                        </Badge>
+                                      ) : null}
                                     </Link>
                                   </TableCell>
                                   <TableCell className="whitespace-nowrap">
@@ -265,6 +273,19 @@ export default async function TemporadaPartidaPage({ params }: PageParams) {
             );
           })
         )}
+        {/* Jogos de W.O. (não disputados): contam no placar, sem K/D/A nem MVP. */}
+        {walkoverGames.map((jogo) => (
+          <Card key={`${series.id}-wo${jogo.gameIndex}`} className="p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="font-heading text-lg font-semibold tracking-wide">{t.jogoRotulo} {jogo.gameIndex}</p>
+              <Badge variant="muted">{tc.serieWalkover}</Badge>
+            </div>
+            <p className="mt-1 text-sm text-muted">
+              <span className="text-text">{indexes.teamsById.get(jogo.winnerTeamId)?.name ?? jogo.winnerTeamId}</span> {t.woVenceu}
+            </p>
+            <p className="mt-2 text-sm text-muted">{te.jogoDeWalkoverTexto}</p>
+          </Card>
+        ))}
       </section>
     </PageShell>
   );

@@ -4,8 +4,27 @@
 import "server-only";
 
 import { createSupabaseAdminClient, isSupabaseConfigured } from "@/lib/data-store";
+import {
+  alertasDoInscrito,
+  assinaturaDoAlerta,
+  cienciaDoAlerta,
+  lerAlertasCientes,
+  type Alerta,
+  type CienciaDoAlerta,
+  type CodigoDoAlerta,
+} from "@/lib/inscricoes/alertas";
 import { ErroDeConflito } from "@/lib/inscricoes/conflito";
-import { foraDaCobranca } from "@/lib/inscricoes/pagamento";
+import {
+  ESTADOS_PENDENTES,
+  lugarNaFila,
+  montarFila,
+  motivoParaManterAVaga,
+  prazoDoChamado,
+  previsaoParaNovaInscricao,
+  type Fila,
+  type LugarNaFila,
+} from "@/lib/inscricoes/fila";
+import { estaFora, foraDaCobranca } from "@/lib/inscricoes/pagamento";
 import {
   contaParaTimes,
   distribuirTimes,
@@ -65,6 +84,12 @@ export type EdicaoConfig = {
   min_ranqueadas: number;
   dias_no_grupo: number;
   prazo_pagamento_dias: number;
+  /**
+   * Prazo de pagamento dos titulares, uma data só para todos (D3: fim de 31/10/2026 em
+   * Brasília). Nulo = o comportamento antigo, `prazo_pagamento_dias` contados do envio.
+   * Opcional: banco sem a migração — a leitura é `select *` e a coluna simplesmente falta.
+   */
+  prazo_pagamento_ate?: string | null;
   segundos_por_escolha: number;
   taxa_centavos: number;
   pct_campeao: number;
@@ -121,7 +146,13 @@ export type Inscricao = ColunasRiot & {
   entrou_no_grupo: string | null;
   situacao: "pendente" | "apto" | "recusado" | "desistiu" | "sobra" | "excluido";
   organizador: boolean;
+  /** NOTA INTERNA da organização. O jogador nunca vê (desde 2026-10-22, decisão G). */
   observacao: string | null;
+  /**
+   * "Recado para o jogador": o único texto da ficha que aparece em Minha inscrição.
+   * Opcional: banco sem a migração não tem a coluna.
+   */
+  recado_jogador?: string | null;
   /**
    * De onde veio o `elo_verificado`: `riot` (o robô atualiza), `organizacao` (travado à
    * mão — o robô não mexe) ou nulo (ninguém confirmou ainda, ou foi gravado antes do robô).
@@ -129,6 +160,14 @@ export type Inscricao = ColunasRiot & {
   elo_fonte?: "riot" | "organizacao" | null;
   /** Falso quando a organização tirou a pessoa de apto: o sistema não a promove de novo. */
   promocao_automatica?: boolean;
+  /**
+   * Ciência da organização nos alertas: código → { texto, por, em } (ver `lerAlertasCientes`
+   * em lib/inscricoes/alertas.ts, que é quem lê). `unknown` porque vem do jsonb como estiver;
+   * ausente = banco sem a migração.
+   */
+  alertas_cientes?: unknown;
+  /** A trava das gravações da ciência (`gravarCiencias`). Vem no `select *`. */
+  atualizado_em?: string | null;
 };
 
 export type Conferencia = {
@@ -252,7 +291,15 @@ export async function salvarConfig(patch: Partial<EdicaoConfig>, autor: string =
     .select("*")
     .single<EdicaoConfig>();
 
-  if (error) throw new Error(`Falha ao salvar a configuração: ${error.message}`);
+  if (error) {
+    // Mesma janela entre o deploy e a migração, para o prazo único dos titulares (D3).
+    if (efetivo.prazo_pagamento_ate !== undefined && colunaQueFalta(error, "prazo_pagamento_ate")) {
+      throw new ErroDeRegra(
+        "O prazo único de pagamento ainda não pode ser gravado: falta a migração do banco (coluna prazo_pagamento_ate). Nada foi salvo.",
+      );
+    }
+    throw new Error(`Falha ao salvar a configuração: ${error.message}`);
+  }
 
   const chaves = Object.keys(efetivo) as (keyof EdicaoConfig)[];
   await registrarAuditoria({
@@ -280,7 +327,7 @@ export async function salvarConfig(patch: Partial<EdicaoConfig>, autor: string =
 export async function criarInscricao(
   dados: InscricaoPublica,
   dono: { ipHash: string; jogadorId: string; email: string },
-): Promise<Inscricao> {
+): Promise<Inscricao & { lugarNaFila: LugarNaFila | null }> {
   const config = await lerConfig();
   // A data de fechamento também fecha — não só a chave. Antes a data só escolhia o aviso,
   // e a inscrição seguia aberta depois dela até alguém lembrar de desligar.
@@ -398,7 +445,22 @@ export async function criarInscricao(
     detalhe: { elo: data.elo_declarado, pontos: data.pontos },
   });
 
-  return data;
+  /*
+   * Vagas cheias: a inscrição entra na fila de reserva, e reserva só paga se for chamado
+   * (D2). O gatilho abriu o pagamento com prazo, como para todo mundo — o alinhamento tira
+   * o prazo de quem caiu na fila. Falhar aqui NÃO desfaz a inscrição (ela já está gravada):
+   * a resposta sai sem o lugar, a tela não mostra o Pix, e o próximo alinhamento (qualquer
+   * gravação do painel) acerta o prazo.
+   */
+  let lugarNaFilaDaNova: LugarNaFila | null = null;
+  try {
+    const { fila } = await alinharCobrancaComAFila(AUTOR_SISTEMA);
+    lugarNaFilaDaNova = lugarNaFila(fila, data.id);
+  } catch (erro) {
+    console.error("[inscricoes] inscrição gravada, mas a fila não foi alinhada", erro);
+  }
+
+  return { ...data, lugarNaFila: lugarNaFilaDaNova };
 }
 
 /**
@@ -522,7 +584,17 @@ export type MinhaInscricao = {
   rotaSecundaria: string;
   disponibilidade: string[];
   situacao: Inscricao["situacao"];
-  observacao: string | null;
+  /**
+   * "Recado para o jogador", escrito pela organização. A `observacao` da ficha NÃO vem
+   * mais: virou nota interna (decisão G, 2026-10-22).
+   */
+  recado: string | null;
+  /**
+   * Titular, fila de reserva (com a posição) ou fora (D1). Só o lugar DELE — nada sobre os
+   * outros inscritos sai daqui. `indefinido` = a leitura da fila falhou: na dúvida a tela não
+   * cobra (ele pode ser reserva, e reserva só paga se for chamado — D2).
+   */
+  fila: { tipo: "titular" } | { tipo: "reserva"; posicao: number } | { tipo: "fora" } | { tipo: "indefinido" };
   criadoEm: string;
   pagamento: { estado: EstadoPagamento; valorCentavos: number; venceEm: string | null } | null;
   conferencias: { item: ItemConferencia; estado: string; observacao: string | null }[];
@@ -534,32 +606,57 @@ export type MinhaInscricao = {
  * A consulta filtra por `jogador_id` vindo da SESSÃO, nunca por um id recebido do
  * cliente: essa é a diferença entre "ver a minha ficha" e "ver a ficha de qualquer um
  * trocando um número na URL".
+ *
+ * As colunas são listadas uma a uma, de propósito: nem a nota interna (`observacao`), nem
+ * contato, nem o que o robô da Riot viu saem do banco nesta leitura. O `recado_jogador` vai
+ * na lista, mas o banco pode ainda não ter a coluna (o deploy chega antes da migração):
+ * nesse caso a leitura é refeita sem ela e a tela segue de pé, sem recado.
  */
 export async function minhaInscricao(jogadorId: string): Promise<MinhaInscricao | null> {
   const cliente = createSupabaseAdminClient();
 
-  const { data: inscricao, error } = await cliente
-    .from("inscricoes")
-    .select(
-      "id,criado_em,riot_id,elo_declarado,elo_verificado,elo_congelado,rota_primaria,rota_secundaria,disponibilidade,situacao,observacao",
-    )
-    .eq("jogador_id", jogadorId)
-    .maybeSingle<{
-      id: string;
-      criado_em: string;
-      riot_id: string;
-      elo_declarado: string;
-      elo_verificado: string | null;
-      elo_congelado: string | null;
-      rota_primaria: string;
-      rota_secundaria: string;
-      disponibilidade: string[] | null;
-      situacao: Inscricao["situacao"];
-      observacao: string | null;
-    }>();
+  type Linha = {
+    id: string;
+    criado_em: string;
+    riot_id: string;
+    elo_declarado: string;
+    elo_verificado: string | null;
+    elo_congelado: string | null;
+    rota_primaria: string;
+    rota_secundaria: string;
+    disponibilidade: string[] | null;
+    situacao: Inscricao["situacao"];
+    recado_jogador?: string | null;
+  };
+  const COLUNAS =
+    "id,criado_em,riot_id,elo_declarado,elo_verificado,elo_congelado,rota_primaria,rota_secundaria,disponibilidade,situacao";
+  const ler = (colunas: string) =>
+    cliente.from("inscricoes").select(colunas).eq("jogador_id", jogadorId).maybeSingle<Linha>();
+
+  let lida = await ler(`${COLUNAS},recado_jogador`);
+  if (lida.error && colunaQueFalta(lida.error, "recado_jogador")) lida = await ler(COLUNAS);
+  const { data: inscricao, error } = lida;
 
   if (error) throw new Error(`Falha ao ler a inscrição: ${error.message}`);
   if (!inscricao) return null;
+
+  /*
+   * O lugar na fila (D1) depende de todos os ativos: lido aqui, devolvido só o dele. Se uma
+   * das duas leituras falha (as linhas da fila, ou o teto de vagas da configuração), o lugar
+   * fica INDEFINIDO e a tela segue de pé sem o Pix: valer como titular abria a cobrança a
+   * quem está na fila de reserva (D2), e derrubar a tela inteira escondia também o resto da
+   * ficha. A falha fica no log.
+   */
+  let fila: MinhaInscricao["fila"];
+  try {
+    const [linhasDaFila, configDaFila] = await Promise.all([lerLinhasDaFila(), lerVagasDaConfig()]);
+    const lugar = lugarNaFila(montarFila(linhasDaFila, configDaFila), inscricao.id);
+    fila = lugar.tipo === "reserva" ? { tipo: "reserva", posicao: lugar.posicao } : { tipo: lugar.tipo };
+  } catch (erro) {
+    console.error("[inscricoes] lugar na fila indisponível para a Minha inscrição", erro);
+    // Quem já está fora (recusado, desistente, excluído) continua fora: isso a ficha diz sozinha.
+    fila = estaFora(inscricao.situacao) ? { tipo: "fora" } : { tipo: "indefinido" };
+  }
 
   const [pag, conf] = await Promise.all([
     cliente
@@ -595,7 +692,8 @@ export async function minhaInscricao(jogadorId: string): Promise<MinhaInscricao 
     rotaSecundaria: inscricao.rota_secundaria,
     disponibilidade: inscricao.disponibilidade ?? [],
     situacao: inscricao.situacao,
-    observacao: inscricao.observacao,
+    recado: inscricao.recado_jogador?.trim() || null,
+    fila,
     criadoEm: inscricao.criado_em,
     pagamento: pag.data
       ? { estado: pag.data.estado, valorCentavos: pag.data.valor_centavos, venceEm: pag.data.vence_em }
@@ -660,6 +758,491 @@ export async function declararPagamento(jogadorId: string): Promise<"ok" | "sem_
   return "ok";
 }
 
+// ---------------------------------------------------------------- fila de reserva (D1 a D5)
+
+type LinhaDaFila = { id: string; criado_em: string; situacao: string; organizador: boolean };
+
+async function lerLinhasDaFila(): Promise<LinhaDaFila[]> {
+  const { data, error } = await createSupabaseAdminClient()
+    .from("inscricoes")
+    .select("id,criado_em,situacao,organizador")
+    .order("criado_em", { ascending: true })
+    .returns<LinhaDaFila[]>();
+
+  if (error) throw new Error(`Falha ao ler a fila de inscrições: ${error.message}`);
+  return Array.isArray(data) ? data : [];
+}
+
+/**
+ * Só o que a fila precisa da configuração (teto de times e jogadores por time), com as
+ * colunas nomeadas: é a leitura da Minha inscrição, que não puxa nada com `*`. Estoura na
+ * falha e com a configuração vazia, como `lerConfig`: "sem teto" aqui faria todo ativo valer
+ * como titular — e o reserva receber o Pix. Quem chama decide o que fazer na dúvida.
+ */
+async function lerVagasDaConfig(): Promise<{ max_times?: number | null; jogadores_por_time?: number | null }> {
+  const { data, error } = await createSupabaseAdminClient()
+    .from("edicao_config")
+    .select("max_times,jogadores_por_time")
+    .eq("id", 1)
+    .maybeSingle<{ max_times: number | null; jogadores_por_time: number }>();
+  if (error) throw new Error(`Falha ao ler o teto de vagas: ${error.message}`);
+  if (!data) throw new Error("edicao_config vazia: rode supabase/schema-4a-edicao.sql.");
+  return data;
+}
+
+/**
+ * O erro do PostgREST é "a coluna não existe"? (42703 do Postgres, ou a mensagem citando a
+ * coluna.) Serve à janela entre o deploy e a migração: o código novo pede a coluna nova, o
+ * banco ainda não a tem, e a leitura é refeita sem ela em vez de derrubar a tela.
+ */
+function colunaQueFalta(erro: { code?: string; message?: string }, coluna: string): boolean {
+  return erro.code === "42703" || (erro.message ?? "").includes(coluna);
+}
+
+/** A fila de agora (ver `montarFila`), lida do banco. Estoura na falha de leitura. */
+export async function lerFila(): Promise<Fila> {
+  const [linhas, config] = await Promise.all([lerLinhasDaFila(), lerConfig()]);
+  return montarFila(linhas, config);
+}
+
+/**
+ * Onde cairia quem se inscrever agora — para o formulário avisar ANTES do envio que as
+ * vagas estão cheias (D2). Nunca lança: na dúvida (banco fora, sem chaves) devolve nulo e a
+ * página segue como antes; o lugar de verdade é dado depois do envio.
+ */
+export async function previsaoParaNovoInscrito(): Promise<
+  (({ tipo: "titular" } | { tipo: "reserva"; posicao: number }) & { vagas: number | null }) | null
+> {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    const fila = await lerFila();
+    return { ...previsaoParaNovaInscricao(fila), vagas: fila.vagas };
+  } catch (erro) {
+    console.error("[inscricoes] previsão da fila indisponível", erro);
+    return null;
+  }
+}
+
+/**
+ * Deixa o prazo de cada cobrança em aberto de acordo com a fila de AGORA (D2 e D4).
+ *
+ *  - **Reserva** com cobrança em aberto e prazo: o prazo some (`vence_em` nulo). Reserva
+ *    só paga se for chamado.
+ *  - **Titular** (não organizador) com cobrança em aberto e SEM prazo: foi chamado da fila —
+ *    o prazo passa a valer (`prazoDoChamado`: o prazo da edição se ainda não venceu, senão
+ *    agora + 48 h).
+ *
+ * Não precisa saber o que mudou: o "sem prazo" do titular É o rastro de quem estava na
+ * fila. Por isso serve a toda ação que mexe na fila — situação na ficha, organizador, teto
+ * de times, inscrição nova, passar a vaga — e roda na MESMA ação que tirou o outro da
+ * vaga. Pago, isento, estornado e cancelado nunca são tocados, e prazo já gravado de
+ * titular também não (D6 cuida do alinhamento inicial).
+ *
+ * Cada gravação é condicional ao estado lido (em aberto, com ou sem prazo): duas rodadas
+ * juntas não gravam duas vezes, e só a que gravou escreve auditoria.
+ */
+export async function alinharCobrancaComAFila(
+  autor: string,
+  agoraMs = Date.now(),
+): Promise<{ fila: Fila; chamados: { inscricaoId: string; venceEm: string }[]; paraAFila: string[] }> {
+  const cliente = createSupabaseAdminClient();
+  const [linhas, config, pagamentos] = await Promise.all([
+    lerLinhasDaFila(),
+    lerConfig(),
+    cliente
+      .from("inscricao_pagamentos")
+      .select("inscricao_id,estado,vence_em")
+      .in("estado", [...ESTADOS_PENDENTES])
+      .returns<{ inscricao_id: string; estado: string; vence_em: string | null }[]>(),
+  ]);
+  if (pagamentos.error) throw new Error(`Falha ao ler os pagamentos: ${pagamentos.error.message}`);
+
+  const fila = montarFila(linhas, config);
+  const organizador = new Set(linhas.filter((l) => l.organizador).map((l) => l.id));
+  const chamados: { inscricaoId: string; venceEm: string }[] = [];
+  const paraAFila: string[] = [];
+  const agora = new Date(agoraMs).toISOString();
+
+  for (const p of pagamentos.data ?? []) {
+    if (!ESTADOS_PENDENTES.includes(p.estado)) continue;
+    const lugar = lugarNaFila(fila, p.inscricao_id);
+
+    if (lugar.tipo === "reserva" && p.vence_em !== null) {
+      const { data, error } = await cliente
+        .from("inscricao_pagamentos")
+        .update({ vence_em: null, atualizado_em: agora })
+        .eq("inscricao_id", p.inscricao_id)
+        .in("estado", [...ESTADOS_PENDENTES])
+        .not("vence_em", "is", null)
+        .select("inscricao_id");
+      if (error) throw new Error(`Falha ao tirar o prazo da reserva: ${error.message}`);
+      if ((data?.length ?? 0) === 0) continue;
+      paraAFila.push(p.inscricao_id);
+      await registrarAuditoria({
+        inscricaoId: p.inscricao_id,
+        autor,
+        acao: "foi_para_a_fila",
+        detalhe: { posicao: lugar.posicao, prazoAnterior: p.vence_em },
+      });
+      continue;
+    }
+
+    if (lugar.tipo === "titular" && p.vence_em === null && !organizador.has(p.inscricao_id)) {
+      const venceEm = prazoDoChamado(config, agoraMs);
+      const { data, error } = await cliente
+        .from("inscricao_pagamentos")
+        .update({ vence_em: venceEm, atualizado_em: agora })
+        .eq("inscricao_id", p.inscricao_id)
+        .in("estado", [...ESTADOS_PENDENTES])
+        .is("vence_em", null)
+        .select("inscricao_id");
+      if (error) throw new Error(`Falha ao gravar o prazo de quem foi chamado: ${error.message}`);
+      if ((data?.length ?? 0) === 0) continue;
+      chamados.push({ inscricaoId: p.inscricao_id, venceEm });
+      await registrarAuditoria({ inscricaoId: p.inscricao_id, autor, acao: "chamado_da_fila", detalhe: { venceEm } });
+    }
+  }
+
+  return { fila, chamados, paraAFila };
+}
+
+/**
+ * "Passar a vaga ao 1º da fila" (D5): o titular que não pagou até o prazo vira desistente,
+ * com auditoria, e o próximo da fila é chamado na mesma ação (D4).
+ *
+ * Nada disso acontece sozinho: é um clique, com confirmação, de quem tem o escopo. As
+ * condições são as mesmas que o painel usa para mostrar o botão (`motivoParaManterAVaga`)
+ * e são conferidas de novo AQUI, com leitura fresca: organizador nunca perde a vaga,
+ * "declarado" pede abrir o extrato antes, e prazo que não venceu não tira ninguém.
+ *
+ * O pagamento dele não é tocado (recusar/desistir não cancela pagamento): fica
+ * «aguardando» e sai da cobrança na leitura (`foraDaCobranca`).
+ */
+export async function passarVagaPorFaltaDePagamento(
+  inscricaoId: string,
+  autor: string,
+  agoraMs = Date.now(),
+): Promise<{ chamados: { inscricaoId: string; riotId: string | null; venceEm: string }[]; filaAlinhada: boolean }> {
+  const cliente = createSupabaseAdminClient();
+  const [fila, ficha, pagamento] = await Promise.all([
+    lerFila(),
+    cliente
+      .from("inscricoes")
+      .select("id,riot_id,situacao,organizador")
+      .eq("id", inscricaoId)
+      .maybeSingle<{ id: string; riot_id: string; situacao: Inscricao["situacao"]; organizador: boolean }>(),
+    cliente
+      .from("inscricao_pagamentos")
+      .select("estado,vence_em")
+      .eq("inscricao_id", inscricaoId)
+      .maybeSingle<{ estado: string; vence_em: string | null }>(),
+  ]);
+
+  if (ficha.error) throw new Error(`Falha ao ler a ficha: ${ficha.error.message}`);
+  if (pagamento.error) throw new Error(`Falha ao ler o pagamento: ${pagamento.error.message}`);
+  if (!ficha.data) throw new ErroDeRegra("Inscrição não encontrada.");
+
+  const motivo = motivoParaManterAVaga(
+    {
+      lugar: lugarNaFila(fila, inscricaoId),
+      organizador: ficha.data.organizador === true,
+      situacao: ficha.data.situacao,
+      pagamento: pagamento.data ?? null,
+    },
+    agoraMs,
+  );
+  if (motivo) throw new ErroDeRegra(`A vaga não foi passada: ${motivo}`);
+
+  // A situação lida vai NA instrução: se outro organizador mudou a ficha no meio, nada muda.
+  const agora = new Date(agoraMs).toISOString();
+  const { data, error } = await cliente
+    .from("inscricoes")
+    .update({ situacao: "desistiu", promocao_automatica: true, atualizado_em: agora })
+    .eq("id", inscricaoId)
+    .eq("situacao", ficha.data.situacao)
+    .select("id");
+  if (error) throw new Error(`Falha ao liberar a vaga: ${error.message}`);
+  if ((data?.length ?? 0) === 0) {
+    throw new ErroDeConflito(
+      "A situação desta inscrição mudou desde que você abriu a tela. Nada foi gravado: confira o valor atual e decida de novo.",
+    );
+  }
+
+  await registrarAuditoria({
+    inscricaoId,
+    autor,
+    acao: "vaga_perdida_por_falta_de_pagamento",
+    detalhe: {
+      motivo: "perdeu a vaga por falta de pagamento",
+      situacaoAnterior: ficha.data.situacao,
+      venceEm: pagamento.data?.vence_em ?? null,
+    },
+  });
+
+  // A vaga JÁ foi liberada: uma falha daqui em diante não pode virar "não foi possível" na
+  // tela, senão a organização tentaria de novo sobre algo feito. O próximo alinhamento (toda
+  // gravação do painel) chama quem ficou sem prazo.
+  let chamados: { inscricaoId: string; venceEm: string }[];
+  try {
+    chamados = (await alinharCobrancaComAFila(autor, agoraMs)).chamados;
+  } catch (erro) {
+    console.error("[inscricoes] vaga liberada, mas o próximo da fila não foi chamado", erro);
+    return { chamados: [], filaAlinhada: false };
+  }
+  if (chamados.length === 0) return { chamados: [], filaAlinhada: true };
+
+  const nomes = await cliente
+    .from("inscricoes")
+    .select("id,riot_id")
+    .in(
+      "id",
+      chamados.map((c) => c.inscricaoId),
+    )
+    .returns<{ id: string; riot_id: string }[]>();
+  const riotIdDe = (id: string) => (nomes.error ? null : (nomes.data ?? []).find((n) => n.id === id)?.riot_id ?? null);
+
+  return { chamados: chamados.map((c) => ({ ...c, riotId: riotIdDe(c.inscricaoId) })), filaAlinhada: true };
+}
+
+/**
+ * O e-mail da conta de um inscrito — para a organização liberar o login trancado (F) sem
+ * receber nem mandar e-mail pela tela.
+ */
+export async function emailDaInscricao(inscricaoId: string): Promise<{ email: string; riotId: string } | null> {
+  const { data, error } = await createSupabaseAdminClient()
+    .from("inscricoes")
+    .select("email,riot_id")
+    .eq("id", inscricaoId)
+    .maybeSingle<{ email: string; riot_id: string }>();
+
+  if (error) throw new Error(`Falha ao ler a inscrição: ${error.message}`);
+  return data ? { email: data.email, riotId: data.riot_id } : null;
+}
+
+// ---------------------------------------------------------------- ciência dos alertas
+
+/** Janela entre o deploy e a migração: o código pede a coluna, o banco ainda não a tem. */
+const CIENCIA_SEM_COLUNA =
+  "A ciência dos alertas ainda não pode ser gravada: falta a migração do banco (coluna alertas_cientes). Nada foi gravado.";
+
+/** Quantas vezes a gravação relê e tenta de novo quando a linha mudou no meio. */
+const TENTATIVAS_DA_CIENCIA = 3;
+
+/**
+ * Os alertas de AGORA de um inscrito, calculados exatamente como o painel calcula (a mesma
+ * `alertasDoInscrito`, com a lista inteira, as conferências dele, o pagamento com o prazo e
+ * o lugar na fila). Nulo: a inscrição não existe.
+ */
+async function alertasAtuaisDoInscrito(
+  inscricaoId: string,
+  agoraMs: number,
+): Promise<{ inscrito: Inscricao; alertas: Alerta[] } | null> {
+  const cliente = createSupabaseAdminClient();
+  const [inscritos, config, conferencias, pagamento] = await Promise.all([
+    listarInscricoes(),
+    lerConfig(),
+    cliente
+      .from("inscricao_conferencias")
+      .select("item,estado,conferido_por")
+      .eq("inscricao_id", inscricaoId)
+      .returns<{ item: string; estado: string; conferido_por: string | null }[]>(),
+    // Os mesmos campos que o painel tem do pagamento: os carimbos entram na assinatura dos
+    // alertas de dinheiro (`PagamentoParaAlerta`), e a assinatura daqui tem de ser a da tela.
+    cliente
+      .from("inscricao_pagamentos")
+      .select("estado,valor_centavos,declarado_em,conferido_em,vence_em")
+      .eq("inscricao_id", inscricaoId)
+      .maybeSingle<{
+        estado: string;
+        valor_centavos: number;
+        declarado_em: string | null;
+        conferido_em: string | null;
+        vence_em: string | null;
+      }>(),
+  ]);
+  if (conferencias.error) throw new Error(`Falha ao ler as conferências: ${conferencias.error.message}`);
+  if (pagamento.error) throw new Error(`Falha ao ler o pagamento: ${pagamento.error.message}`);
+
+  const inscrito = inscritos.find((i) => i.id === inscricaoId);
+  if (!inscrito) return null;
+  const alertas = alertasDoInscrito({
+    inscrito,
+    conferencias: conferencias.data ?? [],
+    pagamento: pagamento.data ?? null,
+    config,
+    agoraMs,
+    lugar: lugarNaFila(montarFila(inscritos, config), inscricaoId),
+    inscritos,
+  });
+  return { inscrito, alertas };
+}
+
+/**
+ * Grava o mapa novo de ciências SÓ se a linha ainda é a que foi lida (`atualizado_em` na
+ * mesma instrução): duas ciências no mesmo inscrito ao mesmo tempo — o financeiro numa, a
+ * conferência noutra — não apagam uma à outra. Devolve se gravou.
+ */
+async function gravarCiencias(
+  lida: Readonly<Pick<Inscricao, "id" | "atualizado_em">>,
+  cientes: Record<string, unknown>,
+  agoraMs: number,
+): Promise<boolean> {
+  let gravacao = createSupabaseAdminClient()
+    .from("inscricoes")
+    .update({ alertas_cientes: cientes, atualizado_em: new Date(agoraMs).toISOString() })
+    .eq("id", lida.id);
+  gravacao = lida.atualizado_em ? gravacao.eq("atualizado_em", lida.atualizado_em) : gravacao.is("atualizado_em", null);
+  const { data, error } = await gravacao.select("id");
+  if (error) {
+    if (colunaQueFalta(error, "alertas_cientes")) throw new ErroDeRegra(CIENCIA_SEM_COLUNA);
+    throw new Error(`Falha ao gravar a ciência do alerta: ${error.message}`);
+  }
+  return (data?.length ?? 0) > 0;
+}
+
+/** O que está na coluna, como objeto que dá para copiar — preserva o que não é deste código. */
+function cienciasGravadas(valor: unknown): Record<string, unknown> {
+  return typeof valor === "object" && valor !== null && !Array.isArray(valor) ? { ...(valor as Record<string, unknown>) } : {};
+}
+
+/**
+ * «Dar ciência» de um alerta: a organização viu e aceitou AQUELE alerta, com AQUELA
+ * assinatura — o texto e os fatos que o disparam (ver `CienciaDoAlerta` em
+ * lib/inscricoes/alertas.ts). Os alertas são recalculados aqui, com leitura fresca: só se
+ * aceita ciência de um alerta que EXISTE agora com o código, o texto e a assinatura que a
+ * tela mostrou. Senão, `ErroDeConflito` (409) e nada muda — a tela velha não dá ciência de
+ * "declarou Ouro, a Riot mostra Diamante" quando a Riot já mostra Mestre, nem do «aprovado sem
+ * pagamento» de antes do jogador declarar.
+ *
+ * Quem pode dar ciência de qual alerta (financeiro × conferência) é conferido na rota,
+ * antes de chegar aqui (`escopoDaCiencia`).
+ */
+export async function darCienciaDoAlerta(args: {
+  inscricaoId: string;
+  codigo: CodigoDoAlerta;
+  texto: string;
+  /**
+   * A assinatura que a tela calculou (`assinaturaDoAlerta`). Ausente = a tela só mandou o
+   * texto (o alerta não tem fatos fora dele, ou é uma aba aberta antes da assinatura).
+   */
+  assinatura?: string;
+  autor: string;
+  agoraMs?: number;
+}): Promise<{ ciencia: CienciaDoAlerta; jaTinha: boolean }> {
+  const agoraMs = args.agoraMs ?? Date.now();
+
+  for (let tentativa = 0; tentativa < TENTATIVAS_DA_CIENCIA; tentativa += 1) {
+    const atual = await alertasAtuaisDoInscrito(args.inscricaoId, agoraMs);
+    if (!atual) throw new ErroDeRegra("Inscrição não encontrada.");
+    // `select *` sem a coluna: a chave nem vem.
+    if (atual.inscrito.alertas_cientes === undefined) throw new ErroDeRegra(CIENCIA_SEM_COLUNA);
+
+    const alerta = atual.alertas.find((a) => a.codigo === args.codigo);
+    if (!alerta) {
+      throw new ErroDeConflito(
+        "Esse alerta não aparece mais para este inscrito — algo mudou desde que você abriu a tela. Nada foi gravado.",
+      );
+    }
+    if (alerta.texto !== args.texto) {
+      throw new ErroDeConflito(
+        `Esse alerta mudou desde que você abriu a tela. Agora ele diz: «${alerta.texto}» Nada foi gravado: leia de novo e, se for o caso, dê ciência outra vez.`,
+      );
+    }
+    // O mesmo texto, outros fatos: o jogador declarou, alguém mexeu no pagamento, o prazo
+    // mudou. A tela não pode dar ciência de um fato que ela ainda não mostrou.
+    const assinatura = assinaturaDoAlerta(alerta);
+    // Alerta com fatos além do texto e pedido SEM assinatura: é uma tela de antes da
+    // assinatura (aba aberta antes do deploy). Gravar a assinatura de agora daria ciência de
+    // fatos que essa tela nunca mostrou.
+    if (args.assinatura === undefined && assinatura !== alerta.texto) {
+      throw new ErroDeConflito(
+        "Esta tela está desatualizada para dar ciência deste alerta. Recarregue a página e dê ciência de novo.",
+      );
+    }
+    if (args.assinatura !== undefined && args.assinatura !== assinatura) {
+      throw new ErroDeConflito(
+        "Esse alerta diz o mesmo, mas o que está por trás dele mudou desde que você abriu a tela (o pagamento, o prazo ou um requisito). Nada foi gravado: confira de novo e, se for o caso, dê ciência outra vez.",
+      );
+    }
+
+    // Outra pessoa deu a mesma ciência no meio: está feito, sem gravar nem auditar de novo.
+    const existente = cienciaDoAlerta(alerta, atual.inscrito.alertas_cientes);
+    if (existente) return { ciencia: existente, jaTinha: true };
+
+    // A assinatura só é gravada quando vai além do texto: sem fatos, o texto já é ela.
+    const comFatos = assinatura !== alerta.texto;
+    const ciencia: CienciaDoAlerta = {
+      texto: alerta.texto,
+      ...(comFatos && { assinatura }),
+      por: args.autor,
+      em: new Date(agoraMs).toISOString(),
+    };
+    const cientes = { ...cienciasGravadas(atual.inscrito.alertas_cientes), [args.codigo]: ciencia };
+    if (!(await gravarCiencias(atual.inscrito, cientes, agoraMs))) continue;
+
+    await registrarAuditoria({
+      inscricaoId: args.inscricaoId,
+      autor: args.autor,
+      acao: "alerta_ciencia",
+      detalhe: { codigo: args.codigo, texto: alerta.texto, ...(comFatos && { assinatura }) },
+    });
+    return { ciencia, jaTinha: false };
+  }
+
+  throw new ErroDeConflito(
+    "A inscrição mudou várias vezes enquanto a ciência era gravada. Nada foi gravado: tente de novo em instantes.",
+  );
+}
+
+/**
+ * «Desfazer» a ciência: o alerta volta a contar. Não precisa que o alerta exista agora —
+ * desfazer a ciência de um alerta que sumiu também é legítimo (limpa o registro).
+ */
+export async function desfazerCienciaDoAlerta(args: {
+  inscricaoId: string;
+  codigo: CodigoDoAlerta;
+  autor: string;
+  agoraMs?: number;
+}): Promise<{ desfeita: CienciaDoAlerta | null }> {
+  const agoraMs = args.agoraMs ?? Date.now();
+  const cliente = createSupabaseAdminClient();
+
+  for (let tentativa = 0; tentativa < TENTATIVAS_DA_CIENCIA; tentativa += 1) {
+    // `*` e não a lista: sem a coluna (banco antes da migração) a leitura não falha, a chave
+    // só não vem — e a resposta diz o porquê.
+    const { data: lida, error } = await cliente
+      .from("inscricoes")
+      .select("*")
+      .eq("id", args.inscricaoId)
+      .maybeSingle<Inscricao>();
+    if (error) throw new Error(`Falha ao ler a inscrição: ${error.message}`);
+    if (!lida) throw new ErroDeRegra("Inscrição não encontrada.");
+    if (lida.alertas_cientes === undefined) throw new ErroDeRegra(CIENCIA_SEM_COLUNA);
+
+    const gravadas = cienciasGravadas(lida.alertas_cientes);
+    if (!Object.hasOwn(gravadas, args.codigo)) {
+      throw new ErroDeConflito(
+        "Esse alerta já estava sem ciência (outra pessoa pode ter desfeito antes). Nada foi gravado.",
+      );
+    }
+    const desfeita = lerAlertasCientes(gravadas)[args.codigo] ?? null;
+    delete gravadas[args.codigo];
+    if (!(await gravarCiencias(lida, gravadas, agoraMs))) continue;
+
+    await registrarAuditoria({
+      inscricaoId: args.inscricaoId,
+      autor: args.autor,
+      acao: "alerta_ciencia_desfeita",
+      detalhe: { codigo: args.codigo, texto: desfeita?.texto ?? null, cienciaDe: desfeita?.por ?? null },
+    });
+    return { desfeita };
+  }
+
+  throw new ErroDeConflito(
+    "A inscrição mudou várias vezes enquanto a ciência era desfeita. Nada foi gravado: tente de novo em instantes.",
+  );
+}
+
 // ---------------------------------------------------------------- ficha (organização)
 
 /**
@@ -671,7 +1254,10 @@ export async function declararPagamento(jogadorId: string): Promise<"ok" | "sem_
  */
 export type PatchInscricao = {
   situacao?: Inscricao["situacao"];
+  /** Nota interna: só a organização vê. */
   observacao?: string | null;
+  /** "Recado para o jogador": aparece em Minha inscrição. Vazio apaga. */
+  recadoJogador?: string | null;
   organizador?: boolean;
   eloVerificado?: string | null;
   entrouNoGrupo?: string | null;
@@ -690,6 +1276,9 @@ export async function atualizarInscricao(
 
   if (patch.situacao !== undefined) linha.situacao = patch.situacao;
   if (patch.observacao !== undefined) linha.observacao = patch.observacao;
+  // Só entra no update quando veio: a ficha salva sem o recado não cita a coluna, e o
+  // painel continua gravando no intervalo entre o deploy e a migração.
+  if (patch.recadoJogador !== undefined) linha.recado_jogador = patch.recadoJogador || null;
   if (patch.organizador !== undefined) linha.organizador = patch.organizador;
   if (patch.entrouNoGrupo !== undefined) linha.entrou_no_grupo = patch.entrouNoGrupo;
   if (patch.disponibilidade !== undefined) linha.disponibilidade = patch.disponibilidade;
@@ -760,7 +1349,16 @@ export async function atualizarInscricao(
   if (patch.situacaoAnterior !== undefined) gravacao = gravacao.eq("situacao", patch.situacaoAnterior);
   const { data, error } = await gravacao.select("id");
 
-  if (error) throw new Error(`Falha ao salvar a ficha: ${error.message}`);
+  if (error) {
+    // Janela entre o deploy e a migração: o recado não tem coluna ainda. A ficha inteira não
+    // foi gravada (é uma instrução só) — dizer isso, em vez de "não foi possível salvar".
+    if (linha.recado_jogador !== undefined && colunaQueFalta(error, "recado_jogador")) {
+      throw new ErroDeRegra(
+        "O recado para o jogador ainda não pode ser gravado: falta a migração do banco (coluna recado_jogador). A ficha não foi salva — tire o recado e salve de novo, ou espere a migração.",
+      );
+    }
+    throw new Error(`Falha ao salvar a ficha: ${error.message}`);
+  }
   if (patch.situacaoAnterior !== undefined && (data?.length ?? 0) === 0) {
     throw new ErroDeConflito(
       "A situação desta inscrição mudou desde que você abriu a ficha (outra pessoa ou a promoção automática gravou antes). Nada foi gravado na ficha: confira o valor atual e salve de novo.",
@@ -1003,30 +1601,40 @@ function conflitoNoPagamento(): ErroDeConflito {
  * `arrecadado` desconta os estornos de propósito: é esse número, e não o bruto, que
  * vira premiação — e é ele que precisa bater com o que o site declara publicamente.
  * Isentos entram numa linha própria porque o dinheiro deles nunca existiu.
+ *
+ * `reservas` (opcional): quem está na fila de reserva. O «pago» deles vai para a linha
+ * `aDevolverSeNaoJogar`, FORA do arrecadado (D2): reserva só paga se for chamado, e se não
+ * for, a organização devolve — esse dinheiro não pode virar prêmio. Quando o reserva é
+ * chamado, ele deixa de estar na lista e o mesmo pagamento passa a contar no arrecadado.
  */
-export function fecharCaixa(pagamentos: readonly Pagamento[]) {
-  const soma = (...estados: readonly EstadoPagamento[]) =>
-    pagamentos.filter((p) => estados.includes(p.estado)).reduce((t, p) => t + p.valor_centavos, 0);
+export function fecharCaixa(pagamentos: readonly Pagamento[], reservas: ReadonlySet<string> = new Set()) {
+  const soma = (filtro: (p: Pagamento) => boolean, ...estados: readonly EstadoPagamento[]) =>
+    pagamentos.filter((p) => estados.includes(p.estado) && filtro(p)).reduce((t, p) => t + p.valor_centavos, 0);
+  const todos = () => true;
+  const deReserva = (p: Pagamento) => reservas.has(p.inscricao_id);
 
   // Estado é EXCLUSIVO: quem foi estornado deixou de ser "pago". Então "pago" já não
   // contém o dinheiro devolvido, e subtrair o estorno de novo descontaria duas vezes
   // o mesmo valor. `recebido` reconstrói o bruto somando tudo que um dia entrou.
-  const daOrganizacao = soma("pago");
-  const aDevolver = soma("estorno_devido");
-  const estornado = soma("estornado");
-  const recebido = daOrganizacao + aDevolver + estornado;
+  const daOrganizacao = soma((p) => !deReserva(p), "pago");
+  const aDevolverSeNaoJogar = soma(deReserva, "pago");
+  const aDevolver = soma(todos, "estorno_devido");
+  const estornado = soma(todos, "estornado");
+  const recebido = daOrganizacao + aDevolverSeNaoJogar + aDevolver + estornado;
 
   return {
     recebido,
     estornado,
     // Já entrou e ainda está na conta, mas está comprometido a sair.
     aDevolver,
+    // Pago por quem está na fila de reserva: fica na conta, fora do prêmio (D2).
+    aDevolverSeNaoJogar,
     // O que existe na conta agora, incluindo o que ainda será devolvido.
     emCaixa: recebido - estornado,
     // O dinheiro que é de fato da organização — é ESTE que vira premiação.
     arrecadado: daOrganizacao,
-    aReceber: soma("aguardando", "declarado"),
-    isento: soma("isento"),
+    aReceber: soma(todos, "aguardando", "declarado"),
+    isento: soma(todos, "isento"),
   };
 }
 
@@ -1101,6 +1709,9 @@ export function panorama(
   );
 
   const donoDe = (p: Pagamento) => inscricoes.find((i) => i.id === p.inscricao_id);
+  // A fila de reserva (D1): titulares e reservas. Sem teto de times, todo ativo é titular.
+  const fila = montarFila(inscricoes, config);
+  const reservas = new Set(fila.reservas);
   // Recusado ou desistente que não pagou não é "a receber": a cobrança morreu com a
   // inscrição. Fica fora da conta do caixa sem gravar nada (ver `foraDaCobranca`).
   const caixa = fecharCaixa(
@@ -1108,20 +1719,25 @@ export function panorama(
       const dono = donoDe(p);
       return !dono || !foraDaCobranca(dono.situacao, p.estado);
     }),
+    reservas,
   );
   // «A receber» é cobrança VIVA: nem organizador (não paga — o caso dele é o alerta
   // «organizador_cobrado», até alguém isentar) nem recusado/desistente que declarou (o
-  // alerta «recusado_declarado» pede conferir o extrato antes de devolver). Só este número
-  // muda: tirar o organizador do caixa inteiro zeraria a linha «isento».
+  // alerta «recusado_declarado» pede conferir o extrato antes de devolver), nem reserva (só
+  // paga se for chamado, D2). Só este número muda: tirar o organizador do caixa inteiro
+  // zeraria a linha «isento».
   caixa.aReceber = pagamentos
     .filter((p) => {
       if (p.estado !== "aguardando" && p.estado !== "declarado") return false;
       const dono = donoDe(p);
-      return !dono || (!dono.organizador && contaParaTimes(dono.situacao));
+      return !dono || (!dono.organizador && contaParaTimes(dono.situacao) && !reservas.has(dono.id));
     })
     .reduce((t, p) => t + p.valor_centavos, 0);
 
   return {
+    // Quantos são titulares e quantos esperam na fila (a lista completa vem em `fila`).
+    titulares: fila.titulares.length,
+    reservas: fila.reservas.length,
     // Recusado não conta como inscrito (pedido do Lucas, 22/10): ele continua na lista e
     // tem o próprio número em `recusados`. Excluído também não — esse nem aparece na lista.
     inscritos: inscricoes.length - recusados - excluidos,

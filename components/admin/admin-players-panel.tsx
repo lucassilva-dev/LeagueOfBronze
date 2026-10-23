@@ -1,9 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Plus, Trash2, Undo2 } from "lucide-react";
+import { Plus, Trash2, Undo2, UserRoundCog } from "lucide-react";
 
 import type { Player, TournamentDataset } from "@/lib/schema";
+import { formatDateLabel } from "@/lib/format";
+import {
+  estaNoElenco,
+  jogadorTemHistorico,
+  linhasSemJogouPor,
+  reservasDoDataset,
+  substituirDeVez,
+} from "@/lib/tournament";
 import { createBlankPlayer, slugifyValue, type MutateDraft } from "@/components/admin/shared";
 import { ICONE_DA_SECAO } from "@/components/admin/icones-admin";
 import { useCompacto } from "@/components/admin/responsivo";
@@ -48,7 +56,22 @@ import {
  * No celular, a lista fica na página (filtro de time em chips, no polegar) e o formulário
  * abre numa folha de tela cheia, com as ações presas no rodapé. Fechar a folha é sair do
  * editor: com edição pendente, pergunta antes, exatamente como trocar de jogador pergunta.
+ *
+ * REGRA 6 (decisões de 22/10/2026):
+ * - o jogador pode ser RESERVA (sem time): é quem ficou na fila e entra para substituir jogo a
+ *   jogo. No campo Time, "Reserva (sem time)" grava `reserva: true` e tira o `teamId`;
+ * - "Substituir de vez" (titular → reserva): o titular sai do elenco público e fica com o time
+ *   (o K/D/A dele continua nas partidas e na ficha), e o reserva herda a vaga. É a mesma
+ *   `substituirDeVez` pura do servidor, aplicada no rascunho, com confirmação;
+ * - quem já jogou NÃO é excluído: excluir apagava as linhas de estatística e os MVPs dele —
+ *   a história das partidas. Para esses, o caminho é "Substituir de vez".
  */
+
+/** Valor do campo Time para o reserva, que não tem time. Não é id de time nenhum. */
+const RESERVA = "__reserva__";
+
+/** O elenco cheio de um time (5 titulares). Só alimenta o aviso de quem recebe uma vaga. */
+const ELENCO_COMPLETO = 5;
 
 // ---------------------------------------------------------------- regras de imagem
 
@@ -289,12 +312,19 @@ function removePlayerFromSeriesMatches(
 
 // ---------------------------------------------------------------- painel
 
+/**
+ * O retrato do jogador que decide "sujo" e "o rascunho mudou por fora". `reserva` e `saiuEm`
+ * entram de propósito: sem eles, um "Substituir de vez" no rascunho não recarregava o
+ * formulário aberto, e o "Salvar" seguinte gravava por cima a ficha velha — apagando a saída.
+ */
 function serializa(player: Player) {
   return JSON.stringify([
     player.id,
     player.nick,
     player.slug,
-    player.teamId,
+    player.teamId ?? "",
+    player.reserva ?? false,
+    player.saiuEm ?? "",
     player.role1,
     player.role2 ?? "",
     player.elo,
@@ -303,6 +333,13 @@ function serializa(player: Player) {
     player.mono ?? false,
     player.captain ?? false,
   ]);
+}
+
+/** O time na lista: o nome, "Reserva" (sem time) ou o time com a marca de quem saiu de vez. */
+function rotuloDoTime(player: Player, nomeDoTime: string | undefined) {
+  if (player.reserva === true) return "Reserva (sem time)";
+  const nome = nomeDoTime ?? "sem time";
+  return player.saiuEm ? `${nome} · saiu do time` : nome;
 }
 
 /** Correção #25: jogador novo começa vazio — nada de time/rota/elo chutados. */
@@ -333,6 +370,14 @@ export function AdminPlayersPanel({
   const [pendente, setPendente] = useState<{ id: string | null } | null>(null);
   const [desatualizado, setDesatualizado] = useState(false);
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
+  // "Substituir de vez": o reserva escolhido e se a confirmação está aberta.
+  const [herdeiroId, setHerdeiroId] = useState("");
+  const [confirmandoSubstituicao, setConfirmandoSubstituicao] = useState(false);
+  const [erroSubstituicao, setErroSubstituicao] = useState<string | null>(null);
+  const refSubstituicao = useRef<HTMLDivElement>(null);
+  // O reserva que recebe um time pelo campo Time (a vaga aberta do draft, C1): pede confirmação.
+  const [confirmandoVaga, setConfirmandoVaga] = useState(false);
+  const refVaga = useRef<HTMLDivElement>(null);
   // Só no celular: a folha do editor está aberta, e o "fechar" pediu confirmação.
   const [editorAberto, setEditorAberto] = useState(false);
   const [confirmandoFechar, setConfirmandoFechar] = useState(false);
@@ -373,17 +418,32 @@ export function AdminPlayersPanel({
     [draft.teams],
   );
 
-  /** Quantos jogadores cada time tem — o número que vai em cada chip do filtro no celular. */
+  /**
+   * Quantos jogadores cada time tem — o número que vai em cada chip do filtro no celular. É o
+   * ELENCO de hoje: quem saiu de vez continua listado no filtro do time (é o histórico), mas
+   * não conta — senão o time "tinha 6".
+   */
   const elencoPorTime = useMemo(() => {
     const contagem = new Map<string, number>();
-    for (const player of draft.players) contagem.set(player.teamId, (contagem.get(player.teamId) ?? 0) + 1);
+    for (const player of draft.players) {
+      if (player.teamId === undefined || !estaNoElenco(player)) continue;
+      contagem.set(player.teamId, (contagem.get(player.teamId) ?? 0) + 1);
+    }
     return contagem;
   }, [draft.players]);
+
+  const reservas = useMemo(() => reservasDoDataset(draft), [draft]);
 
   const filtrados = useMemo(() => {
     const alvo = busca.trim().toLowerCase();
     return draft.players
-      .filter((player) => teamFilter === "all" || player.teamId === teamFilter)
+      .filter((player) =>
+        teamFilter === "all"
+          ? true
+          : teamFilter === RESERVA
+            ? player.reserva === true
+            : player.teamId === teamFilter,
+      )
       .filter(
         (player) =>
           alvo === "" ||
@@ -420,6 +480,10 @@ export function AdminPlayersPanel({
     setPendente(null);
     setDesatualizado(false);
     setConfirmandoExclusao(false);
+    setConfirmandoSubstituicao(false);
+    setHerdeiroId("");
+    setErroSubstituicao(null);
+    setConfirmandoVaga(false);
   }
 
   function trocar(id: string | null) {
@@ -460,6 +524,8 @@ export function AdminPlayersPanel({
     setEditorAberto(false);
     setConfirmandoFechar(false);
     setConfirmandoExclusao(false);
+    setConfirmandoSubstituicao(false);
+    setConfirmandoVaga(false);
     setPendente(null);
   }
 
@@ -493,22 +559,67 @@ export function AdminPlayersPanel({
     draft.players.some((player) => player.id !== form.id && player.slug === form.slug.trim());
   const idDuplicado = !editando && draft.players.some((player) => player.id === form.id);
   const imagemInvalida = !imagemAceita(form.imageUrl ?? "");
+  const formReserva = form.reserva === true;
+  const teamIdDoForm = (form.teamId ?? "").trim();
   const timeInexistente =
-    form.teamId.trim().length > 0 && !draft.teams.some((team) => team.id === form.teamId);
+    !formReserva && teamIdDoForm.length > 0 && !draft.teams.some((team) => team.id === form.teamId);
+  // Virar reserva tira o time do jogador — e as linhas dele sem "Jogou por" contavam por esse
+  // time: o servidor recusa (a linha do reserva precisa dizer o time) e a história mudaria.
+  const linhasQueDependemDoTime = salvo && carregado.teamId !== undefined ? linhasSemJogouPor(draft, salvo.id) : 0;
+  const reservaComHistorico = formReserva && carregado.reserva !== true && linhasQueDependemDoTime > 0;
+  // Trocar por OUTRO time tem o mesmo problema (FB-3): as linhas sem "Jogou por" valem pelo
+  // time do jogador e iriam junto — a ALFA perdia os abates e o time novo, que nem jogou a
+  // série, ganhava. O servidor recusa (`problemasDeTrocaDeTimeComHistorico`); a ficha trava antes.
+  const trocaDeTimeComHistorico =
+    !formReserva &&
+    carregado.teamId !== undefined &&
+    teamIdDoForm !== "" &&
+    teamIdDoForm !== carregado.teamId &&
+    linhasQueDependemDoTime > 0;
+  const nomeDoTime = (teamId: string | undefined) =>
+    draft.teams.find((team) => team.id === teamId)?.name ?? teamId ?? "";
 
   const problemas: string[] = [];
   if (!form.nick.trim()) problemas.push("informe o nick");
   if (!form.slug.trim()) problemas.push("informe o slug");
-  if (!form.teamId.trim()) problemas.push("escolha o time");
+  if (!formReserva && !teamIdDoForm) problemas.push("escolha o time (ou “Reserva (sem time)”)");
   if (timeInexistente) problemas.push("o time escolhido não existe mais");
+  if (reservaComHistorico) {
+    problemas.push(
+      `${carregado.nick} tem ${linhasQueDependemDoTime} linha(s) de K/D/A pelo time dele — para tirá-lo do time sem mudar a história, use “Substituir de vez”`,
+    );
+  }
+  if (trocaDeTimeComHistorico) {
+    problemas.push(
+      `${carregado.nick} tem ${linhasQueDependemDoTime} linha(s) de K/D/A pelo ${nomeDoTime(carregado.teamId)} sem “Jogou por” — trocar o time aqui levaria esses abates e jogos para ${nomeDoTime(teamIdDoForm)}. Para tirá-lo do time sem mudar a história, use “Substituir de vez”; se ele só cobriu uma vaga, deixe o time como está e marque “Jogou por” na linha do jogo (aba Séries)`,
+    );
+  }
   if (!form.role1.trim()) problemas.push("escolha a rota principal");
   if (!form.elo.trim()) problemas.push("escolha o elo");
   if (slugDuplicado) problemas.push("o slug já pertence a outro jogador");
   if (idDuplicado) problemas.push("já existe um jogador com este ID");
   if (imagemInvalida) problemas.push("o caminho da foto não é aceito pelo servidor");
 
-  function salvar() {
+  /*
+   * O reserva que recebe um time pelo campo Time entra no ELENCO público daquele time: é a
+   * vaga aberta de um time que terminou o draft com 4 de 5 (C1), sem titular a substituir.
+   * Mexe na contagem de 5, no PTS do elenco e no Multi OP.GG — por isso confirma antes.
+   * Quem entra NO LUGAR de alguém usa "Substituir de vez" na ficha do titular.
+   */
+  const daVagaAoReserva = editando && carregado.reserva === true && !formReserva && teamIdDoForm !== "" && !timeInexistente;
+  const nomeDoTimeDaVaga = draft.teams.find((team) => team.id === teamIdDoForm)?.name ?? teamIdDoForm;
+  const elencoDoTimeDaVaga = elencoPorTime.get(teamIdDoForm) ?? 0;
+
+  function salvar(confirmado = false) {
     if (problemas.length > 0) return;
+    if (daVagaAoReserva && !confirmado) {
+      setConfirmandoVaga(true);
+      if (compacto) {
+        requestAnimationFrame(() => refVaga.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" }));
+      }
+      return;
+    }
+    setConfirmandoVaga(false);
     const limpo: Player = {
       ...form,
       nick: form.nick.trim(),
@@ -518,20 +629,32 @@ export function AdminPlayersPanel({
       elo: form.elo.trim(),
       imageUrl: (form.imageUrl ?? "").trim(),
     };
+    // O reserva não tem time — e o schema recusa reserva COM time: as duas marcas não
+    // convivem. Nem capitão, que só vale dentro do elenco.
+    if (limpo.reserva === true) {
+      delete limpo.teamId;
+      delete limpo.captain;
+    } else {
+      delete limpo.reserva;
+      limpo.teamId = teamIdDoForm;
+    }
     // A marca de capitão (gravada pela virada do draft) é do TIME: quem troca de time não
     // leva a capitania junto — senão o time novo ficava com dois capitães e o antigo com
     // nenhum. Para seguir capitão no time novo, é marcar de novo aqui.
-    const trocouDeTime = carregado.teamId !== "" && carregado.teamId !== limpo.teamId;
+    const trocouDeTime = Boolean(carregado.teamId) && carregado.teamId !== limpo.teamId;
     if (trocouDeTime && carregado.captain && limpo.captain) delete limpo.captain;
     if (!limpo.captain) delete limpo.captain;
     mutateDraft((next) => {
       const indice = next.players.findIndex((player) => player.id === selectedId);
       if (indice >= 0) next.players[indice] = { ...limpo };
       else next.players.push({ ...limpo });
-      // Um capitão por time: marcar este desmarca quem mais estava marcado no mesmo time.
+      // Um capitão por time: marcar este desmarca quem mais estava marcado no mesmo ELENCO. A
+      // marca de quem saiu de vez fica gravada (é histórico) — ela já não vale no site.
       if (limpo.captain) {
         for (const outro of next.players) {
-          if (outro.id !== limpo.id && outro.teamId === limpo.teamId && outro.captain) delete outro.captain;
+          if (outro.id !== limpo.id && outro.teamId === limpo.teamId && outro.captain && estaNoElenco(outro)) {
+            delete outro.captain;
+          }
         }
       }
     });
@@ -542,6 +665,9 @@ export function AdminPlayersPanel({
   }
 
   function excluir(playerId: string) {
+    // Quem já jogou não sai do cadastro: o K/D/A e os MVPs dele são das partidas. O botão
+    // nem aparece; isto segura um clique que chegue por outro caminho.
+    if (jogadorTemHistorico(draft, playerId)) return;
     mutateDraft((next) => {
       next.players = next.players.filter((player) => player.id !== playerId);
       next.seriesMatches = removePlayerFromSeriesMatches(next.seriesMatches, playerId);
@@ -554,7 +680,42 @@ export function AdminPlayersPanel({
     setEditorAberto(false);
   }
 
+  /**
+   * "Substituir de vez" (regra 6): o titular sai do elenco público e o reserva herda a vaga,
+   * pela mesma `substituirDeVez` pura que o servidor entende. Grava só `saiuEm` no titular e
+   * o time no reserva — custa só players:write, e as linhas de estatística não mudam.
+   */
+  function confirmarSubstituicao() {
+    if (!salvo || !herdeiroId) return;
+    const titularId = salvo.id;
+    const reservaId = herdeiroId;
+    const quando = new Date().toISOString();
+    // Confere no rascunho de AGORA antes de mexer: a receita do `mutateDraft` roda dentro
+    // do setState, tarde demais para devolver o motivo de uma recusa.
+    try {
+      substituirDeVez(draft, titularId, reservaId, quando);
+    } catch (falha) {
+      setErroSubstituicao(falha instanceof Error ? falha.message : "Não deu para substituir.");
+      setConfirmandoSubstituicao(false);
+      return;
+    }
+    mutateDraft((next) => {
+      try {
+        next.players = substituirDeVez(next, titularId, reservaId, quando).players;
+      } catch {
+        // O rascunho mudou entre a conferência e a gravação: fica como estava.
+      }
+    });
+    setErroSubstituicao(null);
+    setConfirmandoSubstituicao(false);
+    setHerdeiroId("");
+  }
+
   const impacto = salvo ? medirImpacto(draft, salvo.id) : null;
+  const temHistorico = salvo ? jogadorTemHistorico(draft, salvo.id) : false;
+  const podeSubstituir = salvo !== null && estaNoElenco(salvo);
+  const herdeiro = reservas.find((player) => player.id === herdeiroId) ?? null;
+  const timeDoSalvo = salvo?.teamId ? (draft.teams.find((team) => team.id === salvo.teamId)?.name ?? salvo.teamId) : "";
   const corAtual = form.teamId ? teamColor(form.teamId) : C.bronze;
   const eloAtual = resolveElo(form.elo);
   const rota1Conhecida = ROTAS.some((r) => r.valor === form.role1);
@@ -718,7 +879,8 @@ export function AdminPlayersPanel({
     </Field>
   );
 
-  const campoCapitao = (
+  // O reserva não tem time — não tem do que ser capitão.
+  const campoCapitao = formReserva ? null : (
     <Field
       label="Capitão"
       hint="Um por time. Marcar aqui desmarca o capitão anterior do mesmo time. Sem nenhum marcado na temporada, o site usa a regra antiga (o MID)."
@@ -798,16 +960,46 @@ export function AdminPlayersPanel({
         </div>
       </Field>
 
-      {/* Correção #25: sem time padrão — quem cadastra escolhe. */}
+      {/* Correção #25: sem time padrão — quem cadastra escolhe. "Reserva (sem time)" é o
+          reserva oficial da regra 6: entra nos jogos como substituto avulso. */}
       <Field
         label="Time"
-        hint={timeInexistente ? "O time gravado neste jogador não existe mais no rascunho." : undefined}
+        hint={
+          timeInexistente
+            ? "O time gravado neste jogador não existe mais no rascunho."
+            : trocaDeTimeComHistorico
+              ? `Ele já jogou pelo ${nomeDoTime(carregado.teamId)}: as linhas sem “Jogou por” contam pelo time do jogador, então trocar o time aqui mudaria a história das partidas. Volte para ${nomeDoTime(carregado.teamId)} ou use “Substituir de vez”.`
+              : formReserva
+                ? "Reserva: sem time. Entra nos jogos como substituto avulso (“Jogou por”, na aba Séries) e pode herdar uma vaga com “Substituir de vez”. Para dar a ele a vaga aberta de um time (time que ficou com 4 de 5), escolha o time aqui e salve."
+                : undefined
+        }
       >
         <Select
-          value={form.teamId}
-          onChange={(v) => setForm((prev) => ({ ...prev, teamId: v }))}
+          ariaLabel="Time"
+          value={formReserva ? RESERVA : teamIdDoForm}
+          onChange={(v) => {
+            setConfirmandoVaga(false);
+            setForm((prev) => {
+              const proximo: Player = { ...prev };
+              if (v === RESERVA) {
+                proximo.reserva = true;
+                delete proximo.teamId;
+                delete proximo.captain;
+              } else {
+                delete proximo.reserva;
+                proximo.teamId = v;
+              }
+              // Quem saiu de vez e muda de Time (volta à reserva ou vai para outro elenco)
+              // deixa de ter saído: com o `saiuEm` antigo, ao herdar ou receber uma vaga ele
+              // ficava com o time e FORA do elenco — o time com 4 no site, sem aviso.
+              if (v !== (prev.reserva === true ? RESERVA : (prev.teamId ?? ""))) delete proximo.saiuEm;
+              return proximo;
+            });
+          }}
           style={
-            !form.teamId || timeInexistente ? { border: `1px solid ${C.warn}66` } : undefined
+            (!formReserva && !teamIdDoForm) || timeInexistente || trocaDeTimeComHistorico
+              ? { border: `1px solid ${C.warn}66` }
+              : undefined
           }
         >
           <option value="">Escolha o time…</option>
@@ -816,11 +1008,20 @@ export function AdminPlayersPanel({
               {team.name}
             </option>
           ))}
+          <option value={RESERVA}>Reserva (sem time)</option>
           {timeInexistente ? (
-            <option value={form.teamId}>{form.teamId} (time removido)</option>
+            <option value={teamIdDoForm}>{teamIdDoForm} (time removido)</option>
           ) : null}
         </Select>
       </Field>
+
+      {/* Quem saiu de vez continua no cadastro, com o time: o K/D/A dele é das partidas. */}
+      {form.saiuEm ? (
+        <Banner tone="warn" title={`Saiu do time em ${formatDateLabel(form.saiuEm)}`}>
+          Fora do elenco público (times, PTS do elenco, Multi OP.GG). O K/D/A dele continua nas
+          partidas e na ficha, contando para o time em que jogou.
+        </Banner>
+      ) : null}
 
       {/* Correção #24: rota e elo viraram lista fechada. */}
       {compacto ? (
@@ -901,13 +1102,119 @@ export function AdminPlayersPanel({
         </Banner>
       ) : null}
 
-      {/* Correção #7: exclusão em cascata só depois de ver o estrago. O invólucro só existe
-          junto com o aviso: vazio, ele contaria como mais uma linha na grade (e mais um vão). */}
-      {confirmandoExclusao && salvo && impacto ? (
+      {/* Regra 6: o titular sai do elenco e o reserva herda a vaga. */}
+      {podeSubstituir && salvo ? (
+        <div ref={refSubstituicao} style={{ display: "grid", gap: 10 }}>
+          <Field
+            label="Substituir de vez"
+            hint={
+              reservas.length === 0
+                ? "Não há reserva (sem time) no cadastro. A virada do draft traz os reservas da fila; para cadastrar um à mão, crie o jogador e escolha “Reserva (sem time)” no Time."
+                : `${salvo.nick} sai do elenco de ${timeDoSalvo} e o reserva escolhido herda a vaga. O K/D/A de ${salvo.nick} continua nas partidas e na ficha.`
+            }
+          >
+            <span style={{ display: "flex", gap: 8, flexWrap: compacto ? "wrap" : "nowrap" }}>
+              <Select
+                ariaLabel="Reserva que herda a vaga"
+                value={herdeiroId}
+                disabled={reservas.length === 0}
+                onChange={(v) => {
+                  setHerdeiroId(v);
+                  setConfirmandoSubstituicao(false);
+                  setErroSubstituicao(null);
+                }}
+                style={{ flex: "1 1 200px", minWidth: 0 }}
+              >
+                <option value="">Escolha o reserva…</option>
+                {reservas.map((player) => (
+                  <option key={player.id} value={player.id}>
+                    {player.nick}
+                  </option>
+                ))}
+              </Select>
+              <Button
+                tone="ghost"
+                disabled={!herdeiroId || sujo || confirmandoSubstituicao}
+                title={sujo ? "Salve ou desfaça a edição desta ficha antes de substituir." : undefined}
+                onClick={() => {
+                  setConfirmandoSubstituicao(true);
+                  if (compacto) {
+                    requestAnimationFrame(() =>
+                      refSubstituicao.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" }),
+                    );
+                  }
+                }}
+                style={{ flexShrink: 0, ...(compacto ? { flex: "1 1 100%" } : null) }}
+              >
+                <UserRoundCog size={15} aria-hidden /> Substituir de vez…
+              </Button>
+            </span>
+          </Field>
+
+          {sujo && herdeiroId ? (
+            <p style={{ margin: 0, fontSize: 12, color: C.warnSoft }}>
+              Salve ou desfaça a edição desta ficha antes de substituir.
+            </p>
+          ) : null}
+
+          {confirmandoSubstituicao && herdeiro ? (
+            <Banner
+              tone="warn"
+              title={`Substituir ${salvo.nick} por ${herdeiro.nick} de vez?`}
+              actions={
+                <>
+                  <Button tone="gold" small onClick={confirmarSubstituicao}>
+                    Confirmar substituição
+                  </Button>
+                  <Button small onClick={() => setConfirmandoSubstituicao(false)}>
+                    Cancelar
+                  </Button>
+                </>
+              }
+            >
+              {salvo.nick} sai do elenco público de {timeDoSalvo} (times, PTS do elenco, Multi
+              OP.GG) e fica com o time no histórico: o K/D/A dele continua nas partidas e na ficha.{" "}
+              {herdeiro.nick} herda a vaga e deixa de ser reserva; os jogos que ele já fez como
+              substituto continuam no time que cobriu.
+              {salvo.captain ? (
+                <>
+                  {" "}
+                  <strong style={{ color: C.ink }}>
+                    {salvo.nick} era capitão: a marca deixa de valer — marque o novo capitão do time.
+                  </strong>
+                </>
+              ) : null}
+            </Banner>
+          ) : null}
+
+          {erroSubstituicao ? (
+            <p role="alert" style={{ margin: 0, fontSize: 12, color: C.dangerSoft }}>
+              {erroSubstituicao}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* Quem já jogou não é excluído: o K/D/A e os MVPs dele são das partidas. */}
+      {editando && temHistorico && salvo && impacto ? (
+        <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.6, color: C.ink4 }}>
+          <span style={tabular}>
+            {salvo.nick} já jogou ({impacto.linhas} linha{impacto.linhas === 1 ? "" : "s"} de estatística em{" "}
+            {impacto.series} série{impacto.series === 1 ? "" : "s"} · {impacto.mvps} MVP
+            {impacto.mvps === 1 ? "" : "s"})
+          </span>
+          : não dá para excluir sem apagar a história das partidas.
+          {podeSubstituir ? " Para tirar do elenco, use “Substituir de vez”." : null}
+        </p>
+      ) : null}
+
+      {/* Correção #7: exclusão só depois de ver o estrago. O invólucro só existe junto com o
+          aviso: vazio, ele contaria como mais uma linha na grade (e mais um vão). */}
+      {confirmandoExclusao && salvo && !temHistorico ? (
         <div ref={refExclusao}>
           <Banner
             tone="danger"
-            title={`Excluir “${salvo.nick}” apaga também o histórico dele`}
+            title={`Excluir “${salvo.nick}” do cadastro?`}
             actions={
               <>
                 <Button tone="danger" small onClick={() => excluir(salvo.id)}>
@@ -919,15 +1226,45 @@ export function AdminPlayersPanel({
               </>
             }
           >
-            <span style={tabular}>
-              {impacto.linhas} linha{impacto.linhas === 1 ? "" : "s"} de estatística em{" "}
-              {impacto.series} série{impacto.series === 1 ? "" : "s"} · {impacto.mvps} MVP
-              {impacto.mvps === 1 ? "" : "s"}
-            </span>
-            <br />
-            As linhas somem, os jogos onde ele era MVP ficam sem MVP e{" "}
-            <strong style={{ color: C.dangerSoft }}>não há como desfazer</strong> — só
+            Ele não tem nenhuma linha de estatística nem MVP: sai do cadastro sem mexer em partida
+            nenhuma. <strong style={{ color: C.dangerSoft }}>Não há como desfazer</strong> — só
             restaurando um backup.
+          </Banner>
+        </div>
+      ) : null}
+
+      {/* O reserva que recebe um time: a vaga aberta (C1), sem titular a substituir. */}
+      {confirmandoVaga && daVagaAoReserva && problemas.length === 0 ? (
+        <div ref={refVaga}>
+          <Banner
+            tone="warn"
+            title={`Dar a vaga de ${nomeDoTimeDaVaga} a ${form.nick.trim() || carregado.nick}?`}
+            actions={
+              <>
+                <Button tone="gold" small onClick={() => salvar(true)}>
+                  Dar a vaga
+                </Button>
+                <Button small onClick={() => setConfirmandoVaga(false)}>
+                  Cancelar
+                </Button>
+              </>
+            }
+          >
+            {form.nick.trim() || carregado.nick} deixa de ser reserva e entra no elenco público de{" "}
+            {nomeDoTimeDaVaga} (times, PTS do elenco, Multi OP.GG):{" "}
+            <span style={tabular}>
+              hoje com {elencoDoTimeDaVaga} de {ELENCO_COMPLETO}, fica com {elencoDoTimeDaVaga + 1}
+            </span>
+            . Os jogos que ele já fez como substituto continuam no time que cobriu.
+            {elencoDoTimeDaVaga >= ELENCO_COMPLETO ? (
+              <>
+                {" "}
+                <strong style={{ color: C.ink }}>
+                  {nomeDoTimeDaVaga} já está completo: se ele entra no lugar de alguém, use “Substituir de
+                  vez” na ficha desse titular.
+                </strong>
+              </>
+            ) : null}
           </Banner>
         </div>
       ) : null}
@@ -940,7 +1277,7 @@ export function AdminPlayersPanel({
           {sujo ? (
             <Button onClick={() => carregar(base, selectedId)}>Desfazer alterações</Button>
           ) : null}
-          {editando && !confirmandoExclusao ? (
+          {editando && !temHistorico && !confirmandoExclusao ? (
             <Button tone="danger" onClick={() => setConfirmandoExclusao(true)}>
               Excluir jogador
             </Button>
@@ -983,7 +1320,7 @@ export function AdminPlayersPanel({
     </div>
   ) : (
     <div style={{ width: "100%", display: "flex", gap: 8 }}>
-      {editando && !confirmandoExclusao ? (
+      {editando && !temHistorico && !confirmandoExclusao ? (
         <BotaoDeIcone rotulo="Excluir jogador" tone="danger" onClick={pedirExclusao}>
           <Trash2 size={18} aria-hidden />
         </BotaoDeIcone>
@@ -993,7 +1330,7 @@ export function AdminPlayersPanel({
           <Undo2 size={18} aria-hidden />
         </BotaoDeIcone>
       ) : null}
-      <Button tone="gold" onClick={salvar} disabled={problemas.length > 0} style={{ flex: 1, minWidth: 0 }}>
+      <Button tone="gold" onClick={() => salvar()} disabled={problemas.length > 0} style={{ flex: 1, minWidth: 0 }}>
         Salvar no rascunho
       </Button>
     </div>
@@ -1038,6 +1375,11 @@ export function AdminPlayersPanel({
                   {team.name || "(sem nome)"} <span style={tabular}>{elencoPorTime.get(team.id) ?? 0}</span>
                 </ChipFiltro>
               ))}
+              {reservas.length > 0 ? (
+                <ChipFiltro ativo={teamFilter === RESERVA} onClick={() => setTeamFilter(RESERVA)}>
+                  Reservas <span style={tabular}>{reservas.length}</span>
+                </ChipFiltro>
+              ) : null}
             </RolagemX>
           </div>
 
@@ -1062,7 +1404,7 @@ export function AdminPlayersPanel({
                       titulo={player.nick || "(sem nick)"}
                       subtitulo={
                         <span style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                          <span>{time?.name ?? "sem time"}</span>
+                          <span>{rotuloDoTime(player, time?.name)}</span>
                           {player.role1 ? <SeloRota rota={player.role1} /> : null}
                           {player.role2 ? <SeloRota rota={player.role2} /> : null}
                         </span>
@@ -1153,6 +1495,7 @@ export function AdminPlayersPanel({
                         {team.name}
                       </option>
                     ))}
+                    <option value={RESERVA}>Reservas (sem time)</option>
                   </Select>
                 </Field>
                 <Field label="Buscar">
@@ -1229,7 +1572,7 @@ export function AdminPlayersPanel({
                                 maxWidth: 130,
                               }}
                             >
-                              {time?.name ?? "sem time"}
+                              {rotuloDoTime(player, time?.name)}
                             </span>
                             {player.role1 ? <SeloRota rota={player.role1} /> : null}
                             {player.role2 ? <SeloRota rota={player.role2} /> : null}

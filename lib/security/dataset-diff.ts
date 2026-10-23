@@ -207,6 +207,13 @@ export function diffDatasetForScopes(
   mudancas.push(
     ...diffLista(a.teams as ComChave[], b.teams as ComChave[], "id", "teams", () => "teams:write"),
   );
+  /*
+   * Todo campo de jogador é cadastro — inclusive `reserva` e `saiuEm` (regra 6): marcar a
+   * saída de vez e o reserva herdar a vaga custam só `players:write`, no update e no
+   * add/remove. Isso não abre furo no resultado: as linhas avulsas do reserva carregam o
+   * próprio `teamId`, e o `teamId` da LINHA de K/D/A mora em `seriesMatches[].games`, que
+   * é `results:write` (SERIES_FIELD_SCOPE).
+   */
   mudancas.push(
     ...diffLista(a.players as ComChave[], b.players as ComChave[], "id", "players", () => "players:write"),
   );

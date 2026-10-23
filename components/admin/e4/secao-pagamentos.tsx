@@ -16,6 +16,15 @@ import {
   Undo2,
 } from "lucide-react";
 
+import {
+  ChipDoLugar,
+  PassarAVaga,
+  nomeDe,
+  prazoUnicoEscrito,
+  primeiroDaFila,
+  temFila,
+  useFila,
+} from "@/components/admin/e4/fila-no-painel";
 import type { Inscrito, Pagamento, PropsSecao } from "@/components/admin/e4/painel-edicao";
 import { useCompacto } from "@/components/admin/responsivo";
 import {
@@ -43,9 +52,18 @@ import {
   Toolbar,
 } from "@/components/admin/ui";
 import type { Icone } from "@/components/lob/icones";
-import { alertasDoInscrito, type Alerta } from "@/lib/inscricoes/alertas";
+import {
+  ALERTAS_DO_CAIXA,
+  alertasDoInscrito,
+  cienciaDoAlerta,
+  pedidoDeCiencia,
+  TITULO_DAR_CIENCIA,
+  type Alerta,
+  type CienciaDoAlerta,
+} from "@/lib/inscricoes/alertas";
 import { linkDeCobranca, listaDeQuemFaltaPagar } from "@/lib/inscricoes/cobranca";
-import { foraDaCobranca } from "@/lib/inscricoes/pagamento";
+import { lugarNaFila, perdeuOPrazo, reservaADevolverSeNaoJogar, type LugarNaFila } from "@/lib/inscricoes/fila";
+import { foraDaCobranca, prazoNoFimDoDia } from "@/lib/inscricoes/pagamento";
 import { ESTADOS_PAGAMENTO, ROTULO_PAGAMENTO, type EstadoPagamento } from "@/lib/inscricoes/schema";
 
 /**
@@ -72,6 +90,12 @@ const JANELA_DE_AVISO = 7;
 
 const ESCOPO_FALTANDO =
   "Falta o escopo inscricoes:financeiro — você vê o caixa, mas não altera pagamentos.";
+
+/** Passar a vaga mexe na situação da inscrição, não no caixa: é o escopo da conferência. */
+const SEM_ESCOPO_DA_VAGA = "Passar a vaga exige o escopo inscricoes:conferir.";
+
+/** Banco ainda sem a coluna `alertas_cientes` (deploy antes da migração): o mesmo aviso da gaveta. */
+const CIENCIA_SEM_COLUNA = "«Dar ciência» fica disponível depois da migração do banco (coluna alertas_cientes).";
 
 const th: CSSProperties = {
   padding: "0 12px 9px",
@@ -119,6 +143,24 @@ function dataCurta(iso: string | null): string {
   return Number.isNaN(d.getTime())
     ? "—"
     : d.toLocaleDateString("pt-BR", { timeZone: FUSO, day: "2-digit", month: "short", year: "numeric" });
+}
+
+/**
+ * Um prazo de pagamento: «04 de nov. de 2026» quando vence no fim do dia em Brasília (o
+ * prazo único de 31/10); com a hora quando não — «04 de nov. de 2026 às 15:37». O reserva
+ * chamado depois de 31/10 tem 48 h contadas do chamado (D4), e às 20 h do último dia ele já
+ * está em «Perderam o prazo»: sem a hora, a tela dizia que o prazo era o dia inteiro.
+ */
+function prazoCurto(iso: string | null): string {
+  const dia = dataCurta(iso);
+  if (!iso || dia === "—" || prazoNoFimDoDia(iso)) return dia;
+  const hora = new Date(iso).toLocaleTimeString("pt-BR", {
+    timeZone: FUSO,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+  return `${dia} às ${hora}`;
 }
 
 function emMs(iso: string | null): number | null {
@@ -173,20 +215,25 @@ type Linha = Readonly<{
   venceMs: number | null;
   /** Recusado ou desistente que não pagou: a cobrança não vale mais (ver `foraDaCobranca`). */
   fora: boolean;
+  /**
+   * Titular, fila de reserva (com a posição) ou fora (D1). Reserva só paga se for chamado
+   * (D2): não entra em «a receber», nos prazos nem na lista de quem falta pagar.
+   */
+  lugar: LugarNaFila;
 }>;
 
-/**
- * Os alertas que são do caixa — os de requisito ficam na aba Inscritos. O «apto sem
- * pagamento» é dos dois: o sistema só promove, então um «pago» desfeito depois da promoção
- * (ou um Apto marcado à mão) deixava a pessoa apta, rumo ao draft, sem nada apontar aqui.
+/** Na fila de reserva: não se cobra (D2). */
+function naReserva(linha: Linha): boolean {
+  return linha.lugar.tipo === "reserva";
+}
+
+/*
+ * Os alertas que são do caixa (`ALERTAS_DO_CAIXA`, em lib/inscricoes/alertas.ts) — os de
+ * requisito ficam na aba Inscritos. O «apto sem pagamento» é dos dois: o sistema só promove,
+ * então um «pago» desfeito depois da promoção (ou um Apto marcado à mão) deixava a pessoa
+ * apta, rumo ao draft, sem nada apontar aqui. A lista mora lá porque é também ela que diz
+ * quem pode dar ciência do alerta (o financeiro).
  */
-const ALERTAS_DO_CAIXA = new Set([
-  "apto_sem_pagamento",
-  "organizador_cobrado",
-  "recusado_pago",
-  "recusado_declarado",
-  "desistiu_com_pagamento",
-]);
 
 /**
  * Trocas pelo <select> que pedem confirmação: as que mexem no caixa (ou desfazem um «pago»).
@@ -326,7 +373,7 @@ function ValorDoCartao({ centavos }: Readonly<{ centavos: number }>) {
 function resumoDoPagamento(p: Pagamento): string | null {
   if (p.estado === "declarado" && p.declarado_em) return `declarou ${dataHora(p.declarado_em)}`;
   if (p.conferido_em) return `conferido ${dataCurta(p.conferido_em)}${p.conferido_por ? ` · ${p.conferido_por}` : ""}`;
-  if (p.vence_em) return `vence ${dataCurta(p.vence_em)}`;
+  if (p.vence_em) return `vence ${prazoCurto(p.vence_em)}`;
   return null;
 }
 
@@ -387,6 +434,7 @@ function DetalheDoPagamento({
           </div>
           <div style={{ marginTop: 6, display: "flex", gap: 6, flexWrap: "wrap" }}>
             <Chip tone={TOM_DO_ESTADO[pagamento.estado]}>{ROTULO_PAGAMENTO[pagamento.estado]}</Chip>
+            {linha.lugar.tipo === "reserva" ? <ChipDoLugar lugar={linha.lugar} /> : null}
             {inscrito?.organizador ? (
               <Chip tone="gold" title={TITULO_ORGANIZACAO}>
                 organização
@@ -404,7 +452,7 @@ function DetalheDoPagamento({
       <Dados
         itens={[
           { rotulo: "Inscrição", valor: <ChipDaInscricao inscrito={inscrito} /> },
-          { rotulo: "Vence", valor: <span style={tabular}>{dataCurta(pagamento.vence_em)}</span> },
+          { rotulo: "Vence", valor: <span style={tabular}>{prazoCurto(pagamento.vence_em)}</span> },
           { rotulo: "Declarou", valor: <span style={tabular}>{dataHora(pagamento.declarado_em)}</span> },
           {
             rotulo: "Conferido",
@@ -471,11 +519,22 @@ function DetalheDoPagamento({
 
 // ---------------------------------------------------------------- seção
 
-export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro, ultimoErro = null }: PropsSecao) {
+export function SecaoPagamentos({
+  dados,
+  executar,
+  ocupado,
+  podeFinanceiro,
+  podeConferir,
+  ultimoErro = null,
+  ultimaMensagem = null,
+}: PropsSecao) {
   const { config, panorama, pagamentos, inscritos, conferencias } = dados;
   const caixa = panorama.caixa;
   const compacto = useCompacto();
   const contagemId = useId();
+  const fila = useFila(dados);
+  const comFila = temFila(fila);
+  const prazoUnico = prazoUnicoEscrito(config);
 
   /**
    * O relógio é tratado como fonte externa, e não como valor de renderização.
@@ -535,10 +594,11 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro, ulti
         nome: inscrito ? `${inscrito.nick}#${inscrito.tag}` : `inscrição ${pagamento.inscricao_id.slice(0, 8)}`,
         venceMs: emMs(pagamento.vence_em),
         fora: inscrito ? foraDaCobranca(inscrito.situacao, pagamento.estado) : false,
+        lugar: lugarNaFila(fila, pagamento.inscricao_id),
       };
     });
     return lista.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
-  }, [pagamentos, fichaDe]);
+  }, [pagamentos, fichaDe, fila]);
 
   /** Fila de trabalho: quem esperou mais tempo aparece primeiro. */
   const declarados = useMemo(
@@ -555,7 +615,9 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro, ulti
     for (const linha of linhas) {
       if (linha.pagamento.estado !== "aguardando" || linha.venceMs === null) continue;
       // Fora do campeonato ou da organização: não se cobra (o alerta do caixa cuida do segundo).
-      if (linha.fora || linha.inscrito?.organizador) continue;
+      // Reserva também não: só paga se for chamado (D2) — mesmo que um prazo velho tenha
+      // ficado na linha até o próximo alinhamento.
+      if (linha.fora || linha.inscrito?.organizador || naReserva(linha)) continue;
       // A favor do prazo, `ceil` de propósito: faltando 3 horas, o texto certo é "vence em 1
       // dia", não "0". Passado o prazo, é vencido desde o primeiro instante: o `ceil` de 20 h
       // de atraso dava -0, que não é `< 0`, e a pessoa saía como «vence hoje», em âmbar.
@@ -568,15 +630,91 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro, ulti
     return fora.sort((a, b) => a.dias - b.dias);
   }, [linhas, agoraMs]);
 
-  /** Quem ainda deve: aguardando, nem fora do campeonato, nem organizador. */
+  /** Quem ainda deve: aguardando, nem fora do campeonato, nem organizador, nem na fila de reserva. */
   const devendo = useMemo(
-    () => linhas.filter((l) => l.pagamento.estado === "aguardando" && !l.fora && !l.inscrito?.organizador),
+    () =>
+      linhas.filter(
+        (l) => l.pagamento.estado === "aguardando" && !l.fora && !l.inscrito?.organizador && !naReserva(l),
+      ),
     [linhas],
   );
 
-  /** O que pede um clique de quem cuida do caixa (ver `alertasDoInscrito`). */
-  const pendenciasDoCaixa = useMemo(() => {
-    const lista: { linha: Linha; alerta: Alerta }[] = [];
+  /**
+   * D5: titular que não pagou até o prazo. A partir dele o painel oferece passar a vaga ao 1º
+   * da fila — nada cancela sozinho. A regra é a mesma do servidor (`perdeuOPrazo`): «declarado»
+   * não perde (abra o extrato antes) e organizador nunca perde.
+   */
+  const perderamOPrazo = useMemo(() => {
+    if (agoraMs === null) return [];
+    return linhas
+      .filter(
+        (l) =>
+          l.inscrito !== null &&
+          perdeuOPrazo(
+            {
+              lugar: l.lugar,
+              organizador: l.inscrito.organizador,
+              situacao: l.inscrito.situacao,
+              pagamento: { estado: l.pagamento.estado, vence_em: l.pagamento.vence_em },
+            },
+            agoraMs,
+          ),
+      )
+      .sort((a, b) => (a.venceMs ?? 0) - (b.venceMs ?? 0));
+  }, [linhas, agoraMs]);
+
+  /** D2: reserva que pagou (ou disse que pagou). Se não for chamado até o fim, a organização devolve. */
+  const aDevolverSeNaoJogar = useMemo(
+    () =>
+      linhas
+        .filter((l) => reservaADevolverSeNaoJogar(l.lugar, l.pagamento.estado))
+        .sort(
+          (a, b) =>
+            (a.lugar.tipo === "reserva" ? a.lugar.posicao : 0) - (b.lugar.tipo === "reserva" ? b.lugar.posicao : 0),
+        ),
+    [linhas],
+  );
+  // O servidor separa esse valor do arrecadado (`fecharCaixa`); servidor de antes da fila não
+  // manda o número, e aí a soma sai das linhas — só o «pago», como lá.
+  const valorADevolverSeNaoJogar =
+    caixa.aDevolverSeNaoJogar ??
+    aDevolverSeNaoJogar.filter((l) => l.pagamento.estado === "pago").reduce((t, l) => t + l.pagamento.valor_centavos, 0);
+
+  const primeiroId = primeiroDaFila(fila);
+  const primeiro = primeiroId ? (fichaDe.get(primeiroId) ?? null) : null;
+
+  /*
+   * As respostas das ações desta aba: cada bloco mostra a ÚLTIMA resposta do painel
+   * (`ultimaMensagem`/`ultimoErro`) enquanto o seu resultado não for nulo. Toda ação daqui
+   * zera os dois antes de começar (`limparResultados`, como na gaveta de Inscritos): sem isso,
+   * o bloco do «Passar a vaga» ficava de pé para sempre e, depois de uma troca de pagamento,
+   * dizia «Vaga liberada.» (a troca falhou) ou «Salvo.» (deu certo) como se fosse dele.
+   */
+  /** D5: o servidor confere tudo de novo antes de gravar; a mensagem dele sai no aviso do topo e aqui. */
+  const [resultadoVaga, setResultadoVaga] = useState<"ok" | "falhou" | null>(null);
+  /** «Dar ciência» / «Desfazer» nas Pendências do caixa. */
+  const [resultadoCiencia, setResultadoCiencia] = useState<"ok" | "falhou" | null>(null);
+  const limparResultados = () => {
+    setResultadoVaga(null);
+    setResultadoCiencia(null);
+  };
+
+  const passarVaga = async (linha: Linha): Promise<boolean> => {
+    limparResultados();
+    const ok = await executar("passar_vaga", { inscricaoId: linha.pagamento.inscricao_id });
+    setResultadoVaga(ok ? "ok" : "falhou");
+    return ok;
+  };
+
+  /*
+   * O que pede um clique de quem cuida do caixa (ver `alertasDoInscrito`), e os alertas do
+   * caixa que a organização já aceitou. Alerta com ciência que vale (a mesma assinatura: o
+   * texto e os fatos do pagamento) não pede mais clique: sai das pendências, como sai do ⚠ de
+   * Inscritos, e fica listado embaixo com «Desfazer». Mudou o alerta, volta sozinho.
+   */
+  const { pendenciasDoCaixa, cientesDoCaixa } = useMemo(() => {
+    const pendentes: { linha: Linha; alerta: Alerta }[] = [];
+    const cientes: { linha: Linha; alerta: Alerta; ciencia: CienciaDoAlerta }[] = [];
     for (const linha of linhas) {
       if (!linha.inscrito) continue;
       const doInscrito = conferencias.filter((c) => c.inscricao_id === linha.inscrito!.id);
@@ -586,12 +724,41 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro, ulti
         pagamento: linha.pagamento,
         config,
         agoraMs: agoraMs ?? 0,
+        // Sem o lugar, reserva aprovado sem pagar acusava «aprovado sem pagamento» — e reserva
+        // não paga enquanto não for chamado (D2).
+        lugar: linha.lugar,
       })) {
-        if (ALERTAS_DO_CAIXA.has(alerta.codigo)) lista.push({ linha, alerta });
+        if (!ALERTAS_DO_CAIXA.has(alerta.codigo)) continue;
+        const ciencia = cienciaDoAlerta(alerta, linha.inscrito.alertas_cientes);
+        if (ciencia) cientes.push({ linha, alerta, ciencia });
+        else pendentes.push({ linha, alerta });
       }
     }
-    return lista;
+    return { pendenciasDoCaixa: pendentes, cientesDoCaixa: cientes };
   }, [linhas, conferencias, config, agoraMs]);
+
+  /*
+   * A ciência dos alertas do caixa pede o escopo do financeiro (`escopoDaCiencia`) — o mesmo
+   * desta aba. Antes ela só existia na gaveta de Inscritos, que pede a conferência: a conta só
+   * do financeiro abria lá em modo de leitura, justamente onde estava a única ação dela.
+   */
+  const darCiencia = async (linha: Linha, alerta: Alerta) => {
+    if (!linha.inscrito) return;
+    limparResultados();
+    const ok = await executar("alerta_ciencia", pedidoDeCiencia(linha.inscrito.id, alerta));
+    setResultadoCiencia(ok ? "ok" : "falhou");
+  };
+
+  const desfazerCiencia = async (linha: Linha, alerta: Alerta) => {
+    if (!linha.inscrito) return;
+    limparResultados();
+    const ok = await executar("alerta_ciencia", { inscricaoId: linha.inscrito.id, codigo: alerta.codigo, desfazer: true });
+    setResultadoCiencia(ok ? "ok" : "falhou");
+  };
+
+  /** O «Dar ciência» de uma pendência: só o financeiro, e só com a coluna no banco. */
+  const semColuna = (linha: Linha) => linha.inscrito?.alertas_cientes === undefined;
+  const motivoDaCiencia = (linha: Linha) => motivo ?? (semColuna(linha) ? CIENCIA_SEM_COLUNA : TITULO_DAR_CIENCIA);
 
   const copiarLista = async () => {
     // O valor de CADA pagamento, e não a taxa da configuração: a taxa vale para inscrição
@@ -704,18 +871,33 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro, ulti
     {
       label: "A receber",
       value: moeda(caixa.aReceber),
-      detail: "aguardando + declarado (sem organizadores, recusados e desistentes)",
+      detail: comFila
+        ? "aguardando + declarado (sem organizadores, recusados, desistentes e fila de reserva)"
+        : "aguardando + declarado (sem organizadores, recusados e desistentes)",
     },
   ];
   const metricasMiudas: ReadonlyArray<{ label: string; value: string; detail: string }> = [
     { label: "Recebido (bruto)", value: moeda(caixa.recebido), detail: "tudo que um dia entrou" },
     { label: "Estornado", value: moeda(caixa.estornado), detail: "já devolvido" },
     { label: "A devolver", value: moeda(caixa.aDevolver), detail: "na conta, mas comprometido" },
+    // D2: o pago da fila de reserva fica na conta, mas não é prêmio — volta se ele não jogar.
+    ...(comFila || valorADevolverSeNaoJogar > 0
+      ? [
+          {
+            label: "A devolver se não jogar",
+            value: moeda(valorADevolverSeNaoJogar),
+            detail: "pago pela fila de reserva — fora do prêmio",
+          },
+        ]
+      : []),
     { label: "Isento", value: moeda(caixa.isento), detail: "organizadores desta edição" },
   ];
 
   /** Devolve se gravou — a folha do celular precisa saber para mostrar o motivo da falha. */
   const salvar = async (pagamento: Pagamento, estado: EstadoPagamento): Promise<boolean> => {
+    // A resposta desta troca é a última do painel: os blocos da vaga e da ciência não podem
+    // continuar lendo-a como se fosse deles.
+    limparResultados();
     const inscricaoId = pagamento.inscricao_id;
     const obs = (rascunhoObs[inscricaoId] ?? "").trim();
     // O servidor grava `observacao ?? null`: mandar vazio APAGA a observação anterior.
@@ -773,7 +955,10 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro, ulti
                 rotulo: "Taxa",
                 valor: <span style={{ color: C.bronzeLit, fontWeight: 700, ...tabular }}>{moeda(config.taxa_centavos)}</span>,
               },
-              { rotulo: "Prazo", valor: plural(config.prazo_pagamento_dias, "dia", "dias") },
+              {
+                rotulo: "Prazo",
+                valor: prazoUnico ? `titulares até ${prazoUnico}` : plural(config.prazo_pagamento_dias, "dia", "dias"),
+              },
               { rotulo: "Chave Pix", valor: config.chave_pix ?? "a definir", largo: true },
               { rotulo: "Responsável", valor: config.responsavel_financeiro ?? "a definir", largo: true },
             ]}
@@ -782,7 +967,13 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro, ulti
       ) : (
         <Toolbar style={{ marginBottom: 16 }}>
           <Chip tone="gold">taxa {moeda(config.taxa_centavos)}</Chip>
-          <Chip>prazo de {plural(config.prazo_pagamento_dias, "dia", "dias")}</Chip>
+          {prazoUnico ? (
+            <Chip title="Prazo único dos titulares, até o fim do dia em Brasília. Quem for chamado da fila depois dele tem 48 horas.">
+              titulares pagam até {prazoUnico}
+            </Chip>
+          ) : (
+            <Chip>prazo de {plural(config.prazo_pagamento_dias, "dia", "dias")}</Chip>
+          )}
           <Chip title="Chave usada no PIX da inscrição.">
             PIX: {config.chave_pix ?? "a definir"}
           </Chip>
@@ -843,15 +1034,41 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro, ulti
 
       {/* ------------------------------------------------------------ pendências */}
 
-      {pendenciasDoCaixa.length > 0 ? (
+      {/*
+       * O bloco fica de pé também com os alertas já aceitos (para o «Desfazer») e enquanto houver
+       * a resposta da última ciência: dar ciência da ÚLTIMA pendência esvazia a lista, e sem isto
+       * a resposta do servidor sumia junto.
+       */}
+      {pendenciasDoCaixa.length > 0 || cientesDoCaixa.length > 0 || resultadoCiencia !== null ? (
         <>
-          <BlockTitle right={<Chip tone="warn">{pendenciasDoCaixa.length}</Chip>}>Pendências do caixa</BlockTitle>
-          <p style={{ margin: "0 0 12px", fontSize: 12.5, color: C.ink3, lineHeight: 1.7 }}>
-            O sistema não mexe em dinheiro sozinho: ele aponta, e quem cuida do caixa decide com um clique.
-          </p>
+          <BlockTitle right={<Chip tone={pendenciasDoCaixa.length > 0 ? "warn" : "neutro"}>{pendenciasDoCaixa.length}</Chip>}>
+            Pendências do caixa
+          </BlockTitle>
+          {pendenciasDoCaixa.length > 0 ? (
+            <p style={{ margin: "0 0 12px", fontSize: 12.5, color: C.ink3, lineHeight: 1.7 }}>
+              O sistema não mexe em dinheiro sozinho: ele aponta, e quem cuida do caixa decide com um clique. Já viu e
+              decidiu? «Dar ciência» tira a pendência daqui e do ⚠ de Inscritos — ela volta sozinha se o alerta mudar
+              (o texto, ou o pagamento por trás dele).
+            </p>
+          ) : (
+            <p style={{ margin: "0 0 12px", fontSize: 12.5, color: C.ink4, lineHeight: 1.7 }}>
+              Nenhuma pendência em aberto.
+            </p>
+          )}
           <div style={{ display: "grid", gap: 8 }}>
-            {pendenciasDoCaixa.map(({ linha, alerta }) =>
-              compacto ? (
+            {pendenciasDoCaixa.map(({ linha, alerta }) => {
+              const ciencia = (
+                <Button
+                  small={!compacto}
+                  fullWidth={compacto}
+                  disabled={travado || semColuna(linha)}
+                  title={motivoDaCiencia(linha)}
+                  onClick={() => void darCiencia(linha, alerta)}
+                >
+                  Dar ciência
+                </Button>
+              );
+              return compacto ? (
                 // O estado vai na linha miúda, e não num chip à direita: "Aguardando pagamento"
                 // num chip sem quebra roubava metade da largura e espremia o Riot ID.
                 <CartaoLinha
@@ -862,8 +1079,9 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro, ulti
                   subtitulo={ROTULO_PAGAMENTO[linha.pagamento.estado]}
                 >
                   <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.55, color: C.warnSoft }}>{alerta.texto}</p>
-                  {alerta.acaoPagamento ? (
-                    <div style={{ marginTop: 10 }}>
+                  {/* Um embaixo do outro, na largura toda: alvo de dedo. */}
+                  <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
+                    {alerta.acaoPagamento ? (
                       <Button
                         tone="gold"
                         fullWidth
@@ -873,8 +1091,9 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro, ulti
                       >
                         {ROTULO_DA_ACAO[alerta.acaoPagamento]}
                       </Button>
-                    </div>
-                  ) : null}
+                    ) : null}
+                    {ciencia}
+                  </div>
                 </CartaoLinha>
               ) : (
                 <Card key={`${linha.pagamento.inscricao_id}-${alerta.codigo}`} padding="12px 16px">
@@ -893,11 +1112,69 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro, ulti
                         {ROTULO_DA_ACAO[alerta.acaoPagamento]}
                       </Button>
                     ) : null}
+                    {ciencia}
                   </div>
                 </Card>
-              ),
-            )}
+              );
+            })}
           </div>
+          {cientesDoCaixa.length > 0 ? (
+            // Apagado por COR e texto, nunca por opacidade (como na gaveta de Inscritos): o
+            // alerta aceito continua legível e auditável sem disputar o olho com as pendências.
+            <div
+              role="group"
+              aria-label="Alertas do caixa com ciência da organização"
+              style={{ marginTop: 10, padding: "10px 14px", border: `1px dashed ${C.line}`, borderRadius: 4 }}
+            >
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 10,
+                  letterSpacing: ".16em",
+                  textTransform: "uppercase",
+                  color: C.ink4,
+                }}
+              >
+                Com ciência da organização — não contam como pendência
+              </p>
+              <ul style={{ margin: "6px 0 0", paddingLeft: 18, fontSize: 12, lineHeight: 1.55, color: C.ink4 }}>
+                {cientesDoCaixa.map(({ linha, alerta, ciencia }) => (
+                  <li key={`${linha.pagamento.inscricao_id}-${alerta.codigo}`} style={{ marginBottom: 8 }}>
+                    <span style={{ color: C.ink3, overflowWrap: "anywhere" }}>{linha.nome}</span> — {alerta.texto}
+                    <span style={{ display: "block", fontSize: 11, color: C.ink4 }}>
+                      ciente — {ciencia.por}, {dataHora(ciencia.em)}
+                    </span>
+                    <div style={{ marginTop: 6 }}>
+                      <Button
+                        small={!compacto}
+                        fullWidth={compacto}
+                        disabled={travado || semColuna(linha)}
+                        title={motivo ?? "O alerta volta a contar como pendência."}
+                        onClick={() => void desfazerCiencia(linha, alerta)}
+                      >
+                        Desfazer
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {resultadoCiencia && !ocupado ? (
+            <p
+              role={resultadoCiencia === "falhou" ? "alert" : "status"}
+              style={{
+                margin: "10px 0 0",
+                fontSize: 12.5,
+                lineHeight: 1.55,
+                color: resultadoCiencia === "falhou" ? C.dangerSoft : C.okSoft,
+              }}
+            >
+              {resultadoCiencia === "falhou"
+                ? (ultimoErro ?? "Não foi possível gravar a ciência.")
+                : (ultimaMensagem ?? "Ciência gravada.")}
+            </p>
+          ) : null}
         </>
       ) : null}
 
@@ -1050,9 +1327,12 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro, ulti
 
       <p style={{ margin: "0 0 12px", fontSize: 12.5, color: C.ink3, lineHeight: 1.7 }}>
         Quem está <strong style={{ color: C.ink2 }}>aguardando</strong> e vence nos próximos{" "}
-        {plural(JANELA_DE_AVISO, "dia", "dias")} ou já venceu. O prazo é de{" "}
-        {plural(config.prazo_pagamento_dias, "dia", "dias")} a partir da inscrição. Vencido não é
-        recusado: é hora de cobrar. «Cobrar» abre o seu WhatsApp com a mensagem pronta (valor, Pix e
+        {plural(JANELA_DE_AVISO, "dia", "dias")} ou já venceu.{" "}
+        {prazoUnico
+          ? `Os titulares pagam até ${prazoUnico} (fim do dia, Brasília); quem for chamado da fila depois disso tem 48 horas.`
+          : `O prazo é de ${plural(config.prazo_pagamento_dias, "dia", "dias")} a partir da inscrição.`}{" "}
+        {comFila ? "Quem está na fila de reserva não aparece aqui: só paga se for chamado. " : null}
+        Vencido não é recusado: é hora de cobrar. «Cobrar» abre o seu WhatsApp com a mensagem pronta (valor, Pix e
         link) — quem envia é você.
       </p>
 
@@ -1097,7 +1377,7 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro, ulti
                 destaque={dias < 0 ? C.danger : dias <= 2 ? C.warn : undefined}
                 inicio={<Selo icone={CalendarClock} tom={tom} />}
                 titulo={linha.nome}
-                subtitulo={<span style={tabular}>vence {dataCurta(linha.pagamento.vence_em)}</span>}
+                subtitulo={<span style={tabular}>vence {prazoCurto(linha.pagamento.vence_em)}</span>}
                 fim={
                   <>
                     <ValorDoCartao centavos={linha.pagamento.valor_centavos} />
@@ -1148,7 +1428,7 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro, ulti
                 <tr key={linha.pagamento.inscricao_id}>
                   <td style={{ ...td, color: C.ink }}>{linha.nome}</td>
                   <td style={{ ...td, textAlign: "right" }}>{moeda(linha.pagamento.valor_centavos)}</td>
-                  <td style={td}>{dataCurta(linha.pagamento.vence_em)}</td>
+                  <td style={td}>{prazoCurto(linha.pagamento.vence_em)}</td>
                   <td style={td}>
                     <Chip tone={tomDoPrazo(dias)}>{textoDoPrazo(dias)}</Chip>
                   </td>
@@ -1179,6 +1459,95 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro, ulti
           </table>
         </ScrollX>
       )}
+
+      {/* ------------------------------------------------------------ perderam o prazo (D5) */}
+
+      {/*
+       * O bloco fica de pé enquanto houver a resposta do último «Passar a vaga»: passar a vaga do
+       * ÚLTIMO da lista (o caso comum, um titular vencido) esvazia a lista, e sem isto o bloco
+       * desmontava levando junto a mensagem do servidor — quem foi chamado, ou o erro. A resposta
+       * sai com «Dispensar», e qualquer outra ação da aba a apaga (`limparResultados`): ela
+       * nunca mostra a resposta de outra ação.
+       */}
+      {perderamOPrazo.length > 0 || resultadoVaga !== null ? (
+        <>
+          <BlockTitle right={<Chip tone={perderamOPrazo.length > 0 ? "danger" : "neutro"}>{perderamOPrazo.length}</Chip>}>
+            Perderam o prazo
+          </BlockTitle>
+          {perderamOPrazo.length > 0 ? (
+            <p style={{ margin: "0 0 12px", fontSize: 12.5, color: C.ink3, lineHeight: 1.7 }}>
+              Titulares que não pagaram até o prazo. Nada cancela sozinho: com um clique e a confirmação, a vaga passa ao
+              1º da fila{primeiro ? ` (agora, ${nomeDe(primeiro)})` : ""}, que é chamado na hora e ganha o prazo dele.
+              Quem perde a vaga vira «Desistiu», com auditoria, e o pagamento não é tocado. Quem declarou que pagou não
+              está aqui — abra o extrato antes — e organizador nunca perde a vaga.
+              {podeConferir ? null : ` ${SEM_ESCOPO_DA_VAGA}`}
+            </p>
+          ) : (
+            <p style={{ margin: "0 0 12px", fontSize: 12.5, color: C.ink4, lineHeight: 1.7 }}>
+              Ninguém mais com o prazo vencido.
+            </p>
+          )}
+          {resultadoVaga && !ocupado ? (
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 10, flexWrap: "wrap", margin: "0 0 12px" }}>
+              <p
+                role={resultadoVaga === "falhou" ? "alert" : "status"}
+                style={{
+                  margin: 0,
+                  flex: "1 1 240px",
+                  fontSize: 12.5,
+                  lineHeight: 1.55,
+                  color: resultadoVaga === "falhou" ? C.dangerSoft : C.okSoft,
+                }}
+              >
+                {resultadoVaga === "falhou"
+                  ? (ultimoErro ?? "Não foi possível passar a vaga.")
+                  : (ultimaMensagem ?? "Vaga liberada.")}
+              </p>
+              <Button small fullWidth={compacto} onClick={() => setResultadoVaga(null)}>
+                Dispensar
+              </Button>
+            </div>
+          ) : null}
+          <div style={{ display: "grid", gap: 8 }}>
+            {perderamOPrazo.map((linha) => {
+              const proximo = primeiro && primeiro.id !== linha.pagamento.inscricao_id ? nomeDe(primeiro) : null;
+              const botao = (
+                <PassarAVaga
+                  nome={linha.nome}
+                  proximo={proximo}
+                  onPassar={() => passarVaga(linha)}
+                  desabilitado={!podeConferir || ocupado}
+                  motivo={podeConferir ? undefined : SEM_ESCOPO_DA_VAGA}
+                  largo={compacto}
+                />
+              );
+              return compacto ? (
+                <CartaoLinha
+                  key={linha.pagamento.inscricao_id}
+                  destaque={C.danger}
+                  inicio={<Selo icone={CalendarClock} tom="danger" />}
+                  titulo={linha.nome}
+                  subtitulo={<span style={tabular}>venceu {prazoCurto(linha.pagamento.vence_em)}</span>}
+                  fim={<ValorDoCartao centavos={linha.pagamento.valor_centavos} />}
+                >
+                  {botao}
+                </CartaoLinha>
+              ) : (
+                <Card key={linha.pagamento.inscricao_id} padding="12px 16px">
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                    <span style={{ fontFamily: display, fontSize: 15, color: C.ink }}>{linha.nome}</span>
+                    <ChipDaInscricao inscrito={linha.inscrito} />
+                    <span style={{ fontSize: 12.5, color: C.dangerSoft, ...tabular }}>
+                      venceu {prazoCurto(linha.pagamento.vence_em)} · {moeda(linha.pagamento.valor_centavos)}
+                    </span>
+                    <span style={{ marginLeft: "auto" }}>{botao}</span>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        </>
+      ) : null}
 
       {/* ------------------------------------------------------------ estornos */}
 
@@ -1253,6 +1622,48 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro, ulti
           )}
         </Card>
       </FieldGrid>
+
+      {/* ------------------------------------------------------------ fila de reserva com pagamento (D2) */}
+
+      {aDevolverSeNaoJogar.length > 0 ? (
+        <>
+          <BlockTitle right={<Chip tone="warn">{moeda(valorADevolverSeNaoJogar)}</Chip>}>
+            A devolver se não jogar
+          </BlockTitle>
+          <p style={{ margin: "0 0 12px", fontSize: 12.5, color: C.ink3, lineHeight: 1.7 }}>
+            Quem está na fila de reserva e já pagou (ou disse que pagou). Reserva só paga se for chamado: o dinheiro fica
+            registrado na conta, mas FORA do prêmio. Se a pessoa for chamada, passa a contar no arrecadado; se não for
+            chamada até o fim, a organização devolve — mude o estado para «Estorno devido» e marque «Devolvi» quando o Pix
+            sair. «Declarado» ainda pede abrir o extrato.
+          </p>
+          <div style={{ display: "grid", gap: 8 }}>
+            {aDevolverSeNaoJogar.map((linha) =>
+              compacto ? (
+                <CartaoLinha
+                  key={linha.pagamento.inscricao_id}
+                  inicio={<SeloDoEstado estado={linha.pagamento.estado} />}
+                  titulo={linha.nome}
+                  subtitulo={ROTULO_PAGAMENTO[linha.pagamento.estado]}
+                  fim={<ValorDoCartao centavos={linha.pagamento.valor_centavos} />}
+                >
+                  <ChipDoLugar lugar={linha.lugar} />
+                </CartaoLinha>
+              ) : (
+                <Card key={linha.pagamento.inscricao_id} padding="12px 16px">
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                    <span style={{ fontFamily: display, fontSize: 15, color: C.ink }}>{linha.nome}</span>
+                    <ChipDoLugar lugar={linha.lugar} />
+                    <Chip tone={TOM_DO_ESTADO[linha.pagamento.estado]}>{ROTULO_PAGAMENTO[linha.pagamento.estado]}</Chip>
+                    <span style={{ marginLeft: "auto", fontSize: 13, color: C.warnSoft, ...tabular }}>
+                      {moeda(linha.pagamento.valor_centavos)}
+                    </span>
+                  </div>
+                </Card>
+              ),
+            )}
+          </div>
+        </>
+      ) : null}
 
       {/* ------------------------------------------------------------ todos */}
 
@@ -1344,6 +1755,7 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro, ulti
                   >
                     <span style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                       <Chip tone={TOM_DO_ESTADO[pagamento.estado]}>{ROTULO_PAGAMENTO[pagamento.estado]}</Chip>
+                      {linha.lugar.tipo === "reserva" ? <ChipDoLugar lugar={linha.lugar} /> : null}
                       {inscrito?.organizador ? (
                         <Chip tone="gold" title={TITULO_ORGANIZACAO}>
                           organização
@@ -1397,12 +1809,17 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro, ulti
               </tr>
             </thead>
             <tbody>
-              {visiveis.map(({ pagamento, inscrito, nome }) => {
+              {visiveis.map(({ pagamento, inscrito, nome, lugar }) => {
                 const id = pagamento.inscricao_id;
                 return (
                   <tr key={id}>
                     <td style={{ ...td, color: C.ink }}>
                       {nome}
+                      {lugar.tipo === "reserva" ? (
+                        <span style={{ marginLeft: 8 }}>
+                          <ChipDoLugar lugar={lugar} />
+                        </span>
+                      ) : null}
                       {inscrito?.organizador ? (
                         <span style={{ marginLeft: 8 }}>
                           <Chip tone="gold" title={TITULO_ORGANIZACAO}>
@@ -1428,7 +1845,7 @@ export function SecaoPagamentos({ dados, executar, ocupado, podeFinanceiro, ulti
                       {moeda(pagamento.valor_centavos)}
                     </td>
                     <td style={td}>{dataHora(pagamento.declarado_em)}</td>
-                    <td style={td}>{dataCurta(pagamento.vence_em)}</td>
+                    <td style={td}>{prazoCurto(pagamento.vence_em)}</td>
                     <td style={td}>
                       {pagamento.conferido_em ? (
                         <span title={pagamento.conferido_por ?? undefined}>

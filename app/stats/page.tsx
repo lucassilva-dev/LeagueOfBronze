@@ -2,13 +2,14 @@ import type { Metadata } from "next";
 import { DurationRanking } from "@/components/lob/duration-ranking";
 import { RoleBests } from "@/components/lob/role-bests";
 import { StatsToggles } from "@/components/lob/stats-toggles";
+import { textosElenco } from "@/components/lob/textos-elenco";
 import { Eyebrow, EloCrest, GoldTitle, Pill } from "@/components/lob/ui";
 import { PreTemporadaAviso } from "@/components/pre-temporada-aviso";
 import { semTemporadaAoVivo } from "@/lib/fase-do-site";
 import { ELO_ORDER, eloSvgUrl } from "@/lib/design";
 import { metadadosDaPagina } from "@/lib/i18n/metadados";
-import { getMessages } from "@/lib/i18n/server";
-import { buildDesignPlayers, buildDesignTeams } from "@/lib/roster";
+import { getLocale, getMessages } from "@/lib/i18n/server";
+import { buildDesignPlayersDoElenco, buildDesignTeams } from "@/lib/roster";
 import { getServerDataset } from "@/lib/server-data";
 import { buildRoleBests, buildStatsRows } from "@/lib/stats-view";
 import { getGameDurations } from "@/lib/tournament";
@@ -65,7 +66,10 @@ export default async function EstatisticasPage() {
   // separador decimal do português, divergindo dos cards da mesma página.
   const tc = mensagens.compartilhados;
   const conf = mensagens.conformidade;
-  const players = buildDesignPlayers(dataset);
+  const te = textosElenco[await getLocale()];
+  // O pool de elo é o do ELENCO de hoje: o reserva e quem saiu de vez não somam pontos
+  // (nos rankings dos jogos eles entram normalmente, pelo que jogaram).
+  const players = buildDesignPlayersDoElenco(dataset);
   const teams = buildDesignTeams(dataset);
 
   const poolTotal = players.reduce((sum, player) => sum + player.pts, 0);
@@ -100,6 +104,7 @@ export default async function EstatisticasPage() {
     dosJogos: t.siglaDosJogos,
     rotas: t.rotas,
     localeTag: tc.localeTag,
+    reserva: te.reserva,
   });
   const gameDurations = getGameDurations(dataset);
 
@@ -165,7 +170,7 @@ export default async function EstatisticasPage() {
       </section>
 
       <RoleBests
-        groups={buildRoleBests(dataset)}
+        groups={buildRoleBests(dataset, 3, { reserva: te.reserva })}
         localeTag={tc.localeTag}
         t={{
           titulo: t.rotaTitulo,

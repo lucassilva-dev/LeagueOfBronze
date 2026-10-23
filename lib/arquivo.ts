@@ -21,11 +21,15 @@ function maisRecentePrimeiro(a: ArchivedSeason, b: ArchivedSeason) {
  * Critério: todo time ao vivo existe (mesmo id) no snapshot mais recente, e todo
  * jogador ao vivo existe lá com o mesmo id E no mesmo time. Sem arquivo, ou sem times ao
  * vivo, não há o que comparar: `false`.
+ *
+ * O time do jogador pode faltar: o reserva da 4ª Edição (regra 6) entra no dataset sem
+ * time. Por isso a conta exige que o jogador EXISTA no arquivo — sem isso, um reserva novo
+ * (fora do arquivo, sem time) casava `undefined === undefined` e passava por mantido.
  */
 export function elencosSaoDaUltimaArquivada(
   dataset: Readonly<{
     teams: readonly { id: string }[];
-    players: readonly { id: string; teamId: string }[];
+    players: readonly { id: string; teamId?: string }[];
     archivedSeasons: readonly ArchivedSeason[];
   }>,
 ): boolean {
@@ -38,7 +42,7 @@ export function elencosSaoDaUltimaArquivada(
 
   return (
     dataset.teams.every((t) => timesArquivados.has(t.id)) &&
-    dataset.players.every((p) => timeDoJogadorArquivado.get(p.id) === p.teamId)
+    dataset.players.every((p) => timeDoJogadorArquivado.has(p.id) && timeDoJogadorArquivado.get(p.id) === p.teamId)
   );
 }
 

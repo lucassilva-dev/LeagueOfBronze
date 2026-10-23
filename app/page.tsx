@@ -16,7 +16,7 @@ import {
 import { diaEMes, horaNoIdioma, periodoPorExtenso, turnoLabel } from "@/lib/i18n/messages/paginas-home";
 import { getMessages } from "@/lib/i18n/server";
 import { getDisplayNick } from "@/lib/opgg";
-import { buildDesignPlayers } from "@/lib/roster";
+import { buildDesignPlayersDoElenco } from "@/lib/roster";
 import { getServerDataset } from "@/lib/server-data";
 import { getChampionshipResult } from "@/lib/tournament";
 import { nomeDaTemporada } from "@/lib/i18n/nome-da-temporada";
@@ -107,7 +107,9 @@ async function HomeTemporada() {
     { href: "/cartas", label: t.homeExploreCartas, desc: t.homeExploreCartasDesc },
     { href: "/regras", label: t.homeExploreRegras, desc: t.homeExploreRegrasDesc },
   ];
-  const players = buildDesignPlayers(dataset);
+  // O elenco de HOJE (sem reserva e sem quem saiu de vez): é o que o pool de pontos e o
+  // "30 jogadores" contam. `dataset.players` traz também os reservas da fila.
+  const players = buildDesignPlayersDoElenco(dataset);
   const calDays = buildCalendarDays(dataset);
   const semifinais = buildSemifinalGames(dataset);
 
@@ -137,7 +139,7 @@ async function HomeTemporada() {
 
   const numbers = [
     { v: String(dataset.teams.length), l: t.homeNumTimes },
-    { v: String(dataset.players.length), l: t.homeNumJogadores },
+    { v: String(players.length), l: t.homeNumJogadores },
     { v: String(plano.series), l: t.homeNumConfrontos },
     { v: String(plano.dias.length), l: t.homeNumDias },
   ];
@@ -146,7 +148,7 @@ async function HomeTemporada() {
   const ultimoDia = plano.dias[plano.dias.length - 1];
   const intro = (primeiroDia && ultimoDia ? t.homeIntro : t.homeIntroSemPeriodo)
     .replace("{times}", String(dataset.teams.length))
-    .replace("{jogadores}", String(dataset.players.length))
+    .replace("{jogadores}", String(players.length))
     .replace("{periodo}", primeiroDia && ultimoDia ? periodoPorExtenso(t, primeiroDia, ultimoDia, localeTag) : "");
 
   // Pílula da final: dia e hora da série da final; sem ela, os do calendário oficial.

@@ -51,7 +51,8 @@ import {
 } from "@/lib/calendario-4a";
 import { resolveElo, resolveRole } from "@/lib/design";
 import type { DraftPublico, PreviaDoDraft } from "@/lib/draft/store";
-import { listaForaDoDraft } from "@/lib/draft/virada";
+import { exigemConfirmacaoNaVirada, listaForaDoDraft } from "@/lib/draft/virada";
+import { estaFora } from "@/lib/inscricoes/pagamento";
 
 /**
  * Draft ao vivo — a mesa da organização.
@@ -85,8 +86,11 @@ type RespostaDoPainel = {
 
 type PrevisaoDaVirada = {
   problemas: string[];
+  /** O que não trava, mas a mesa precisa saber (time com vaga aberta, C1). Servidor antigo não manda. */
+  avisos?: string[];
   teams: { id: string; name: string }[];
-  players: { id: string; nick: string; teamId: string; role1: string; elo: string }[];
+  /** `reserva`: vai para o site sem time (C4) — os reservas da fila. */
+  players: { id: string; nick: string; teamId?: string; role1: string; elo: string; reserva?: boolean }[];
 };
 
 type Props = Readonly<{
@@ -129,7 +133,8 @@ const CALENDARIO_DO_PAINEL = (() => {
 
 const MOTIVO_DA_PAUSA: Record<NonNullable<DraftPublico["motivoDaPausa"]>, string> = {
   organizacao: "pausado pela organização",
-  atraso: "pausou sozinho: ficou mais de 10 escolhas sem ninguém acompanhando (sem sondagem)",
+  atraso:
+    "pausou sozinho: ficou mais de uma escolha inteira sem ninguém acompanhando (queda de conexão). Retome quando a sala estiver de volta",
   sem_jogador: "pausou sozinho: o time da vez não tinha jogador possível",
 };
 
@@ -570,9 +575,10 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
           return { ...atual, draft: corpo.draft! };
         });
         // O diagnóstico de "sem saída" e a prévia vêm do GET do painel, não da sondagem
-        // pública: quando a fase muda (pausou, terminou), relê tudo. A comparação fica num
-        // ref, fora do updater do setState — o React pode rodar o updater depois.
-        const situacao = `${corpo.draft.fase}|${corpo.draft.motivoDaPausa ?? ""}`;
+        // pública: quando a fase muda (pausou, terminou) ou alguém sai do pool (C1), relê
+        // tudo — a lista de quem não é mais apto mora na prévia. A comparação fica num ref,
+        // fora do updater do setState — o React pode rodar o updater depois.
+        const situacao = `${corpo.draft.fase}|${corpo.draft.motivoDaPausa ?? ""}|${(corpo.draft.saiuDoPool ?? []).length}`;
         if (ultimaSituacao.current !== null && ultimaSituacao.current !== situacao) void carregar();
         ultimaSituacao.current = situacao;
       } catch {
@@ -691,11 +697,34 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
   /**
    * Quem está no draft e a inscrição não é mais `apto` (recusado ou desistente depois do
    * sorteio, devolvido à sobra ou a pendente). Só aviso: o draft não tira ninguém sozinho, e
-   * o que fazer é decisão da organização. Aplicar no site pede a confirmação desta lista.
+   * o que fazer é decisão da organização. Aplicar no site pede a confirmação de quem está
+   * num ELENCO (C2) — quem está no pool não vai para time nenhum, e o servidor não pede.
    */
   const foraDoDraft = draft ? (previa.foraDoDraft ?? []) : [];
-  const chaveDoFora = foraDoDraft.map((f) => `${f.riotId}:${f.situacao}`).join("|");
-  const confirmoFora = foraDoDraft.length > 0 && foraConfirmado === chaveDoFora;
+  const foraAConfirmar = exigemConfirmacaoNaVirada(foraDoDraft);
+  const chaveDoFora = foraAConfirmar.map((f) => `${f.riotId}:${f.situacao}`).join("|");
+  const confirmoFora = foraAConfirmar.length > 0 && foraConfirmado === chaveDoFora;
+  /*
+   * Onde cada um está no draft (servidor anterior não manda `lugar`, e aí vale o texto de
+   * antes). No pool com a inscrição fora: já saiu dos escolhíveis (C1). No pool com sobra
+   * ou pendente: continua escolhível. Num elenco: segue no draft, e a vaga é reposta pela
+   * saída de vez depois da virada (C2).
+   */
+  const comLugar = foraDoDraft.some((f) => f.lugar !== undefined);
+  const saiuDoPoolNaPrevia = foraDoDraft.filter((f) => f.lugar === "pool" && estaFora(f.situacao));
+  const voltouNoPool = foraDoDraft.filter((f) => f.lugar === "pool" && !estaFora(f.situacao));
+  const foraNoElenco = foraDoDraft.filter((f) => f.lugar === "elenco" || f.lugar === "capitao");
+  const capitaoFora = foraNoElenco.some((f) => f.lugar === "capitao");
+  /** Quem saiu do pool, ao vivo (a sondagem): some dos escolhíveis e a transmissão mostra. */
+  const saiuDoPool = draft?.saiuDoPool ?? [];
+  /** Escolhas que a ordem perdeu por falta de jogador (C1): cada uma é uma vaga para a reserva. */
+  const escolhasCortadas = draft
+    ? Math.max(0, draft.times.length * Math.max(0, draft.jogadoresPorTime - 1) - draft.totalEscolhas)
+    : 0;
+  const titularesNaoAptos = previa.titularesNaoAptos ?? [];
+  /** Faltam titulares aptos (C4): dá para sortear, com vaga aberta. Servidor anterior: sem o campo. */
+  const avisosDoSorteio = previa.avisosDoSorteio ?? [];
+  const reservasDaPrevisao = previsao ? previsao.players.filter((p) => p.reserva) : [];
 
   const alternarManual = (id: string) =>
     setManuais((atual) => (atual.includes(id) ? atual.filter((x) => x !== id) : [...atual, id]));
@@ -960,11 +989,48 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
         </Banner>
       ) : null}
 
+      {saiuDoPool.length > 0 ? (
+        <Banner tone="warn" title={`${saiuDoPool.length} jogador(es) saíram do pool depois do sorteio`}>
+          {saiuDoPool.map((j) => j.riotId).join(", ")}. A inscrição ficou recusada, desistente ou excluída: não
+          podem mais ser escolhidos — nem pela escolha automática —, e a transmissão mostra que saíram.
+          {escolhasCortadas > 0
+            ? ` Faltou jogador para todas as vagas, então a ordem perdeu ${escolhasCortadas === 1 ? "1 escolha" : `${escolhasCortadas} escolhas`}: ${escolhasCortadas === 1 ? "um time termina" : "times terminam"} com vaga aberta, que vai para a fila de reserva depois de aplicar no site.`
+            : ""}
+        </Banner>
+      ) : null}
+
+      {/* C4: a ordem nasceu sem escolhas porque faltava titular apto no sorteio (ou quem saiu
+          do pool voltou depois do corte). Com alguém fora do pool agora, o aviso acima já
+          conta as escolhas cortadas. */}
+      {draft && escolhasCortadas > 0 && saiuDoPool.length === 0 && draft.fase !== "encerrado" ? (
+        <Banner tone="warn" title={`A ordem tem ${escolhasCortadas === 1 ? "1 escolha" : `${escolhasCortadas} escolhas`} a menos`}>
+          Faltou jogador para todas as vagas (titular que não estava apto na hora de sortear, ou alguém que saiu do
+          pool): {escolhasCortadas === 1 ? "um time termina" : "times terminam"} o draft com vaga aberta, que um
+          reserva da fila ocupa depois de aplicar no site.
+        </Banner>
+      ) : null}
+
       {foraDoDraft.length > 0 ? (
         <Banner tone="danger" title={`${foraDoDraft.length} jogador(es) do draft não estão mais aptos`}>
-          {listaForaDoDraft(foraDoDraft)}. A inscrição mudou depois do sorteio, e o draft não tira ninguém sozinho:
-          quem está no pool ainda pode ser escolhido, e quem está num elenco vai junto para o site na virada. O que
-          fazer é decisão da organização. «Aplicar no site» pede uma confirmação a mais.
+          {listaForaDoDraft(foraDoDraft)}. A inscrição mudou depois do sorteio.{" "}
+          {comLugar ? (
+            <>
+              {saiuDoPoolNaPrevia.length > 0 ? "Quem estava no pool e saiu já não pode ser escolhido. " : ""}
+              {voltouNoPool.length > 0
+                ? "Quem voltou para sobra ou pendente continua no pool e ainda pode ser escolhido — o draft só tira quem desistiu, foi recusado ou excluído. "
+                : ""}
+              {foraNoElenco.length > 0
+                ? `Quem já está num elenco segue no draft e vai para o site com o time: depois de aplicar, dê a vaga a um reserva com «Substituir de vez» no painel de Jogadores${capitaoFora ? " e escolha outro capitão do time" : ""}. `
+                : ""}
+              {foraAConfirmar.length > 0 ? "«Aplicar no site» pede uma confirmação a mais." : ""}
+            </>
+          ) : (
+            <>
+              O draft não tira ninguém sozinho: quem está no pool ainda pode ser escolhido, e quem está num elenco vai
+              junto para o site na virada. O que fazer é decisão da organização. «Aplicar no site» pede uma confirmação a
+              mais.
+            </>
+          )}
         </Banner>
       ) : null}
 
@@ -980,7 +1046,16 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
       <BlockTitle>1 · Conferência antes do sorteio</BlockTitle>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(150px,1fr))", gap: 10, marginBottom: 14 }}>
         <Metric label="Times" value={previa.times} detail={previa.config.maxTimes ? `teto de ${previa.config.maxTimes}` : "sem teto"} />
-        <Metric label="Aptos / vagas" value={`${previa.aptos} / ${previa.vagas}`} detail={`${previa.sobra} na sobra · ${previa.pendentes} pendente(s)`} />
+        {/* Quem joga são os titulares aptos da fila (C4). Servidor anterior à fila: a conta de antes. */}
+        <Metric
+          label={previa.titulares !== undefined ? "Titulares aptos / vagas" : "Aptos / vagas"}
+          value={`${previa.aptos} / ${previa.vagas}`}
+          detail={
+            previa.titulares !== undefined
+              ? `${previa.titulares} titular(es) na fila · ${previa.naFila ?? 0} na reserva`
+              : `${previa.sobra} na sobra · ${previa.pendentes} pendente(s)`
+          }
+        />
         <Metric
           label="Pontos de quem joga"
           value={previa.totalDePontos}
@@ -1007,6 +1082,24 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
         </Banner>
       ) : null}
 
+      {/* C4: o pool é dos titulares da fila que estão aptos. Titular ainda não apto não entra
+          no sorteio — a mesa precisa saber quem é, e não só quantos faltam. É aviso: o sorteio
+          pode seguir sem ele, com vaga aberta (`avisosDoSorteio`). */}
+      {titularesNaoAptos.length > 0 && !draft ? (
+        <Banner tone="warn" title={`${titularesNaoAptos.length} titular(es) da fila ainda não estão aptos`}>
+          {titularesNaoAptos.map((t) => `${t.riotId} (${t.situacao})`).join(", ")}. Estão entre os primeiros da fila,
+          mas só entram no sorteio aprovados. Confira a ficha deles em Inscritos — ou, se não vão jogar, recuse ou
+          registre a desistência, e o próximo da fila de reserva sobe. Sortear sem eles deixa a vaga aberta para a
+          fila de reserva.
+        </Banner>
+      ) : null}
+
+      {avisosDoSorteio.length > 0 && !draft ? (
+        <Banner tone="warn" title="Dá para sortear, com vaga aberta">
+          {avisosDoSorteio.join(" ")}
+        </Banner>
+      ) : null}
+
 
       {semConta.length > 0 ? (
         <Banner tone="warn" title={`${semConta.length} jogador(es) aptos sem conta ligada`}>
@@ -1026,8 +1119,8 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
 
       {previa.inscricoesAbertas ? (
         <Banner tone="warn" title="As inscrições ainda estão abertas">
-          Quem se inscrever agora recebe a cobrança da taxa sem ter vaga nos times. Feche as inscrições em
-          Configuração (chave ou data de fechamento) antes do draft.
+          Quem se inscrever agora entra na fila (como titular, se ainda houver vaga), e a lista de quem joga pode
+          mudar. Feche as inscrições em Configuração (chave ou data de fechamento) antes do draft.
         </Banner>
       ) : null}
 
@@ -1337,7 +1430,9 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
                   {t.vagas > 0 ? (
                     <li style={{ display: "flex", alignItems: "center", gap: 6, color: C.ink4 }}>
                       <CircleDashed size={12} aria-hidden style={{ flexShrink: 0 }} />
-                      {t.vagas} vaga(s) abertas
+                      {/* Encerrado com vaga: a ordem perdeu a escolha por falta de jogador — alguém
+                          saiu do pool (C1) ou faltava titular apto no sorteio (C4). */}
+                      {draft.fase === "encerrado" ? `${t.vagas} vaga(s) para a fila de reserva` : `${t.vagas} vaga(s) abertas`}
                     </li>
                   ) : null}
                 </ul>
@@ -1384,6 +1479,11 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
                 {previsao.problemas.join(" ")}
               </Banner>
             ) : null}
+            {(previsao.avisos ?? []).length > 0 ? (
+              <Banner tone="warn" title="Time com vaga aberta">
+                {(previsao.avisos ?? []).join(" ")}
+              </Banner>
+            ) : null}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 8 }}>
               {previsao.teams.map((t) => (
                 <Card key={t.id} padding="10px 12px">
@@ -1421,6 +1521,36 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
                 </Card>
               ))}
             </div>
+            {/* C4: quem está na fila e não ficou num elenco vai para o site como reserva, sem
+                time — é quem substitui jogo a jogo e herda a vaga de quem sair de vez. */}
+            {reservasDaPrevisao.length > 0 ? (
+              <Card padding="10px 12px" style={{ marginTop: 8 }}>
+                <div style={{ fontFamily: display, color: C.ink }}>Reservas ({reservasDaPrevisao.length}) · sem time</div>
+                <p style={{ ...nota, margin: "4px 0 6px" }}>
+                  Todos da fila que não ficaram num elenco, na ordem da fila. Substituem jogo a jogo, e um deles herda a
+                  vaga de quem sair de vez.
+                </p>
+                <ul
+                  style={{
+                    margin: 0,
+                    padding: 0,
+                    listStyle: "none",
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill,minmax(180px,1fr))",
+                    gap: 4,
+                    fontSize: 12,
+                    color: C.ink3,
+                  }}
+                >
+                  {reservasDaPrevisao.map((p) => (
+                    <li key={p.id} style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+                      <Elo elo={p.elo} tamanho={20} />
+                      <span style={{ minWidth: 0, overflowWrap: "anywhere", color: C.ink2 }}>{p.nick}</span>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            ) : null}
           </div>
         ) : null}
         <Check checked={confirmoVirada} onChange={setConfirmoVirada}>
@@ -1428,13 +1558,20 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
         </Check>
         {foraDoDraft.length > 0 ? (
           <>
-            <Banner tone="danger" title="Há jogadores no draft que não estão mais aptos">
-              {listaForaDoDraft(foraDoDraft)}. Aplicar agora publica essas pessoas nos times do site.
+            <Banner tone={foraAConfirmar.length > 0 ? "danger" : "warn"} title="Há jogadores no draft que não estão mais aptos">
+              {listaForaDoDraft(foraDoDraft)}.{" "}
+              {comLugar
+                ? foraNoElenco.length > 0
+                  ? `Aplicar agora publica quem está num elenco no time do site (${foraNoElenco.map((f) => f.riotId).join(", ")}). Depois, «Substituir de vez» no painel de Jogadores dá a vaga a um reserva${capitaoFora ? ", e o time precisa de outro capitão" : ""}.`
+                  : "Ninguém deles está num elenco: nenhum vai para time do site, e aplicar não pede confirmação a mais."
+                : "Aplicar agora publica essas pessoas nos times do site."}
             </Banner>
-            <Check checked={confirmoFora} onChange={(v) => setForaConfirmado(v ? chaveDoFora : null)} tone="danger">
-              Sei que {foraDoDraft.length === 1 ? "esse jogador não está mais apto" : "esses jogadores não estão mais aptos"}{" "}
-              e quero aplicar o draft mesmo assim.
-            </Check>
+            {foraAConfirmar.length > 0 ? (
+              <Check checked={confirmoFora} onChange={(v) => setForaConfirmado(v ? chaveDoFora : null)} tone="danger">
+                Sei que {foraAConfirmar.length === 1 ? "esse jogador não está mais apto" : "esses jogadores não estão mais aptos"}{" "}
+                e quero aplicar o draft mesmo assim.
+              </Check>
+            ) : null}
           </>
         ) : null}
         {pedeReaplicar ? (
@@ -1458,7 +1595,7 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
               draft?.fase !== "encerrado" ||
               !confirmoVirada ||
               (pedeReaplicar && !confirmoReaplicar) ||
-              (foraDoDraft.length > 0 && !confirmoFora)
+              (foraAConfirmar.length > 0 && !confirmoFora)
             }
             onClick={() =>
               void agir(

@@ -6,11 +6,12 @@ import { AvisoConsentimento } from "@/components/aviso-consentimento";
 import { caminhoNoArquivo } from "@/lib/arquivo";
 import { semTemporadaAoVivo } from "@/lib/fase-do-site";
 import { EloCrest, RoleIcon } from "@/components/lob/ui";
+import { textosElenco } from "@/components/lob/textos-elenco";
 import { formatKda } from "@/lib/format";
 import { eloLabel, rotaLabel } from "@/lib/i18n/messages/paginas-home";
 import { metadadosDaPagina, montarMetadados } from "@/lib/i18n/metadados";
 import { nomeDaTemporada } from "@/lib/i18n/nome-da-temporada";
-import { getMessages } from "@/lib/i18n/server";
+import { getLocale, getMessages } from "@/lib/i18n/server";
 import { getOpGgSummonerUrlFromNick } from "@/lib/opgg";
 import { buildDesignPlayers } from "@/lib/roster";
 import { getServerDataset } from "@/lib/server-data";
@@ -41,8 +42,11 @@ export async function generateMetadata({ params }: PlayerPageParams): Promise<Me
 export default async function PlayerFichaPage({ params }: PlayerPageParams) {
   const { slug } = await params;
   const { paginasHome: t, paginasStats: ts, compartilhados } = await getMessages();
+  const te = textosElenco[await getLocale()];
   const { dataset } = await getServerDataset();
-  const player = buildDesignPlayers(dataset).find((p) => p.slug === slug);
+  // TODOS os jogadores, e não só o elenco: o reserva e quem saiu de vez também têm ficha
+  // (o K/D/A deles continua valendo), só não aparecem nos elencos.
+  const player = buildDesignPlayers(dataset, { reserva: te.reserva }).find((p) => p.slug === slug);
 
   // Link antigo de um jogador que saiu do ar — ou que ficou no dataset só porque a nova
   // temporada nasceu mantendo os elencos (ver `semTemporadaAoVivo`): manda para a ficha
@@ -70,8 +74,9 @@ export default async function PlayerFichaPage({ params }: PlayerPageParams) {
 
   return (
     <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "44px clamp(16px,4vw,24px) 96px" }}>
-      <Link href={`/times/${player.teamSlug}`} className="lob-btn-ghost" style={{ padding: "9px 16px", fontSize: 11.5, letterSpacing: ".12em", marginBottom: 26 }}>
-        {t.jogadorVoltar}
+      {/* O reserva não tem time para onde voltar: a volta é para a lista de jogadores. */}
+      <Link href={player.reserva ? "/jogadores" : `/times/${player.teamSlug}`} className="lob-btn-ghost" style={{ padding: "9px 16px", fontSize: 11.5, letterSpacing: ".12em", marginBottom: 26 }}>
+        {player.reserva ? te.voltarJogadores : t.jogadorVoltar}
       </Link>
       <div className="lob-fade" style={{ marginTop: 20, position: "relative", background: "linear-gradient(180deg,#1d1710,#0d0a05)", border: "1px solid rgba(232,184,120,.4)", borderRadius: 8, overflow: "hidden", boxShadow: "0 44px 100px -30px rgba(0,0,0,.6)" }}>
         <div style={{ height: 4, background: `linear-gradient(90deg,${player.teamColor},transparent)` }} />
@@ -95,7 +100,10 @@ export default async function PlayerFichaPage({ params }: PlayerPageParams) {
               <EloCrest elo={player.elo} size={52} title={false} labels={ts.elos} />
             </div>
             <div style={{ position: "absolute", left: 18, right: 18, bottom: 16 }}>
-              <div style={{ fontSize: 11, letterSpacing: ".12em", color: player.teamColor, marginBottom: 5 }}>{player.teamName}</div>
+              <div style={{ fontSize: 11, letterSpacing: ".12em", color: player.teamColor, marginBottom: 5 }}>
+                {player.teamName}
+                {player.saiu ? ` · ${te.saiuDoTime}` : ""}
+              </div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
                 {/* O nick é o título da página: <h1>, com o mesmo desenho do <span> de antes. */}
                 <h1 className="lob-display" style={{ margin: 0, fontSize: "clamp(26px,4.4vw,40px)", lineHeight: 1.08, color: "#f7f1e6", wordBreak: "break-word", textShadow: "0 2px 12px rgba(0,0,0,.8)" }}>{player.displayNick}</h1>

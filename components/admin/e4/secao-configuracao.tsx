@@ -3,6 +3,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Save, TriangleAlert } from "lucide-react";
 
+import { listaDeNomes } from "@/components/admin/e4/fila-no-painel";
 import type { EdicaoConfig, PropsSecao } from "@/components/admin/e4/painel-edicao";
 import { useCompacto } from "@/components/admin/responsivo";
 import {
@@ -23,6 +24,7 @@ import {
   tabular,
 } from "@/components/admin/ui";
 import { JOGADORES_POR_TIME_DO_CALENDARIO, TIMES_DO_CALENDARIO_4A, calendarioDivulgado } from "@/lib/calendario-4a";
+import { montarFila } from "@/lib/inscricoes/fila";
 import { distribuirTimes, estadoDaJanela } from "@/lib/inscricoes/schema";
 import { normalizarChavePix } from "@/lib/pix";
 
@@ -69,6 +71,8 @@ type ChaveRascunho =
   | ChaveData
   | ChaveNumero
   | "max_times"
+  /** O DIA do prazo único dos titulares ("2026-10-31"), em Brasília — ver `fimDoDiaEmBrasilia`. */
+  | "prazo_pagamento_ate"
   | "pct_campeao"
   | "taxa_reais"
   | "chave_pix"
@@ -140,7 +144,7 @@ const NUMEROS = [
     min: 1,
     max: 365,
     efeito:
-      "Contado do envio da inscrição; gera o vencimento do pagamento de quem se inscrever DAQUI EM DIANTE. Pagamentos já criados mantêm o vencimento que tinham.",
+      "Contado do envio da inscrição; gera o vencimento do pagamento de quem se inscrever DAQUI EM DIANTE. Pagamentos já criados mantêm o vencimento que tinham. Só vale com o prazo único (bloco Dinheiro) em branco.",
   },
   {
     chave: "segundos_por_escolha",
@@ -191,6 +195,39 @@ function paraISO(campo: string): string | null | undefined {
   if (v === "") return null;
   const d = new Date(v);
   return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
+}
+
+/**
+ * O prazo único dos titulares (D3) é um DIA, não uma hora: "até 31/10" quer dizer até o fim de
+ * 31/10 em Brasília — 23:59:59 de lá, 02:59:59 de 01/11 em UTC. O campo é `type="date"` e a
+ * conta é feita aqui, no fuso do campeonato, nunca no do computador: no de Manaus (ou num
+ * servidor em UTC) o mesmo "31/10" viraria outro instante, e o prazo andaria horas.
+ *
+ * Brasília é UTC−3 fixo desde que o horário de verão acabou (2019), então a conta é o
+ * deslocamento, sem tabela de fusos.
+ */
+const BRASILIA_MS = 3 * 3_600_000;
+
+/** ISO -> "2026-10-31": o dia em Brasília. Vazio para nulo ou ilegível. */
+function paraDiaDeBrasilia(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const ms = Date.parse(iso);
+  return Number.isFinite(ms) ? new Date(ms - BRASILIA_MS).toISOString().slice(0, 10) : "";
+}
+
+/**
+ * "2026-10-31" -> "2026-11-01T02:59:59.000Z", o fim daquele dia em Brasília. `null` = campo
+ * limpo (volta o prazo em dias); `undefined` = data ilegível, não mande.
+ */
+function fimDoDiaEmBrasilia(dia: string): string | null | undefined {
+  const v = dia.trim();
+  if (v === "") return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return undefined;
+  const ms = Date.parse(`${v}T23:59:59-03:00`);
+  if (!Number.isFinite(ms)) return undefined;
+  const iso = new Date(ms).toISOString();
+  // "2026-02-31" não existe: se o Date rolou para março calado, recusa.
+  return paraDiaDeBrasilia(iso) === v ? iso : undefined;
 }
 
 /**
@@ -251,6 +288,7 @@ function semear(config: EdicaoConfig): Rascunho {
     prazo_pagamento_dias: String(config.prazo_pagamento_dias),
     segundos_por_escolha: String(config.segundos_por_escolha),
     max_times: config.max_times ? String(config.max_times) : "",
+    prazo_pagamento_ate: paraDiaDeBrasilia(config.prazo_pagamento_ate),
     pct_campeao: String(config.pct_campeao),
     taxa_reais: emReaisCru(config.taxa_centavos),
     chave_pix: config.chave_pix ?? "",
@@ -298,6 +336,11 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar, ul
   const { config, panorama } = dados;
   const bloqueado = !podeConfigurar;
   const semEscopo = bloqueado ? "Alterar a configuração exige o escopo de master." : undefined;
+  /*
+   * A leitura é `select *`: com a coluna no banco o prazo vem (nulo quando vazio); sem ela
+   * (deploy antes da migração), a chave nem vem — e o campo fica travado com o porquê.
+   */
+  const prazoSemColuna = config.prazo_pagamento_ate === undefined;
 
   /**
    * A semente é derivada de `dados.config` e o rascunho é RESSINCRONIZADO quando ela muda
@@ -404,6 +447,13 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar, ul
       else if (teto !== (config.max_times ?? null)) p.max_times = teto;
     }
 
+    // O prazo único compara pelo DIA de Brasília: o banco guarda 02:59:59Z, e o campo, o dia.
+    if (rascunho.prazo_pagamento_ate !== paraDiaDeBrasilia(config.prazo_pagamento_ate)) {
+      const iso = fimDoDiaEmBrasilia(rascunho.prazo_pagamento_ate);
+      if (iso === undefined) erros.push("Prazo único de pagamento: data incompleta ou inválida.");
+      else p.prazo_pagamento_ate = iso;
+    }
+
     const pct = inteiroNaFaixa(rascunho.pct_campeao, PCT_CAMPEAO.min, PCT_CAMPEAO.max);
     if (pct === null) erros.push("Fatia do campeão: use um inteiro de 0 a 100.");
     else if (pct !== config.pct_campeao) p.pct_campeao = pct;
@@ -482,6 +532,47 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar, ul
       tempoLotado: maxTimes === null ? null : porCapitao * maxTimes * segundos,
     };
   }, [rascunho.jogadores_por_time, rascunho.segundos_por_escolha, rascunho.max_times, config, panorama.elegiveis]);
+
+  /*
+   * Mudar o teto de times (ou os jogadores por time) mexe na fila na hora (D1/D4): o servidor
+   * refaz a fila na mesma ação do salvar. A tela diz ANTES quem desce para a fila — perde o
+   * prazo e, se já pagou, vira «a devolver se não jogar» — e quem é chamado. A mesma função
+   * pura do servidor (`montarFila`), com os valores que estão no campo.
+   */
+  const { inscritos, pagamentos } = dados;
+  const avisoDaFila = useMemo(() => {
+    const antes = montarFila(inscritos, config);
+    const depois = montarFila(inscritos, { max_times: projecao.maxTimes, jogadores_por_time: projecao.porTime });
+    const porId = new Map(inscritos.map((i) => [i.id, i]));
+    const eraTitular = new Set(antes.titulares);
+    const seraTitular = new Set(depois.titulares);
+    const saem = antes.titulares.filter((id) => !seraTitular.has(id)).flatMap((id) => porId.get(id) ?? []);
+    const entram = depois.titulares.filter((id) => !eraTitular.has(id)).flatMap((id) => porId.get(id) ?? []);
+    if (saem.length === 0 && entram.length === 0) return null;
+    const estadoDe = new Map(pagamentos.map((p) => [p.inscricao_id, p.estado]));
+    const pagaram = saem.filter((i) => estadoDe.get(i.id) === "pago" || estadoDe.get(i.id) === "declarado");
+    const partes: string[] = [];
+    if (saem.length > 0) {
+      partes.push(
+        `Ao salvar, ${listaDeNomes(saem)} ${saem.length === 1 ? "desce" : "descem"} para a fila de reserva — sem prazo de pagamento enquanto não for chamado.`,
+      );
+    }
+    if (pagaram.length > 0) {
+      partes.push(
+        pagaram.length === 1
+          ? `${listaDeNomes(pagaram)} já pagou (ou declarou que pagou): o valor fica registrado, fora do prêmio, e é devolvido se ele não for chamado.`
+          : `${listaDeNomes(pagaram)} já pagaram (ou declararam que pagaram): o valor fica registrado, fora do prêmio, e é devolvido a quem não for chamado.`,
+      );
+    }
+    if (entram.length > 0) {
+      partes.push(
+        `${saem.length > 0 ? "" : "Ao salvar, "}${listaDeNomes(entram)} ${
+          entram.length === 1 ? "é chamado" : "são chamados"
+        } da fila e ${entram.length === 1 ? "passa" : "passam"} a ter prazo de pagamento.`,
+      );
+    }
+    return partes.join(" ");
+  }, [inscritos, pagamentos, config, projecao.maxTimes, projecao.porTime]);
 
   const premiacao = useMemo(() => {
     const arrecadado = panorama.caixa.arrecadado;
@@ -623,7 +714,7 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar, ul
           detail={
             projecao.maxTimes === null
               ? "Sem teto de times"
-              : `${projecao.maxTimes * projecao.porTime} vagas · quem passar vira reserva`
+              : `${projecao.maxTimes * projecao.porTime} vagas · quem passar vai para a fila de reserva`
           }
           small
         />
@@ -715,7 +806,7 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar, ul
             calendarioDivulgado()
               ? `o calendário publicado é de ${TIMES_DO_CALENDARIO_4A}`
               : `o calendário de ${TIMES_DO_CALENDARIO_4A} times ainda não tem datas`
-          }). Quem passar das vagas vira sobra/reserva. Em branco = sem teto.`}
+          }). Quem passar das vagas vai para a fila de reserva, pela ordem de inscrição. Mudar o teto mexe na fila na hora: quem vira titular é chamado e ganha prazo de pagamento, quem desce perde o prazo. Em branco = sem teto.`}
         >
           <Input
             numeric
@@ -814,6 +905,42 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar, ul
             ariaLabel="Responsável financeiro"
           />
         </Field>
+
+        {/* D3: um prazo só para todos os titulares, no lugar dos dias contados do envio. */}
+        <div>
+          <Field
+            label="Prazo único de pagamento (titulares)"
+            hint={
+              prazoSemColuna
+                ? "Ainda não dá para usar: falta a migração do banco (coluna prazo_pagamento_ate). Até lá vale o prazo em dias."
+                : "Até o FIM deste dia em Brasília (23:59:59). Vale para quem se inscrever ou for chamado da fila daqui em diante — quem já tem vencimento fica com o dele. Chamado depois desta data tem 48 horas. Reserva não paga até ser chamado. Em branco = volta o prazo em dias, contado do envio."
+            }
+          >
+            <Input
+              type="date"
+              value={rascunho.prazo_pagamento_ate}
+              onChange={(v) => editar("prazo_pagamento_ate", v)}
+              disabled={bloqueado || ocupado || prazoSemColuna}
+              ariaLabel="Prazo único de pagamento dos titulares"
+              style={{ colorScheme: "dark" }}
+            />
+          </Field>
+          <Toolbar style={{ marginTop: 7 }}>
+            {rascunho.prazo_pagamento_ate === "" ? (
+              <Chip tone="off">{`prazo em dias (${config.prazo_pagamento_dias})`}</Chip>
+            ) : (
+              <Chip tone="ok">até o fim do dia, Brasília</Chip>
+            )}
+            <Button
+              small
+              onClick={() => editar("prazo_pagamento_ate", "")}
+              disabled={rascunho.prazo_pagamento_ate === "" || bloqueado || ocupado || prazoSemColuna}
+              title={semEscopo ?? "Deixa em branco: volta o prazo em dias, contado do envio."}
+            >
+              limpar
+            </Button>
+          </Toolbar>
+        </div>
       </FieldGrid>
 
       {/* 165px no monitor; no celular duas colunas de 165 não cabiam em 360px e os quatro
@@ -860,6 +987,12 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar, ul
                 <li key={texto}>{texto}</li>
               ))}
             </ul>
+          </Banner>
+        ) : null}
+
+        {avisoDaFila ? (
+          <Banner tone="warn" title="A fila de reserva muda ao salvar">
+            {avisoDaFila}
           </Banner>
         ) : null}
 

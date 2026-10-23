@@ -6,9 +6,12 @@ import { definir } from "@/lib/i18n/definir";
  * /regras publica o regulamento da 4ª Edição (4º Campeonato dos Bronzes), seção por seção
  * do PDF oficial, com as decisões da organização de 05/10/2026 aplicadas por cima dele
  * (capitães pela solo/duo, organizadores sem taxa e sem capitania, 100% do arrecadado
- * vira prêmio). Nada de valor em R$ ou percentual cravado aqui: a taxa e a fatia do
- * campeão vêm da Configuração da edição (`edicao_config`), e o texto tem a versão com e a
- * versão sem esses números para quando a configuração não puder ser lida.
+ * vira prêmio) e as de 22/10/2026 (remake não conta na regra 4, substituto por jogo e saída
+ * de vez na regra 6, W.O. no meio da série na regra 8, fila de reserva e prazo de pagamento
+ * na regra 22, desistência depois do sorteio no draft). Nada de valor em R$ ou percentual
+ * cravado aqui: a taxa e a fatia do campeão vêm da Configuração da edição (`edicao_config`),
+ * e o texto tem a versão com e a versão sem esses números para quando a configuração não
+ * puder ser lida.
  *
  * Os marcadores entre chaves ({link}, {canal1}, {r21}…) são trocados por links na página.
  * Mantenha-os IGUAIS nos dois idiomas — o inglês não traduz o nome do marcador.
@@ -65,7 +68,7 @@ const pt = {
     "Nick ou Discord repetido bloqueia a inscrição. Os horários são os do calendário oficial, em manhã, tarde e noite, e cada time joga nos horários da posição sorteada para ele: a disponibilidade informada é o compromisso de jogar nesses horários.",
   inscricaoReservasRotulo: "Reservas:",
   inscricaoReservasTexto:
-    "esta edição tem 8 times de 5 jogadores (40 vagas). Quem passar disso vira reserva oficial e pode substituir titulares (regra 6).",
+    "esta edição tem 8 times de 5 jogadores (40 vagas). Os titulares são todos os organizadores e, depois deles, os primeiros inscritos, pela ordem de inscrição, até completar as 40 vagas. Quem se inscrever depois entra na fila de reserva, na mesma ordem, e o primeiro da fila é chamado quando um titular sai. O reserva só paga se for chamado (regra {r22}) e pode substituir titulares (regra {r6}).",
 
   // ---------- app/regras: 3. formação dos times ----------
   formacaoTitulo: "FORMAÇÃO DOS TIMES",
@@ -91,7 +94,8 @@ const pt = {
     "A ordem de escolha é serpentina (ex.: com 8 times, 1-2-3-4-5-6-7-8-8-7-6-5-4-3-2-1) e não pode ser trocada nem alterada depois de sorteada.",
   draft5:
     "Nenhum capitão pode estourar o orçamento; deve sempre reservar pontos para fechar as rodadas restantes com o jogador mais barato ainda disponível em cada rota.",
-  draft6: "Jogador escolhido não pode ser escolhido por outro time.",
+  draft6:
+    "Jogador escolhido não pode ser escolhido por outro time. Se alguém desistir depois do sorteio, quem ainda não foi escolhido sai da lista na hora; se já tinha sido escolhido, ou é capitão, o draft segue normalmente, e a vaga é reposta depois por um reserva (regra 6).",
   tabelaValoresRotulo: "Tabela de valores.",
   tabelaValoresTexto:
     "Será divulgada depois que a lista completa de jogadores estiver fechada, com os elos atualizados. Os valores serão recalculados para esta edição, em vez de reaproveitar os da 3ª.",
@@ -109,13 +113,13 @@ const pt = {
   regra2Link: "Formação dos times",
   regra3: "Jogadores precisam ter feito a MD5 obrigatoriamente da fila solo/duo para participar.",
   regra4:
-    "Jogadores precisam ter jogado no mínimo 5 partidas da fila solo/duo nos 10 dias anteriores ao início do torneio. Partidas de outras filas não contam.",
+    "Jogadores precisam ter jogado no mínimo 5 partidas da fila solo/duo nos 10 dias anteriores ao início do torneio. Partidas de outras filas não contam, e partida encerrada em remake também não.",
   regra5: "Conta smurf não será aceita.",
   regra6:
-    "Não haverá substituições de fora — apenas de jogadores do próprio grupo (inscritos ou reservas oficiais) que cumpram as regras 3, 4, 5 e 21 e cujo valor em pontos seja igual ou menor ao do jogador substituído; caso contrário, a substituição depende de aprovação da organização. Não é obrigação de ninguém aceitar. A substituição é informada no check-in.",
+    "Não haverá substituições de fora — apenas de jogadores do próprio grupo (inscritos ou reservas oficiais) que cumpram as regras 3, 4, 5 e 21 e cujo valor em pontos seja igual ou menor ao do jogador substituído; caso contrário, a substituição depende de aprovação da organização. Não é obrigação de ninguém aceitar. A substituição é informada no check-in e vale só para os jogos em que o substituto entrar: ele joga por aquele time nesses jogos (o que fizer conta para ele, inclusive MVP), o titular continua no elenco, e o mesmo reserva pode cobrir times diferentes em séries diferentes. Se um titular sair do campeonato de vez, um reserva oficial herda a vaga e passa a ser do elenco do time; os jogos que o titular já disputou continuam valendo. Se quem sair for o capitão, a organização escolhe outro capitão entre os jogadores do time.",
   regra7: "Tolerância de 10 minutos na SÉRIE (MD3 ou MD5), e não por partida.",
   regra8:
-    "Passada a tolerância da regra 7, sem 5 jogadores presentes (titulares ou substitutos da regra 6), o jogo é W.O.: vitória 2x0 e 3 pontos para o time completo presente. Se nenhum dos times estiver completo, é W.O. duplo: ninguém pontua e a série não é remarcada.",
+    "Passada a tolerância da regra 7, sem 5 jogadores presentes (titulares ou substitutos da regra 6), o jogo é W.O.: vitória 2x0 e 3 pontos para o time completo presente. No meio da série, os jogos já disputados valem e o W.O. completa a série para o time presente, até 2 vitórias (MD3) ou 3 (MD5): quem vencia por 1x0 fecha 2x0; quem perdia por 0x1 fecha 2x1. Os jogos completados por W.O. contam no placar e no saldo de games, mas não têm estatísticas de jogador nem MVP. Se nenhum dos times estiver completo, é W.O. duplo: ninguém pontua e a série não é remarcada.",
   regra9:
     "Não será aceito trocar os confrontos com outros capitães, nem adiar ou adiantar jogos. A disponibilidade informada na inscrição vale como compromisso, e o calendário publicado (seção Calendário) é definitivo. Só a organização pode realocar uma série, e apenas para o horário de reserva do calendário.",
   regra10:
@@ -137,13 +141,13 @@ const pt = {
   regra18:
     "Alteração de regras: a organização se reserva o direito de ajustar o regulamento antes do início do torneio, em caso de necessidade, com aviso prévio no Discord e no grupo de WhatsApp.",
   regra19:
-    "Empates na tabela (fase de pontos): critério de desempate na seguinte ordem — confronto direto, depois saldo de games (vitórias menos derrotas em mapas, com o W.O. contando 2x0), depois sorteio. Em empate entre 3 ou mais times, o confronto direto considera só os jogos entre os empatados.",
+    "Empates na tabela (fase de pontos): critério de desempate na seguinte ordem — confronto direto, depois saldo de games (vitórias menos derrotas em mapas, com os jogos de W.O. contando como vitória de quem levou o W.O. — o W.O. sem jogos conta 2x0), depois sorteio. Em empate entre 3 ou mais times, o confronto direto considera só os jogos entre os empatados.",
   regra20:
     "Uso de chat de voz: obrigatório o uso do canal de voz oficial do torneio durante as partidas, para fins de arbitragem e resolução de disputas. É proibido o time jogar sem voice de todos os jogadores; sem isso a partida não inicia e o tempo corre como tolerância.",
   regra21:
     "É obrigatório que a conta da Riot esteja vinculada ao Discord (Configurações > Conexões) antes do início do torneio, para reduzir fraudes e facilitar a verificação de elo e histórico pela organização.",
   regra22:
-    "Inscrição: valor, prazo e forma de pagamento são informados no site e no grupo; a vaga só é confirmada após o pagamento.",
+    "Inscrição: o valor e a forma de pagamento são informados no site e no grupo, e a vaga só é confirmada após o pagamento. Os titulares pagam até 31/10/2026, às 23h59 (horário de Brasília), e os organizadores não pagam; quem não pagar no prazo pode perder a vaga para o primeiro da fila de reserva. O reserva não paga enquanto está na fila: só paga se for chamado — até 31/10, se for chamado antes disso, ou em até 48 horas, se for chamado depois. Reserva que pagou e não jogou recebe o valor de volta.",
 
   // ---------- app/regras: 5. cartinhas surpresa ----------
   cartasTitulo: "CARTINHAS SURPRESA",
@@ -181,7 +185,8 @@ const pt = {
   pontuacaoIntro:
     "Os 4 primeiros da fase de pontos corridos avançam às semifinais, e a pontuação é 3 pontos por série vencida.",
   pontuacaoFaseK: "Fase de pontos corridos:",
-  pontuacaoFaseV: "vitória na série (2x0 ou 2x1) = 3 pontos; derrota = 0. O W.O. vale 2x0 (regra 8).",
+  pontuacaoFaseV:
+    "vitória na série (2x0 ou 2x1) = 3 pontos; derrota = 0. O W.O. sem jogos vale 2x0; no meio da série, os jogos disputados valem e o W.O. completa o placar (regra 8).",
   pontuacaoDesempateK: "Desempate:",
   pontuacaoDesempateV:
     "conforme a {regra} — confronto direto, depois saldo de games, depois sorteio.",
@@ -363,7 +368,7 @@ export const paginasRegras = definir<ChavesPaginasRegras>({
       "A duplicate Riot ID or Discord blocks the sign-up. Times follow the official schedule, across morning, afternoon and evening, and each team plays at the times of the slot drawn for it: the availability you give is your commitment to play at those times.",
     inscricaoReservasRotulo: "Reserves:",
     inscricaoReservasTexto:
-      "this edition has 8 teams of 5 players (40 places). Anyone beyond that becomes an official reserve and may replace starters (rule 6).",
+      "this edition has 8 teams of 5 players (40 places). The starters are all the organisers and, after them, the first sign-ups, in sign-up order, until the 40 places are filled. Anyone who signs up after that goes into the reserve queue, in the same order, and the first in the queue is called up when a starter leaves. A reserve only pays if called up (rule {r22}) and may replace starters (rule {r6}).",
 
     // ---------- app/regras: 3. formação dos times ----------
     formacaoTitulo: "TEAM FORMATION",
@@ -389,7 +394,8 @@ export const paginasRegras = definir<ChavesPaginasRegras>({
       "Pick order is snake (e.g. with 8 teams, 1-2-3-4-5-6-7-8-8-7-6-5-4-3-2-1) and cannot be swapped or changed once drawn.",
     draft5:
       "No captain may go over budget; they must always keep enough points to fill the remaining rounds with the cheapest player still available in each role.",
-    draft6: "A player who has been picked cannot be picked by another team.",
+    draft6:
+      "A player who has been picked cannot be picked by another team. If someone withdraws after the draw, a player who has not been picked yet is removed from the list straight away; if they had already been picked, or are a captain, the draft carries on as normal and the place is filled afterwards by a reserve (rule 6).",
     tabelaValoresRotulo: "Value table.",
     tabelaValoresTexto:
       "It will be published once the full player list is closed, with up-to-date ranks. The values will be recalculated for this edition instead of reusing the 3rd edition's.",
@@ -404,13 +410,13 @@ export const paginasRegras = definir<ChavesPaginasRegras>({
     regra2Link: "Team formation",
     regra3: "Players must have completed their 5 solo/duo queue placement games to take part.",
     regra4:
-      "Players must have played at least 5 solo/duo queue games in the 10 days before the tournament starts. Games in other queues do not count.",
+      "Players must have played at least 5 solo/duo queue games in the 10 days before the tournament starts. Games in other queues do not count, and neither do games that ended in a remake.",
     regra5: "Smurf accounts will not be accepted.",
     regra6:
-      "There will be no outside substitutes — only players from the group itself (sign-ups or official reserves) who meet rules 3, 4, 5 and 21 and whose point value is equal to or lower than that of the player being replaced; otherwise, the substitution needs the organisers' approval. Nobody is obliged to accept. Substitutions are declared at check-in.",
+      "There will be no outside substitutes — only players from the group itself (sign-ups or official reserves) who meet rules 3, 4, 5 and 21 and whose point value is equal to or lower than that of the player being replaced; otherwise, the substitution needs the organisers' approval. Nobody is obliged to accept. Substitutions are declared at check-in and only apply to the games the substitute plays: they play for that team in those games (what they do counts for them, MVP included), the starter stays on the roster, and the same reserve may cover different teams in different series. If a starter leaves the tournament for good, an official reserve inherits the place and joins the team's roster; the games the starter already played still count. If the player who leaves is the captain, the organisers choose another captain from the team's players.",
     regra7: "10-minute grace period per SERIES (Bo3 or Bo5), not per game.",
     regra8:
-      "Once the grace period in rule 7 has passed, a team without 5 players present (starters or rule 6 substitutes) loses by walkover (W.O.): a 2-0 win and 3 points for the complete team that is present. If neither team is complete, it is a double W.O.: nobody scores and the series is not rescheduled.",
+      "Once the grace period in rule 7 has passed, a team without 5 players present (starters or rule 6 substitutes) loses by walkover (W.O.): a 2-0 win and 3 points for the complete team that is present. Midway through a series, the games already played stand and the W.O. completes the series for the team that is present, up to 2 wins (Bo3) or 3 (Bo5): a team leading 1-0 wins 2-0; a team trailing 0-1 wins 2-1. Games completed by W.O. count towards the score and the game difference, but have no player stats or MVP. If neither team is complete, it is a double W.O.: nobody scores and the series is not rescheduled.",
     regra9:
       "Swapping fixtures with other captains, or moving games earlier or later, is not allowed. The availability given at sign-up counts as a commitment, and the published schedule (Schedule section) is final. Only the organisers may move a series, and only to the schedule's reserve slot.",
     regra10:
@@ -432,13 +438,13 @@ export const paginasRegras = definir<ChavesPaginasRegras>({
     regra18:
       "Rule changes: the organisers reserve the right to adjust the rulebook before the tournament starts, if needed, with prior notice on Discord and in the WhatsApp group.",
     regra19:
-      "Ties in the standings (points stage): tiebreakers in this order — head-to-head, then game difference (games won minus games lost, with a W.O. counting as 2-0), then a random draw. In a tie between 3 or more teams, head-to-head only considers the games between the tied teams.",
+      "Ties in the standings (points stage): tiebreakers in this order — head-to-head, then game difference (games won minus games lost, with W.O. games counting as wins for the team awarded the W.O. — a W.O. with no games counts as 2-0), then a random draw. In a tie between 3 or more teams, head-to-head only considers the games between the tied teams.",
     regra20:
       "Voice chat: using the tournament's official voice channel during games is mandatory, for refereeing and settling disputes. A team may not play without every player on voice; until then the game does not start and the clock runs as grace period.",
     regra21:
       "Your Riot account must be linked to Discord (Settings > Connections) before the tournament starts, to reduce fraud and make it easier for the organisers to check rank and match history.",
     regra22:
-      "Sign-up: the fee, deadline and payment method are announced on the site and in the group; a place is only confirmed after payment.",
+      "Sign-up: the fee and payment method are announced on the site and in the group, and a place is only confirmed after payment. Starters pay by 31 October 2026, 23:59 (Brasília time), and the organisers do not pay; anyone who has not paid by then may lose their place to the first person in the reserve queue. Reserves do not pay while they are in the queue: they only pay if called up — by 31 October if called up before then, or within 48 hours if called up afterwards. A reserve who paid and did not play gets the money back.",
 
     // ---------- app/regras: 5. cartinhas surpresa ----------
     cartasTitulo: "SURPRISE WILDCARDS",
@@ -476,7 +482,8 @@ export const paginasRegras = definir<ChavesPaginasRegras>({
     pontuacaoIntro:
       "The top 4 of the round-robin stage go through to the semifinals, and each series won is worth 3 points.",
     pontuacaoFaseK: "Round-robin stage:",
-    pontuacaoFaseV: "series win (2-0 or 2-1) = 3 points; loss = 0. A W.O. counts as 2-0 (rule 8).",
+    pontuacaoFaseV:
+      "series win (2-0 or 2-1) = 3 points; loss = 0. A W.O. with no games counts as 2-0; midway through a series, the games played stand and the W.O. completes the score (rule 8).",
     pontuacaoDesempateK: "Tiebreakers:",
     pontuacaoDesempateV: "as per {regra} — head-to-head, then game difference, then a random draw.",
     pontuacaoDesempateLink: "rule 19",

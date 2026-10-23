@@ -331,7 +331,9 @@ describe("regras do produto que a tela não pode contrariar", () => {
     // 6 aprovados → 1 time, 5 vagas, 1 de sobra (o que `montarDraftDosAprovados` faria).
     const lido = texto(renderToStaticMarkup(<SecaoTimes {...props()} />));
     expect(lido).toContain("Só com os 6 aprovados de hoje (o que o draft usaria): 1 time, 5 vagas, 1 de sobra");
-    expect(lido).toContain("o draft pediria 1 na sobra");
+    // O antigo «marque N como sobra antes de sortear» saiu: com teto de vagas, quem passa delas
+    // vai para a fila de reserva sozinho (D1), e sem teto ninguém espera vaga.
+    expect(lido).not.toContain("o draft pediria");
     expect(lido).not.toContain("entram no draft"); // com pendente, Vagas é previsão
   });
 

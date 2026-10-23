@@ -283,6 +283,10 @@ revoke all on public.draft_estado           from anon, authenticated;
 --
 -- SECURITY INVOKER (o padrao) de proposito: a funcao roda como service_role, que
 -- ja tem BYPASSRLS. Marcar como DEFINER daria privilegio sem necessidade.
+--
+-- SUBSTITUIDA no fim deste arquivo (fila de reserva, 2026-10-22): a versao de la usa o
+-- prazo unico `prazo_pagamento_ate` e vale tambem em lob_teste. Esta fica como a versao
+-- de origem — rodando o arquivo inteiro, a de baixo e a que vale.
 create or replace function public.abrir_pendencias_da_inscricao()
 returns trigger
 language plpgsql
@@ -419,7 +423,8 @@ comment on column public.inscricoes.disponibilidade is
 -- inscricao do site de teste quebra no insert que grava `puuid`.
 --
 --   puuid ... riot_erro   o que a Riot mostrou na ultima consulta (so exibicao; o jogador
---                         nunca recebe estas colunas — `minhaInscricao` usa select explicito)
+--                         nunca recebe estas colunas — `minhaInscricao` devolve campo a
+--                         campo, so os da ficha dele)
 --   elo_fonte             de onde veio elo_verificado: 'riot' (o robo atualiza) ou
 --                         'organizacao' (travado a mao; o robo nao mexe). Nulo = ainda
 --                         ninguem confirmou, ou foi gravado antes do robo existir
@@ -535,3 +540,139 @@ begin
   end loop;
 end
 $excluido$;
+
+-- ---------------------------------------------------------------- fila de reserva, prazo único e recado (2026-10-22)
+-- Decisões do Lucas de 2026-10-22 (D1 a D6 e G). Aditivo e idempotente, em public e lob_teste.
+--
+--   edicao_config.prazo_pagamento_ate  prazo de pagamento dos titulares, uma data só para
+--                         todos (D3: fim de 31/10/2026 em Brasilia = 2026-11-01T02:59:59Z).
+--                         Nulo = o comportamento antigo (prazo_pagamento_dias contados do
+--                         envio). O valor da 4a e gravado a parte (ajuste de dados).
+--   inscricoes.recado_jogador  "Recado para o jogador" (G): o unico texto da ficha que o
+--                         jogador le, em Minha inscricao. A coluna `observacao` virou NOTA
+--                         INTERNA: o servidor deixou de manda-la ao jogador.
+--   abrir_pendencias_da_inscricao  o gatilho passa a usar prazo_pagamento_ate quando existe;
+--                         ja vencido, agora + 48 horas (a mesma regra do reserva chamado,
+--                         D4 — `prazoDoChamado` em lib/inscricoes/fila.ts). A fila de reserva
+--                         NAO e calculada aqui: logo depois do insert o servidor tira o prazo
+--                         de quem caiu na fila (`alinharCobrancaComAFila`), e a regra da fila
+--                         fica num lugar so (`montarFila`).
+--
+-- Recria a funcao e o gatilho TAMBEM em lob_teste, com search_path proprio: o gatilho de la
+-- precisa abrir as pendencias nas tabelas de la. (`create or replace` substitui a versao de
+-- public declarada no comeco deste arquivo; `drop trigger if exists` + `create trigger` e o
+-- mesmo par do comeco do arquivo, e os dois inserts sao `on conflict do nothing`.)
+--
+-- O codigo novo le essas tabelas com `select *` e so ESCREVE as colunas novas quando a
+-- organizacao mexe nelas: a migracao pode entrar antes ou depois do deploy sem derrubar a
+-- inscricao publica nem a Minha inscricao.
+do $fila_e_recado$
+declare s text;
+begin
+  foreach s in array array['public', 'lob_teste'] loop
+    continue when not exists (select 1 from pg_namespace where nspname = s);
+    -- Schema sem as tabelas da 4a (ambiente montado pela metade): pula em vez de abortar o
+    -- arquivo inteiro (uma transacao so) e desfazer o que ja tinha passado.
+    continue when to_regclass(format('%I.edicao_config', s)) is null
+               or to_regclass(format('%I.inscricoes', s)) is null
+               or to_regclass(format('%I.inscricao_conferencias', s)) is null
+               or to_regclass(format('%I.inscricao_pagamentos', s)) is null;
+    execute format($sql$
+      alter table %1$I.edicao_config add column if not exists prazo_pagamento_ate timestamptz;
+      alter table %1$I.inscricoes    add column if not exists recado_jogador      text;
+
+      create or replace function %1$I.abrir_pendencias_da_inscricao()
+      returns trigger
+      language plpgsql
+      set search_path = %1$I, pg_temp
+      as $fn$
+      declare
+        v_taxa  integer;
+        v_dias  integer;
+        v_ate   timestamptz;
+        v_vence timestamptz;
+      begin
+        select taxa_centavos, prazo_pagamento_dias, prazo_pagamento_ate
+          into v_taxa, v_dias, v_ate
+          from %1$I.edicao_config
+         where id = 1;
+
+        insert into %1$I.inscricao_conferencias (inscricao_id, item)
+        select new.id, item from unnest(array['a','b','d','e','f','m']) as item
+        on conflict (inscricao_id, item) do nothing;
+
+        v_vence := case
+          when v_ate is not null and v_ate > now() then v_ate
+          when v_ate is not null then now() + interval '48 hours'
+          else now() + make_interval(days => coalesce(v_dias, 14))
+        end;
+
+        insert into %1$I.inscricao_pagamentos (inscricao_id, valor_centavos, vence_em)
+        values (new.id, coalesce(v_taxa, 2000), v_vence)
+        on conflict (inscricao_id) do nothing;
+
+        return new;
+      end;
+      $fn$;
+
+      drop trigger if exists inscricoes_abrir_pendencias on %1$I.inscricoes;
+      create trigger inscricoes_abrir_pendencias
+        after insert on %1$I.inscricoes
+        for each row execute function %1$I.abrir_pendencias_da_inscricao();
+    $sql$, s);
+  end loop;
+end
+$fila_e_recado$;
+
+comment on column public.edicao_config.prazo_pagamento_ate is
+  'Prazo unico de pagamento dos titulares (D3). Nulo = prazo_pagamento_dias contados do envio. Reserva chamado depois do prazo: agora + 48 h.';
+comment on column public.inscricoes.recado_jogador is
+  'Recado da organizacao para o jogador: aparece em Minha inscricao. A coluna observacao e nota interna (o jogador nao ve).';
+comment on column public.inscricoes.observacao is
+  'Nota interna da organizacao. Nunca vai para o jogador (desde 2026-10-22); o que ele le e recado_jogador.';
+
+-- O PostgREST guarda o esquema em cache: sem recarregar, a primeira gravacao do recado (ou do
+-- prazo unico) depois da migracao ainda pode responder "coluna inexistente". (A leitura da
+-- Minha inscricao aguenta: refaz sem `recado_jogador`.)
+notify pgrst, 'reload schema';
+
+-- Depois desta migracao, os DADOS da 4a (prazo de 31/10 na configuracao e o prazo de cada
+-- pagamento em aberto segundo a fila) vao em supabase/dados-4a-fila-e-prazo.sql.
+
+-- ---------------------------------------------------------------- ciência dos alertas (2026-10-23)
+-- Pedido do Lucas de 2026-10-23: os alertas do painel (lib/inscricoes/alertas.ts) sao
+-- calculados na leitura e nao tinham como ser dispensados. «Dar ciencia» registra que a
+-- organizacao viu e aceitou AQUELE alerta. Aditivo e idempotente, em public e lob_teste.
+--
+--   inscricoes.alertas_cientes  mapa codigo do alerta -> { "texto", "assinatura"?, "por", "em" }.
+--                         A ciencia vale enquanto a ASSINATURA do alerta for a mesma (o texto
+--                         mais os fatos que o disparam: estado e carimbos do pagamento, prazo,
+--                         itens fora de ok); ciencia antiga sem assinatura vale pelo texto.
+--                         Mudou (outro nick, outro elo, outro pagamento), ele volta a contar
+--                         sozinho. Quem grava e
+--                         o servidor (acao `alerta_ciencia` do painel), conferindo os alertas
+--                         de agora; a regra fica num lugar so (`cienciaDoAlerta`).
+--
+-- O codigo novo le a tabela com `select *` e trata a coluna ausente como {} (nenhuma
+-- ciencia): a migracao pode entrar antes ou depois do deploy. Antes dela, so o botao de
+-- ciencia responde que falta a migracao.
+do $ciencia_dos_alertas$
+declare s text;
+begin
+  foreach s in array array['public', 'lob_teste'] loop
+    continue when not exists (select 1 from pg_namespace where nspname = s);
+    continue when to_regclass(format('%I.inscricoes', s)) is null;
+    execute format($sql$
+      alter table %1$I.inscricoes
+        add column if not exists alertas_cientes jsonb not null default '{}'::jsonb;
+    $sql$, s);
+  end loop;
+end
+$ciencia_dos_alertas$;
+
+comment on column public.inscricoes.alertas_cientes is
+  'Ciencia da organizacao nos alertas do painel: codigo -> {texto, assinatura?, por, em}. Vale enquanto a assinatura do alerta (texto + fatos) for a mesma; sem assinatura, vale pelo texto. So o servidor grava.';
+
+-- Mesmo motivo do bloco anterior: sem recarregar o cache, a primeira ciencia depois da
+-- migracao ainda pode responder "coluna inexistente".
+notify pgrst, 'reload schema';

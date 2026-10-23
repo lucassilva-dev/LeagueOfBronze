@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 import { alcancarORelogio } from "@/lib/draft/motor";
-import { lerDraftCompleto, paraPublico, salvarDraftSeIntacto, timeDoCapitao } from "@/lib/draft/store";
+import { comAsSaidasDoPool, lerDraftCompleto, paraPublico, salvarDraftSeIntacto, timeDoCapitao } from "@/lib/draft/store";
 import { inscricaoIdDoJogador } from "@/lib/inscricoes/store";
 import {
   atributosDoCookie,
@@ -28,6 +28,11 @@ export const dynamic = "force-dynamic";
  * escolha quando ninguém escolheu, e não há processo de fundo: quem sonda faz o
  * relógio andar. Como a gravação é condicionada à revisão lida, dez espectadores
  * sondando ao mesmo tempo produzem UMA escolha automática, não dez.
+ *
+ * A sondagem também confere quem saiu do pool (decisão C1 de 2026-10-22): lê a situação
+ * atual das inscrições de quem ainda não foi escolhido, e quem desistiu, foi recusado ou
+ * excluído sai dos escolhíveis — antes do relógio andar, para a escolha automática também
+ * não levar essa pessoa. A gravação é a mesma, condicionada à revisão.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -40,7 +45,7 @@ export async function GET(request: NextRequest) {
     }
 
     const agora = Date.now();
-    const alcancado = alcancarORelogio(estado, agora);
+    const alcancado = alcancarORelogio(await comAsSaidasDoPool(estado), agora);
 
     // Se o relógio andou e a gravação pegou, a revisão avançou uma.
     //

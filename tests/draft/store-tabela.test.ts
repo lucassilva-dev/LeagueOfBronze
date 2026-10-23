@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { estadoFecha } from "@/lib/draft/motor";
+import { alcancarORelogio, estadoFecha, iniciarDraft } from "@/lib/draft/motor";
+import { avisosDaVirada, problemasDaVirada } from "@/lib/draft/virada";
 import { calcularTabela } from "@/lib/draft/precos";
 import { ORCAMENTO_DA_MONTAGEM } from "@/lib/draft/viabilidade";
 import { resolveElo } from "@/lib/design";
@@ -267,16 +268,116 @@ describe("a prévia do draft com a tabela automática", () => {
     expect(previa.tabela).toMatchObject({ curvatura: 0.1, folga: 0, queda: null });
   });
 
-  it("aptos ≠ vagas: a tabela vem marcada como pool incompleto (a tela não a mostra como fechada)", async () => {
-    // 42 aprovados como apto (os 40 e mais dois), nenhum marcado como sobra: o pool do sorteio
-    // ainda não existe.
+  it("menos aptos que vagas (C4): a tabela é a do sorteio, sem «pool incompleto», e fecha com uma vaga aberta", async () => {
+    // Um titular dos 40 ainda pendente: 39 titulares aptos para 40 vagas. O sorteio pode
+    // seguir assim (titular não apto é aviso, não impedimento), então a tabela calculada sobre
+    // os 39 é a que vai para o draft — e a conta dos capitães sabe que um time fica com a
+    // vaga aberta (sem isso, nenhuma tabela fecharia com um a menos).
+    banco.inscritos = POOL_4A_40.map((j) => inscricao(j, j.posicao === 7 ? { situacao: "pendente" } : {}));
+    const previa = await previaDoDraft(SEM_DRAFT);
+    expect(previa.aptos).toBe(39);
+    expect(previa.vagas).toBe(40);
+    expect(previa.impedimentos).toEqual([]);
+    expect(previa.avisosDoSorteio.join(" ")).toContain("Faltam 1");
+    expect(previa.tabela!.poolIncompleto).toBeUndefined();
+    expect(previa.fechaComOsCapitaesDaRegra).toBe(true);
+  });
+
+  it("mais aptos que vagas (sem teto de times): aí sim a tabela vem marcada como pool incompleto", async () => {
+    banco.config = { ...banco.config, max_times: null };
     banco.inscritos = [...POOL_4A_40, ...ALEM_DOS_40].map((j) => inscricao(j, { situacao: "apto" }));
     const previa = await previaDoDraft(SEM_DRAFT);
-    expect(previa.aptos).toBe(42);
-    expect(previa.vagas).toBe(40);
+    expect(previa.aptos).toBeGreaterThan(previa.vagas);
     expect(previa.impedimentos.length).toBeGreaterThan(0);
     expect(previa.tabela!.poolIncompleto).toBe(true);
-    expect(previa.fechaComOsCapitaesDaRegra).toBeNull();
+  });
+});
+
+/*
+ * C4 (decisão de 2026-10-22): o pool do draft são os TITULARES da fila que estão `apto`. A
+ * fila corta pela ordem de inscrição (organizadores sempre dentro); antes, com 42 aptos para
+ * 40 vagas, o sorteio travava até a organização marcar 2 como sobra.
+ */
+describe("o pool do draft é o dos titulares da fila (C4)", () => {
+  /** `criado_em` na ordem da posição: a fila corta pela ordem de inscrição. */
+  const comData = (j: JogadorDoPool, over: Partial<Linha> = {}) =>
+    inscricao(j, { criado_em: new Date(Date.UTC(2026, 9, 5, 12, 0, j.posicao)).toISOString(), ...over });
+
+  it("42 aptos para 40 vagas: entram os 40 primeiros da fila, sem impedimento", async () => {
+    banco.inscritos = [...POOL_4A_40, ...ALEM_DOS_40].map((j) => comData(j, { situacao: "apto" }));
+    const previa = await previaDoDraft(SEM_DRAFT);
+    expect(previa.impedimentos).toEqual([]);
+    expect(previa.aptos).toBe(40);
+    expect(previa.titulares).toBe(40);
+    expect(previa.naFila).toBe(2);
+    const quem = previa.jogadores.map((j) => j.riotId);
+    expect(quem).not.toContain("Jogador41#BR1");
+    expect(quem).not.toContain("Jogador42#BR1");
+    // O Diamante I (#41) seria capitão pelo elo — mas chegou depois das 40 vagas.
+    expect([...previa.capitaesPelaRegra].sort()).toEqual([...CAPITAES_DA_REGRA].sort());
+    expect(previa.tabela!.poolIncompleto).toBeUndefined();
+
+    const estado = await montarDraftDosAprovados({ metodo: "maior_elo" });
+    expect(estado.jogadores).toHaveLength(40);
+    expect(estado.jogadores.some((j) => j.riotId === "Jogador41#BR1")).toBe(false);
+  });
+
+  it("quem se inscreveu ANTES fica: um dos 40 desiste e o 41º sobe para o pool", async () => {
+    banco.inscritos = [...POOL_4A_40, ...ALEM_DOS_40].map((j) =>
+      comData(j, j.posicao === 7 ? { situacao: "desistiu" } : { situacao: "apto" }),
+    );
+    const estado = await montarDraftDosAprovados({ metodo: "manual", capitaesManuais: CAPITAES_DA_REGRA });
+    const quem = estado.jogadores.map((j) => j.riotId);
+    expect(quem).toHaveLength(40);
+    expect(quem).toContain("Jogador41#BR1");
+    expect(quem).not.toContain("Jogador42#BR1");
+    expect(quem).not.toContain("Jogador7#BR1");
+  });
+
+  it("titular ainda pendente não entra no sorteio e vira AVISO na mesa, com o nome — o sorteio segue (C4)", async () => {
+    banco.inscritos = [...POOL_4A_40, ...ALEM_DOS_40].map((j) =>
+      comData(j, j.posicao === 9 ? { situacao: "pendente" } : { situacao: "apto" }),
+    );
+    const previa = await previaDoDraft(SEM_DRAFT);
+    expect(previa.titularesNaoAptos).toEqual([{ riotId: "Jogador9#BR1", situacao: "pendente" }]);
+    expect(previa.aptos).toBe(39);
+    expect(previa.jogadores.map((j) => j.riotId)).not.toContain("Jogador9#BR1");
+    // O 41º NÃO sobe sozinho: o 9º continua titular (só não está apto) — faltam 1.
+    expect(previa.jogadores.map((j) => j.riotId)).not.toContain("Jogador41#BR1");
+    // Especificação C4: «titular que não está apto na hora de sortear vira aviso na mesa».
+    expect(previa.impedimentos).toEqual([]);
+    expect(previa.avisosDoSorteio.join(" ")).toContain("Faltam 1");
+
+    // O sorteio sai com os 39, e a ordem perde a escolha que não teria quem escolher.
+    const estado = await montarDraftDosAprovados({ metodo: "maior_elo" });
+    expect(estado.jogadores).toHaveLength(39);
+    expect(estado.ordem).toHaveLength(8 * 4 - 1);
+    expect(estadoFecha(estado, ORCAMENTO_DA_MONTAGEM)).toBe(true);
+
+    // Só com a escolha automática, o draft vai até o fim sem pausar; um time termina com 4 de
+    // 5, e a virada aceita (a vaga é de um reserva da fila) e avisa.
+    let e = iniciarDraft(estado, 0);
+    for (let k = 1; k <= 40 && e.fase === "rodando"; k++) e = alcancarORelogio(e, k * 60_000 + 1);
+    expect(e.motivoDaPausa).toBeUndefined();
+    expect(e.fase).toBe("encerrado");
+    const tamanhos = e.times.map((t) => e.jogadores.filter((j) => j.timeId === t.id).length).sort();
+    expect(tamanhos).toEqual([4, 5, 5, 5, 5, 5, 5, 5]);
+    expect(problemasDaVirada(e)).toEqual([]);
+    expect(avisosDaVirada(e).join(" ")).toContain("vai para o site com 4 de 5");
+  });
+
+  it("quem está em «sobra» é reserva da fila, mesmo inscrito antes: a vaga vai ao próximo", async () => {
+    banco.inscritos = [...POOL_4A_40, ...ALEM_DOS_40].map((j) =>
+      comData(j, { situacao: j.posicao === 7 ? "sobra" : "apto" }),
+    );
+    const previa = await previaDoDraft(SEM_DRAFT);
+    const quem = previa.jogadores.map((j) => j.riotId);
+    expect(previa.impedimentos).toEqual([]);
+    expect(quem).toHaveLength(40);
+    expect(quem).not.toContain("Jogador7#BR1");
+    expect(quem).toContain("Jogador41#BR1");
+    expect(quem).not.toContain("Jogador42#BR1");
+    expect(previa.naFila).toBe(2);
   });
 });
 

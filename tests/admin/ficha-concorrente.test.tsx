@@ -141,7 +141,7 @@ describe("um «Salvar tudo» só", () => {
     marcar("Estado do item F", "Não cumpre");
     marcar("Situação do inscrito", "Recusado");
     aba("Ficha");
-    fireEvent.change(screen.getByLabelText("Observação da ficha"), { target: { value: "Conta smurf." } });
+    fireEvent.change(screen.getByLabelText("Nota interna"), { target: { value: "Conta smurf." } });
     salvarTudo();
 
     expect(executar).toHaveBeenCalledTimes(1);
@@ -252,7 +252,7 @@ describe("a gaveta não desfaz o que outro organizador gravou", () => {
     expect(marcado("Situação do inscrito")).toBe("Apto");
 
     aba("Ficha");
-    fireEvent.change(screen.getByLabelText("Observação da ficha"), { target: { value: "Conferido no grupo." } });
+    fireEvent.change(screen.getByLabelText("Nota interna"), { target: { value: "Conferido no grupo." } });
     salvarTudo();
 
     expect(executar).toHaveBeenCalledTimes(1);
@@ -349,7 +349,7 @@ describe("mexer e desfazer é o mesmo que não mexer", () => {
     expect(marcado("Situação do inscrito")).toBe("Apto");
 
     aba("Ficha");
-    fireEvent.change(screen.getByLabelText("Observação da ficha"), { target: { value: "ok" } });
+    fireEvent.change(screen.getByLabelText("Nota interna"), { target: { value: "ok" } });
     salvarTudo();
     expect(executar).toHaveBeenCalledWith("inscrito", {
       inscricaoId: "x1",

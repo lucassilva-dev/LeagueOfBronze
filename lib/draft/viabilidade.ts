@@ -170,7 +170,10 @@ export function elencosFecham(
       if (soma + minimoAPartirDe(cont, i, faltam) > time.folga) return false;
       if (soma + maximoAPartirDe(cont, i, faltam) < piso) return false;
 
-      let maximo = Math.min(cont[i]!, faltam, Math.floor((time.folga - soma) / valores[i]!));
+      // Valor 0 é o "fantasma" do corte de escolhas (lib/draft/motor.ts): cabe qualquer
+      // quantidade. Sem o desvio, folga exata dava 0 / 0 = NaN, e o laço não tentava nada.
+      const cabemNaFolga = valores[i] === 0 ? faltam : Math.floor((time.folga - soma) / valores[i]!);
+      let maximo = Math.min(cont[i]!, faltam, cabemNaFolga);
       if (preso && limite) maximo = Math.min(maximo, limite[i]!);
       // Mais caros primeiro dentro do valor: deixa os baratos para os outros times.
       for (let k = maximo; k >= 0; k--) {

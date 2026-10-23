@@ -70,17 +70,37 @@ export const TENTATIVA_EM_ANDAMENTO = "em_andamento";
 export const TENTATIVA_ERRO_INTERNO = "erro_interno";
 
 /**
+ * Motivo com que a organização marca as falhas recentes de UMA conta de jogador no botão
+ * «Liberar login» do painel (decisão F, 2026-10-22). O caso: alguém martela o e-mail de um
+ * capitão de vários IPs e tranca a conta (10 falhas) — o capitão, com a senha certa, fica
+ * de fora no dia do draft.
+ *
+ * Ela NÃO conta para a CONTA (é o que destranca o dono), mas CONTINUA contando para o IP de
+ * onde a falha veio: o IP do atacante segue bloqueado (ver `contarDasLinhas`). A linha
+ * continua no registro de segurança, com o motivo trocado — quem liberou fica na auditoria
+ * da inscrição.
+ */
+export const TENTATIVA_LIBERADA_PELA_ORGANIZACAO = "liberado_pela_organizacao";
+
+/**
  * Motivos que ficam gravados — o registro de segurança mostra tudo — mas NÃO contam como
- * falha concluída em teto nenhum.
+ * falha concluída contra a conta.
  *
  * - `ip_bloqueado`/`usuario_bloqueado`: tentativas recusadas pelo próprio limitador. Contando,
  *   o bloqueio se auto-prorrogava (cada retentativa empurrava a janela para a frente).
  * - `erro_interno`: ver `TENTATIVA_ERRO_INTERNO`.
+ * - `liberado_pela_organizacao`: ver `TENTATIVA_LIBERADA_PELA_ORGANIZACAO` — a única que
+ *   ainda pesa, e só no teto POR IP.
  *
  * `em_andamento` também fica de fora das falhas CONCLUÍDAS: ele tem contagem própria, só
  * enquanto é recente (ver `TENTATIVA_EM_ANDAMENTO`).
  */
-export const MOTIVOS_QUE_NAO_CONTAM: readonly string[] = ["ip_bloqueado", "usuario_bloqueado", TENTATIVA_ERRO_INTERNO];
+export const MOTIVOS_QUE_NAO_CONTAM: readonly string[] = [
+  "ip_bloqueado",
+  "usuario_bloqueado",
+  TENTATIVA_ERRO_INTERNO,
+  TENTATIVA_LIBERADA_PELA_ORGANIZACAO,
+];
 
 /** Instante a partir do qual uma reserva `em_andamento` ainda conta (ISO, para o filtro). */
 export function inicioDasReservasEmVoo(agora = Date.now()): string {
@@ -145,7 +165,14 @@ export function contarDasLinhas(
     }
 
     // Mesma regra do `not in` do SQL de antes: motivo nulo não conta.
-    if (linha.success !== false || linha.reason === null || MOTIVOS_QUE_NAO_CONTAM.includes(linha.reason)) continue;
+    if (linha.success !== false || linha.reason === null) continue;
+    // Liberada pela organização: destranca a conta, mas o IP de onde veio continua pagando
+    // por ela — o atacante não ganha palpites novos com o botão.
+    if (linha.reason === TENTATIVA_LIBERADA_PELA_ORGANIZACAO) {
+      if (doIp) porIp += 1;
+      continue;
+    }
+    if (MOTIVOS_QUE_NAO_CONTAM.includes(linha.reason)) continue;
     if (doIp) porIp += 1;
     if (daConta) porConta += 1;
   }

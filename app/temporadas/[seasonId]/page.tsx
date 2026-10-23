@@ -8,6 +8,7 @@ import { DurationRanking } from "@/components/lob/duration-ranking";
 import { EmptyState } from "@/components/empty-state";
 import { RoleBests } from "@/components/lob/role-bests";
 import { StatsToggles } from "@/components/lob/stats-toggles";
+import { textosElenco } from "@/components/lob/textos-elenco";
 import { PageHero } from "@/components/page-hero";
 import { PageShell } from "@/components/page-shell";
 import { SectionTitle } from "@/components/section-title";
@@ -19,7 +20,7 @@ import { CARDS_BY_ID } from "@/lib/cards";
 import { formatDateLabel } from "@/lib/format";
 import { metadadosDaPagina, montarMetadados } from "@/lib/i18n/metadados";
 import { nomeDaTemporada } from "@/lib/i18n/nome-da-temporada";
-import { getMessages } from "@/lib/i18n/server";
+import { getLocale, getMessages } from "@/lib/i18n/server";
 import type { CardId } from "@/lib/schema";
 import { getServerArchivedSeason } from "@/lib/server-data";
 import { buildRoleBests, buildStatsRows } from "@/lib/stats-view";
@@ -56,6 +57,7 @@ export default async function TemporadaDetailPage({ params }: TemporadaPageParam
   // `paginasRegras` cobre os textos próprios desta página; `paginasStats` alimenta os painéis
   // de estatísticas e `compartilhados` os componentes que também servem o campeonato ativo.
   const { paginasRegras: t, paginasStats: ts, compartilhados: tc } = await getMessages();
+  const te = textosElenco[await getLocale()];
   const { archived, dataset, indexes, overview } = result;
   // A temporada arquivada usa os MESMOS rótulos traduzidos da página /stats. Sem eles,
   // esta página caía nos padrões em português (`LABELS_PT`) e a data no fuso/idioma do
@@ -75,6 +77,7 @@ export default async function TemporadaDetailPage({ params }: TemporadaPageParam
     dosJogos: ts.siglaDosJogos,
     rotas: ts.rotas,
     localeTag: tc.localeTag,
+    reserva: te.reserva,
   });
   const championTeamSlug = overview.championship
     ? indexes.teamsById.get(overview.championship.championTeamId)?.slug
@@ -243,7 +246,7 @@ export default async function TemporadaDetailPage({ params }: TemporadaPageParam
       </section>
 
       <RoleBests
-        groups={buildRoleBests(dataset)}
+        groups={buildRoleBests(dataset, 3, { reserva: te.reserva })}
         localeTag={tc.localeTag}
         hrefBase={`/temporadas/${seasonId}/jogadores/`}
         t={{

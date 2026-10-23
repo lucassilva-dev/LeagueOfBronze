@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 
 import type { Messages } from "@/lib/i18n/messages";
+import { dataDoPrazo } from "@/lib/inscricoes/pagamento";
 import { problemasDoPasso1 } from "@/lib/inscricoes/passo1";
 import { TURNOS, type Turno } from "@/lib/inscricoes/turnos";
 import { avisarSessaoMudou } from "@/lib/sessao-mudou";
@@ -42,10 +43,29 @@ export type ConfigPublica = {
   taxaCentavos: number;
   chavePix: string | null;
   prazoPagamentoDias: number;
+  /**
+   * O prazo único da edição (D3), enquanto ele vale. Ausente ou nulo = o prazo único já
+   * passou (ver `prazoPagamentoHoras`) ou não existe (o prazo antigo, em dias do envio).
+   */
+  prazoPagamentoAte?: string | null;
+  /**
+   * Depois do prazo único, quem vira titular tem estas horas a partir do ENVIO (D4). O aviso
+   * diz "48 horas a partir do envio": uma hora exata calculada quando a página abriu não
+   * seria a do envio.
+   */
+  prazoPagamentoHoras?: number | null;
   minRanqueadas: number;
   /** Percentual do prêmio do campeão; o do vice é o resto. */
   pctCampeao: number;
+  /**
+   * Onde cairia uma inscrição enviada agora (D1/D2). Reserva: o passo 3 avisa que as vagas
+   * estão cheias e NÃO mostra o Pix. Ausente = sem previsão (como antes da fila).
+   */
+  fila?: PrevisaoDaFila | null;
 };
+
+/** O lugar previsto no passo 3, ou o lugar de verdade devolvido pelo envio. */
+export type PrevisaoDaFila = { tipo: "titular" } | { tipo: "reserva"; posicao: number; vagas?: number | null };
 
 type Props = Readonly<{
   t: Rotulos;
@@ -79,6 +99,8 @@ type Resposta = {
   precisaEntrar?: boolean;
   /** 409 do envio: esta conta já tem inscrição (o envio anterior chegou). */
   jaInscrito?: boolean;
+  /** Envio aceito: titular (recibo com Pix) ou fila de reserva (sem Pix). Ausente = não se sabe. */
+  fila?: PrevisaoDaFila;
 };
 
 /*
@@ -105,6 +127,15 @@ function preencher(texto: string, valores: Record<string, string | number>) {
   );
 }
 
+/** O aviso de prazo: a data única da edição (D3), as horas do envio depois dela (D4), ou os dias do envio. */
+function textoDoPrazo(t: Rotulos, config: ConfigPublica) {
+  if (config.prazoPagamentoAte) {
+    return preencher(t.prazoAvisoData, { data: dataDoPrazo(config.prazoPagamentoAte, t.localeDatas) });
+  }
+  if (config.prazoPagamentoHoras) return preencher(t.prazoAvisoHoras, { horas: config.prazoPagamentoHoras });
+  return preencher(t.prazoAviso, { dias: config.prazoPagamentoDias });
+}
+
 export default function FormularioInscricao({ t, config, elos, jogadorInicial }: Props) {
   const [passo, setPasso] = useState(1);
   const [jogador, setJogador] = useState(jogadorInicial);
@@ -128,6 +159,8 @@ export default function FormularioInscricao({ t, config, elos, jogadorInicial }:
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [pronto, setPronto] = useState<string | null>(null);
+  // O lugar devolvido pelo envio: decide se o recibo mostra o Pix (titular) ou a fila.
+  const [lugar, setLugar] = useState<PrevisaoDaFila | null>(null);
   const [jaInscrito, setJaInscrito] = useState(false);
   const [pixCopiado, setPixCopiado] = useState(false);
 
@@ -367,6 +400,7 @@ export default function FormularioInscricao({ t, config, elos, jogadorInicial }:
     setEnviando(false);
 
     if (r.ok) {
+      setLugar(r.dados.fila ?? null);
       setPronto(t.prontoTitulo);
       return;
     }
@@ -409,6 +443,11 @@ export default function FormularioInscricao({ t, config, elos, jogadorInicial }:
   // ------------------------------------------------------------------ recibo
 
   if (pronto) {
+    // Fila de reserva (D2): reserva só paga se for chamado — o recibo diz a posição e NÃO
+    // mostra o Pix. Sem o lugar (o servidor não conseguiu calcular), também sem Pix: o
+    // caminho é Minha inscrição, que mostra o Pix a quem é titular.
+    const reservaNoRecibo = lugar?.tipo === "reserva" ? lugar : null;
+    const titularNoRecibo = lugar?.tipo === "titular";
     return (
       <div className="lob-card-2 lob-fade" style={{ padding: "34px 30px" }}>
         <div style={{ textAlign: "center" }}>
@@ -416,15 +455,22 @@ export default function FormularioInscricao({ t, config, elos, jogadorInicial }:
             {t.prontoTitulo}
           </div>
           <p style={{ margin: "12px auto 22px", maxWidth: "52ch", color: "var(--lob-muted)" }}>
-            {t.pagamentoAjuda}
+            {reservaNoRecibo
+              ? preencher(t.reservaRecebidaTexto, { posicao: reservaNoRecibo.posicao })
+              : t.pagamentoAjuda}
           </p>
+          {!reservaNoRecibo && !titularNoRecibo ? (
+            <p style={{ margin: "-10px auto 22px", maxWidth: "52ch", fontSize: 12.5, color: "var(--lob-muted)" }}>
+              {t.reciboSemFila}
+            </p>
+          ) : null}
         </div>
 
         {/*
           O QR aparece AQUI, depois do envio, e não no passo 3: pagar antes de a inscrição
           existir deixaria um Pix sem dono se o envio falhasse (nick repetido, rede caindo).
         */}
-        {config.chavePix ? (
+        {config.chavePix && titularNoRecibo ? (
           <div
             style={{
               margin: "0 auto 22px",
@@ -438,9 +484,7 @@ export default function FormularioInscricao({ t, config, elos, jogadorInicial }:
               {t.taxaTitulo} — {moeda(config.taxaCentavos)}
             </div>
             <PagamentoPix t={t} chave={config.chavePix} valorCentavos={config.taxaCentavos} />
-            <p style={{ margin: "12px 0 0", fontSize: 12.5, color: "var(--lob-muted)" }}>
-              {preencher(t.prazoAviso, { dias: config.prazoPagamentoDias })}
-            </p>
+            <p style={{ margin: "12px 0 0", fontSize: 12.5, color: "var(--lob-muted)" }}>{textoDoPrazo(t, config)}</p>
           </div>
         ) : null}
 
@@ -1130,6 +1174,9 @@ export function Passo3({
     t.aceite2,
     preencher(t.aceite3, { partidas: config.minRanqueadas }),
   ];
+  // Vagas cheias (D1/D2): quem envia agora cai na fila e só paga se for chamado — a chave
+  // Pix não aparece, para ninguém pagar o que a organização teria de devolver.
+  const reserva = config.fila?.tipo === "reserva" ? config.fila : null;
 
   return (
     <>
@@ -1165,7 +1212,25 @@ export function Passo3({
           {preencher(t.taxaTexto, { campeao: config.pctCampeao, vice: 100 - config.pctCampeao })}
         </p>
 
-        {config.chavePix ? (
+        {reserva ? (
+          <div
+            role="note"
+            style={{
+              padding: "12px 14px",
+              borderRadius: 6,
+              border: "1px solid rgba(224,163,58,.40)",
+              background: "rgba(224,163,58,.10)",
+            }}
+          >
+            <div style={{ fontSize: 10, letterSpacing: ".2em", color: "#f3d69a" }}>{t.vagasCheiasTitulo}</div>
+            <p style={{ margin: "6px 0 0", fontSize: 12.5, lineHeight: 1.55, color: "var(--lob-text)" }}>
+              {preencher(t.vagasCheiasTexto, {
+                vagas: reserva.vagas ?? "",
+                posicao: reserva.posicao,
+              })}
+            </p>
+          </div>
+        ) : config.chavePix ? (
           <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
             <div style={{ flex: "1 1 220px", minWidth: 0 }}>
               <div style={{ fontSize: 10, letterSpacing: ".2em", color: "var(--lob-bronze)" }}>{t.pixLabel}</div>
@@ -1184,10 +1249,12 @@ export function Passo3({
           <p style={{ margin: 0, fontSize: 12.5, color: "var(--lob-muted)" }}>{t.pixIndisponivel}</p>
         )}
 
-        <p style={{ margin: "14px 0 0", fontSize: 12.5, color: "var(--lob-muted)" }}>{t.pagamentoAjuda}</p>
-        <p style={{ margin: "6px 0 0", fontSize: 12.5, color: "var(--lob-muted)" }}>
-          {preencher(t.prazoAviso, { dias: config.prazoPagamentoDias })}
-        </p>
+        {reserva ? null : (
+          <>
+            <p style={{ margin: "14px 0 0", fontSize: 12.5, color: "var(--lob-muted)" }}>{t.pagamentoAjuda}</p>
+            <p style={{ margin: "6px 0 0", fontSize: 12.5, color: "var(--lob-muted)" }}>{textoDoPrazo(t, config)}</p>
+          </>
+        )}
       </div>
 
       <div style={{ height: 16 }} />

@@ -121,11 +121,25 @@ export async function POST(request: NextRequest) {
 
     // Devolve só o que a pessoa precisa ver de volta. Nada de e-mail, WhatsApp,
     // Discord ou id interno — a resposta de um endpoint público não é lugar disso.
+    //
+    // `fila`: titular (o recibo mostra o Pix) ou reserva com a posição (vagas cheias: o
+    // recibo NÃO mostra o Pix — reserva só paga se for chamado, D2). Ausente quando o lugar
+    // não pôde ser calculado: o recibo manda acompanhar em Minha inscrição, sem o Pix.
+    const lugar = inscricao.lugarNaFila;
+    const fila =
+      lugar?.tipo === "reserva"
+        ? { tipo: "reserva" as const, posicao: lugar.posicao }
+        : lugar?.tipo === "titular"
+          ? { tipo: "titular" as const }
+          : undefined;
     return NextResponse.json({
       ok: true,
       riotId: inscricao.riot_id,
+      ...(fila && { fila }),
       mensagem:
-        "Recebemos sua inscrição. A organização vai conferir os requisitos e confirmar no Discord assim que o pagamento cair.",
+        fila?.tipo === "reserva"
+          ? `Recebemos sua inscrição. As vagas estão cheias: você está na fila de reserva, na posição ${fila.posicao}. Reserva só paga se for chamado.`
+          : "Recebemos sua inscrição. A organização vai conferir os requisitos e confirmar no Discord assim que o pagamento cair.",
     });
   } catch (error) {
     // O mesmo caso por outro caminho: o 1º envio ainda estava gravando (o prazo de 15 s do

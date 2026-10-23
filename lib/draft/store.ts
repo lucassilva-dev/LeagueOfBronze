@@ -4,9 +4,14 @@ import { createSupabaseAdminClient } from "@/lib/data-store";
 import { ErroDeRegra } from "@/lib/security/erros";
 import { identidadeDoTime } from "@/lib/draft/times";
 import {
+  ajustarOrdemAoPool,
+  atualizarForaDoPool,
+  avisosDoSorteio,
   escolhiveisDaVez,
   estadoFecha,
   impedimentosDoSorteio,
+  jogadoresDisponiveis,
+  jogadoresQueSairamDoPool,
   montarDraft,
   timeDaVez,
   type EstadoDraft,
@@ -14,8 +19,10 @@ import {
   type MotivoDaPausa,
   type TimeDoDraft,
 } from "@/lib/draft/motor";
+import { montarFila } from "@/lib/inscricoes/fila";
+import { estaFora } from "@/lib/inscricoes/pagamento";
 import { lerConfig, listarInscricoes, type EdicaoConfig, type Inscricao } from "@/lib/inscricoes/store";
-import { distribuirTimes, estadoDaJanela } from "@/lib/inscricoes/schema";
+import { contaParaTimes, distribuirTimes, estadoDaJanela } from "@/lib/inscricoes/schema";
 import { forcaDoElo, rankingDeCapitaes, type CandidatoACapitao } from "@/lib/draft/capitaes";
 import { eloDoJogadorDaInscricao, eloQueVale, temEloReconhecido } from "@/lib/draft/elo-da-inscricao";
 import {
@@ -73,6 +80,72 @@ export async function salvarDraftSeIntacto(
 
   if (error) throw new Error(`Falha ao salvar o draft: ${error.message}`);
   return (data?.length ?? 0) > 0;
+}
+
+// ---------------------------------------------------------------- quem saiu do pool (C1)
+
+/**
+ * A última leitura das situações do pool, guardada por pouco tempo. A sondagem roda a cada
+ * 2 s em TODA tela aberta (TV, capitães, mesa, plateia), e cada uma leria o banco de novo
+ * sem isto. Dois segundos não mudam nada para quem desiste: a saída aparece na sondagem
+ * seguinte. As escolhas (POST) leem sem guardar.
+ */
+const GUARDA_DAS_SITUACOES_MS = 2_000;
+let situacoesGuardadas: { chave: string; ate: number; saidas: ReadonlySet<string> } | null = null;
+
+/** Para os testes: esquece a leitura guardada. */
+export function esquecerSituacoesGuardadas(): void {
+  situacoesGuardadas = null;
+}
+
+/**
+ * Quem do pool (ainda não escolhido) está com a inscrição FORA agora — recusado, desistiu
+ * ou excluído (`estaFora`, a mesma regra da fila e da cobrança). Inscrição que não aparece
+ * na leitura não conta como saída: exclusão é situação («excluido»), nunca DELETE, então
+ * sumir é falha de leitura, não decisão de ninguém.
+ */
+async function saidasDoPool(estado: EstadoDraft, fresco: boolean): Promise<ReadonlySet<string>> {
+  const ids = estado.jogadores.filter((j) => j.timeId === null).map((j) => j.id);
+  if (ids.length === 0) return new Set();
+  const chave = ids.join(",");
+  const agora = Date.now();
+  if (!fresco && situacoesGuardadas && situacoesGuardadas.chave === chave && situacoesGuardadas.ate > agora) {
+    return situacoesGuardadas.saidas;
+  }
+
+  const { data, error } = await createSupabaseAdminClient()
+    .from("inscricoes")
+    .select("id,situacao")
+    .in("id", ids)
+    .returns<{ id: string; situacao: string }[]>();
+  if (error) throw new Error(`Falha ao ler as inscrições do pool: ${error.message}`);
+
+  const saidas: ReadonlySet<string> = new Set((data ?? []).filter((l) => estaFora(l.situacao)).map((l) => l.id));
+  situacoesGuardadas = { chave, ate: agora + GUARDA_DAS_SITUACOES_MS, saidas };
+  return saidas;
+}
+
+/**
+ * O estado com quem saiu do pool aplicado (`atualizarForaDoPool`), lido da situação ATUAL
+ * das inscrições — decisão C1: quem desiste ou é recusado depois do sorteio sai dos
+ * escolhíveis na hora, sem a mesa precisar fazer nada.
+ *
+ * Quem chama grava o resultado (condicionado à revisão), como faz com o relógio. Se a
+ * leitura falhar, devolve o estado como está: o draft não para por causa disso, e a virada
+ * continua pedindo confirmação de quem não é mais apto.
+ *
+ * `fresco`: sem a leitura guardada — para as escolhas, que não podem levar quem acabou de sair.
+ */
+export async function comAsSaidasDoPool(estado: EstadoDraft, opcoes: { fresco?: boolean } = {}): Promise<EstadoDraft> {
+  if (estado.fase === "encerrado") return estado;
+  try {
+    // O agora só pesa no caso raro em que o time da vez perde a escolha: o seguinte ganha o
+    // prazo inteiro (ver `atualizarForaDoPool`).
+    return atualizarForaDoPool(estado, await saidasDoPool(estado, opcoes.fresco === true), Date.now());
+  } catch (erro) {
+    console.error("[draft] não foi possível conferir quem saiu do pool", erro);
+    return estado;
+  }
 }
 
 // ---------------------------------------------------------------- montagem
@@ -178,6 +251,38 @@ function temConta(i: Inscricao): boolean {
 }
 
 /**
+ * Quem joga o draft: os TITULARES da fila que estão `apto` (decisão C4 de 2026-10-22).
+ *
+ * A fila é a de sempre (lib/inscricoes/fila.ts, a mesma do formulário, da Minha inscrição e
+ * do painel): todos os organizadores e os primeiros por ordem de inscrição até as vagas da
+ * edição; o resto, e quem está em «sobra», é reserva. Antes o pool eram todos os `apto`, e
+ * a organização tinha de marcar à mão quem sobrava; agora quem decide é a ordem de
+ * inscrição.
+ *
+ * O número de times sai de quantos ainda podem jogar (`contaParaTimes`, a mesma conta da
+ * aba Times e vagas), com o teto da Configuração. Titular que ainda não está `apto` não
+ * entra no sorteio e vira aviso na mesa (`titularesNaoAptos`).
+ */
+function quemJoga(inscritos: readonly Inscricao[], config: EdicaoConfig) {
+  const fila = montarFila(inscritos, config);
+  const titular = new Set(fila.titulares);
+  // Na ordem em que as inscrições chegaram do banco (a de `criado_em`), como sempre foi.
+  const titulares = inscritos.filter((i) => titular.has(i.id));
+  const vaoJogar = titulares.filter((i) => i.situacao === "apto");
+  const elegiveis = inscritos.filter((i) => contaParaTimes(i.situacao)).length;
+  const { times, vagas } = distribuirTimes(elegiveis, config.jogadores_por_time, config.max_times ?? null);
+  return {
+    fila,
+    titulares,
+    vaoJogar,
+    titularesNaoAptos: titulares.filter((i) => i.situacao !== "apto"),
+    elegiveis,
+    times,
+    vagas,
+  };
+}
+
+/**
  * Tudo o que a organização precisa ver ANTES de sortear, sem gravar nada.
  *
  * É a tela de conferência do painel do draft: quantos times, quem joga, se o orçamento
@@ -197,9 +302,8 @@ export async function previaDoDraft(draftLido?: DraftGravado | Promise<DraftGrav
   ]);
 
   const aprovados = inscritos.filter((i) => i.situacao === "apto" || i.situacao === "sobra");
-  const vaoJogar = inscritos.filter((i) => i.situacao === "apto");
+  const { fila, titulares, vaoJogar, titularesNaoAptos, elegiveis, times, vagas } = quemJoga(inscritos, config);
   const maxTimes = config.max_times ?? null;
-  const { times, vagas } = distribuirTimes(aprovados.length, config.jogadores_por_time, maxTimes);
 
   // O preço de cada um sai da tabela automática, calculada sobre quem joga.
   const pedida = tabelaDosQueJogam(vaoJogar, times, config);
@@ -210,7 +314,7 @@ export async function previaDoDraft(draftLido?: DraftGravado | Promise<DraftGrav
       vagas,
       times,
       orcamentoPorTime: config.orcamento_por_time,
-      totalDeAprovados: aprovados.length,
+      totalDeElegiveis: elegiveis,
     }),
     ...pedida.semElo,
   ];
@@ -240,10 +344,19 @@ export async function previaDoDraft(draftLido?: DraftGravado | Promise<DraftGrav
     times,
     vagas,
     aprovados: aprovados.length,
+    /** Os titulares da fila que estão `apto`: o pool do sorteio. */
     aptos: vaoJogar.length,
     sobra: inscritos.filter((i) => i.situacao === "sobra").length,
     pendentes: inscritos.filter((i) => i.situacao === "pendente").length,
+    // A fila (C4): quantos são titulares, quantos esperam na reserva, e os titulares que
+    // ainda não estão aptos — não entram no sorteio, e a mesa precisa saber quem são.
+    titulares: titulares.length,
+    naFila: fila.reservas.length,
+    titularesNaoAptos: titularesNaoAptos.map((i) => ({ riotId: i.riot_id, situacao: i.situacao })),
     impedimentos,
+    // Titular que ainda não está apto não impede o sorteio (C4): é aviso, e a ordem perde a
+    // escolha que falta — um time termina com vaga aberta, que a fila de reserva ocupa.
+    avisosDoSorteio: avisosDoSorteio({ quantos: vaoJogar.length, vagas, times }),
     totalDePontos,
     /**
      * Sempre nulo: a regra antiga (média + 15%) saiu. Continua na resposta por uma versão
@@ -252,9 +365,10 @@ export async function previaDoDraft(draftLido?: DraftGravado | Promise<DraftGrav
      */
     orcamentoSugerido: null,
     // A tabela de pontos desta edição (substitui a regra antiga "média + 15%"). Nula sem
-    // time fechado ou sem ninguém com preço. Com aptos ≠ vagas ela vem marcada como pool
-    // incompleto: dá ideia dos preços, mas a tela não a mostra como fechada.
-    tabela: times > 0 && conta.precoDe.size > 0 ? retratoComQueda(conta, vaoJogar.length !== vagas) : null,
+    // time fechado ou sem ninguém com preço. Com mais aptos que vagas ela vem marcada como pool
+    // incompleto: dá ideia dos preços, mas a tela não a mostra como fechada. Com MENOS (titular
+    // ainda não apto, C4) ela é a do sorteio, se a organização sortear agora.
+    tabela: times > 0 && conta.precoDe.size > 0 ? retratoComQueda(conta, vaoJogar.length > vagas) : null,
     // Os capitães da regra fecham os elencos com esta tabela (já com a queda, se houve)? Nulo
     // quando não dá para saber ainda (lista com impedimento, empate no corte, faltam capitães).
     fechaComOsCapitaesDaRegra,
@@ -296,9 +410,24 @@ export async function previaDoDraft(draftLido?: DraftGravado | Promise<DraftGrav
  */
 export type PreviaDoDraft = Omit<
   Awaited<ReturnType<typeof previaDoDraft>>,
-  "foraDoDraft" | "tabela" | "fechaComOsCapitaesDaRegra" | "orcamentoSugerido"
+  | "foraDoDraft"
+  | "tabela"
+  | "fechaComOsCapitaesDaRegra"
+  | "orcamentoSugerido"
+  | "titulares"
+  | "naFila"
+  | "titularesNaoAptos"
+  | "avisosDoSorteio"
 > & {
   foraDoDraft?: ForaDoDraft[];
+  /** Titulares da fila (C4). Ausente na resposta de um servidor anterior à fila. */
+  titulares?: number;
+  /** Quantos esperam na fila de reserva (inclusive quem está em «sobra»). */
+  naFila?: number;
+  /** Titulares que ainda não estão `apto`: não entram no sorteio. */
+  titularesNaoAptos?: { riotId: string; situacao: string }[];
+  /** O que a mesa precisa saber sem impedir o sorteio (C4: faltam titulares aptos). */
+  avisosDoSorteio?: string[];
   tabela?: RetratoDaTabela | null;
   fechaComOsCapitaesDaRegra?: boolean | null;
   /**
@@ -318,11 +447,12 @@ export type PreviaDoDraft = Omit<
 export type EstadoDraftComTabela = EstadoDraft & { tabelaDePontos?: RetratoDaTabela };
 
 /**
- * Monta o draft a partir de quem foi aprovado — e SORTEIA a ordem.
+ * Monta o draft a partir dos titulares aptos da fila — e SORTEIA a ordem.
  *
  * O número de times é DERIVADO (`distribuirTimes`), com o teto `max_times` da
- * Configuração (8 na 4ª Edição, desde 2026-10-22). Quem sobra da divisão fica fora do
- * sorteio. É por isso que a organização precisa fechar a lista de aprovados antes de montar.
+ * Configuração (8 na 4ª Edição, desde 2026-10-22). Quem joga são os titulares da fila que
+ * estão `apto` (`quemJoga`, decisão C4): a fila corta pela ordem de inscrição, e quem fica
+ * na reserva vai para o site como reserva na virada.
  *
  * "Um sorteio ao vivo define qual time cada capitão vai capitanear e a ordem de escolha
  * do draft" (regulamento). Antes a ordem saía da própria lista de capitães — por pontos,
@@ -338,16 +468,9 @@ export async function montarDraftDosAprovados(params: {
   const config = await lerConfig();
   const inscritos = await listarInscricoes();
 
-  // "sobra" também é aprovado — conta para decidir QUANTOS times cabem. Quem joga,
-  // porém, são só os "apto": a sobra é justamente quem a organização decidiu deixar
-  // de fora.
-  const aprovados = inscritos.filter((i) => i.situacao === "apto" || i.situacao === "sobra");
-  const vaoJogar = inscritos.filter((i) => i.situacao === "apto");
-  const { times: quantosTimes, vagas } = distribuirTimes(
-    aprovados.length,
-    config.jogadores_por_time,
-    config.max_times ?? null,
-  );
+  // Quem joga: os titulares da fila que estão "apto". Quem está na reserva (inclusive a
+  // "sobra", que é reserva por decisão da organização) fica fora do sorteio.
+  const { vaoJogar, elegiveis, times: quantosTimes, vagas } = quemJoga(inscritos, config);
 
   // O preço de cada um sai da tabela automática desta edição, calculada sobre quem joga —
   // não da coluna `pontos` do banco, que é a tabela fixa por elo da 3ª. Esta é a PEDIDA; com
@@ -367,16 +490,16 @@ export async function montarDraftDosAprovados(params: {
   }));
 
   // As duas regras que já falharam ficam numa função pura, testável sem banco:
-  // quem joga tem de ser exatamente as vagas (senão a decisão da organização sobre
-  // quem sobra era apagada por um corte na ordem de inscrição), e a soma dos pontos
-  // tem de caber no teto (senão o draft entra ao vivo já condenado a travar).
+  // quem joga não passa das vagas (a fila decide quem, pela ordem de inscrição), e a soma
+  // dos pontos tem de caber no teto (senão o draft entra ao vivo já condenado a travar).
+  // Faltar titular apto NÃO impede (C4): a ordem perde as escolhas que faltam, mais abaixo.
   const impedimentos = [
     ...impedimentosDoSorteio({
       pontosDosQueJogam: pool.map((j) => j.pontos),
       vagas,
       times: quantosTimes,
       orcamentoPorTime: config.orcamento_por_time,
-      totalDeAprovados: aprovados.length,
+      totalDeElegiveis: elegiveis,
     }),
     ...semElo,
   ];
@@ -449,13 +572,18 @@ export async function montarDraftDosAprovados(params: {
     }
   }
 
-  const estado = montarDraft({
-    times,
-    jogadores: pool,
-    jogadoresPorTime: config.jogadores_por_time,
-    orcamentoPorTime: config.orcamento_por_time,
-    segundosPorEscolha: config.segundos_por_escolha,
-  });
+  // Com menos titulares aptos do que vagas (C4), a ordem sai sem as escolhas que não teriam
+  // quem escolher — a mesma conta de quem deixa o pool (C1), a partir do fim da serpentina —,
+  // e o time que fica com vaga aberta a recebe de um reserva da fila depois da virada.
+  const estado = ajustarOrdemAoPool(
+    montarDraft({
+      times,
+      jogadores: pool,
+      jogadoresPorTime: config.jogadores_por_time,
+      orcamentoPorTime: config.orcamento_por_time,
+      segundosPorEscolha: config.segundos_por_escolha,
+    }),
+  );
 
   // A conta de verdade, com os preços que existem: sem ela, a checagem acima (1 ponto por
   // vaga) deixava ir ao ar um draft que travaria no meio. Com a soma da tabela exata, é
@@ -508,7 +636,7 @@ function escolherCapitaes(params: {
 
     const validos = new Set(aprovados.map((j) => j.id));
     for (const id of manuais) {
-      if (!validos.has(id)) throw new ErroDeRegra("Um dos capitães escolhidos não está entre os aprovados.");
+      if (!validos.has(id)) throw new ErroDeRegra("Um dos capitães escolhidos não está entre os titulares aptos (quem joga o draft).");
     }
     return [...manuais];
   }
@@ -517,7 +645,7 @@ function escolherCapitaes(params: {
     const ranking = rankingDeCapitaes(inscritos.map(candidatoACapitao), quantos);
     if (ranking.faltam > 0) {
       throw new ErroDeRegra(
-        `Não há aprovados suficientes fora da organização para ${quantos} capitães (faltam ${ranking.faltam}).`,
+        `Não há titulares aptos suficientes fora da organização para ${quantos} capitães (faltam ${ranking.faltam}).`,
       );
     }
     if (ranking.empateNoCorte) {
@@ -579,8 +707,20 @@ export type DraftPublico = {
     { riotId: string; pontos: number; rota1: string; rota2: string; elo: string; classe?: string; capitao: boolean }[]
   >;
   disponiveis: { id: string; riotId: string; pontos: number; rota1: string; rota2: string; elo: string; classe?: string }[];
+  /**
+   * Quem estava no pool e saiu depois do sorteio (C1): não pode mais ser escolhido, e a
+   * transmissão mostra que saiu. Sem o porquê (desistência, recusa) — isso é da organização,
+   * não da plateia. Opcional: a resposta de um servidor anterior não tem.
+   */
+  saiuDoPool?: { riotId: string; pontos: number; rota1: string; rota2: string; elo: string; classe?: string }[];
   escolhaAtual: number;
   totalEscolhas: number;
+  /**
+   * O time de cada escolha, na ordem. É a serpentina — menos as escolhas que saíram quando
+   * faltou jogador (C1), que podem não ser as do fim. O trilho da transmissão lê daqui.
+   * Opcional: a resposta de um servidor anterior não tem, e a tela refaz a serpentina.
+   */
+  ordem?: string[];
   timeDaVezId: string | null;
   /**
    * Ids de quem o time da vez pode escolher agora, pela conta do motor (orçamento E
@@ -617,8 +757,18 @@ export type DraftPublico = {
 const escolhiveisGuardados = new Map<string, string[]>();
 
 function escolhiveisDoEstado(estado: EstadoDraft, revisao: number): string[] {
-  const livres = estado.jogadores.filter((j) => j.timeId === null).map((j) => j.id).join(",");
-  const chave = [revisao, estado.escolhaAtual, estado.fase, estado.sorteio?.semente ?? "", estado.orcamentoPorTime, livres].join("|");
+  // Quem saiu do pool e o tamanho da ordem também mudam a conta (C1) — e entram na chave,
+  // porque a sondagem calcula a visão do estado já atualizado antes de gravar.
+  const livres = jogadoresDisponiveis(estado).map((j) => j.id).join(",");
+  const chave = [
+    revisao,
+    estado.escolhaAtual,
+    estado.fase,
+    estado.sorteio?.semente ?? "",
+    estado.orcamentoPorTime,
+    estado.ordem.length,
+    livres,
+  ].join("|");
   const guardado = escolhiveisGuardados.get(chave);
   if (guardado) return guardado;
   const calculado = escolhiveisDaVez(estado);
@@ -668,12 +818,28 @@ export function paraPublico(estado: EstadoDraftComTabela, revisao: number): Draf
     elencos,
     // O id do jogador disponível SAI, porque o painel do capitão precisa dele para
     // escolher. É um uuid de inscrição sem significado fora daqui, e o servidor
-    // confere de quem é a vez de qualquer forma.
-    disponiveis: estado.jogadores
-      .filter((j) => j.timeId === null)
-      .map((j) => ({ id: j.id, riotId: j.riotId, pontos: j.pontos, rota1: j.rota1, rota2: j.rota2, elo: j.elo, ...classeDe(j) })),
+    // confere de quem é a vez de qualquer forma. Quem saiu do pool não está aqui (C1).
+    disponiveis: jogadoresDisponiveis(estado).map((j) => ({
+      id: j.id,
+      riotId: j.riotId,
+      pontos: j.pontos,
+      rota1: j.rota1,
+      rota2: j.rota2,
+      elo: j.elo,
+      ...classeDe(j),
+    })),
+    // Sem o id: ninguém escolhe quem saiu, e a tela só precisa mostrar o nome.
+    saiuDoPool: jogadoresQueSairamDoPool(estado).map((j) => ({
+      riotId: j.riotId,
+      pontos: j.pontos,
+      rota1: j.rota1,
+      rota2: j.rota2,
+      elo: j.elo,
+      ...classeDe(j),
+    })),
     escolhaAtual: estado.escolhaAtual,
     totalEscolhas: estado.ordem.length,
+    ordem: [...estado.ordem],
     // `timeDaVez` do motor, e não a indexação crua da ordem: o motor devolve null fora de
     // "rodando"/"pausado", enquanto indexar direto continua apontando um time em
     // "preparando" e em "encerrado". A visão pública e a autorização precisam responder a

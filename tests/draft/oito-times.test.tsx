@@ -303,8 +303,9 @@ describe("motor com 8 times", () => {
     expect(e.ordem.slice(0, 16).map((id) => Number(id.slice(1)))).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 8, 7, 6, 5, 4, 3, 2, 1]);
     const inicio = Date.parse("2026-11-15T20:00:00Z");
     e = iniciarDraft(e, inicio);
-    // De 8 em 8 escolhas: atraso de 10 ou mais pausa o draft (o freio do motor).
-    for (let k = 8; k <= 32; k += 8) e = alcancarORelogio(e, inicio + k * 60_000 + 1);
+    // Uma escolha por sondagem: atraso de mais de uma escolha inteira pausa o draft (o freio
+    // do motor, decisão C3 de 2026-10-22).
+    for (let k = 1; k <= 32; k++) e = alcancarORelogio(e, inicio + k * 60_000 + 1);
     expect(e.fase).toBe("encerrado");
     for (const t of times) expect(e.jogadores.filter((j) => j.timeId === t.id)).toHaveLength(5);
   });

@@ -34,11 +34,14 @@ import {
   type Player,
   type PlayerGameStats,
   type SeriesFormat,
+  type SeriesGame,
   type SeriesStage,
   type SeriesMatch,
   type TournamentDataset,
 } from "@/lib/schema";
 import {
+  elencoAtivo,
+  estaNoElenco,
   getKda,
   getSeriesFormat,
   getSeriesFormatLabel,
@@ -49,7 +52,18 @@ import {
   getSeriesWinnerTeamId,
   inferGameMvpPlayerId,
   isWalkoverSeries,
+  jogosDeWalkoverDaSerie,
+  linhaDeSubstituto,
+  linhaJaGravada,
+  linhaPrecisaDeTime,
+  mvpDoJogo,
+  placarComWalkover,
+  reservasDoDataset,
+  timeDaLinha,
+  walkoverPermitido,
 } from "@/lib/tournament";
+import { avisosDeSubstituto, type AvisoDeSubstituto, type RegraDoSubstituto } from "@/lib/roster";
+import { useRegraDoSubstituto } from "@/components/admin/regra-do-substituto";
 import { formatDateLabel, formatSeriesDateLabel } from "@/lib/format";
 import { resolveRole, roleIconUrl, teamColor } from "@/lib/design";
 import {
@@ -106,6 +120,15 @@ import {
  *    rodada. Só a série ainda sem os dois times abre com o Confronto em cima.
  * Toda a lógica (confirmações, auditoria, limpeza de linhas em branco) é a mesma dos dois
  * arranjos — muda só onde cada coisa fica.
+ *
+ * REGRA 6 e W.O. NO MEIO DA SÉRIE (decisões de 22/10/2026):
+ *  - a linha de K/D/A pode ser de um SUBSTITUTO AVULSO (reserva sem time, ou titular de outro
+ *    time cobrindo uma vaga): ela ganha "Jogou por", que grava o `teamId` da linha. Quem joga
+ *    pelo próprio time fica sem ele, como sempre. Os pontos do substituto (regra 6) só viram
+ *    AVISO — a organização aprova; nada trava;
+ *  - o W.O. pode entrar numa série com jogos lançados: os jogos valem e o W.O. completa a
+ *    série (`placarComWalkover`). Nada é apagado; só não cabe W.O. numa série que os jogos já
+ *    decidiram — o servidor recusa, e o painel nem oferece.
  */
 
 // ---------------------------------------------------------------- layout
@@ -162,8 +185,18 @@ const caixaLeitura: CSSProperties = {
 
 // ---------------------------------------------------------------- helpers de leitura
 
-function getTeamName(dataset: TournamentDataset, teamId: string) {
+function getTeamName(dataset: TournamentDataset, teamId: string | undefined) {
   return dataset.teams.find((team) => team.id === teamId)?.name ?? teamId ?? "—";
+}
+
+/**
+ * De onde o jogador é HOJE, em palavras: o time, "reserva" (sem time) ou o time com a marca
+ * de quem saiu de vez — que continua no dataset, com o time, por causa do histórico.
+ */
+function ondeEstaHoje(dataset: TournamentDataset, player: Player) {
+  if (player.teamId === undefined) return "reserva (sem time)";
+  const time = getTeamName(dataset, player.teamId);
+  return player.saiuEm ? `${time}, saiu do time` : time;
 }
 
 function getFormatOptionLabel(format: SeriesFormat) {
@@ -228,17 +261,62 @@ function ordenarPorRota(players: Player[]) {
 }
 
 function rotuloJogador(dataset: TournamentDataset, player: Player) {
-  return `${resolveRole(player.role1).short} · ${player.nick} — ${getTeamName(dataset, player.teamId)}`;
+  return `${resolveRole(player.role1).short} · ${player.nick} — ${ondeEstaHoje(dataset, player)}`;
 }
 
 /**
- * Linha de quem não está em nenhum dos dois times HOJE — em geral, substituição feita depois
- * da série. Pelo nick e pelo time atual: o id cru ("player-1729...") não dizia quem era.
+ * Linha de quem não está em nenhuma das listas do select — em geral, troca de time feita
+ * depois da série. Pelo nick e por onde ele está hoje: o id cru ("player-1729...") não dizia
+ * quem era.
  */
 function rotuloForaDaSerie(dataset: TournamentDataset, playerId: string) {
   const jogador = dataset.players.find((player) => player.id === playerId);
   if (!jogador) return `${playerId} (fora do cadastro)`;
-  return `${jogador.nick} (hoje em ${getTeamName(dataset, jogador.teamId)})`;
+  return jogador.teamId === undefined
+    ? `${jogador.nick} (reserva, sem time)`
+    : `${jogador.nick} (hoje em ${ondeEstaHoje(dataset, jogador)})`;
+}
+
+/**
+ * As opções de jogador de uma linha, em grupos: os titulares de HOJE dos dois times, na ordem
+ * das rotas (é a ordem do print), e depois quem pode entrar como substituto avulso — os
+ * reservas e os titulares de outros times — e quem já saiu de vez de um dos dois (para lançar
+ * jogo antigo, de antes da saída).
+ */
+type OpcoesDeJogador = {
+  teamAPlayers: Player[];
+  teamBPlayers: Player[];
+  /** Os dez titulares de hoje: é o que "Preencher elenco" traz. */
+  combined: Player[];
+  reservas: Player[];
+  sairam: Player[];
+  outrosTimes: Player[];
+  todos: Player[];
+};
+
+function opcoesDeJogador(dataset: TournamentDataset, series: SeriesMatch | null): OpcoesDeJogador {
+  if (!series) {
+    return { teamAPlayers: [], teamBPlayers: [], combined: [], reservas: [], sairam: [], outrosTimes: [], todos: [] };
+  }
+  const teamAPlayers = series.teamAId ? ordenarPorRota(elencoAtivo(dataset, series.teamAId)) : [];
+  const teamBPlayers = series.teamBId ? ordenarPorRota(elencoAtivo(dataset, series.teamBId)) : [];
+  const doConfronto = (player: Player) =>
+    player.teamId !== undefined && (player.teamId === series.teamAId || player.teamId === series.teamBId);
+  const reservas = ordenarPorRota(reservasDoDataset(dataset));
+  const sairam = ordenarPorRota(dataset.players.filter((player) => doConfronto(player) && !estaNoElenco(player)));
+  const outrosTimes = ordenarPorRota(
+    dataset.players.filter((player) => estaNoElenco(player) && !doConfronto(player)),
+  );
+  const combined = [...teamAPlayers, ...teamBPlayers];
+  return {
+    teamAPlayers,
+    teamBPlayers,
+    combined,
+    reservas,
+    sairam,
+    outrosTimes,
+    todos: [...combined, ...reservas, ...sairam, ...outrosTimes],
+  };
 }
 
 function getDefaultSeriesSettings(format: SeriesFormat) {
@@ -271,15 +349,37 @@ function getSelectedSeriesSettings(selectedSeries: SeriesMatch | null, draft: To
   };
 }
 
-function getWalkoverSummaryText(
-  dataset: TournamentDataset,
-  winnerTeamId: string | undefined,
-  targetWins: number,
-  reason: string | undefined,
-) {
+/** "jogo 3" / "jogos 2 e 3" / "jogos 3, 4 e 5". */
+function listaDeJogos(numeros: number[]) {
+  if (numeros.length === 1) return `jogo ${numeros[0]}`;
+  return `jogos ${numeros.slice(0, -1).join(", ")} e ${numeros.at(-1)}`;
+}
+
+/**
+ * O resumo do W.O. com o placar OFICIAL ("jogos valem, W.O. completa"): sem jogo, 2-0 (MD5:
+ * 3-0), como sempre; com jogos lançados, as vitórias deles mais os jogos de W.O. — A venceu o
+ * jogo 1 e B abandonou: 2-0, com o jogo 2 por W.O.; B venceu o jogo 1 e A leva o W.O.: 2-1.
+ */
+function getWalkoverSummaryText(dataset: TournamentDataset, series: SeriesMatch) {
+  const winnerTeamId = series.walkoverWinnerTeamId;
   const teamName = getTeamName(dataset, winnerTeamId ?? "");
-  const reasonLabel = reason ? ` • ${reason}` : "";
-  return `Série encerrada por W.O. com placar automático de ${targetWins}-0 para ${teamName}${reasonLabel}`;
+  const reasonLabel = series.walkoverReason ? ` • ${series.walkoverReason}` : "";
+  const placar = placarComWalkover(series, getSeriesTargetWins(series, dataset));
+  const placarDoVencedor =
+    winnerTeamId === series.teamBId ? `${placar.teamBWins}-${placar.teamAWins}` : `${placar.teamAWins}-${placar.teamBWins}`;
+
+  if (series.games.length === 0) {
+    return `Série encerrada por W.O. com placar automático de ${placarDoVencedor} para ${teamName}${reasonLabel}`;
+  }
+  const deWalkover = jogosDeWalkoverDaSerie(series, dataset).map((jogo) => jogo.gameIndex);
+  const disputados =
+    series.games.length === 1 ? "O jogo disputado vale" : `Os ${series.games.length} jogos disputados valem`;
+  const porWalkover =
+    deWalkover.length > 0 ? `${listaDeJogos(deWalkover)} por W.O., sem K/D/A nem MVP` : "nenhum jogo por W.O.";
+  return (
+    `W.O. para ${teamName} no meio da série: ${placarDoVencedor} para ${teamName}. ` +
+    `${disputados} (K/D/A e MVP); ${porWalkover}${reasonLabel}`
+  );
 }
 
 function getGamesSectionDescription(
@@ -289,7 +389,7 @@ function getGamesSectionDescription(
   targetWins: number,
 ) {
   if (isWalkover) {
-    return "Série encerrada por W.O.; os jogos e stats ficam desabilitados.";
+    return "Série encerrada por W.O.: os jogos já disputados valem (K/D/A e MVP) e o W.O. completa a série. Para lançar mais um jogo disputado, volte a série para “jogada normalmente” — os jogos ficam.";
   }
 
   return `${formatLabel} com até ${maxGames} jogos. A série fecha quando um time alcançar ${targetWins} vitórias.`;
@@ -306,12 +406,57 @@ function getGamesSectionDescription(
  * "incompleta" = números digitados sem jogador (o servidor recusa). "sem-campeao" e
  * "forasteira" são só AVISO: o servidor aceita, e tratá-los como bloqueio levava a pessoa a
  * apagar estatística histórica de quem trocou de time depois (ver `auditarSerie`).
+ *
+ * Regra 6 (substituto avulso): "sem-time" = linha do RESERVA (jogador sem time) que não diz
+ * por qual time ele jogou; "time-fora" = linha que diz um time que não disputa a série;
+ * "sem-jogou-por" = linha NOVA (não gravada igual nesta série) de titular de OUTRO time sem
+ * "Jogou por" — o substituto avulso esquecido. Os três o servidor recusa. "forasteira" fica
+ * só para a linha que já estava gravada: a história de quem trocou de time depois.
  */
-type EstadoLinha = "ok" | "vazia" | "incompleta" | "sem-campeao" | "repetida" | "forasteira";
+type EstadoLinha =
+  | "ok"
+  | "vazia"
+  | "incompleta"
+  | "sem-campeao"
+  | "repetida"
+  | "forasteira"
+  | "sem-time"
+  | "sem-jogou-por"
+  | "time-fora";
 
-/** Estados que travam o salvamento (o schema recusa). Os outros só pedem conferência. */
+/** Estados que travam o salvamento (o servidor recusa). Os outros só pedem conferência. */
 function linhaTrava(estado: EstadoLinha) {
-  return estado === "incompleta" || estado === "repetida";
+  return (
+    estado === "incompleta" ||
+    estado === "repetida" ||
+    estado === "sem-time" ||
+    estado === "sem-jogou-por" ||
+    estado === "time-fora"
+  );
+}
+
+/** O motivo do estado da linha, para o `title` (monitor) e o texto do cartão (celular). */
+function motivoDaLinha(estado: EstadoLinha): string | null {
+  switch (estado) {
+    case "incompleta":
+      return "Falta escolher o jogador.";
+    case "repetida":
+      return "Este jogador já está em outra linha deste jogo.";
+    case "forasteira":
+      return "Jogador hoje não está em nenhum dos dois times da série. Se ele cobriu uma vaga como substituto, escolha o time em “Jogou por”; se jogou por outro time e trocou depois, está certo.";
+    case "sem-time":
+      return "Reserva (sem time): escolha em “Jogou por” o time que ele cobriu neste jogo.";
+    case "sem-jogou-por":
+      return "Titular de outro time: escolha em “Jogou por” o time que ele cobriu neste jogo.";
+    case "time-fora":
+      return "“Jogou por” aponta para um time que não disputa esta série.";
+    case "sem-campeao":
+      return "Falta o campeão.";
+    case "vazia":
+      return "Linha em branco — será descartada.";
+    default:
+      return null;
+  }
 }
 
 /** Estados que pedem conferência sem travar. */
@@ -330,7 +475,21 @@ function isLinhaDescartavel(row: PlayerGameStats) {
   );
 }
 
-function getEstadosDasLinhas(rows: PlayerGameStats[], idsDoConfronto: Set<string>): EstadoLinha[] {
+/**
+ * Jogo que ninguém lançou: sem vencedor, sem ban e só com linhas descartáveis (o "Adicionar
+ * jogo" sem nada digitado). Duração não conta — o jogo novo já nasce com 30 minutos.
+ */
+function jogoEmBranco(game: SeriesGame) {
+  return !game.winnerTeamId && (game.bans?.length ?? 0) === 0 && game.statsByPlayer.every(isLinhaDescartavel);
+}
+
+function getEstadosDasLinhas(
+  rows: PlayerGameStats[],
+  series: SeriesMatch,
+  idsDoConfronto: Set<string>,
+  jogadoresPorId: ReadonlyMap<string, Player>,
+  gravada: SeriesMatch | undefined,
+): EstadoLinha[] {
   const vistos = new Set<string>();
 
   return rows.map((row) => {
@@ -342,7 +501,26 @@ function getEstadosDasLinhas(rows: PlayerGameStats[], idsDoConfronto: Set<string
     if (vistos.has(playerId)) return "repetida";
 
     vistos.add(playerId);
-    if (idsDoConfronto.size > 0 && !idsDoConfronto.has(playerId)) return "forasteira";
+    const jogador = jogadoresPorId.get(playerId);
+    // A linha com time próprio (substituto avulso) conta para ESSE time: o que importa é ele
+    // estar na série, não onde o jogador está hoje.
+    if (row.teamId !== undefined) {
+      if (row.teamId !== series.teamAId && row.teamId !== series.teamBId) return "time-fora";
+    } else if (jogador && jogador.teamId === undefined) {
+      return "sem-time";
+    } else if (
+      jogador &&
+      series.teamAId &&
+      series.teamBId &&
+      linhaPrecisaDeTime(jogador, series) &&
+      !linhaJaGravada(row, gravada)
+    ) {
+      // A mesma regra do PUT (`problemasDeLinhaSemTime`): linha nova de titular de outro time
+      // sem "Jogou por" sumiria das duas colunas da partida e contaria para o time dele.
+      return "sem-jogou-por";
+    } else if (idsDoConfronto.size > 0 && !idsDoConfronto.has(playerId)) {
+      return "forasteira";
+    }
     if (!champion) return "sem-campeao";
     return "ok";
   });
@@ -352,13 +530,35 @@ type AuditoriaSerie = {
   bloqueios: string[];
   /**
    * Não travam o salvamento — o servidor aceita —, mas quase sempre são engano que muda
-   * resultado: campeão declarado cedo demais ou pontos a mais na tabela.
+   * resultado: campeão declarado cedo demais ou pontos a mais na tabela. Inclui o aviso de
+   * pontos do substituto (regra 6), que a organização aprova.
    */
   avisos: string[];
   estadosPorJogo: EstadoLinha[][];
   jogosComProblema: number[];
   descartaveis: number;
+  /** O aviso de pontos de cada substituto avulso, por jogo (vazio sem a regra). */
+  substitutosPorJogo: AvisoDeSubstituto[][];
 };
+
+/**
+ * O texto do aviso da regra 6 para um substituto. Os pontos são do PAINEL (a organização
+ * decide): não vão para o rascunho nem para página nenhuma.
+ */
+function textoDoAvisoDeSubstituto(draft: TournamentDataset, aviso: AvisoDeSubstituto) {
+  const time = getTeamName(draft, aviso.teamId);
+  if (aviso.motivo === "sem_preco") {
+    return (
+      `${aviso.nick} cobriu ${time}, mas não há preço para comparar com os titulares que ficaram de fora ` +
+      `(inscrição com outro Riot ID ou elo que o site não reconhece). Confira a regra 6 à mão.`
+    );
+  }
+  const valores =
+    aviso.pontos !== null && aviso.teto !== null
+      ? `${aviso.pontos} ponto(s), acima de ${aviso.teto} (o titular de fora mais caro)`
+      : "mais que os titulares que ficaram de fora";
+  return `${aviso.nick} cobriu ${time} valendo ${valores}. Pela regra 6, a troca precisa da aprovação da organização.`;
+}
 
 function etapaDa(series: SeriesMatch): SeriesStage {
   return series.stage ?? "REGULAR_SEASON";
@@ -422,16 +622,26 @@ function avisosDaEtapa(series: SeriesMatch, draft: TournamentDataset): string[] 
  * `gravada` é a mesma série como está no servidor: o jogo lançado depois de a série estar
  * decidida só TRAVA quando o rascunho piora o que está gravado — a mesma regra do PUT. A
  * `serie-14` da 3ª já tem um 3º jogo depois de 2x0 e precisa continuar editável.
+ *
+ * W.O. no meio da série: a série com W.O. continua tendo os jogos auditados — eles VALEM, e
+ * o servidor os valida do mesmo jeito. O W.O. numa série que os jogos já decidiram trava
+ * (o servidor recusa).
+ *
+ * `regra` é a regra 6 (pontos do substituto, de `useRegraDoSubstituto`): com ela, cada
+ * substituto avulso acima do teto vira AVISO; `null` = não deu para ler os preços, e o aviso
+ * pede a conferência à mão; ausente = não confere pontos (uso isolado, testes antigos).
  */
 export function auditarSerie(
   series: SeriesMatch,
   draft: TournamentDataset,
   gravada?: SeriesMatch,
+  regra?: RegraDoSubstituto | null,
 ): AuditoriaSerie {
   const bloqueios: string[] = [];
   const avisos = avisosDaEtapa(series, draft);
   const estadosPorJogo: EstadoLinha[][] = [];
   const jogosComProblema: number[] = [];
+  const substitutosPorJogo: AvisoDeSubstituto[][] = [];
   let descartaveis = 0;
 
   if (!series.teamAId || !series.teamBId) {
@@ -446,7 +656,16 @@ export function auditarSerie(
   });
 
   if (isWalkoverSeries(series)) {
-    return { bloqueios, avisos, estadosPorJogo, jogosComProblema, descartaveis };
+    const vencedor = series.walkoverWinnerTeamId;
+    if (vencedor !== series.teamAId && vencedor !== series.teamBId) {
+      bloqueios.push("O vencedor do W.O. não é nenhum dos dois times da série.");
+    } else if (!walkoverPermitido(series, draft)) {
+      const soOsJogos = placarComWalkover({ ...series, walkoverWinnerTeamId: undefined }, getSeriesTargetWins(series, draft));
+      bloqueios.push(
+        `A série já estava decidida pelos jogos lançados (${soOsJogos.teamAWins}x${soOsJogos.teamBWins}): ` +
+          `não cabe W.O. Volte a série para “jogada normalmente” ou corrija o vencedor dos jogos.`,
+      );
+    }
   }
 
   const maxGames = getSeriesMaxGames(series, draft);
@@ -475,13 +694,16 @@ export function auditarSerie(
   const nomeB = getTeamName(draft, series.teamBId);
   const idsDoConfronto = new Set(
     draft.players
-      .filter((player) => player.teamId === series.teamAId || player.teamId === series.teamBId)
+      .filter(
+        (player) =>
+          player.teamId !== undefined && (player.teamId === series.teamAId || player.teamId === series.teamBId),
+      )
       .map((player) => player.id),
   );
   const jogadoresPorId = new Map(draft.players.map((player) => [player.id, player]));
 
   series.games.forEach((game, gameIndex) => {
-    const estados = getEstadosDasLinhas(game.statsByPlayer, idsDoConfronto);
+    const estados = getEstadosDasLinhas(game.statsByPlayer, series, idsDoConfronto, jogadoresPorId, gravada);
     estadosPorJogo.push(estados);
     descartaveis += estados.filter((estado) => estado === "vazia").length;
 
@@ -519,6 +741,25 @@ export function auditarSerie(
       } else if (estado === "repetida") {
         bloqueios.push(`${linha}: o mesmo jogador aparece duas vezes.`);
         temProblema = true;
+      } else if (estado === "sem-time") {
+        const nick = (row && jogadoresPorId.get(row.playerId)?.nick) ?? row?.playerId ?? "";
+        bloqueios.push(
+          `${linha}: ${nick} é reserva (sem time) — escolha em “Jogou por” o time que ele cobriu (${nomeA} ou ${nomeB}).`,
+        );
+        temProblema = true;
+      } else if (estado === "sem-jogou-por") {
+        const jogador = row ? jogadoresPorId.get(row.playerId) : undefined;
+        const nick = jogador?.nick ?? row?.playerId ?? "";
+        bloqueios.push(
+          `${linha}: ${nick} é de ${jogador ? ondeEstaHoje(draft, jogador) : "outro time"}, que não disputa esta série — escolha em “Jogou por” o time que ele cobriu (${nomeA} ou ${nomeB}).`,
+        );
+        temProblema = true;
+      } else if (estado === "time-fora") {
+        const nick = (row && jogadoresPorId.get(row.playerId)?.nick) ?? row?.playerId ?? "";
+        bloqueios.push(
+          `${linha}: “Jogou por” de ${nick} aponta para ${getTeamName(draft, row?.teamId)}, que não disputa esta série — escolha ${nomeA} ou ${nomeB}.`,
+        );
+        temProblema = true;
       } else if (estado === "forasteira") {
         const jogador = row ? jogadoresPorId.get(row.playerId) : undefined;
         if (!jogador) {
@@ -526,16 +767,37 @@ export function auditarSerie(
           bloqueios.push(`${linha}: o jogador ${row?.playerId ?? ""} não existe mais no cadastro.`);
           temProblema = true;
         } else {
-          // Quase sempre é substituição: o jogador trocou de time DEPOIS desta série. A
-          // linha é história e o servidor a aceita — apagar mudaria estatística e MVP.
+          // Duas histórias possíveis, e o servidor aceita as duas: o jogador trocou de time
+          // DEPOIS desta série (a linha é história — apagar mudaria estatística e MVP), ou
+          // cobriu uma vaga como substituto e falta dizer por qual time (regra 6).
           avisos.push(
-            `${linha}: ${jogador.nick} hoje está em ${getTeamName(draft, jogador.teamId)} (não em ${nomeA} nem em ${nomeB}). Se ele jogou esta série por outro time, está certo — não apague.`,
+            `${linha}: ${jogador.nick} hoje está em ${ondeEstaHoje(draft, jogador)} (não em ${nomeA} nem em ${nomeB}). Se ele jogou esta série por outro time, está certo — não apague. Se cobriu uma vaga como substituto, escolha o time em “Jogou por”.`,
           );
         }
       } else if (estado === "sem-campeao") {
         avisos.push(`${linha}: falta o campeão.`);
       }
     });
+
+    // Regra 6: o substituto vale pontos iguais ou menores que o titular substituído. Só
+    // AVISO — a organização aprova a exceção; o servidor aceita de qualquer jeito.
+    const substitutos =
+      regra && series.teamAId && series.teamBId ? avisosDeSubstituto(game, draft, regra) : [];
+    substitutosPorJogo.push(substitutos);
+    for (const aviso of substitutos) avisos.push(`${jogo}: ${textoDoAvisoDeSubstituto(draft, aviso)}`);
+    if (regra === null) {
+      const avulsos = game.statsByPlayer.filter((linha) => {
+        const jogador = jogadoresPorId.get(linha.playerId);
+        return Boolean(jogador) && linhaDeSubstituto(linha, jogador);
+      });
+      for (const linha of avulsos) {
+        const nick = jogadoresPorId.get(linha.playerId)?.nick ?? linha.playerId;
+        avisos.push(
+          `${jogo}: ${nick} jogou como substituto por ${getTeamName(draft, linha.teamId)}, e não deu para ler os pontos ` +
+            `das inscrições (sem acesso ou sem rede). Confira a regra 6 à mão.`,
+        );
+      }
+    }
 
     // O MVP automático sai da melhor linha com jogador cadastrado (é o que o painel envia);
     // sem nenhuma, vale o MVP gravado. Sem os dois, o servidor recusa.
@@ -551,7 +813,7 @@ export function auditarSerie(
     if (temProblema && !jogosComProblema.includes(gameIndex)) jogosComProblema.push(gameIndex);
   });
 
-  return { bloqueios, avisos, estadosPorJogo, jogosComProblema, descartaveis };
+  return { bloqueios, avisos, estadosPorJogo, jogosComProblema, descartaveis, substitutosPorJogo };
 }
 
 // ---------------------------------------------------------------- importação da Riot
@@ -612,6 +874,8 @@ type ImportSeriesRostersResult =
       ok: true;
       teamAPlayers: Player[];
       teamBPlayers: Player[];
+      /** Quem pode ter entrado como substituto avulso: reservas e titulares de outros times. */
+      substitutos: Player[];
     }
   | {
       ok: false;
@@ -658,6 +922,7 @@ function getImportSeriesRosters(
     return { ok: false, error: "Selecione Time A e Time B antes de importar da Riot." };
   }
 
+  // Todos do time, inclusive quem saiu de vez: o jogo importado pode ser de antes da saída.
   const teamAPlayers = draft.players.filter((player) => player.teamId === series.teamAId);
   const teamBPlayers = draft.players.filter((player) => player.teamId === series.teamBId);
 
@@ -668,7 +933,10 @@ function getImportSeriesRosters(
     };
   }
 
-  return { ok: true, teamAPlayers, teamBPlayers };
+  const substitutos = draft.players.filter(
+    (player) => player.teamId !== series.teamAId && player.teamId !== series.teamBId,
+  );
+  return { ok: true, teamAPlayers, teamBPlayers, substitutos };
 }
 
 function getImportedParticipantSides(
@@ -705,19 +973,26 @@ function getImportedParticipantSides(
   };
 }
 
+/**
+ * Casa cada participante com um jogador: primeiro no elenco do lado dele; sem casar, entre os
+ * substitutos possíveis (reserva, titular de outro time) — e aí a linha ganha o `teamId` do
+ * lado em que ele jogou, como o "Jogou por" do lançamento à mão (regra 6).
+ */
 function mapImportedStatsByPlayer(
   teamAParticipants: RiotImportedParticipant[],
   teamAPlayers: Player[],
   teamBParticipants: RiotImportedParticipant[],
   teamBPlayers: Player[],
+  lados: Readonly<{ teamAId: string; teamBId: string; substitutos: Player[] }>,
 ): ImportedStatsMappingResult {
   const usedPlayerIds = new Set<string>();
   const statsByPlayer: PlayerGameStats[] = [];
   const unmatched: string[] = [];
 
-  const mapSideParticipants = (participants: RiotImportedParticipant[], roster: Player[]) => {
+  const mapSideParticipants = (participants: RiotImportedParticipant[], roster: Player[], teamId: string) => {
     for (const participant of participants) {
-      const mappedPlayer = choosePlayerForParticipant(participant, roster, usedPlayerIds);
+      const doElenco = choosePlayerForParticipant(participant, roster, usedPlayerIds);
+      const mappedPlayer = doElenco ?? choosePlayerForParticipant(participant, lados.substitutos, usedPlayerIds);
       if (!mappedPlayer) {
         unmatched.push(participant.riotId || participant.summonerName || participant.puuid);
         continue;
@@ -730,12 +1005,13 @@ function mapImportedStatsByPlayer(
         kills: participant.kills,
         deaths: participant.deaths,
         assists: participant.assists,
+        ...(doElenco === null && teamId ? { teamId } : {}),
       });
     }
   };
 
-  mapSideParticipants(teamAParticipants, teamAPlayers);
-  mapSideParticipants(teamBParticipants, teamBPlayers);
+  mapSideParticipants(teamAParticipants, teamAPlayers, lados.teamAId);
+  mapSideParticipants(teamBParticipants, teamBPlayers, lados.teamBId);
 
   if (unmatched.length > 0) {
     return {
@@ -761,9 +1037,17 @@ function getWinningImportedSide(
   return blueWins > redWins ? "BLUE" : "RED";
 }
 
-function getAutoMvpDisplay(game: SeriesMatch["games"][number], roster: Player[]) {
-  const autoMvpPlayerId = inferGameMvpPlayerId(game.statsByPlayer);
-  const autoMvpPlayer = roster.find((player) => player.id === autoMvpPlayerId) ?? null;
+/**
+ * O MVP que o SITE vai mostrar: o da melhor linha entre quem jogou por um dos dois times —
+ * pela linha, então o substituto avulso pode ser MVP (`mvpDoJogo`).
+ */
+function getAutoMvpDisplay(
+  game: SeriesMatch["games"][number],
+  series: SeriesMatch,
+  playersById: ReadonlyMap<string, Player>,
+) {
+  const autoMvpPlayerId = mvpDoJogo({ ...game, mvpPlayerId: "" }, series, playersById);
+  const autoMvpPlayer = playersById.get(autoMvpPlayerId) ?? null;
 
   if (autoMvpPlayer) {
     return { text: autoMvpPlayer.nick, muted: false };
@@ -862,6 +1146,7 @@ function applyRiotMatchToSeriesGame({
     rosters.teamAPlayers,
     teamBParticipants,
     rosters.teamBPlayers,
+    { teamAId: series.teamAId, teamBId: series.teamBId, substitutos: rosters.substitutos },
   );
   if (!importedStats.ok) return importedStats;
 
@@ -1264,6 +1549,8 @@ export function AdminSeriesPanel({
   podeLados = true,
   podeCartas = true,
   podeRiot = true,
+  podeVerPrecos,
+  regraDoSubstituto,
 }: Readonly<{
   draft: TournamentDataset;
   mutateDraft: MutateDraft;
@@ -1281,6 +1568,14 @@ export function AdminSeriesPanel({
   podeLados?: boolean;
   podeCartas?: boolean;
   podeRiot?: boolean;
+  /**
+   * Regra 6: a pessoa pode ler as inscrições (conferir ou financeiro), de onde vêm os pontos
+   * do substituto. Verdadeiro: o painel lê os preços e avisa o substituto acima do teto.
+   * Falso: avisa que a regra 6 tem de ser conferida à mão. Ausente (uso isolado): não confere.
+   */
+  podeVerPrecos?: boolean;
+  /** A regra pronta, no lugar da leitura (`null` = indisponível). Para testes e usos isolados. */
+  regraDoSubstituto?: RegraDoSubstituto | null;
 }>) {
   // O sorteio ao vivo grava DIRETO no servidor, fora do rascunho. Por isso ele DEVOLVE
   // o que gravou (`onSorteado`): o rascunho local sincroniza só `blueSideTeamId` e
@@ -1365,12 +1660,16 @@ export function AdminSeriesPanel({
 
   const selectedSeries = draft.seriesMatches.find((series) => series.id === selectedId) ?? null;
 
-  const currentRosters = useMemo(() => {
-    if (!selectedSeries) return { teamAPlayers: [], teamBPlayers: [], combined: [] as Player[] };
-    const teamAPlayers = ordenarPorRota(draft.players.filter((player) => player.teamId === selectedSeries.teamAId));
-    const teamBPlayers = ordenarPorRota(draft.players.filter((player) => player.teamId === selectedSeries.teamBId));
-    return { teamAPlayers, teamBPlayers, combined: [...teamAPlayers, ...teamBPlayers] };
-  }, [draft, selectedSeries]);
+  // Regra 6: os pontos do substituto. A leitura só acontece quando a pessoa pode ver as
+  // inscrições e ninguém entregou a regra pronta.
+  const regraLida = useRegraDoSubstituto(podeVerPrecos === true && regraDoSubstituto === undefined);
+  let regraDaSerie: RegraDoSubstituto | null | undefined;
+  if (regraDoSubstituto !== undefined) regraDaSerie = regraDoSubstituto;
+  else if (podeVerPrecos === false) regraDaSerie = null;
+  else regraDaSerie = podeVerPrecos ? regraLida : undefined;
+
+  const jogadoresPorId = useMemo(() => new Map(draft.players.map((player) => [player.id, player])), [draft.players]);
+  const currentRosters = useMemo(() => opcoesDeJogador(draft, selectedSeries), [draft, selectedSeries]);
 
   const selectedSeriesSettings = getSelectedSeriesSettings(selectedSeries, draft);
   const selectedSeriesIsWalkover = selectedSeriesSettings.isWalkover;
@@ -1388,10 +1687,10 @@ export function AdminSeriesPanel({
   const auditorias = useMemo(() => {
     const mapa = new Map<string, AuditoriaSerie>();
     for (const series of draft.seriesMatches) {
-      mapa.set(series.id, auditarSerie(series, draft, gravadasPorId?.get(series.id)));
+      mapa.set(series.id, auditarSerie(series, draft, gravadasPorId?.get(series.id), regraDaSerie));
     }
     return mapa;
-  }, [draft, gravadasPorId]);
+  }, [draft, gravadasPorId, regraDaSerie]);
 
   /**
    * Por que o "Sortear ao vivo" está desligado, ou `null` se pode sortear.
@@ -1622,16 +1921,22 @@ export function AdminSeriesPanel({
 
     const timesFinais = lado === "A" ? [novoTimeId, selectedSeries.teamBId] : [selectedSeries.teamAId, novoTimeId];
     const idsValidos = new Set(
-      draft.players.filter((player) => timesFinais.includes(player.teamId)).map((player) => player.id),
+      draft.players
+        .filter((player) => player.teamId !== undefined && timesFinais.includes(player.teamId))
+        .map((player) => player.id),
     );
+    // A linha do substituto avulso vale pelo time DELA (o "Jogou por"): o reserva que cobriu o
+    // time que fica continua; o que cobriu o time que sai fica órfão, como os titulares dele.
+    const linhaContinua = (row: PlayerGameStats) => {
+      if (!row.playerId.trim()) return true;
+      return row.teamId !== undefined ? timesFinais.includes(row.teamId) : idsValidos.has(row.playerId);
+    };
 
     let linhasOrfas = 0;
     let bansOrfaos = 0;
     let vencedoresOrfaos = 0;
     for (const game of selectedSeries.games) {
-      linhasOrfas += game.statsByPlayer.filter(
-        (row) => row.playerId.trim() && !idsValidos.has(row.playerId),
-      ).length;
+      linhasOrfas += game.statsByPlayer.filter((row) => !linhaContinua(row)).length;
       bansOrfaos += (game.bans ?? []).filter((ban) => ban.teamId && !timesFinais.includes(ban.teamId)).length;
       if (game.winnerTeamId && !timesFinais.includes(game.winnerTeamId)) vencedoresOrfaos += 1;
     }
@@ -1700,10 +2005,11 @@ export function AdminSeriesPanel({
 
       for (const game of series.games) {
         if (game.winnerTeamId && !times.includes(game.winnerTeamId)) game.winnerTeamId = "";
-        game.statsByPlayer = game.statsByPlayer.filter(
-          (row) => !row.playerId.trim() || idsValidos.has(row.playerId),
-        );
-        if (game.mvpPlayerId && !idsValidos.has(game.mvpPlayerId)) game.mvpPlayerId = "";
+        game.statsByPlayer = game.statsByPlayer.filter(linhaContinua);
+        const jogaram = new Set(game.statsByPlayer.map((row) => row.playerId));
+        if (game.mvpPlayerId && !idsValidos.has(game.mvpPlayerId) && !jogaram.has(game.mvpPlayerId)) {
+          game.mvpPlayerId = "";
+        }
         if (game.bans) game.bans = game.bans.filter((ban) => !ban.teamId || times.includes(ban.teamId));
       }
 
@@ -1739,18 +2045,63 @@ export function AdminSeriesPanel({
       return;
     }
 
-    if (selectedSeries.games.length > 0) {
-      const shouldConvert = confirmBrowserAction(
-        "Marcar esta série como W.O. vai remover os jogos e stats já lançados no rascunho. Deseja continuar?",
+    /*
+     * "Jogos valem, W.O. completa" (22/10/2026): o W.O. entra por cima dos jogos lançados, sem
+     * apagar nada. Antes esta troca zerava `games` — com o W.O. no meio da série, isso jogava
+     * fora o jogo 1 que de fato aconteceu (e o K/D/A e o MVP dele).
+     *
+     * Só não cabe W.O. numa série que os jogos já decidiram: o servidor recusa, então o painel
+     * nem aplica.
+     */
+    if (!walkoverPermitido(selectedSeries, draft)) {
+      const placar = getSeriesScore({ ...selectedSeries, walkoverWinnerTeamId: undefined }, draft);
+      avisar(
+        "wo",
+        `A série já está decidida pelos jogos (${placar.teamAWins}x${placar.teamBWins}): não cabe W.O.`,
+        "warn",
       );
-      if (!shouldConvert) return;
+      return;
+    }
+
+    /*
+     * Jogo EM BRANCO (sem vencedor, sem linha preenchida e sem ban) não é jogo lançado: é o
+     * "Adicionar jogo" do dia em que o adversário não apareceu. Ele sai junto com o W.O. —
+     * guardado, virava "jogo disputado" na pergunta, empurrava os jogos de W.O. para 2 e 3 e
+     * travava o salvamento ("falta marcar o time vencedor"). Os jogos com algo lançado ficam.
+     */
+    const lancados = selectedSeries.games.filter((game) => !jogoEmBranco(game));
+    const emBranco = selectedSeries.games.length - lancados.length;
+    const textoEmBranco =
+      emBranco === 0
+        ? ""
+        : emBranco === 1
+          ? " O jogo em branco (sem vencedor nem K/D/A) é descartado."
+          : ` Os ${emBranco} jogos em branco (sem vencedor nem K/D/A) são descartados.`;
+
+    if (lancados.length > 0) {
+      const comWalkover = { ...selectedSeries, games: lancados, walkoverWinnerTeamId: winnerTeamId };
+      const placar = getSeriesScore(comWalkover, draft);
+      const jogos = lancados.length;
+      const confirmou = confirmBrowserAction(
+        `Aplicar W.O. para ${getTeamName(draft, winnerTeamId)}?\n\n` +
+          `${jogos === 1 ? "O jogo já lançado continua" : `Os ${jogos} jogos já lançados continuam`} valendo ` +
+          `(K/D/A e MVP), e o W.O. completa a série: placar final ` +
+          `${getTeamName(draft, selectedSeries.teamAId)} ${placar.teamAWins} x ${placar.teamBWins} ` +
+          `${getTeamName(draft, selectedSeries.teamBId)}.` +
+          (emBranco === 0 ? " Nada é apagado." : textoEmBranco),
+      );
+      if (!confirmou) return;
     }
 
     updateSelectedSeries((series) => {
       series.walkoverWinnerTeamId = winnerTeamId;
-      series.games = [];
+      if (emBranco > 0) series.games = series.games.filter((game) => !jogoEmBranco(game));
     });
-    clearRiotStateForSeries(selectedSeries.id);
+    if (emBranco > 0) {
+      // As chaves de importação da Riot são por índice: com os jogos deslocados, deixam de valer.
+      clearRiotStateForSeries(selectedSeries.id);
+      avisar("wo", `W.O. aplicado.${textoEmBranco}`, "warn");
+    }
   };
 
   const updateSeriesFormat = (nextFormat: SeriesFormat) => {
@@ -1822,8 +2173,17 @@ export function AdminSeriesPanel({
     const game = selectedSeries.games[gameIndex];
     if (!game) return;
 
+    // Os titulares de HOJE (quem saiu de vez não volta sozinho para a lista). Time que já tem
+    // as 5 linhas — um substituto avulso no lugar de alguém — não recebe mais ninguém.
     const jaListados = new Set(game.statsByPlayer.map((row) => row.playerId));
-    const faltando = currentRosters.combined.filter((player) => !jaListados.has(player.id));
+    const linhasDoTime = (teamId: string) =>
+      game.statsByPlayer.filter((row) => timeDaLinha(row, jogadoresPorId.get(row.playerId)) === teamId).length;
+    const completos = new Set(
+      [selectedSeries.teamAId, selectedSeries.teamBId].filter((teamId) => teamId && linhasDoTime(teamId) >= 5),
+    );
+    const faltando = currentRosters.combined.filter(
+      (player) => !jaListados.has(player.id) && !(player.teamId !== undefined && completos.has(player.teamId)),
+    );
 
     if (faltando.length === 0) {
       avisar(`jogo:${gameIndex}`, "O elenco dos dois times já está na lista.", "warn");
@@ -1875,6 +2235,49 @@ export function AdminSeriesPanel({
       const current = series.games[gameIndex]?.statsByPlayer[rowIndex];
       if (!current) return;
       current[field] = value;
+    });
+  };
+
+  /**
+   * Trocar o jogador da linha refaz o "Jogou por": quem joga pelo próprio time fica sem o
+   * `teamId` na linha (como sempre foi); o substituto avulso guarda o time escolhido se ele
+   * ainda é um dos dois da série — senão a linha pede a escolha de novo.
+   *
+   * O substituto que chega sem time válido já vem com o lado que está FALTANDO gente: quando
+   * só um dos dois times tem menos de 5 linhas neste jogo, é a vaga que ele cobriu. Com os
+   * dois incompletos não há palpite — a linha trava até alguém escolher o “Jogou por”.
+   */
+  const trocarJogadorDaLinha = (gameIndex: number, rowIndex: number, playerId: string) => {
+    const jogador = jogadoresPorId.get(playerId);
+    updateSelectedSeries((series) => {
+      const game = series.games[gameIndex];
+      const current = game?.statsByPlayer[rowIndex];
+      if (!game || !current) return;
+      current.playerId = playerId;
+      const timeValido = current.teamId === series.teamAId || current.teamId === series.teamBId;
+      if (!jogador || !linhaPrecisaDeTime(jogador, series)) {
+        delete current.teamId;
+        return;
+      }
+      if (timeValido) return;
+      delete current.teamId;
+      const linhasDoLado = (teamId: string) =>
+        game.statsByPlayer.filter(
+          (row, indice) =>
+            indice !== rowIndex && row.playerId.trim() !== "" && timeDaLinha(row, jogadoresPorId.get(row.playerId)) === teamId,
+        ).length;
+      const faltando = [series.teamAId, series.teamBId].filter((teamId) => teamId && linhasDoLado(teamId) < 5);
+      if (faltando.length === 1) current.teamId = faltando[0];
+    });
+  };
+
+  /** O "Jogou por" do substituto avulso: o time que ele cobriu NESTE jogo. Vazio tira a marca. */
+  const updateTimeDaLinha = (gameIndex: number, rowIndex: number, teamId: string) => {
+    updateSelectedSeries((series) => {
+      const current = series.games[gameIndex]?.statsByPlayer[rowIndex];
+      if (!current) return;
+      if (teamId) current.teamId = teamId;
+      else delete current.teamId;
     });
   };
 
@@ -2325,6 +2728,103 @@ export function AdminSeriesPanel({
 
   // -------------------------------------------------------------- jogos da série
 
+  /**
+   * As opções do select de jogador da linha (monitor e celular): os titulares de hoje dos
+   * dois times e, em grupos, quem pode entrar como substituto avulso. Um jogador que não
+   * está em lista nenhuma continua listado, para não sumir em silêncio.
+   */
+  const opcoesDoJogador = (row: PlayerGameStats) => {
+    const grupo = (rotulo: string, jogadores: Player[]) =>
+      jogadores.length > 0 ? (
+        <optgroup label={rotulo}>
+          {jogadores.map((player) => (
+            <option key={player.id} value={player.id}>
+              {rotuloJogador(draft, player)}
+            </option>
+          ))}
+        </optgroup>
+      ) : null;
+    return (
+      <>
+        <option value="">Jogador…</option>
+        {currentRosters.combined.map((player) => (
+          <option key={player.id} value={player.id}>
+            {rotuloJogador(draft, player)}
+          </option>
+        ))}
+        {grupo("Reservas (substituto)", currentRosters.reservas)}
+        {grupo("Outros times (substituto)", currentRosters.outrosTimes)}
+        {grupo("Saíram do time", currentRosters.sairam)}
+        {row.playerId && !currentRosters.todos.some((player) => player.id === row.playerId) ? (
+          <option value={row.playerId}>{rotuloForaDaSerie(draft, row.playerId)}</option>
+        ) : null}
+      </>
+    );
+  };
+
+  /**
+   * "Jogou por": aparece na linha do substituto avulso — o reserva (sem time) ou o titular de
+   * um time que não disputa a série. Grava o `teamId` da LINHA: é por ele que abates, vitória
+   * e MVP daquele jogo contam para o time coberto, sem mudar o time do jogador. Embaixo, o
+   * aviso de pontos da regra 6, quando a troca passa do teto (só aviso).
+   */
+  const blocoJogouPor = (gameIndex: number, row: PlayerGameStats, rowIndex: number) => {
+    if (!selectedSeries) return null;
+    const jogador = jogadoresPorId.get(row.playerId);
+    if (!jogador || (!linhaPrecisaDeTime(jogador, selectedSeries) && row.teamId === undefined)) return null;
+    const aviso = auditoriaSelecionada?.substitutosPorJogo[gameIndex]?.find((item) => item.jogadorId === jogador.id);
+    const semEscolha = row.teamId === undefined;
+    // "Pelo próprio time" só vale para a linha JÁ GRAVADA assim (quem trocou de time depois de
+    // jogar). Na linha nova de titular de outro time o servidor recusa, e o reserva não tem
+    // time próprio: nos dois casos a escolha é obrigatória.
+    const proprioTimeVale =
+      jogador.teamId !== undefined &&
+      linhaJaGravada({ ...row, teamId: undefined }, gravadasPorId?.get(selectedSeries.id));
+    const escolhaObrigatoria = semEscolha && !proprioTimeVale;
+    return (
+      <div style={{ display: "grid", gap: 6, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <Chip tone="warn" title="Substituto avulso: joga este jogo por outro time">
+            SUB
+          </Chip>
+          <span style={{ fontSize: 12, color: C.ink3 }}>Jogou por</span>
+          <span style={{ flex: compacto ? "1 1 100%" : "0 1 240px", minWidth: 0 }}>
+            <Select
+              ariaLabel={`Time pelo qual a linha ${rowIndex + 1} jogou`}
+              value={row.teamId ?? ""}
+              onChange={(value) => updateTimeDaLinha(gameIndex, rowIndex, value)}
+              style={escolhaObrigatoria ? { borderColor: "rgba(212,87,74,.55)" } : undefined}
+            >
+              <option value="">{proprioTimeVale ? `Pelo próprio time (${ondeEstaHoje(draft, jogador)})` : "Escolha o time…"}</option>
+              {selectedSeries.teamAId ? (
+                <option value={selectedSeries.teamAId}>{getTeamName(draft, selectedSeries.teamAId)}</option>
+              ) : null}
+              {selectedSeries.teamBId ? (
+                <option value={selectedSeries.teamBId}>{getTeamName(draft, selectedSeries.teamBId)}</option>
+              ) : null}
+            </Select>
+          </span>
+        </div>
+        {aviso ? (
+          <p
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 6,
+              margin: 0,
+              fontSize: 12,
+              lineHeight: 1.45,
+              color: C.warnSoft,
+            }}
+          >
+            <AlertTriangle size={14} aria-hidden style={{ flexShrink: 0, marginTop: 1 }} />
+            {textoDoAvisoDeSubstituto(draft, aviso)}
+          </p>
+        ) : null}
+      </div>
+    );
+  };
+
   const renderStatsRow = (
     gameIndex: number,
     row: PlayerGameStats,
@@ -2339,18 +2839,11 @@ export function AdminSeriesPanel({
         : C.line;
     const kda = getKda(row.kills, row.deaths, row.assists);
 
-    const motivo =
-      estado === "incompleta"
-        ? "Falta escolher o jogador"
-        : estado === "repetida"
-          ? "Este jogador já está em outra linha deste jogo"
-          : estado === "forasteira"
-            ? "Jogador hoje não está em nenhum dos dois times da série (não trava o salvamento)"
-            : estado === "sem-campeao"
-              ? "Falta o campeão (não trava o salvamento)"
-              : estado === "vazia"
-                ? "Linha em branco — será descartada"
-                : undefined;
+    const motivoBase = motivoDaLinha(estado);
+    const motivo = motivoBase
+      ? `${motivoBase}${linhaTrava(estado) || estado === "vazia" ? "" : " (não trava o salvamento)"}`
+      : undefined;
+    const jogouPor = blocoJogouPor(gameIndex, row, rowIndex);
 
     return (
       <div
@@ -2371,18 +2864,9 @@ export function AdminSeriesPanel({
         <Select
           ariaLabel={`Jogador da linha ${rowIndex + 1}`}
           value={row.playerId}
-          onChange={(value) => updateStatsRowField(gameIndex, rowIndex, "playerId", value)}
+          onChange={(value) => trocarJogadorDaLinha(gameIndex, rowIndex, value)}
         >
-          <option value="">Jogador…</option>
-          {currentRosters.combined.map((player) => (
-            <option key={player.id} value={player.id}>
-              {rotuloJogador(draft, player)}
-            </option>
-          ))}
-          {/* Jogador de fora do confronto continua listado para não sumir silenciosamente. */}
-          {row.playerId && !currentRosters.combined.some((player) => player.id === row.playerId) ? (
-            <option value={row.playerId}>{rotuloForaDaSerie(draft, row.playerId)}</option>
-          ) : null}
+          {opcoesDoJogador(row)}
         </Select>
 
         <InputCampeao
@@ -2429,6 +2913,9 @@ export function AdminSeriesPanel({
             onClick={() => removeStatsRowFromGame(gameIndex, rowIndex)}
           />
         </div>
+
+        {/* O "Jogou por" do substituto ocupa a largura inteira, numa segunda fileira da grade. */}
+        {jogouPor ? <div style={{ gridColumn: "1 / -1" }}>{jogouPor}</div> : null}
       </div>
     );
   };
@@ -2440,7 +2927,7 @@ export function AdminSeriesPanel({
     const riotImportStatus = riotImportStatusByGame[riotImportKey];
     const riotMatchId = riotMatchIdsByGame[riotImportKey] ?? "";
     const isImportingRiot = riotImportingGameKey === riotImportKey;
-    const autoMvpDisplay = getAutoMvpDisplay(game, currentRosters.combined);
+    const autoMvpDisplay = getAutoMvpDisplay(game, selectedSeries, jogadoresPorId);
     const estados =
       auditoriaSelecionada?.estadosPorJogo[gameIndex] ??
       game.statsByPlayer.map((): EstadoLinha => "ok");
@@ -2721,21 +3208,13 @@ export function AdminSeriesPanel({
         ? "rgba(224,163,58,.40)"
         : C.line;
     const kda = getKda(row.kills, row.deaths, row.assists);
-    const jogador = draft.players.find((player) => player.id === row.playerId) ?? null;
+    const jogador = jogadoresPorId.get(row.playerId) ?? null;
     const rota = jogador ? resolveRole(jogador.role1) : null;
+    // A faixa é a cor do time pelo qual a LINHA jogou: o substituto aparece do lado que cobriu.
+    const timeDaFaixa = jogador ? timeDaLinha(row, jogador) : undefined;
 
-    const motivo =
-      estado === "incompleta"
-        ? "Falta escolher o jogador."
-        : estado === "repetida"
-          ? "Este jogador já está em outra linha deste jogo."
-          : estado === "forasteira"
-            ? "Jogador hoje não está em nenhum dos dois times da série. Se ele jogou por outro time, está certo."
-            : estado === "sem-campeao"
-              ? "Falta o campeão."
-              : estado === "vazia"
-                ? "Linha em branco — será descartada."
-                : null;
+    const motivo = motivoDaLinha(estado);
+    const jogouPor = blocoJogouPor(gameIndex, row, rowIndex);
 
     const campoNumero = (rotulo: string, nomeLongo: string, campo: "kills" | "deaths" | "assists") => (
       <Field label={rotulo}>
@@ -2756,7 +3235,7 @@ export function AdminSeriesPanel({
           border: `1px solid ${corBorda}`,
           borderRadius: 4,
           background: problema ? "rgba(212,87,74,.06)" : "rgba(0,0,0,.20)",
-          boxShadow: jogador ? `inset 3px 0 0 ${teamColor(jogador.teamId)}` : undefined,
+          boxShadow: timeDaFaixa ? `inset 3px 0 0 ${teamColor(timeDaFaixa)}` : undefined,
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -2784,17 +3263,9 @@ export function AdminSeriesPanel({
             <Select
               ariaLabel={`Jogador da linha ${rowIndex + 1}`}
               value={row.playerId}
-              onChange={(value) => updateStatsRowField(gameIndex, rowIndex, "playerId", value)}
+              onChange={(value) => trocarJogadorDaLinha(gameIndex, rowIndex, value)}
             >
-              <option value="">Jogador…</option>
-              {currentRosters.combined.map((player) => (
-                <option key={player.id} value={player.id}>
-                  {rotuloJogador(draft, player)}
-                </option>
-              ))}
-              {row.playerId && !currentRosters.combined.some((player) => player.id === row.playerId) ? (
-                <option value={row.playerId}>{rotuloForaDaSerie(draft, row.playerId)}</option>
-              ) : null}
+              {opcoesDoJogador(row)}
             </Select>
           </div>
           <BotaoIcone
@@ -2802,6 +3273,8 @@ export function AdminSeriesPanel({
             onClick={() => removeStatsRowFromGame(gameIndex, rowIndex)}
           />
         </div>
+
+        {jogouPor ? <div style={{ marginTop: 8 }}>{jogouPor}</div> : null}
 
         <div style={{ marginTop: 8 }}>
           <InputCampeao
@@ -2878,7 +3351,7 @@ export function AdminSeriesPanel({
     const isImportingRiot = riotImportingGameKey === riotImportKey;
     const importAberto =
       riotAbertos[riotImportKey] ?? Boolean(riotMatchId.trim() || riotImportStatus || isImportingRiot);
-    const autoMvpDisplay = getAutoMvpDisplay(game, currentRosters.combined);
+    const autoMvpDisplay = getAutoMvpDisplay(game, selectedSeries, jogadoresPorId);
     const estados =
       auditoriaSelecionada?.estadosPorJogo[gameIndex] ??
       game.statsByPlayer.map((): EstadoLinha => "ok");
@@ -3186,18 +3659,49 @@ export function AdminSeriesPanel({
     );
   };
 
+  /**
+   * W.O. no meio da série: os jogos disputados continuam aqui, editáveis (eles VALEM), e os
+   * jogos de W.O. aparecem depois deles, numerados, sem K/D/A — como na página da partida.
+   */
+  const jogosDeWalkover = selectedSeries ? jogosDeWalkoverDaSerie(selectedSeries, draft) : [];
+  const cartoesDeWalkover = selectedSeries ? (
+    <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
+      {jogosDeWalkover.map((jogo) => (
+        <div
+          key={`wo-${jogo.gameIndex}`}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            flexWrap: "wrap",
+            padding: "10px 12px",
+            border: `1px dashed ${C.line2}`,
+            borderRadius: 4,
+            background: "rgba(0,0,0,.16)",
+            boxShadow: `inset 3px 0 0 ${teamColor(jogo.winnerTeamId)}`,
+          }}
+        >
+          <span style={{ fontFamily: display, fontSize: 16, color: C.ink }}>Jogo {jogo.gameIndex}</span>
+          <Chip tone="warn">W.O.</Chip>
+          <span style={{ fontSize: 12.5, color: C.ink3 }}>
+            Vitória de {getTeamName(draft, jogo.winnerTeamId)} por W.O. — sem K/D/A nem MVP.
+          </span>
+        </div>
+      ))}
+    </div>
+  ) : null;
+
   let conteudoDosJogos: ReactNode = null;
   if (selectedSeries) {
     if (selectedSeriesIsWalkover) {
       conteudoDosJogos = (
-        <LinhaVazia>
-          {getWalkoverSummaryText(
-            draft,
-            selectedSeries.walkoverWinnerTeamId,
-            selectedSeriesTargetWins,
-            selectedSeries.walkoverReason,
+        <>
+          <LinhaVazia>{getWalkoverSummaryText(draft, selectedSeries)}</LinhaVazia>
+          {selectedSeries.games.map((game, gameIndex) =>
+            compacto ? renderGameCompacto(game, gameIndex) : renderGame(game, gameIndex),
           )}
-        </LinhaVazia>
+          {cartoesDeWalkover}
+        </>
       );
     } else if (selectedSeries.games.length === 0) {
       conteudoDosJogos = compacto ? (
@@ -3411,29 +3915,47 @@ export function AdminSeriesPanel({
     </div>
   ) : null;
 
+  // Os jogos lançados já decidiram a série: não cabe W.O. (o servidor recusa). A opção fica
+  // desligada — menos a que já está gravada, para a série com problema abrir mostrando o dado.
+  const cabeWalkover = selectedSeries ? walkoverPermitido(selectedSeries, draft) : true;
+  const placarSoDosJogos = selectedSeries
+    ? getSeriesScore({ ...selectedSeries, walkoverWinnerTeamId: undefined }, draft)
+    : null;
+
   const camposWo = selectedSeries ? (
     <>
       <p style={{ margin: "0 0 12px", fontSize: 12, color: C.ink4 }}>
-        Use quando a série não foi jogada: o placar vira {selectedSeriesTargetWins}-0 automático, sem stats
-        de jogadores.
+        Use quando um time não comparece ou abandona. Sem jogo lançado, o placar vira{" "}
+        {selectedSeriesTargetWins}-0 automático. Com jogos lançados, eles valem (K/D/A e MVP) e o W.O.
+        completa a série — ex.: 1x0 e o outro time abandona, {selectedSeriesTargetWins}x0. Nada é apagado.
       </p>
+      {!cabeWalkover && placarSoDosJogos ? (
+        <div style={{ marginBottom: 12 }}>
+          <AvisoEmLinha
+            tom="warn"
+            texto={`Os jogos lançados já decidiram a série (${placarSoDosJogos.teamAWins}x${placarSoDosJogos.teamBWins}): não cabe W.O.`}
+          />
+        </div>
+      ) : null}
       <div className="lob-2col">
         <Field label="Situação da série">
           <Select
+            ariaLabel="Situação da série"
             value={selectedSeries.walkoverWinnerTeamId ?? ""}
             onChange={(value) => updateWalkoverWinner(value)}
           >
             <option value="">Série jogada normalmente</option>
-            {selectedSeries.teamAId ? (
-              <option value={selectedSeries.teamAId}>
-                W.O. para {getTeamName(draft, selectedSeries.teamAId)}
-              </option>
-            ) : null}
-            {selectedSeries.teamBId ? (
-              <option value={selectedSeries.teamBId}>
-                W.O. para {getTeamName(draft, selectedSeries.teamBId)}
-              </option>
-            ) : null}
+            {[selectedSeries.teamAId, selectedSeries.teamBId].map((teamId) =>
+              teamId ? (
+                <option
+                  key={teamId}
+                  value={teamId}
+                  disabled={!cabeWalkover && selectedSeries.walkoverWinnerTeamId !== teamId}
+                >
+                  W.O. para {getTeamName(draft, teamId)}
+                </option>
+              ) : null,
+            )}
           </Select>
         </Field>
         <Field label="Observação do W.O. (opcional)">
@@ -3645,7 +4167,7 @@ export function AdminSeriesPanel({
 
       {camposConfronto}
 
-      <BlockTitle>Resultado por W.O.</BlockTitle>
+      <BlockTitle right={<Aviso escopo="wo" />}>Resultado por W.O.</BlockTitle>
       {camposWo}
 
       <BlockTitle
@@ -3744,7 +4266,13 @@ export function AdminSeriesPanel({
               disabled={
                 selectedSeriesIsWalkover || serieDecidida || selectedSeries.games.length >= selectedSeriesMaxGames
               }
-              title={serieDecidida ? `Série decidida (${placarSelecionado?.teamAWins}x${placarSelecionado?.teamBWins})` : undefined}
+              title={
+                selectedSeriesIsWalkover
+                  ? "Série com W.O.: para lançar mais um jogo disputado, volte a série para “jogada normalmente” (os jogos ficam)."
+                  : serieDecidida
+                    ? `Série decidida (${placarSelecionado?.teamAWins}x${placarSelecionado?.teamBWins})`
+                    : undefined
+              }
               onClick={adicionarJogo}
             >
               <Plus size={14} aria-hidden /> {serieDecidida && !selectedSeriesIsWalkover ? "Série decidida" : "Adicionar jogo"}
@@ -3947,7 +4475,9 @@ export function AdminSeriesPanel({
       <TituloCompacto icone={CalendarClock}>Data e horário</TituloCompacto>
       {camposDataHora}
 
-      <TituloCompacto icone={Flag}>Resultado por W.O.</TituloCompacto>
+      <TituloCompacto icone={Flag} aviso={avisoCompacto("wo")}>
+        Resultado por W.O.
+      </TituloCompacto>
       {camposWo}
 
       <TituloCompacto icone={Link2} aviso={avisoCompacto("identidade")}>

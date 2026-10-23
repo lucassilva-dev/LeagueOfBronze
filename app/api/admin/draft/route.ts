@@ -12,14 +12,24 @@ import {
   alcancarORelogio,
   aplicarEscolha,
   iniciarDraft,
+  jogadoresQueSairamDoPool,
   pausarDraft,
   podeEscolher,
   retomarDraft,
   timeDaVez,
   vezSemSaida,
 } from "@/lib/draft/motor";
-import { datasetDoDraft, jogadoresForaDoDraft, listaForaDoDraft, problemasDaVirada } from "@/lib/draft/virada";
 import {
+  avisosDaVirada,
+  datasetDoDraft,
+  exigemConfirmacaoNaVirada,
+  jogadoresForaDoDraft,
+  listaForaDoDraft,
+  problemasDaVirada,
+  reservasDaVirada,
+} from "@/lib/draft/virada";
+import {
+  comAsSaidasDoPool,
   lerDraftCompleto,
   montarDraftDosAprovados,
   paraPublico,
@@ -201,12 +211,14 @@ export async function POST(request: NextRequest) {
         }
 
         const agora = Date.now();
+        // Iniciar e retomar já saem com quem deixou o pool aplicado (C1): o relógio começa
+        // a correr sem essa pessoa entre os escolhíveis.
         const novo =
           corpo.acao === "iniciar"
-            ? iniciarDraft(estado, agora)
+            ? await comAsSaidasDoPool(iniciarDraft(estado, agora), { fresco: true })
             : corpo.acao === "pausar"
               ? pausarDraft(estado)
-              : retomarDraft(estado, agora);
+              : await comAsSaidasDoPool(retomarDraft(estado, agora), { fresco: true });
 
         const gravou = await salvarDraftSeIntacto(novo, revisao);
         if (!gravou) return conflito();
@@ -228,7 +240,9 @@ export async function POST(request: NextRequest) {
         const jogadorId = typeof corpo.jogadorId === "string" ? corpo.jogadorId : null;
         if (!jogadorId) return NextResponse.json({ error: "Escolha um jogador." }, { status: 400 });
 
-        const atual = alcancarORelogio(estado, Date.now());
+        // Quem saiu do pool (C1) lido na hora, antes do relógio: a mesa não leva quem acabou
+        // de desistir, mesmo com a tela mostrando o nome.
+        const atual = alcancarORelogio(await comAsSaidasDoPool(estado, { fresco: true }), Date.now());
         const daVez = timeDaVez(atual);
         if (!daVez) return NextResponse.json({ error: "Não há escolha em andamento." }, { status: 409 });
 
@@ -267,28 +281,42 @@ export async function POST(request: NextRequest) {
       case "virar": {
         if (!estado) return NextResponse.json({ error: "Monte o draft primeiro." }, { status: 409 });
 
-        const problemas = problemasDaVirada(estado);
-        const resultado = datasetDoDraft(estado);
+        const inscritos = await listarInscricoes();
+
+        /*
+         * Os reservas (decisão C4 de 2026-10-22): todo inscrito da fila — titular ou reserva —
+         * que não ficou num elenco vai para o site como reserva oficial, sem time. São eles
+         * que substituem jogo a jogo e herdam a vaga de quem sair de vez.
+         */
+        const reservas = reservasDaVirada(estado, inscritos);
+        const problemas = problemasDaVirada(estado, reservas);
+        const resultado = datasetDoDraft(estado, reservas);
+        // O time que vai com vaga aberta porque a ordem perdeu escolhas por falta de jogador
+        // (alguém saiu do pool, C1, ou faltava titular apto no sorteio, C4): não trava.
+        const avisos = avisosDaVirada(estado);
 
         /*
          * Quem está no draft e a inscrição não é mais `apto` (recusado ou desistente depois
-         * do sorteio, devolvido à sobra ou a pendente). O draft não tira ninguém sozinho e
-         * isto não muda regra nenhuma — o que fazer é decisão da organização. Mas aplicar no
-         * site publica essa pessoa num time, então a virada só segue com a confirmação
-         * explícita no corpo (`confirmoForaDoDraft: true`, booleano, não "sim").
+         * do sorteio, devolvido à sobra ou a pendente). Quem estava no POOL já saiu dos
+         * escolhíveis (C1) e não vai para time nenhum: fica no aviso, sem confirmação. Quem
+         * está num ELENCO segue no draft (C2): aplicar no site publica essa pessoa num time,
+         * então a virada só segue com a confirmação explícita no corpo (`confirmoForaDoDraft:
+         * true`, booleano, não "sim"); depois, a vaga é reposta pela saída de vez no painel de
+         * Jogadores.
          */
-        const foraDoDraft = jogadoresForaDoDraft(estado, await listarInscricoes());
+        const foraDoDraft = jogadoresForaDoDraft(estado, inscritos);
+        const precisamConfirmar = exigemConfirmacaoNaVirada(foraDoDraft);
 
         if (corpo.acao === "prever") {
           // Só olha. A organização confere os elencos antes de qualquer escrita no
           // dataset público — que é de onde o site inteiro lê.
-          return NextResponse.json({ ok: true, problemas, foraDoDraft, ...resultado });
+          return NextResponse.json({ ok: true, problemas, avisos, foraDoDraft, ...resultado });
         }
 
-        const foraSemConfirmacao = foraDoDraft.length > 0 && corpo.confirmoForaDoDraft !== true;
+        const foraSemConfirmacao = precisamConfirmar.length > 0 && corpo.confirmoForaDoDraft !== true;
         if (foraSemConfirmacao) {
           problemas.push(
-            `Não estão mais aptos na inscrição: ${listaForaDoDraft(foraDoDraft)}. Para aplicar mesmo assim, confirme.`,
+            `Não estão mais aptos na inscrição: ${listaForaDoDraft(precisamConfirmar)}. Para aplicar mesmo assim, confirme.`,
           );
         }
 
@@ -401,18 +429,27 @@ export async function POST(request: NextRequest) {
           throw erro;
         }
 
+        const naoAptosSemTime = [
+          ...jogadoresQueSairamDoPool(estado).map((j) => j.riotId),
+          ...foraDoDraft.filter((f) => f.lugar === "pool").map((f) => f.riotId),
+        ];
         await registrarAuditoria({
           autor,
           acao: "draft_virado_para_o_dataset",
           detalhe: {
             times: resultado.teams.length,
             jogadores: resultado.players.length,
-            // Aplicado com a confirmação: fica registrado quem não era mais apto.
-            ...(foraDoDraft.length > 0 ? { confirmadoForaDoDraft: foraDoDraft } : {}),
+            reservas: reservas.length,
+            ...(avisos.length > 0 ? { avisos } : {}),
+            // Aplicado com a confirmação: fica registrado quem não era mais apto num elenco.
+            ...(precisamConfirmar.length > 0 ? { confirmadoForaDoDraft: precisamConfirmar } : {}),
+            // E quem não é mais apto e não foi para time nenhum (não pediu confirmação): quem
+            // saiu do pool não vai para o site; quem voltou a sobra ou pendente vai como reserva.
+            ...(naoAptosSemTime.length > 0 ? { naoAptosSemTime } : {}),
           },
         });
 
-        return NextResponse.json({ ok: true, ...resultado });
+        return NextResponse.json({ ok: true, avisos, ...resultado });
       }
 
       case "calendario": {

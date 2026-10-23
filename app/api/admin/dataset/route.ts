@@ -20,6 +20,7 @@ import {
   type TournamentDataset,
 } from "@/lib/schema";
 import { ancorarCamposDoServidor, registrarCorrecoesManuais } from "@/lib/series/campos-do-servidor";
+import { problemasDeLinhaSemTime, problemasDeTrocaDeTimeComHistorico } from "@/lib/tournament";
 
 export const dynamic = "force-dynamic";
 
@@ -293,6 +294,28 @@ async function tentarGravar({
   const jogosDemais = problemasDeJogoDepoisDaDecisao(proposta, atual);
   if (jogosDemais.length > 0) {
     return { resposta: NextResponse.json({ error: jogosDemais.join(" | ") }, { status: 400 }) };
+  }
+
+  /*
+   * Troca de time pelo cadastro de quem já jogou (FB-3): as linhas antigas sem "Jogou por"
+   * valem pelo time do jogador e iriam junto para o time novo — estatística pública mudando
+   * de lado por quem só tem `players:write`. Antes do `problemasDeLinhaSemTime` porque é a
+   * causa: depois da troca, as linhas dele podem cair também naquela regra.
+   */
+  const trocasComHistorico = problemasDeTrocaDeTimeComHistorico(proposta, atual);
+  if (trocasComHistorico.length > 0) {
+    return { resposta: NextResponse.json({ error: trocasComHistorico.join(" | ") }, { status: 400 }) };
+  }
+
+  /*
+   * Substituto avulso sem "Jogou por" (regra 6): a linha NOVA (ou mudada) de titular de um
+   * time que não disputa a série some das duas colunas da partida e conta para o time dele.
+   * Mesma lógica de cima — só para a gravação e comparando com o gravado, porque o dado real
+   * tem sobras assim e o schema roda em toda leitura.
+   */
+  const linhasSemTime = problemasDeLinhaSemTime(proposta, atual);
+  if (linhasSemTime.length > 0) {
+    return { resposta: NextResponse.json({ error: linhasSemTime.join(" | ") }, { status: 400 }) };
   }
 
   const veredito = authorizeDatasetChange(identity, atual, proposta);

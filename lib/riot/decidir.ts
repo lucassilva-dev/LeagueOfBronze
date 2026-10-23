@@ -63,7 +63,13 @@ export type DadosRiot = {
   regiao?: string;
   solo?: SoloDuo | null;
   nivel?: number | null;
+  /** Partidas da janela do (e) que contam — os remakes já descontados. */
   partidasNaJanela?: number;
+  /**
+   * Quantos remakes foram descontados de `partidasNaJanela`. Só existe quando o detalhe das
+   * partidas foi buscado nesta rodada (ver `precisaConferirRemakes`).
+   */
+  remakesNaJanela?: number;
 };
 
 export type ConfigParaRobo = {
@@ -214,6 +220,7 @@ export function decidirSincronizacao(args: {
     }),
     ...(riot.nivel !== undefined && { nivel: riot.nivel }),
     ...(partidas !== null && { partidasNaJanela: partidas }),
+    ...(riot.remakesNaJanela !== undefined && { remakesNaJanela: riot.remakesNaJanela }),
   };
 
   const outroServidor = !!regiao && regiao.toLowerCase() !== PLATAFORMA_DO_CAMPEONATO;
@@ -266,9 +273,13 @@ export function decidirSincronizacao(args: {
     if (partidas >= minimo) {
       quer("e", "ok", `${partidas} partidas na solo/duo nos 10 dias antes do início.`);
     } else if (agoraMs < janela.fimMs) {
-      quer("e", "pendente", `${partidas} de ${minimo} partidas na solo/duo até agora (regra 4).`);
+      quer("e", "pendente", `${partidas} de ${minimo} partidas na solo/duo até agora (regra 4; remake não conta).`);
     } else {
-      quer("e", "risco", `${partidas} de ${minimo} partidas na solo/duo nos 10 dias antes do início (regra 4).`);
+      quer(
+        "e",
+        "risco",
+        `${partidas} de ${minimo} partidas na solo/duo nos 10 dias antes do início (regra 4; remake não conta).`,
+      );
     }
   }
 
@@ -313,4 +324,20 @@ export function precisaContarPartidas(args: {
   // «risco». Custa 1 chamada por dia por pessoa abaixo do mínimo.
   if (args.partidasGravadas !== null && args.partidasGravadas >= args.minimo) return null;
   return { inicioS: janela.inicioMs / 1000, fimS: Math.min(args.agoraMs, janela.fimMs) / 1000 };
+}
+
+/**
+ * Folga acima do mínimo em que ainda vale conferir remake. Com 3 ou mais partidas sobrando,
+ * só 3+ remakes na mesma janela mudariam o veredicto — não compensa a cota.
+ */
+export const FOLGA_PARA_CONFERIR_REMAKE = 2;
+
+/**
+ * Remake não conta (regra 4, decisão de 22/10/2026). Buscar o detalhe custa 1 chamada por
+ * partida, então o robô só busca quando o desconto pode mudar o veredicto do (e): contagem
+ * entre o mínimo e o mínimo + 2. Abaixo do mínimo, descontar não muda nada (continua
+ * abaixo); com mínimo zero, não há o que cumprir.
+ */
+export function precisaConferirRemakes(contagem: number, minimo: number): boolean {
+  return minimo > 0 && contagem >= minimo && contagem <= minimo + FOLGA_PARA_CONFERIR_REMAKE;
 }

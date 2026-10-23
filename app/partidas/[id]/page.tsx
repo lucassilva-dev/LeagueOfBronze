@@ -20,16 +20,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ChampionIcon } from "@/components/champion-icon";
+import { textosElenco, type TextosElenco } from "@/components/lob/textos-elenco";
 import { SeriesLiveDraw } from "@/components/series-live-draw";
 import { formatKda, formatSeriesDateLabel } from "@/lib/format";
 import type { Messages } from "@/lib/i18n/messages";
 import { metadadosDaPagina, montarMetadados } from "@/lib/i18n/metadados";
 import { nomeDaTemporada } from "@/lib/i18n/nome-da-temporada";
-import { getMessages } from "@/lib/i18n/server";
+import { getLocale, getMessages } from "@/lib/i18n/server";
 import { getServerDataset } from "@/lib/server-data";
 import {
-  elencoDaSerie,
-  getGameMvpPlayerId,
   getGameTeamKills,
   getSeriesById,
   getSeriesFormatLabel,
@@ -39,6 +38,8 @@ import {
   getSeriesTeamKillTotals,
   getSeriesWinnerTeamId,
   isWalkoverSeries,
+  jogosDeWalkoverDaSerie,
+  mvpDoJogo,
 } from "@/lib/tournament";
 import type { Player, Team } from "@/lib/schema";
 
@@ -96,8 +97,18 @@ type GameDetailsCardProps = Readonly<{
   blocks: readonly [GameTeamBlock, GameTeamBlock];
   playersById: Map<string, Player>;
   textos: Textos;
+  /** Marca do substituto avulso (regra 6). */
+  te: TextosElenco;
   /** Idioma para os números: sem ele o KDA saía com vírgula decimal no site em inglês. */
   localeTag: string;
+}>;
+type WalkoverGameCardProps = Readonly<{
+  gameIndex: number;
+  winnerName: string;
+  walkoverReason: string | undefined;
+  rotuloWalkover: string;
+  textos: Textos;
+  te: TextosElenco;
 }>;
 
 function isGrandFinalStage(stage: string | undefined) {
@@ -312,6 +323,7 @@ function GameDetailsCard({
   blocks,
   playersById,
   textos,
+  te,
   localeTag,
 }: GameDetailsCardProps) {
   return (
@@ -386,6 +398,12 @@ function GameDetailsCard({
                             className="block break-all font-semibold hover:text-accent"
                           >
                             {row.playerNick}
+                            {/* Substituto avulso: aparece na coluna do time que cobriu, marcado. */}
+                            {row.substituto ? (
+                              <Badge variant="outline" className="ml-2 align-middle text-[10px]" title={te.substitutoTitulo}>
+                                {te.substitutoCurto}
+                              </Badge>
+                            ) : null}
                           </Link>
                         </TableCell>
                         <TableCell className="whitespace-nowrap">
@@ -406,6 +424,30 @@ function GameDetailsCard({
           </div>
         ))}
       </div>
+    </Card>
+  );
+}
+
+/**
+ * Um jogo de W.O. (W.O. no meio da série: "jogos valem, W.O. completa"). Não foi
+ * disputado: conta no placar, mas não tem K/D/A, MVP nem duração.
+ */
+function WalkoverGameCard({ gameIndex, winnerName, walkoverReason, rotuloWalkover, textos, te }: WalkoverGameCardProps) {
+  return (
+    <Card className="p-5">
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="font-heading text-lg font-semibold tracking-wide">
+          {textos.detalheJogo} {gameIndex}
+        </p>
+        <Badge variant="muted">{rotuloWalkover}</Badge>
+      </div>
+      <p className="mt-1 text-sm text-muted">
+        {textos.detalheVencedorWo} <span className="text-text">{winnerName}</span>
+      </p>
+      <p className="mt-2 text-sm text-muted">
+        {te.jogoDeWalkoverTexto}
+        {walkoverReason ? ` ${walkoverReason}` : ""}
+      </p>
     </Card>
   );
 }
@@ -436,6 +478,7 @@ export default async function PartidaDetalhePage({ params }: PartidaDetalhePageP
   const { id } = await params;
   const t = await getMessages();
   const textos = t.paginasCompeticao;
+  const te = textosElenco[await getLocale()];
   const { dataset, indexes } = await getServerDataset();
   const series = getSeriesById(dataset, id);
 
@@ -457,6 +500,9 @@ export default async function PartidaDetalhePage({ params }: PartidaDetalhePageP
   const seriesMvpNick = seriesMvp ? indexes.playersById.get(seriesMvp.playerId)?.nick ?? seriesMvp.playerId : null;
   const seriesKillTotals = getSeriesTeamKillTotals(series, dataset);
   const gameRows = getSeriesGamesWithTeamRows(series, dataset);
+  // W.O. no meio da série: os jogos que o W.O. completou, depois dos disputados. Sem jogo
+  // disputado nenhum, a página continua como sempre (o cartão "encerrada por W.O.").
+  const walkoverGames = gameRows.length > 0 ? jogosDeWalkoverDaSerie(series, dataset) : [];
   const identity: SeriesIdentity = {
     teamA,
     teamB,
@@ -548,7 +594,7 @@ export default async function PartidaDetalhePage({ params }: PartidaDetalhePageP
         ) : (
           gameRows.map(({ game, gameIndex, teamARows, teamBRows }) => {
             const winnerName = indexes.teamsById.get(game.winnerTeamId)?.name ?? game.winnerTeamId;
-            const gameMvpPlayerId = getGameMvpPlayerId(game, elencoDaSerie(series, dataset));
+            const gameMvpPlayerId = mvpDoJogo(game, series, indexes.playersById);
             const gameMvpNick = indexes.playersById.get(gameMvpPlayerId)?.nick ?? gameMvpPlayerId;
             const kills = getGameTeamKills(game, series, dataset);
 
@@ -570,10 +616,22 @@ export default async function PartidaDetalhePage({ params }: PartidaDetalhePageP
                 ]}
                 playersById={indexes.playersById}
                 textos={textos}
+                te={te}
               />
             );
           })
         )}
+        {walkoverGames.map((jogo) => (
+          <WalkoverGameCard
+            key={`${series.id}-wo${jogo.gameIndex}`}
+            gameIndex={jogo.gameIndex}
+            winnerName={indexes.teamsById.get(jogo.winnerTeamId)?.name ?? jogo.winnerTeamId}
+            walkoverReason={series.walkoverReason}
+            rotuloWalkover={t.compartilhados.serieWalkover}
+            textos={textos}
+            te={te}
+          />
+        ))}
       </section>
     </PageShell>
   );

@@ -36,15 +36,36 @@ export function requisitosCumpridos(
   inicioCampeonato: string | null,
   agoraMs: number,
 ): boolean {
+  return requisitosForaDeOk(conferencias, inicioCampeonato, agoraMs).length === 0;
+}
+
+/**
+ * Os requisitos que seguram a pessoa — fora de ok/exceção, na ordem dos itens — com o estado
+ * de cada um (`null` = sem registro). Vazio = todos cumpridos (`requisitosCumpridos`).
+ *
+ * É o FATO por trás do alerta «aprovado com requisito fora de ok/exceção»: a ciência da
+ * organização no «(A) pendente» não pode cobrir, depois, um «(F) recusado».
+ */
+export function requisitosForaDeOk(
+  conferencias: readonly { item: string; estado: string }[],
+  inicioCampeonato: string | null,
+  agoraMs: number,
+): { item: (typeof ITENS_CONFERENCIA)[number]; estado: string | null }[] {
   const inicioMs = inicioCampeonato ? new Date(inicioCampeonato).getTime() : NaN;
   const eAindaNaoAvaliavel = !Number.isFinite(inicioMs) || agoraMs < inicioMs;
 
-  return ITENS_CONFERENCIA.every((item) => {
+  const fora: { item: (typeof ITENS_CONFERENCIA)[number]; estado: string | null }[] = [];
+  for (const item of ITENS_CONFERENCIA) {
     const estado = conferencias.find((c) => c.item === item)?.estado;
-    if (estado === undefined) return false;
-    if (CUMPRIDO.has(estado)) return true;
-    return item === "e" && eAindaNaoAvaliavel && !BLOQUEIA.has(estado);
-  });
+    if (estado === undefined) {
+      fora.push({ item, estado: null });
+      continue;
+    }
+    if (CUMPRIDO.has(estado)) continue;
+    if (item === "e" && eAindaNaoAvaliavel && !BLOQUEIA.has(estado)) continue;
+    fora.push({ item, estado });
+  }
+  return fora;
 }
 
 export function situacaoSugerida(args: {

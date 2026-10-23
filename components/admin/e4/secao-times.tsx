@@ -1,9 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { UserRoundSearch } from "lucide-react";
 
 import { EloPorRota } from "@/components/admin/e4/elo-por-rota";
+import {
+  ChipDoLugar,
+  listaDeNomes,
+  nomeDe,
+  preverFila,
+  temFila,
+  textoDaPrevisao,
+  useFila,
+} from "@/components/admin/e4/fila-no-painel";
 import type { Inscrito, PropsSecao } from "@/components/admin/e4/painel-edicao";
 import { TabelaDePontos } from "@/components/admin/e4/tabela-de-pontos";
 import { useCompacto } from "@/components/admin/responsivo";
@@ -33,6 +42,7 @@ import { ELO_ORDER, resolveElo, resolveRole, type EloMeta } from "@/lib/design";
 import { podeSubstituir, precosDoSorteio, previaDosPrecos, type PreviaDosPrecos } from "@/lib/draft/previa-de-precos";
 import { retratoDaTabela, type RetratoDaTabela } from "@/lib/draft/precos";
 import type { DraftPublico } from "@/lib/draft/store";
+import { lugarNaFila, reservaADevolverSeNaoJogar, type LugarNaFila } from "@/lib/inscricoes/fila";
 import { contaParaTimes, distribuirTimes } from "@/lib/inscricoes/schema";
 
 /**
@@ -52,6 +62,12 @@ import { contaParaTimes, distribuirTimes } from "@/lib/inscricoes/schema";
  * - O que é DEFINITIVO (congelar o elo, escolher substituto, a lista de sobra) continua
  *   só com aprovados: congelar o preço de quem nem foi conferido, ou oferecer um pendente
  *   como substituto, seria tratar a previsão como fato.
+ *
+ * FILA DE RESERVA (decisões de 2026-10-22, D1/D2): com teto de vagas, quem passa delas espera
+ * numa fila COM ordem — a de inscrição, organizadores sempre dentro (`montarFila`, a mesma
+ * função do servidor). A lista daqui é essa fila, na ordem em que as pessoas são chamadas; a
+ * «sobra» marcada à mão vai para o fim dela. Reserva só paga se for chamado, e quem pagou
+ * aparece marcado — o dinheiro dele fica fora do prêmio (aba Pagamentos).
  *
  * No celular a conta é a mesma e o arranjo é de bolso: as quatro tabelas (elos, sobra,
  * substitutos, rotas) viram listas de cartões com o emblema do elo ou o ícone da rota à
@@ -155,6 +171,9 @@ const listaDeCartoes: CSSProperties = {
 const ROTAS = ["TOP", "JUNG", "MID", "ADC", "SUP"] as const;
 
 const SEM_ESCOPO = "Somente leitura: falta o escopo inscricoes:conferir.";
+
+/** D2: reserva que pagou fica com o dinheiro registrado — e a organização devolve se ele não jogar. */
+const TEXTO_PAGOU_NA_FILA = "pagou — fora do prêmio; devolver se não for chamado";
 
 /**
  * O elo que vale como PREÇO, na mesma ordem que o servidor usa.
@@ -313,6 +332,57 @@ function CartaoDoAprovado({
 }
 
 /**
+ * O 2º passo do «Voltar para apto» quando a volta tira alguém das vagas (D1/D4). Quem estava em
+ * «sobra» volta ao lugar dele pela ordem de inscrição, e quem estava nas vagas depois dele desce
+ * para a fila: perde o prazo e, se já pagou, o valor vira «a devolver se não jogar». A gaveta de
+ * Inscritos avisa o mesmo antes de salvar; aqui é a mesma frase (`textoDaPrevisao`), em dois
+ * passos como o «Passar a vaga» — o servidor refaz a fila na mesma ação que grava.
+ */
+function ConfirmarVolta({
+  inscrito,
+  aviso,
+  desabilitado,
+  motivo,
+  largo,
+  onConfirmar,
+  onCancelar,
+}: Readonly<{
+  inscrito: Inscrito;
+  aviso: string;
+  desabilitado: boolean;
+  motivo?: string;
+  /** No celular: botões na largura toda, um embaixo do outro. */
+  largo: boolean;
+  onConfirmar: () => void;
+  onCancelar: () => void;
+}>) {
+  return (
+    <div
+      role="group"
+      aria-label={`Confirmar: voltar ${nomeDe(inscrito)} para apto`}
+      style={{ display: "grid", gap: 8, whiteSpace: "normal" }}
+    >
+      <p style={{ margin: 0, fontSize: 12, lineHeight: 1.6, color: C.warnSoft }}>{aviso}</p>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", flexDirection: largo ? "column" : "row" }}>
+        <Button
+          small={!largo}
+          fullWidth={largo}
+          tone="danger"
+          disabled={desabilitado}
+          title={motivo}
+          onClick={onConfirmar}
+        >
+          Confirmar: voltar para apto
+        </Button>
+        <Button small={!largo} fullWidth={largo} onClick={onCancelar}>
+          Cancelar
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Distribuição de elos no celular: uma linha por elo, emblema · barra · quantas pessoas.
  * Sem preço: o preço é por divisão e sai da tabela de pontos, logo acima.
  */
@@ -379,7 +449,24 @@ function QuadroDaRota({ rota }: Readonly<{ rota: string }>) {
 
 export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSecao) {
   const compacto = useCompacto();
-  const { config, inscritos, panorama } = dados;
+  const { config, inscritos, panorama, pagamentos } = dados;
+
+  /*
+   * A fila de reserva (D1): quem é titular e quem espera, na ordem em que é chamado. Mesmo
+   * sem teto de vagas a lista existe — só com quem a organização marcou como sobra.
+   */
+  const fila = useFila(dados);
+  const comFila = temFila(fila);
+  const naFila = useMemo(() => {
+    const porId = new Map(inscritos.map((i) => [i.id, i]));
+    const estadoDe = new Map(pagamentos.map((p) => [p.inscricao_id, p.estado]));
+    return fila.reservas.flatMap((id): { inscrito: Inscrito; lugar: LugarNaFila; pagou: boolean }[] => {
+      const inscrito = porId.get(id);
+      if (!inscrito) return [];
+      const lugar = lugarNaFila(fila, id);
+      return [{ inscrito, lugar, pagou: reservaADevolverSeNaoJogar(lugar, estadoDe.get(id)) }];
+    });
+  }, [fila, inscritos, pagamentos]);
   const [alvoId, setAlvoId] = useState("");
   const [confirmaCongelar, setConfirmaCongelar] = useState(false);
 
@@ -417,7 +504,6 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
     // O definitivo: aprovado = apto + sobra, o mesmo pool que o servidor congela.
     const aprovados = pool.filter((i) => i.situacao === "apto" || i.situacao === "sobra");
 
-    const marcadosSobra = aprovados.filter((i) => i.situacao === "sobra");
     const semCongelar = aprovados.filter((i) => i.elo_congelado === null);
     // Mesmo `resolveElo` que o servidor usa: se ele não reconhece, `congelarElos`
     // estoura no meio do laço — e o que já passou fica congelado. Ver o cartão final.
@@ -458,7 +544,6 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
       pool,
       jogadoresDoQuadro,
       aprovados,
-      marcadosSobra,
       semCongelar,
       jaCongelados: aprovados.length - semCongelar.length,
       eloIlegivel,
@@ -510,11 +595,53 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
     if (deuCerto) setConfirmaCongelar(false);
   };
 
-  const mudarSituacao = (inscrito: Inscrito, situacao: "apto" | "sobra") => {
+  const mudarSituacao = (inscrito: Inscrito, situacao: "apto" | "sobra") =>
     // Com a situação que esta tela mostrava: se outra pessoa mudou antes (recusou, segurou),
     // o servidor responde 409 sem gravar e a tela recarrega com o valor de agora.
-    void executar("ficha", { inscricaoId: inscrito.id, situacao, situacaoAnterior: inscrito.situacao });
+    executar("ficha", { inscricaoId: inscrito.id, situacao, situacaoAnterior: inscrito.situacao });
+
+  /*
+   * «Voltar para apto» com a fila (D1): a «sobra» volta ao lugar dela pela ordem de inscrição e
+   * pode empurrar um titular para a fila — titular que perde o prazo e, se pagou, vira «a
+   * devolver se não jogar». Quando alguém desce, a tela diz quem ANTES de gravar e pede a
+   * confirmação; quando ninguém desce, grava no clique, como sempre foi.
+   */
+  const [voltaPendente, setVoltaPendente] = useState<string | null>(null);
+  const estadoDoPagamento = useMemo(() => new Map(pagamentos.map((p) => [p.inscricao_id, p.estado])), [pagamentos]);
+  const avisoDaVolta = (inscrito: Inscrito): string | null => {
+    if (!comFila) return null;
+    const previsao = preverFila(inscritos, config, inscrito.id, { situacao: "apto", organizador: inscrito.organizador });
+    if (previsao.saem.length === 0) return null;
+    const pagaram = previsao.saem.filter((i) => {
+      const estado = estadoDoPagamento.get(i.id);
+      return estado === "pago" || estado === "declarado";
+    });
+    return [
+      textoDaPrevisao(previsao, inscrito, "Ao voltar para apto"),
+      pagaram.length > 0
+        ? pagaram.length === 1
+          ? `${listaDeNomes(pagaram)} já pagou (ou declarou que pagou): o valor fica registrado, fora do prêmio, e é devolvido se ele não for chamado.`
+          : `${listaDeNomes(pagaram)} já pagaram (ou declararam que pagaram): o valor fica registrado, fora do prêmio, e é devolvido a quem não for chamado.`
+        : null,
+    ]
+      .filter(Boolean)
+      .join(" ");
   };
+  const pedirVoltaParaApto = (inscrito: Inscrito) => {
+    if (avisoDaVolta(inscrito) === null) {
+      void mudarSituacao(inscrito, "apto");
+      return;
+    }
+    setVoltaPendente(inscrito.id);
+  };
+  const confirmarVolta = async (inscrito: Inscrito) => {
+    const ok = await mudarSituacao(inscrito, "apto");
+    // Numa falha, a confirmação fica aberta: a pessoa tenta de novo sem refazer o 1º passo.
+    if (ok) setVoltaPendente(null);
+  };
+  /** O aviso do 2º passo aberto nesta linha, ou nulo (fechado, ou a volta não tira mais ninguém). */
+  const voltaDe = (inscrito: Inscrito): string | null =>
+    voltaPendente === inscrito.id && inscrito.situacao === "sobra" ? avisoDaVolta(inscrito) : null;
 
   const tabela =
     previa.tabela && previa.tabela.linhas.length > 0 ? { ...retratoDaTabela(previa.tabela), queda: previa.queda } : null;
@@ -585,8 +712,8 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
           config.max_times && panorama.times >= config.max_times ? (
             // No teto, "mais N fecham o 7º time" seria mentira: não existe 7º time.
             <p style={{ margin: 0, fontSize: 12.5, color: C.okSoft }}>
-              Os {config.max_times} times já fecham. Quem entrar a mais vira reserva (sobra) — a
-              organização escolhe quem fica de fora antes do sorteio.
+              Os {config.max_times} times já fecham. Quem se inscrever a mais entra na fila de reserva, pela ordem
+              de inscrição — e só paga se for chamado.
             </p>
           ) : panorama.times === 0 ? (
             <p style={{ margin: 0, fontSize: 12.5, color: C.warnSoft }}>
@@ -604,7 +731,7 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
 
         <p style={nota}>
           {config.max_times
-            ? `Esta edição tem teto de ${config.max_times} times (${config.max_times * jogadoresPorTime} vagas): quem passar disso vira reserva (sobra). Até lá, o número de times acompanha os elegíveis — todo inscrito, menos quem foi recusado ou desistiu. Pendente já conta.`
+            ? `Esta edição tem teto de ${config.max_times} times (${config.max_times * jogadoresPorTime} vagas): quem passar disso vai para a fila de reserva, pela ordem de inscrição (organizadores sempre entram). Até lá, o número de times acompanha os elegíveis — todo inscrito, menos quem foi recusado, desistiu ou foi excluído. Pendente já conta.`
             : "Sem teto de times: o número de times acompanha os elegíveis — todo inscrito, menos quem foi recusado ou desistiu. Pendente já conta."}
         </p>
 
@@ -676,7 +803,7 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
           <Card padding="14px 16px" style={{ marginTop: 12, display: "grid", gap: 8 }}>
             <p style={nota}>
               {previa.origem === "titulares"
-                ? `Calculada com os ${previa.vagas} elegíveis que não estão marcados como sobra — o pool que o draft vai usar quando a conferência acabar.`
+                ? `Calculada com os ${previa.vagas} titulares — quem não está na fila de reserva nem marcado como sobra —, o pool que o draft vai usar quando a conferência acabar.`
                 : `Calculada com os ${previa.vagas} de elo mais baixo entre os ${previa.elegiveis} elegíveis — o cenário mais barato possível, enquanto não está decidido quem fica na sobra.`}{" "}
               Quem fica de fora recebe o preço da reta, preso entre as linhas vizinhas.
             </p>
@@ -754,70 +881,111 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
 
       <EloPorRota jogadores={analise.jogadoresDoQuadro} times={panorama.times} />
 
-      {/* ---------------------------------------------------------------- 3. sobra */}
+      {/* ---------------------------------------------------------- 3. fila de reserva */}
 
       <BlockTitle
         right={
-          <Chip tone="warn" title="Situação gravada na ficha">
-            {analise.marcadosSobra.length}{" "}
-            {analise.marcadosSobra.length === 1 ? "marcado" : "marcados"}
-          </Chip>
+          comFila ? (
+            <Chip tone={fila.reservas.length > 0 ? "warn" : "neutro"} title="Na ordem em que são chamados">
+              {fila.reservas.length} na fila
+            </Chip>
+          ) : (
+            <Chip tone="off" title="Sem máximo de times na Configuração">
+              sem teto de vagas
+            </Chip>
+          )
         }
       >
-        Quem sobrou
+        Titulares e fila de reserva
       </BlockTitle>
 
+      {comFila ? (
+        <FieldGrid min={150} style={{ marginBottom: 12 }}>
+          <Metric label="Titulares" value={fila.titulares.length} detail={`de ${fila.vagas} vagas`} />
+          <Metric label="Fila de reserva" value={fila.reservas.length} detail="na ordem de inscrição" />
+          <Metric
+            label="Vagas abertas"
+            value={Math.max(0, (fila.vagas ?? 0) - fila.titulares.length)}
+            detail="quem se inscrever agora entra direto"
+          />
+        </FieldGrid>
+      ) : null}
+
       <Card padding="14px 16px" style={{ marginBottom: 12, display: "grid", gap: 8 }}>
-        <p style={{ margin: 0, fontSize: 12.5, color: C.ink2, lineHeight: 1.6 }}>
-          Isto NÃO é fila com ordem. Não há posição, prioridade nem antiguidade: quem entra no lugar
-          de quem sai é decidido na conversa do grupo, pela organização.
-        </p>
-        <p style={nota}>
-          A divisão diz que {panorama.sobra}{" "}
-          {panorama.sobra === 1 ? "pessoa fica" : "pessoas ficam"} de fora; {analise.marcadosSobra.length}{" "}
-          {analise.marcadosSobra.length === 1 ? "está marcada" : "estão marcadas"} como sobra na
-          ficha. São coisas diferentes — a primeira é o resto da divisão, a segunda é quem já foi
-          avisado. Marcar alguém como sobra não muda a divisão: sobra continua na conta, senão o
-          número de times mudaria sozinho a cada marcação.
-        </p>
-        {draftHoje ? (
-          <p style={{ ...nota, color: C.warnSoft }}>
-            Esse resto ainda conta {panorama.pendentes}{" "}
-            {panorama.pendentes === 1 ? "pendente" : "pendentes"}: não marque ninguém como sobra antes
-            de conferir todo mundo, senão o número de quem fica de fora muda e alguém é avisado à
-            toa. Só com os aprovados de hoje, o draft pediria {draftHoje.sobra} na sobra.
+        {comFila ? (
+          <>
+            <p style={{ margin: 0, fontSize: 12.5, color: C.ink2, lineHeight: 1.6 }}>
+              A fila TEM ordem: titulares são todos os organizadores mais os primeiros por ordem de inscrição, até
+              completar as {fila.vagas} vagas; o resto espera na ordem de inscrição. Quem sai da vaga — desiste, é
+              recusado, excluído ou perde o prazo de pagamento — chama o 1º da fila na mesma hora, e ele passa a ter
+              prazo de pagamento. Reserva só paga se for chamado.
+            </p>
+            <p style={nota}>
+              «Sobra» continua valendo como decisão à mão: quem a organização marca como sobra sai das vagas e vai para o
+              FIM da fila, sem ser chamado sozinho. «Voltar para apto» devolve a pessoa ao lugar dela pela ordem de
+              inscrição.
+            </p>
+          </>
+        ) : (
+          <p style={{ margin: 0, fontSize: 12.5, color: C.ink2, lineHeight: 1.6 }}>
+            Sem máximo de times na Configuração, todo inscrito que ainda pode jogar é titular e ninguém espera vaga — só
+            quem a organização marcou como sobra fica de fora.
           </p>
-        ) : null}
+        )}
       </Card>
 
-      {analise.marcadosSobra.length === 0 ? (
-        <Empty title="Ninguém marcado como sobra">
-          Quando a organização decidir quem fica de fora, marque a situação na aba Inscritos — aqui
-          a lista serve para revisar e desfazer.
+      {fila.reservas.length === 0 ? (
+        <Empty title="Ninguém na fila">
+          {comFila
+            ? `Os ${fila.titulares.length} inscritos que ainda podem jogar estão dentro das ${fila.vagas} vagas.`
+            : "Ninguém marcado como sobra."}
         </Empty>
       ) : compacto ? (
         // No celular o botão desce para a largura inteira do cartão: na tabela ele era a
         // última coluna, a que mais se perdia fora da tela.
         <ul style={listaDeCartoes}>
-          {analise.marcadosSobra.map((i) => (
-            <CartaoDoAprovado key={i.id} inscrito={i} preco={precoDe(i)}>
-              <Button
-                small
-                fullWidth
-                disabled={!podeConferir || ocupado}
-                title={podeConferir ? "Devolve a situação para apto." : SEM_ESCOPO}
-                onClick={() => mudarSituacao(i, "apto")}
-              >
-                Voltar para apto
-              </Button>
+          {naFila.map(({ inscrito: i, lugar, pagou }) => (
+            <CartaoDoAprovado
+              key={i.id}
+              inscrito={i}
+              preco={precoDe(i)}
+              fim={<ChipDoLugar lugar={lugar} />}
+            >
+              {pagou ? (
+                <span style={{ display: "block", fontSize: 11.5, color: C.warnSoft }}>{TEXTO_PAGOU_NA_FILA}</span>
+              ) : null}
+              {i.situacao === "sobra" && voltaDe(i) !== null ? (
+                <ConfirmarVolta
+                  inscrito={i}
+                  aviso={voltaDe(i)!}
+                  desabilitado={!podeConferir || ocupado}
+                  motivo={podeConferir ? undefined : SEM_ESCOPO}
+                  largo
+                  onConfirmar={() => void confirmarVolta(i)}
+                  onCancelar={() => setVoltaPendente(null)}
+                />
+              ) : i.situacao === "sobra" ? (
+                <Button
+                  small
+                  fullWidth
+                  disabled={!podeConferir || ocupado}
+                  title={podeConferir ? "Devolve a situação para apto." : SEM_ESCOPO}
+                  onClick={() => pedirVoltaParaApto(i)}
+                >
+                  Voltar para apto
+                </Button>
+              ) : null}
             </CartaoDoAprovado>
           ))}
         </ul>
       ) : (
         <ScrollX>
-          <table style={{ width: "100%", minWidth: 620, borderCollapse: "collapse" }}>
+          <table style={{ width: "100%", minWidth: 700, borderCollapse: "collapse" }}>
             <thead>
               <tr>
+                <th scope="col" style={th}>
+                  Fila
+                </th>
                 <th scope="col" style={{ ...th, width: "100%" }}>
                   Jogador
                 </th>
@@ -831,7 +999,7 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
                   Primária
                 </th>
                 <th scope="col" style={th}>
-                  Secundária
+                  Na ficha
                 </th>
                 <th scope="col" style={{ ...th, textAlign: "right" }}>
                   Ação
@@ -839,32 +1007,61 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
               </tr>
             </thead>
             <tbody>
-              {analise.marcadosSobra.map((i) => (
-                <tr key={i.id}>
-                  <td style={{ ...td, width: "100%" }}>
-                    <CelulaJogador inscrito={i} />
-                  </td>
-                  <td style={td}>
-                    <Elo elo={eloDePreco(i)} tamanho={24} />
-                  </td>
-                  <td style={tdNum}>{precoDe(i) ?? "—"}</td>
-                  <td style={td}>
-                    <CelulaRota rota={i.rota_primaria} />
-                  </td>
-                  <td style={td}>
-                    <CelulaRota rota={i.rota_secundaria} />
-                  </td>
-                  <td style={{ ...td, textAlign: "right" }}>
-                    <Button
-                      small
-                      disabled={!podeConferir || ocupado}
-                      title={podeConferir ? "Devolve a situação para apto." : SEM_ESCOPO}
-                      onClick={() => mudarSituacao(i, "apto")}
-                    >
-                      Voltar para apto
-                    </Button>
-                  </td>
-                </tr>
+              {naFila.map(({ inscrito: i, lugar, pagou }) => (
+                <Fragment key={i.id}>
+                  <tr>
+                    <td style={td}>
+                      <ChipDoLugar lugar={lugar} />
+                    </td>
+                    <td style={{ ...td, width: "100%" }}>
+                      <CelulaJogador inscrito={i} />
+                      {pagou ? (
+                        <span style={{ display: "block", marginTop: 2, fontSize: 11, color: C.warnSoft }}>
+                          {TEXTO_PAGOU_NA_FILA}
+                        </span>
+                      ) : null}
+                    </td>
+                    <td style={td}>
+                      <Elo elo={eloDePreco(i)} tamanho={24} />
+                    </td>
+                    <td style={tdNum}>{precoDe(i) ?? "—"}</td>
+                    <td style={td}>
+                      <CelulaRota rota={i.rota_primaria} />
+                    </td>
+                    <td style={td}>{i.situacao}</td>
+                    <td style={{ ...td, textAlign: "right" }}>
+                      {i.situacao === "sobra" && voltaDe(i) !== null ? (
+                        <span style={{ fontSize: 11.5, color: C.warnSoft }}>confirme abaixo</span>
+                      ) : i.situacao === "sobra" ? (
+                        <Button
+                          small
+                          disabled={!podeConferir || ocupado}
+                          title={podeConferir ? "Devolve a situação para apto." : SEM_ESCOPO}
+                          onClick={() => pedirVoltaParaApto(i)}
+                        >
+                          Voltar para apto
+                        </Button>
+                      ) : (
+                        <span style={{ color: C.ink4 }}>—</span>
+                      )}
+                    </td>
+                  </tr>
+                  {i.situacao === "sobra" && voltaDe(i) !== null ? (
+                    <tr>
+                      <td colSpan={7} style={{ ...td, whiteSpace: "normal" }}>
+                        <ConfirmarVolta
+                          inscrito={i}
+                          aviso={voltaDe(i)!}
+                          desabilitado={!podeConferir || ocupado}
+                          motivo={podeConferir ? undefined : SEM_ESCOPO}
+                          largo={false}
+                          onConfirmar={() => void confirmarVolta(i)}
+                          onCancelar={() => setVoltaPendente(null)}
+                        />
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
               ))}
             </tbody>
           </table>

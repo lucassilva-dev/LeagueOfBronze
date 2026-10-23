@@ -7,8 +7,9 @@ import { Eyebrow, GoldTitle, LobShell } from "@/components/lob/ui";
 import { ELO_ORDER } from "@/lib/design";
 import { metadadosDaPagina } from "@/lib/i18n/metadados";
 import { getMessages } from "@/lib/i18n/server";
+import { prazoDoAvisoDoFormulario } from "@/lib/inscricoes/fila";
 import { estadoDaJanela } from "@/lib/inscricoes/schema";
-import { inscricaoIdDoJogador, lerConfigOuNulo } from "@/lib/inscricoes/store";
+import { inscricaoIdDoJogador, lerConfigOuNulo, previsaoParaNovoInscrito } from "@/lib/inscricoes/store";
 import { JOGADOR_COOKIE, identidadePorToken } from "@/lib/jogadores/auth";
 
 /**
@@ -74,6 +75,26 @@ export default async function InscricaoPage() {
   // A decisão sai de uma função pura, com o "agora" resolvido fora do render.
   const janela = estadoDaJanela(config);
 
+  /*
+   * Vagas cheias? (D1/D2) Só com o formulário à vista. A previsão NUNCA derruba a página:
+   * qualquer falha vira "sem previsão" e o passo 3 fica como era — quem decide o lugar de
+   * verdade é o servidor, no envio, e o recibo segue o que ele devolver.
+   */
+  const formularioVisivel = !jaInscrito && janela === "aberta" && config !== null;
+  let previsao: Awaited<ReturnType<typeof previsaoParaNovoInscrito>> = null;
+  if (formularioVisivel) {
+    try {
+      previsao = await previsaoParaNovoInscrito();
+    } catch {
+      previsao = null;
+    }
+  }
+  // O prazo que um titular novo recebe (D3/D4): a data da edição enquanto ela vale. Depois
+  // dela, são 48 h contadas do ENVIO — e a hora exata calculada aqui seria a de quando a
+  // página abriu, não a de quando a pessoa enviar. Então o aviso diz "48 horas a partir do
+  // envio". Sem data na configuração, o aviso antigo em dias.
+  const { ate: prazoPagamentoAte, horas: prazoPagamentoHoras } = prazoDoAvisoDoFormulario(config);
+
   // Com a janela fechada o formulário some — e com ele o "Já tenho conta". Quem se inscreveu
   // e está sem sessão (venceu, outro aparelho) precisa de um caminho para a própria
   // inscrição; quem está logado não precisa dele.
@@ -117,8 +138,16 @@ export default async function InscricaoPage() {
             taxaCentavos: config.taxa_centavos,
             chavePix: config.chave_pix,
             prazoPagamentoDias: config.prazo_pagamento_dias,
+            prazoPagamentoAte,
+            prazoPagamentoHoras,
             minRanqueadas: config.min_ranqueadas,
             pctCampeao: config.pct_campeao,
+            fila:
+              previsao?.tipo === "reserva"
+                ? { tipo: "reserva", posicao: previsao.posicao, vagas: previsao.vagas }
+                : previsao?.tipo === "titular"
+                  ? { tipo: "titular" }
+                  : null,
           }}
           jogadorInicial={jogador ? { displayName: jogador.displayName, email: jogador.email } : null}
         />

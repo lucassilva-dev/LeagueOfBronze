@@ -12,6 +12,17 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
+import {
+  ChipDoLugar,
+  PassarAVaga,
+  nomeDe,
+  preverFila,
+  primeiroDaFila,
+  temFila,
+  textoDaPrevisao,
+  useFila,
+  type PrevisaoDaFila,
+} from "@/components/admin/e4/fila-no-painel";
 import type { EdicaoConfig, Inscrito, Pagamento, PropsSecao } from "@/components/admin/e4/painel-edicao";
 import {
   Banner,
@@ -43,7 +54,15 @@ import { compararForca, forcaDoElo, type ForcaDoElo } from "@/lib/draft/capitaes
 import { eloDoJogadorDaInscricao } from "@/lib/draft/elo-da-inscricao";
 import { previaDosPrecos } from "@/lib/draft/previa-de-precos";
 import { formatDateTimeLabel } from "@/lib/format";
-import { alertasDoInscrito, type Alerta } from "@/lib/inscricoes/alertas";
+import {
+  alertasDoInscrito,
+  escopoDaCiencia,
+  pedidoDeCiencia,
+  separarPorCiencia,
+  TITULO_DAR_CIENCIA,
+  type Alerta,
+} from "@/lib/inscricoes/alertas";
+import { lugarNaFila, type LugarNaFila } from "@/lib/inscricoes/fila";
 import { LIMITES_INSCRICAO } from "@/lib/inscricoes/passo1";
 import {
   ESTADOS_CONFERENCIA,
@@ -56,6 +75,7 @@ import {
 import { TURNOS, type Turno } from "@/lib/inscricoes/turnos";
 import { getOpGgSummonerUrlFromNick } from "@/lib/opgg";
 import { AUTOR_RIOT, itemEhDoRobo } from "@/lib/riot/decidir";
+import { RATE_LIMIT } from "@/lib/security/rate-limit";
 
 /**
  * Matriz de conferência + gaveta do inscrito.
@@ -75,8 +95,10 @@ import { AUTOR_RIOT, itemEhDoRobo } from "@/lib/riot/decidir";
  *    depois do sorteio. Quem já sabe os critérios de cor pode ocultá-los — a escolha fica
  *    no navegador dele, e o padrão é mostrar.
  *
- * 3. NÃO HÁ TETO DE INSCRIÇÕES. Nada aqui escreve "X de N vagas": o número de times é
- *    derivado (elegíveis ÷ jogadores por time) e vem pronto do servidor, no panorama.
+ * 3. NÃO HÁ TETO DE INSCRIÇÕES — há teto de VAGAS. O número de times é derivado (elegíveis ÷
+ *    jogadores por time, até `max_times`) e vem pronto do servidor, no panorama. Quem passa
+ *    das vagas continua inscrito, na fila de reserva (decisão D1 de 2026-10-22): a coluna
+ *    «Vaga» diz titular ou a posição na fila, pela mesma função do servidor (`montarFila`).
  *
  * A data de entrada no grupo saiu da tela: a 4ª não pede tempo mínimo (regra 1), o que
  * conta é estar no grupo — e isso é o item (a).
@@ -235,6 +257,9 @@ function turnosDe(valores: readonly string[] | null | undefined): Turno[] {
 }
 
 const SEM_ESCOPO = "Falta o escopo inscricoes:conferir para editar.";
+
+/** O banco ainda não tem a coluna da ciência (deploy antes da migração): o botão espera. */
+const CIENCIA_SEM_COLUNA = "«Dar ciência» fica disponível depois da migração do banco (coluna alertas_cientes).";
 
 /** Mapa vazio ESTÁVEL: um `new Map()` por render faria a gaveta achar que os dados mudaram. */
 const SEM_CONFERENCIAS: ReadonlyMap<ItemConferencia, RegistroConferencia> = new Map();
@@ -641,7 +666,7 @@ const OPCOES_DE_SITUACAO: readonly Opcao<Inscrito["situacao"]>[] = SITUACOES.map
   tom: TOM_SITUACAO[s],
   dica:
     s === "sobra"
-      ? "Aprovado que ficou de fora quando os times fecharam — não é fila com ordem."
+      ? "Aprovado que a organização tirou das vagas: vai para o FIM da fila de reserva e não é chamado sozinho."
       : s === EXCLUIDO
         ? "Some da lista de inscritos (fica só no filtro «Excluído») e sai de times, caixa e robô da Riot. Para desfazer, escolha outra situação."
         : undefined,
@@ -831,7 +856,10 @@ type RascunhoFicha = Partial<{
   situacao: Inscrito["situacao"];
   eloVerificado: string;
   organizador: boolean;
+  /** Nota interna (coluna `observacao`): só a organização vê. */
   observacao: string;
+  /** «Recado para o jogador» (coluna `recado_jogador`): aparece em Minha inscrição. */
+  recadoJogador: string;
   turnos: Turno[];
   nomeReal: string;
 }>;
@@ -858,7 +886,9 @@ type ItemSalvo = Readonly<{
 /** Um campo da ficha "não muda nada" se, gravado, deixaria o banco como está. */
 function fichaIgualAoBanco(campo: keyof RascunhoFicha, valor: unknown, salva: FichaSalva) {
   if (campo === "turnos") return turnosDe(valor as Turno[]).join(",") === salva.turnos.join(",");
-  if (campo === "observacao" || campo === "nomeReal") return String(valor).trim() === salva[campo].trim();
+  if (campo === "observacao" || campo === "recadoJogador" || campo === "nomeReal") {
+    return String(valor).trim() === salva[campo].trim();
+  }
   return valor === salva[campo];
 }
 
@@ -910,11 +940,17 @@ const FOCAVEIS = "a[href], button, input, select, textarea, [tabindex]";
 type PropsGaveta = Readonly<{
   inscrito: Inscrito;
   config: EdicaoConfig;
+  /**
+   * TODOS os alertas de agora, com e sem ciência — a gaveta separa (`separarPorCiencia`):
+   * os que contam vão no aviso, com «Dar ciência»; os aceitos, apagados, com «Desfazer».
+   */
   alertas: readonly Alerta[];
   conferencias: ReadonlyMap<ItemConferencia, RegistroConferencia>;
   executar: PropsSecao["executar"];
   ocupado: boolean;
   podeConferir: boolean;
+  /** Dá ciência dos alertas do caixa (`escopoDaCiencia`); os outros pedem `podeConferir`. */
+  podeFinanceiro: boolean;
   ultimoErro: string | null;
   /** O que a última ação que deu certo respondeu (o resumo do «atualizar da Riot»). */
   ultimaMensagem: string | null;
@@ -927,6 +963,23 @@ type PropsGaveta = Readonly<{
    * fechado ainda. Não é a coluna `pontos` — essa é a tabela fixa da 3ª, que o draft não usa.
    */
   precoNoDraft: number | null;
+  /** O lugar na fila de reserva (D1); nulo quando a edição não tem teto de vagas (não há fila). */
+  lugar: LugarNaFila | null;
+  /**
+   * Quem a saída deste inscrito chama da fila (o 1º que pode ser chamado), para a frase de
+   * confirmação do «passar a vaga» e o aviso de quando a situação o tira das vagas.
+   */
+  primeiroDaFila: Inscrito | null;
+  /**
+   * Como a fila fica se a situação/organizador da ficha forem os do rascunho — para a gaveta
+   * dizer ANTES de salvar quem é chamado e quem desce para a fila (D4). Nulo sem fila.
+   */
+  simularFila: (mudanca: Readonly<{ situacao: Inscrito["situacao"]; organizador: boolean }>) => PrevisaoDaFila | null;
+  /**
+   * Falhas de login recentes da conta (janela de 15 min do limitador), para o «Liberar login».
+   * `null` = a leitura falhou (ou o servidor ainda não manda): o botão funciona igual.
+   */
+  falhasDeLogin: number | null;
   anterior: Inscrito | null;
   proximo: Inscrito | null;
   onIr: (id: string) => void;
@@ -941,11 +994,16 @@ function GavetaInscrito({
   executar,
   ocupado,
   podeConferir,
+  podeFinanceiro,
   ultimoErro,
   ultimaMensagem,
   podeRedefinirSenha,
   posicao,
   precoNoDraft,
+  lugar,
+  primeiroDaFila,
+  simularFila,
+  falhasDeLogin,
   anterior,
   proximo,
   onIr,
@@ -958,6 +1016,12 @@ function GavetaInscrito({
   const [resultado, setResultado] = useState<"salvo" | "falhou" | null>(null);
   /** O «atualizar da Riot» daqui: o aviso do topo fica atrás da gaveta, então a resposta vem para cá. */
   const [resultadoRiot, setResultadoRiot] = useState<"ok" | "falhou" | null>(null);
+  /** Mesmo motivo, para o «passar a vaga» (D5): o botão some quando dá certo, a frase fica. */
+  const [resultadoVaga, setResultadoVaga] = useState<"ok" | "falhou" | null>(null);
+  /** E para o «Liberar login» (F), na aba Contato. */
+  const [resultadoLogin, setResultadoLogin] = useState<"ok" | "falhou" | null>(null);
+  /** E para o «Dar ciência» / «Desfazer» dos alertas. */
+  const [resultadoCiencia, setResultadoCiencia] = useState<"ok" | "falhou" | null>(null);
   const [observacoesAbertas, setObservacoesAbertas] = useState<ReadonlySet<ItemConferencia>>(
     () => new Set(),
   );
@@ -1011,9 +1075,17 @@ function GavetaInscrito({
     eloVerificado: inscrito.elo_fonte === "organizacao" ? (resolveElo(inscrito.elo_verificado)?.label ?? "") : "",
     organizador: inscrito.organizador,
     observacao: inscrito.observacao ?? "",
+    recadoJogador: inscrito.recado_jogador ?? "",
     turnos: turnosSalvos,
     nomeReal: inscrito.nome_real ?? "",
   };
+
+  /*
+   * O GET é `select *`: com a coluna no banco o recado vem (nulo quando vazio); sem ela
+   * (deploy antes da migração), a chave nem vem. Aí o campo fica travado com o porquê —
+   * gravar daria 400 e derrubaria a ficha inteira junto.
+   */
+  const recadoSemColuna = inscrito.recado_jogador === undefined;
 
   const itemSalvo = (item: ItemConferencia): ItemSalvo => {
     const registro = conferencias.get(item);
@@ -1099,6 +1171,7 @@ function GavetaInscrito({
   const eloVerificado = rascunho.ficha.eloVerificado ?? fichaSalva.eloVerificado;
   const organizador = rascunho.ficha.organizador ?? fichaSalva.organizador;
   const observacao = rascunho.ficha.observacao ?? fichaSalva.observacao;
+  const recadoJogador = rascunho.ficha.recadoJogador ?? fichaSalva.recadoJogador;
   const turnos = rascunho.ficha.turnos ?? fichaSalva.turnos;
   const nomeReal = rascunho.ficha.nomeReal ?? fichaSalva.nomeReal;
 
@@ -1115,6 +1188,8 @@ function GavetaInscrito({
     eloVerificado: rascunho.ficha.eloVerificado !== undefined && eloVerificado !== fichaSalva.eloVerificado,
     organizador: rascunho.ficha.organizador !== undefined && organizador !== fichaSalva.organizador,
     observacao: rascunho.ficha.observacao !== undefined && observacao.trim() !== fichaSalva.observacao.trim(),
+    recadoJogador:
+      rascunho.ficha.recadoJogador !== undefined && recadoJogador.trim() !== fichaSalva.recadoJogador.trim(),
     disponibilidade:
       rascunho.ficha.turnos !== undefined && turnosDe(turnos).join(",") !== fichaSalva.turnos.join(","),
     nomeReal: rascunho.ficha.nomeReal !== undefined && nomeReal.trim() !== fichaSalva.nomeReal.trim(),
@@ -1165,6 +1240,9 @@ function GavetaInscrito({
     ...(mudouNaFicha.eloVerificado && { eloVerificado: eloVerificado === "" ? null : eloVerificado }),
     ...(mudouNaFicha.organizador && { organizador }),
     ...(mudouNaFicha.observacao && { observacao: observacao.trim() === "" ? null : observacao.trim() }),
+    // O recado só viaja quando mudou: assim o resto da ficha continua gravando no intervalo
+    // entre o deploy e a migração (a rota só cita a coluna quando ela vem no pedido).
+    ...(mudouNaFicha.recadoJogador && { recadoJogador: recadoJogador.trim() === "" ? null : recadoJogador.trim() }),
     ...(mudouNaFicha.disponibilidade && { disponibilidade: turnosDe(turnos) }),
     ...(mudouNaFicha.nomeReal && { nomeReal: nomeReal.trim() }),
   };
@@ -1198,6 +1276,13 @@ function GavetaInscrito({
   const seguradoAoSalvar = mudouNaFicha.situacao
     ? situacao === "pendente" && (fichaSalva.situacao === "apto" || fichaSalva.situacao === "sobra")
     : inscrito.promocao_automatica === false;
+
+  // A fila muda com a situação e com o organizador (D1): a gaveta diz antes de salvar quem é
+  // chamado e quem desce — o servidor faz isso na mesma ação do salvar (D4).
+  const avisoDaFila =
+    mudouNaFicha.situacao || mudouNaFicha.organizador
+      ? textoDaPrevisao(simularFila({ situacao, organizador }), inscrito)
+      : null;
 
   const pendentes = ITENS_CONFERENCIA.filter((item) => estadoDe(item) === "pendente");
   // Item pendente que ainda é do robô (ex.: (D) sem ranque na solo/duo) fica fora do atalho:
@@ -1240,11 +1325,62 @@ function GavetaInscrito({
     segurarFoco();
   };
 
-  const atualizarDaRiot = async () => {
+  /**
+   * Os avisos de resposta da gaveta leem a ÚLTIMA resposta do painel (`ultimaMensagem` /
+   * `ultimoErro`): toda ação nova apaga os das outras, senão um deles passaria a mostrar a
+   * resposta de outra ação.
+   */
+  const limparResultados = () => {
     setResultadoRiot(null);
+    setResultadoVaga(null);
+    setResultadoLogin(null);
+    setResultadoCiencia(null);
+  };
+
+  const atualizarDaRiot = async () => {
+    limparResultados();
     const ok = await executar("sincronizar_riot", { inscricaoId: inscrito.id });
     if (!montada.current) return;
     setResultadoRiot(ok ? "ok" : "falhou");
+  };
+
+  /** D5: o servidor confere de novo (titular, não organizador, prazo vencido) antes de gravar. */
+  const passarVaga = async (): Promise<boolean> => {
+    limparResultados();
+    const ok = await executar("passar_vaga", { inscricaoId: inscrito.id });
+    if (montada.current) setResultadoVaga(ok ? "ok" : "falhou");
+    return ok;
+  };
+
+  /*
+   * Ciência dos alertas. Vai o TEXTO que a tela mostra, e a assinatura quando ela vai além do
+   * texto (os fatos do pagamento, o prazo): o servidor recalcula os alertas e só aceita se o
+   * de agora é o mesmo (senão 409, e o painel recarrega com o alerta novo). Não mexe na ficha
+   * nem nos requisitos — o rascunho aberto fica como está.
+   */
+  const alertasSeparados = separarPorCiencia(alertas, inscrito.alertas_cientes);
+  const cienciaSemColuna = inscrito.alertas_cientes === undefined;
+  /** Alerta do caixa: financeiro. Os outros: conferência. Sem o escopo, o botão nem aparece. */
+  const podeDarCiencia = (alerta: Alerta) =>
+    escopoDaCiencia(alerta.codigo) === "inscricoes:financeiro" ? podeFinanceiro : podeConferir;
+
+  const darCiencia = async (alerta: Alerta) => {
+    limparResultados();
+    const ok = await executar("alerta_ciencia", pedidoDeCiencia(inscrito.id, alerta));
+    if (montada.current) setResultadoCiencia(ok ? "ok" : "falhou");
+  };
+
+  const desfazerCiencia = async (alerta: Alerta) => {
+    limparResultados();
+    const ok = await executar("alerta_ciencia", { inscricaoId: inscrito.id, codigo: alerta.codigo, desfazer: true });
+    if (montada.current) setResultadoCiencia(ok ? "ok" : "falhou");
+  };
+
+  /** F: o e-mail da conta sai da inscrição no servidor — nada de e-mail no corpo. */
+  const liberarLogin = async () => {
+    limparResultados();
+    const ok = await executar("liberar_login", { inscricaoId: inscrito.id });
+    if (montada.current) setResultadoLogin(ok ? "ok" : "falhou");
   };
 
   const salvar = async (depois?: () => void) => {
@@ -1252,8 +1388,8 @@ function GavetaInscrito({
     // Zera o resultado ANTES: senão, numa nova tentativa depois de uma falha, o rodapé
     // continuava dizendo "Não foi possível salvar" durante o próprio salvamento.
     setResultado(null);
-    // O aviso da Riot lê a última resposta do painel, que passa a ser a deste salvamento.
-    setResultadoRiot(null);
+    // Os avisos de Riot, vaga e login leem a última resposta do painel, que passa a ser a deste salvamento.
+    limparResultados();
     const ok = await executar("inscrito", {
       inscricaoId: inscrito.id,
       ...(conferenciasMudadas.length > 0 && { conferencias: conferenciasMudadas }),
@@ -1407,16 +1543,140 @@ function GavetaInscrito({
         </p>
       ) : null}
 
-      {alertas.length > 0 ? (
+      {alertasSeparados.pendentes.length > 0 ? (
         <div style={{ marginTop: 10 }}>
-          <Banner tone="warn" title={plural(alertas.length, "ponto de atenção", "pontos de atenção")}>
+          <Banner
+            tone="warn"
+            title={plural(alertasSeparados.pendentes.length, "ponto de atenção", "pontos de atenção")}
+          >
             <ul style={{ margin: 0, paddingLeft: 18 }}>
-              {alertas.map((a) => (
-                <li key={a.codigo}>{a.texto}</li>
+              {alertasSeparados.pendentes.map((a) => (
+                <li key={a.codigo} style={{ marginBottom: 6 }}>
+                  {a.texto}
+                  {podeDarCiencia(a) ? (
+                    <div style={{ marginTop: 6 }}>
+                      <Button
+                        small
+                        disabled={ocupado || cienciaSemColuna}
+                        title={
+                          cienciaSemColuna
+                            ? CIENCIA_SEM_COLUNA
+                            : TITULO_DAR_CIENCIA
+                        }
+                        onClick={() => void darCiencia(a)}
+                      >
+                        Dar ciência
+                      </Button>
+                    </div>
+                  ) : null}
+                  {/* D5: o titular que perdeu o prazo — um clique, com confirmação. Com rascunho
+                      aberto, não: a situação mudaria por baixo do que a pessoa está marcando. */}
+                  {a.acaoFila === "passar_vaga" ? (
+                    <div style={{ marginTop: 8 }}>
+                      <PassarAVaga
+                        nome={nomeDe(inscrito)}
+                        proximo={primeiroDaFila ? nomeDe(primeiroDaFila) : null}
+                        onPassar={passarVaga}
+                        desabilitado={bloqueado || totalMudado > 0}
+                        motivo={
+                          !podeConferir
+                            ? SEM_ESCOPO
+                            : totalMudado > 0
+                              ? "Salve ou descarte as alterações da gaveta antes."
+                              : undefined
+                        }
+                        largo={compacto}
+                      />
+                    </div>
+                  ) : null}
+                </li>
               ))}
             </ul>
+            {cienciaSemColuna && alertasSeparados.pendentes.some(podeDarCiencia) ? (
+              <p style={{ margin: "4px 0 0", fontSize: 11, color: C.ink4 }}>{CIENCIA_SEM_COLUNA}</p>
+            ) : null}
           </Banner>
         </div>
+      ) : null}
+      {alertasSeparados.comCiencia.length > 0 ? (
+        // Apagado por COR e texto, nunca por opacidade: o alerta aceito continua legível
+        // (e auditável) sem disputar o olho com os que ainda pedem ação.
+        <div
+          role="group"
+          aria-label="Alertas com ciência da organização"
+          style={{ marginTop: 10, padding: "10px 14px", border: `1px dashed ${C.line}`, borderRadius: 4 }}
+        >
+          <p
+            style={{
+              margin: 0,
+              fontSize: 10,
+              letterSpacing: ".16em",
+              textTransform: "uppercase",
+              color: C.ink4,
+            }}
+          >
+            Com ciência da organização — não contam no ⚠
+          </p>
+          <ul style={{ margin: "6px 0 0", paddingLeft: 18, fontSize: 12, lineHeight: 1.55, color: C.ink4 }}>
+            {alertasSeparados.comCiencia.map(({ alerta, ciencia }) => (
+              <li key={alerta.codigo} style={{ marginBottom: 6 }}>
+                {alerta.texto}
+                <span
+                  style={{ display: "block", fontSize: 11, color: C.ink4 }}
+                  title={`Ciência de ${ciencia.por} em ${formatDateTimeLabel(ciencia.em)} (horário de Brasília)`}
+                >
+                  ciente — {ciencia.por}, {quandoCurto(ciencia.em)}
+                  {podeDarCiencia(alerta) && !compacto ? (
+                    <>
+                      {" · "}
+                      <BotaoLink disabled={ocupado || cienciaSemColuna} onClick={() => void desfazerCiencia(alerta)}>
+                        Desfazer
+                      </BotaoLink>
+                    </>
+                  ) : null}
+                </span>
+                {/* No celular, alvo de dedo: o botão pequeno tem 40px de altura. */}
+                {podeDarCiencia(alerta) && compacto ? (
+                  <div style={{ marginTop: 6 }}>
+                    <Button small disabled={ocupado || cienciaSemColuna} onClick={() => void desfazerCiencia(alerta)}>
+                      Desfazer
+                    </Button>
+                  </div>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {resultadoCiencia && !ocupado ? (
+        <p
+          role={resultadoCiencia === "falhou" ? "alert" : "status"}
+          style={{
+            margin: "8px 0 0",
+            fontSize: 12,
+            lineHeight: 1.5,
+            color: resultadoCiencia === "falhou" ? C.dangerSoft : C.okSoft,
+          }}
+        >
+          {resultadoCiencia === "falhou"
+            ? (ultimoErro ?? "Não foi possível gravar a ciência.")
+            : (ultimaMensagem ?? "Ciência gravada.")}
+        </p>
+      ) : null}
+      {resultadoVaga && !ocupado ? (
+        <p
+          role={resultadoVaga === "falhou" ? "alert" : "status"}
+          style={{
+            margin: "8px 0 0",
+            fontSize: 12,
+            lineHeight: 1.5,
+            color: resultadoVaga === "falhou" ? C.dangerSoft : C.okSoft,
+          }}
+        >
+          {resultadoVaga === "falhou"
+            ? (ultimoErro ?? "Não foi possível passar a vaga.")
+            : (ultimaMensagem ?? "Vaga liberada.")}
+        </p>
       ) : null}
 
       {ITENS_CONFERENCIA.map((item) => {
@@ -1543,11 +1803,14 @@ function GavetaInscrito({
         </p>
       </fieldset>
 
-      {/* O jogador LÊ este campo em «Minha inscrição», logo abaixo da situação — o mesmo aviso
-          da observação de cada requisito. Nota interna da organização não vai aqui. */}
+      {/*
+        Decisão G (2026-10-22): a observação da ficha virou DOIS campos, e cada um diz quem o
+        lê. A nota interna (coluna `observacao`) não sai mais para o jogador; o recado (coluna
+        `recado_jogador`) é o único texto da ficha que aparece em «Minha inscrição».
+      */}
       <Field
-        label="Observação da ficha"
-        hint="Vale para a inscrição inteira. O jogador lê esta observação em «Minha inscrição» — não escreva aqui o que é só da organização."
+        label="Nota interna — só a organização vê"
+        hint="Vale para a inscrição inteira e fica só no painel: o jogador NÃO lê este campo. Para falar com ele, use o recado logo abaixo."
       >
         <Textarea
           value={observacao}
@@ -1556,7 +1819,26 @@ function GavetaInscrito({
           disabled={bloqueado}
           onChange={(v) => editarFicha("observacao", v)}
           placeholder="Ex.: pediu para jogar no mesmo time do irmão; combinado que não há garantia."
-          ariaLabel="Observação da ficha"
+          ariaLabel="Nota interna"
+        />
+      </Field>
+
+      <Field
+        label="Recado para o jogador — aparece em «Minha inscrição»"
+        hint={
+          recadoSemColuna
+            ? "Ainda não dá para escrever: falta a migração do banco (coluna recado_jogador). O resto da ficha salva normalmente."
+            : "O jogador lê este texto em «Minha inscrição», logo abaixo da situação. Em branco, nada aparece para ele."
+        }
+      >
+        <Textarea
+          value={recadoJogador}
+          rows={3}
+          maxLength={LIMITES_INSCRICAO.texto}
+          disabled={bloqueado || recadoSemColuna}
+          onChange={(v) => editarFicha("recadoJogador", v)}
+          placeholder="Ex.: falta mandar o print do perfil no privado da organização até sexta."
+          ariaLabel="Recado para o jogador"
         />
       </Field>
     </div>
@@ -1626,6 +1908,21 @@ function GavetaInscrito({
         </FieldGrid>
       </div>
 
+      <LoginDaConta
+        falhas={falhasDeLogin}
+        bloqueado={bloqueado}
+        motivo={podeConferir ? undefined : SEM_ESCOPO}
+        largo={compacto}
+        onLiberar={() => void liberarLogin()}
+        resultado={
+          resultadoLogin && !ocupado
+            ? resultadoLogin === "falhou"
+              ? { ok: false, texto: ultimoErro ?? "Não foi possível liberar o login." }
+              : { ok: true, texto: ultimaMensagem ?? "Login liberado." }
+            : null
+        }
+      />
+
       {podeRedefinirSenha ? <SenhaProvisoria inscrito={inscrito} /> : null}
     </div>
   );
@@ -1668,7 +1965,13 @@ function GavetaInscrito({
       </span>
     );
   } else if (resultado === "salvo") {
-    situacaoDoRascunho = <span style={{ color: C.okSoft }}>✓ Salvo.</span>;
+    // A resposta pode dizer mais que "Salvo." — virou Apto, alguém foi chamado da fila, ou o
+    // prazo da fila não foi alinhado. O aviso do topo fica atrás da gaveta, então vem para cá.
+    situacaoDoRascunho = (
+      <span style={{ color: C.okSoft }}>
+        ✓ {ultimaMensagem && ultimaMensagem !== "Salvo." ? ultimaMensagem : "Salvo."}
+      </span>
+    );
   } else {
     situacaoDoRascunho = <span style={{ color: C.ink4 }}>Nada alterado.</span>;
   }
@@ -1764,6 +2067,9 @@ function GavetaInscrito({
         <p style={{ margin: "-4px 0 10px", fontSize: 11, color: C.ink4 }}>
           Vira Apto sozinho quando todos os requisitos cumprirem e o pagamento estiver confirmado.
         </p>
+      ) : null}
+      {avisoDaFila ? (
+        <p style={{ margin: "-4px 0 10px", fontSize: 11.5, lineHeight: 1.5, color: C.warnSoft }}>{avisoDaFila}</p>
       ) : null}
       <Toolbar
         right={
@@ -1869,6 +2175,7 @@ function GavetaInscrito({
             <Chip tone={TOM_SITUACAO[inscrito.situacao]} title="Situação gravada">
               {ROTULO_SITUACAO[inscrito.situacao]}
             </Chip>
+            {lugar ? <ChipDoLugar lugar={lugar} /> : null}
             {inscrito.organizador ? (
               <Chip tone="gold" title="Organizador desta edição — não paga inscrição e não é capitão">
                 organização
@@ -1880,6 +2187,11 @@ function GavetaInscrito({
               </Chip>
             ) : null}
             {congelado ? <Chip tone="warn">elo congelado</Chip> : null}
+            {falhasDeLogin !== null && falhasDeLogin >= RATE_LIMIT.maxFailuresPerUser ? (
+              <Chip tone="danger" title="Falhas de senha demais nos últimos minutos — dá para liberar na aba Contato.">
+                login trancado
+              </Chip>
+            ) : null}
           </div>
 
           {/* O que se olha ao conferir, sem trocar de aba. */}
@@ -2032,6 +2344,69 @@ function GavetaInscrito({
       </div>
     </div>,
     document.body,
+  );
+}
+
+// ---------------------------------------------------------------- liberar login
+
+/**
+ * «Liberar login» (decisão F, 2026-10-22) — para quem ficou trancado para fora da própria
+ * conta: alguém martela o e-mail dele de vários IPs e as falhas travam a CONTA, e o dono, com
+ * a senha certa, não entra (no dia do draft, um capitão).
+ *
+ * O botão marca as falhas recentes (15 min) da conta como liberadas pela organização: elas
+ * deixam de contar contra a conta, mas continuam contando para o IP de onde vieram — o IP de
+ * quem martelou segue bloqueado. O número mostrado ANTES é o da última leitura do painel; o
+ * servidor relê na hora do clique e a resposta diz quantas liberou.
+ */
+function LoginDaConta({
+  falhas,
+  bloqueado,
+  motivo,
+  largo,
+  onLiberar,
+  resultado,
+}: Readonly<{
+  falhas: number | null;
+  bloqueado: boolean;
+  motivo?: string;
+  largo: boolean;
+  onLiberar: () => void;
+  resultado: Readonly<{ ok: boolean; texto: string }> | null;
+}>) {
+  const minutos = Math.round(RATE_LIMIT.windowSeconds / 60);
+  const trancada = falhas !== null && falhas >= RATE_LIMIT.maxFailuresPerUser;
+  const texto: CSSProperties = { margin: "6px 0 0", fontSize: 12, lineHeight: 1.6, color: C.ink3 };
+
+  return (
+    <section aria-label="Login da conta" style={{ marginTop: 18, paddingTop: 14, borderTop: `1px solid ${C.line}` }}>
+      <div style={{ fontSize: 10, letterSpacing: ".16em", textTransform: "uppercase", color: C.bronze }}>
+        Login da conta
+      </div>
+      <p style={{ ...texto, color: trancada ? C.warnSoft : C.ink3 }}>
+        {falhas === null
+          ? "Não deu para ler as falhas de login agora — o botão funciona do mesmo jeito."
+          : falhas === 0
+            ? `Nenhuma falha de login nos últimos ${minutos} minutos (na última leitura do painel).`
+            : `${plural(falhas, "falha de login", "falhas de login")} nos últimos ${minutos} minutos${
+                trancada ? ": a conta está TRANCADA — o jogador não entra nem com a senha certa." : "."
+              }`}
+      </p>
+      <p style={texto}>
+        Liberar faz as falhas recentes pararem de contar contra a conta. Quem tentou de outro aparelho continua
+        bloqueado nele. Não muda a senha.
+      </p>
+      <div style={{ marginTop: 8 }}>
+        <Button small={!largo} fullWidth={largo} disabled={bloqueado} title={motivo} onClick={onLiberar}>
+          Liberar login
+        </Button>
+      </div>
+      {resultado ? (
+        <p role={resultado.ok ? "status" : "alert"} style={{ ...texto, color: resultado.ok ? C.okSoft : C.dangerSoft }}>
+          {resultado.texto}
+        </p>
+      ) : null}
+    </section>
   );
 }
 
@@ -2284,6 +2659,7 @@ export function SecaoInscritos({
   executar,
   ocupado,
   podeConferir,
+  podeFinanceiro,
   ultimoErro = null,
   ultimaMensagem = null,
   podeRedefinirSenha = false,
@@ -2293,6 +2669,7 @@ export function SecaoInscritos({
   const [filtroSituacao, setFiltroSituacao] = useState("todos");
   const [soPendencia, setSoPendencia] = useState(false);
   const [soAlerta, setSoAlerta] = useState(false);
+  const [soFila, setSoFila] = useState(false);
   // Inicializador preguiçoso: a seção só monta no cliente (depois da sessão), então ler o
   // navegador aqui não diverge do servidor.
   const [ordem, setOrdemBruta] = useState<Ordem>(lerOrdem);
@@ -2317,6 +2694,28 @@ export function SecaoInscritos({
 
   const { config, inscritos, conferencias, pagamentos, panorama } = dados;
   const janelaAberta = estadoDaJanela(config, agora) === "aberta";
+
+  /*
+   * A fila de reserva (D1): titular ou posição na fila, para cada inscrito. Sem teto de vagas
+   * todo ativo é titular — aí a coluna e os chips não aparecem, porque não diriam nada.
+   */
+  const fila = useFila(dados);
+  const comFila = temFila(fila);
+  const lugarDoInscrito = (id: string) => lugarNaFila(fila, id);
+  const porId = useMemo(() => new Map(inscritos.map((i) => [i.id, i])), [inscritos]);
+  const primeiro = useMemo(() => {
+    const id = primeiroDaFila(fila);
+    return id ? (porId.get(id) ?? null) : null;
+  }, [fila, porId]);
+
+  /** A fila depois de mudar a situação/organizador de UM inscrito — a mesma função pura. */
+  const simularFila = (
+    id: string,
+    mudanca: Readonly<{ situacao: Inscrito["situacao"]; organizador: boolean }>,
+  ): PrevisaoDaFila | null => (comFila ? preverFila(inscritos, config, id, mudanca) : null);
+
+  const falhasDeLoginDe = (id: string): number | null =>
+    dados.falhasDeLogin ? (dados.falhasDeLogin[id] ?? 0) : null;
 
   /**
    * O preço de cada um na PRÉVIA da tabela automática — a mesma conta de Times e vagas. A
@@ -2346,25 +2745,40 @@ export function SecaoInscritos({
     return mapa;
   }, [conferencias]);
 
-  /** O que merece olho em cada inscrito (ver `alertasDoInscrito`). Calculado, nunca gravado. */
-  const alertasPorInscrito = useMemo(() => {
+  /**
+   * O que merece olho em cada inscrito (ver `alertasDoInscrito`). Calculado, nunca gravado.
+   *
+   * Dois mapas: `todosOsAlertas` vai para a gaveta (que mostra também os aceitos, apagados);
+   * `alertasPorInscrito` só com os que CONTAM — sem ciência da organização que valha para o
+   * texto de agora (`separarPorCiencia`). É ele que dá o ⚠ N e o filtro «Só quem tem ponto
+   * de atenção».
+   */
+  const { todosOsAlertas, alertasPorInscrito } = useMemo(() => {
     const pagamentoDe = new Map<string, Pagamento>(pagamentos.map((p) => [p.inscricao_id, p]));
+    const todos = new Map<string, Alerta[]>();
     const mapa = new Map<string, Alerta[]>();
     for (const i of inscritos) {
       const alertas = alertasDoInscrito({
         inscrito: i,
         conferencias: [...(porInscrito.get(i.id)?.values() ?? [])],
+        // Com `vence_em`: é ele que acende o «prazo vencido» (D5).
         pagamento: pagamentoDe.get(i.id) ?? null,
         config,
         agoraMs: agora,
+        // O lugar na fila: reserva não é cobrado (D2), e titular com o prazo vencido ganha o
+        // botão «Passar a vaga ao 1º da fila» (D5).
+        lugar: lugarNaFila(fila, i.id),
         // A lista inteira: sem ela o alerta de conta da Riot repetida (`mesma_conta`) não é
         // calculado — o índice do banco não pega "VENANCIO" × "VENÂNCIO", e a Riot sim.
         inscritos,
       });
-      if (alertas.length > 0) mapa.set(i.id, alertas);
+      if (alertas.length === 0) continue;
+      todos.set(i.id, alertas);
+      const { pendentes } = separarPorCiencia(alertas, i.alertas_cientes);
+      if (pendentes.length > 0) mapa.set(i.id, pendentes);
     }
-    return mapa;
-  }, [inscritos, pagamentos, porInscrito, config, agora]);
+    return { todosOsAlertas: todos, alertasPorInscrito: mapa };
+  }, [inscritos, pagamentos, porInscrito, config, agora, fila]);
 
   /**
    * A lista inteira na ordem escolhida. Tudo o que depende de "quem vem antes/depois"
@@ -2424,13 +2838,28 @@ export function SecaoInscritos({
       if (filtroSituacao === "todos" ? i.situacao === EXCLUIDO : i.situacao !== filtroSituacao) return false;
       if (soPendencia && !temPendencia(i.id)) return false;
       if (soAlerta && !alertasPorInscrito.has(i.id)) return false;
+      if (soFila && comFila && lugarNaFila(fila, i.id).tipo !== "reserva") return false;
       if (filtroElos.size > 0 && !filtroElos.has(resolveElo(eloExibido(i).bruto)?.key ?? "")) return false;
       if (!termo) return true;
       return [i.nick, i.riot_id, i.discord, i.email, i.nome_real ?? ""].some((campo) =>
         campo.toLowerCase().includes(termo),
       );
     });
-  }, [ordenados, busca, filtroSituacao, soPendencia, soAlerta, filtroElos, porInscrito, alertasPorInscrito, config, agora]);
+  }, [
+    ordenados,
+    busca,
+    filtroSituacao,
+    soPendencia,
+    soAlerta,
+    soFila,
+    comFila,
+    fila,
+    filtroElos,
+    porInscrito,
+    alertasPorInscrito,
+    config,
+    agora,
+  ]);
 
   // A gaveta busca em TODOS os inscritos, não nos visíveis: mudar um filtro (ou salvar
   // alguém que por isso sai do filtro) não pode fechar a pessoa que está aberta.
@@ -2522,6 +2951,22 @@ export function SecaoInscritos({
           value={panorama.times}
           detail={`de ${panorama.elegiveis} (pendentes + aprovados)`}
         />
+        {comFila ? (
+          <>
+            <Metric
+              small
+              label="Titulares"
+              value={fila.titulares.length}
+              detail={`de ${fila.vagas} vagas (organizadores sempre entram)`}
+            />
+            <Metric
+              small
+              label="Fila de reserva"
+              value={fila.reservas.length}
+              detail="pela ordem de inscrição — só paga se for chamado"
+            />
+          </>
+        ) : null}
       </FieldGrid>
 
       <BarraDoRobo
@@ -2624,6 +3069,11 @@ export function SecaoInscritos({
           <Check checked={soAlerta} onChange={setSoAlerta}>
             Só quem tem ponto de atenção ({alertasPorInscrito.size})
           </Check>
+          {comFila ? (
+            <Check checked={soFila} onChange={setSoFila}>
+              Só a fila de reserva ({fila.reservas.length})
+            </Check>
+          ) : null}
         </div>
 
         <p
@@ -2692,6 +3142,7 @@ export function SecaoInscritos({
                           </Chip>
                         );
                       })}
+                      {comFila ? <ChipDoLugar lugar={lugarDoInscrito(inscrito.id)} /> : null}
                       {inscrito.organizador ? (
                         <Chip tone="gold" title="Organizador desta edição — não paga inscrição e não é capitão">
                           org
@@ -2748,6 +3199,15 @@ export function SecaoInscritos({
                       {item}
                     </th>
                   ))}
+                  {comFila ? (
+                    <th
+                      scope="col"
+                      style={{ ...th, textAlign: "left" }}
+                      title={`Titular (dentro das ${fila.vagas} vagas) ou a posição na fila de reserva, pela ordem de inscrição. Organizadores sempre entram.`}
+                    >
+                      Vaga
+                    </th>
+                  ) : null}
                   <th scope="col" style={{ ...th, textAlign: "left" }}>
                     Situação
                   </th>
@@ -2859,6 +3319,16 @@ export function SecaoInscritos({
                         );
                       })}
 
+                      {comFila ? (
+                        <td style={td}>
+                          {lugarDoInscrito(inscrito.id).tipo === "fora" ? (
+                            <span style={{ color: C.ink4 }}>—</span>
+                          ) : (
+                            <ChipDoLugar lugar={lugarDoInscrito(inscrito.id)} />
+                          )}
+                        </td>
+                      ) : null}
+
                       <td style={td}>
                         <Chip tone={TOM_SITUACAO[inscrito.situacao]}>
                           {ROTULO_SITUACAO[inscrito.situacao]}
@@ -2884,16 +3354,21 @@ export function SecaoInscritos({
           key={selecionado.id}
           inscrito={selecionado}
           config={config}
-          alertas={alertasPorInscrito.get(selecionado.id) ?? SEM_ALERTAS}
+          alertas={todosOsAlertas.get(selecionado.id) ?? SEM_ALERTAS}
           conferencias={porInscrito.get(selecionado.id) ?? SEM_CONFERENCIAS}
           executar={executar}
           ocupado={ocupado}
           podeConferir={podeConferir}
+          podeFinanceiro={podeFinanceiro}
           ultimoErro={ultimoErro}
           ultimaMensagem={ultimaMensagem}
           podeRedefinirSenha={podeRedefinirSenha}
           posicao={vizinhos.posicao}
           precoNoDraft={precoDaPrevia(selecionado)}
+          lugar={comFila ? lugarDoInscrito(selecionado.id) : null}
+          primeiroDaFila={primeiro && primeiro.id !== selecionado.id ? primeiro : null}
+          simularFila={(mudanca) => simularFila(selecionado.id, mudanca)}
+          falhasDeLogin={falhasDeLoginDe(selecionado.id)}
           anterior={vizinhos.anterior}
           proximo={vizinhos.proximo}
           onIr={setSelecionadoId}

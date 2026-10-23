@@ -15,7 +15,7 @@
  *     derivados do elo.
  */
 
-import { elencosFecham } from "@/lib/draft/viabilidade";
+import { elencosFecham, type Viabilidade } from "@/lib/draft/viabilidade";
 
 // ---------------------------------------------------------------- tipos
 
@@ -85,6 +85,17 @@ export type EstadoDraft = {
   sorteio?: { semente: string; capitaes: string[]; emISO: string };
   /** Só com `fase === "pausado"`. Ausente em estados gravados antes deste campo existir. */
   motivoDaPausa?: MotivoDaPausa;
+  /**
+   * Quem estava no POOL (ainda não escolhido) e saiu depois do sorteio: a inscrição ficou
+   * recusada, desistente ou excluída (decisão C1 de 2026-10-22). Sai dos escolhíveis NA HORA
+   * — nem o capitão nem a escolha automática levam — e a transmissão mostra que saiu. Quem
+   * já está num elenco (escolhido ou capitão) e sai NÃO entra aqui: o draft segue com ele
+   * (C2), e a vaga é reposta depois da virada, pela saída de vez.
+   *
+   * Quem grava é `atualizarForaDoPool`, a partir da situação ATUAL das inscrições (a
+   * sondagem lê). Opcional: estados gravados antes não têm, e lista vazia não é gravada.
+   */
+  foraDoPool?: string[];
 };
 
 /**
@@ -99,6 +110,7 @@ export type CodigoDaRecusa =
   | "sem_escolha"
   | "nao_e_a_vez"
   | "fora_do_pool"
+  | "saiu_do_pool"
   | "ja_escolhido"
   | "elenco_completo"
   | "acima_do_teto"
@@ -149,6 +161,27 @@ export function vagasAbertasDoTime(estado: EstadoDraft, timeId: string): number 
   return Math.max(0, estado.jogadoresPorTime - elencoDoTime(estado, timeId).length);
 }
 
+/** Quantas escolhas este time ainda tem na ordem, da escolha atual em diante. */
+export function escolhasRestantesDoTime(estado: EstadoDraft, timeId: string): number {
+  let n = 0;
+  for (let i = estado.escolhaAtual; i < estado.ordem.length; i++) if (estado.ordem[i] === timeId) n++;
+  return n;
+}
+
+/**
+ * As vagas que o DRAFT ainda vai preencher neste time.
+ *
+ * Num draft normal é o mesmo que as vagas abertas: a serpentina dá a cada time uma escolha
+ * por vaga além do capitão. Só muda quando alguém sai do pool depois do sorteio
+ * (`atualizarForaDoPool`): faltando jogador para todas as vagas, a ordem perde escolhas, e o
+ * time que perdeu uma termina o draft com uma vaga aberta — reposta depois, pela fila de
+ * reserva. A conta de viabilidade e o teto olham ESTE número; senão pediriam um jogador que
+ * não existe e o draft travaria.
+ */
+function vagasNoDraft(estado: EstadoDraft, timeId: string): number {
+  return Math.min(vagasAbertasDoTime(estado, timeId), escolhasRestantesDoTime(estado, timeId));
+}
+
 /**
  * O máximo que este time pode gastar NESTA escolha.
  *
@@ -157,9 +190,11 @@ export function vagasAbertasDoTime(estado: EstadoDraft, timeId: string): number 
  * precisa de pelo menos 1 ponto, então esse mínimo fica reservado.
  *
  *   teto = orçamento − gasto − (vagas abertas − 1)
+ *
+ * "Vagas abertas" são as que o draft ainda preenche (`vagasNoDraft`).
  */
 export function tetoDaEscolha(estado: EstadoDraft, timeId: string): number {
-  const abertas = vagasAbertasDoTime(estado, timeId);
+  const abertas = vagasNoDraft(estado, timeId);
   if (abertas === 0) return 0;
   return estado.orcamentoPorTime - gastoDoTime(estado, timeId) - (abertas - 1);
 }
@@ -169,8 +204,21 @@ export function timeDaVez(estado: EstadoDraft): string | null {
   return estado.ordem[estado.escolhaAtual] ?? null;
 }
 
+/** Quem saiu do pool depois do sorteio (C1), como conjunto. */
+function saidasDoEstado(estado: Pick<EstadoDraft, "foraDoPool">): ReadonlySet<string> {
+  return new Set(estado.foraDoPool ?? []);
+}
+
+/** Quem ainda pode ser escolhido: sem time e sem ter saído do pool depois do sorteio. */
 export function jogadoresDisponiveis(estado: EstadoDraft): JogadorDoDraft[] {
-  return estado.jogadores.filter((j) => j.timeId === null);
+  const saiu = saidasDoEstado(estado);
+  return estado.jogadores.filter((j) => j.timeId === null && !saiu.has(j.id));
+}
+
+/** Quem estava no pool e saiu depois do sorteio (C1): a transmissão e a mesa mostram. */
+export function jogadoresQueSairamDoPool(estado: EstadoDraft): JogadorDoDraft[] {
+  const saiu = saidasDoEstado(estado);
+  return estado.jogadores.filter((j) => j.timeId === null && saiu.has(j.id));
 }
 
 // ---------------------------------------------------------------- validação
@@ -198,6 +246,14 @@ export function podeEscolher(
   const jogador = estado.jogadores.find((j) => j.id === jogadorId);
   if (!jogador) return { ok: false, codigo: "fora_do_pool", motivo: "Jogador não está no pool." };
   if (jogador.timeId !== null) return { ok: false, codigo: "ja_escolhido", motivo: "Esse jogador já foi escolhido." };
+  if (saidasDoEstado(estado).has(jogador.id)) {
+    return {
+      ok: false,
+      codigo: "saiu_do_pool",
+      params: { riotId: jogador.riotId },
+      motivo: `${jogador.riotId} saiu do draft depois do sorteio e não pode mais ser escolhido. Escolha outro jogador.`,
+    };
+  }
 
   if (vagasAbertasDoTime(estado, timeId) === 0) {
     return { ok: false, codigo: "elenco_completo", motivo: "Seu elenco já está completo." };
@@ -235,14 +291,24 @@ export function podeEscolher(
 // ---------------------------------------------------------------- viabilidade
 
 function custosRestantes(estado: EstadoDraft, semJogadorId?: string): number[] {
-  return estado.jogadores.filter((j) => j.timeId === null && j.id !== semJogadorId).map((j) => j.pontos);
+  return jogadoresDisponiveis(estado)
+    .filter((j) => j.id !== semJogadorId)
+    .map((j) => j.pontos);
 }
 
 /** Vagas e folga de um time, opcionalmente depois de levar `levando`. */
 function situacaoDoTime(estado: EstadoDraft, timeId: string, levando?: JogadorDoDraft) {
-  const vagas = vagasAbertasDoTime(estado, timeId) - (levando ? 1 : 0);
+  const vagas = vagasNoDraft(estado, timeId) - (levando ? 1 : 0);
   const folga = estado.orcamentoPorTime - gastoDoTime(estado, timeId) - (levando ? levando.pontos : 0);
   return { vagas, folga };
+}
+
+/** A resposta da busca para `timeId` levar `jogador`: fecha, não fecha ou indeterminado. */
+function viabilidadeDepoisDe(estado: EstadoDraft, timeId: string, jogador: JogadorDoDraft): Viabilidade {
+  const times = estado.times.map((t) =>
+    t.id === timeId ? situacaoDoTime(estado, t.id, jogador) : situacaoDoTime(estado, t.id),
+  );
+  return elencosFecham(times, custosRestantes(estado, jogador.id));
 }
 
 /**
@@ -252,10 +318,27 @@ function situacaoDoTime(estado: EstadoDraft, timeId: string, levando?: JogadorDo
  * é o comportamento de antes, que nunca recusava por isso.
  */
 function fechaDepoisDe(estado: EstadoDraft, timeId: string, jogador: JogadorDoDraft): boolean {
-  const times = estado.times.map((t) =>
-    t.id === timeId ? situacaoDoTime(estado, t.id, jogador) : situacaoDoTime(estado, t.id),
-  );
-  return elencosFecham(times, custosRestantes(estado, jogador.id)) !== "nao_fecha";
+  return viabilidadeDepoisDe(estado, timeId, jogador) !== "nao_fecha";
+}
+
+/**
+ * Quem o time da vez pode levar, na ordem recebida: os que a busca PROVOU que fecham; só se
+ * nenhum foi provado, os "indeterminados" (o comportamento de antes, que nunca travava por
+ * isso). A conta é uma por valor de pontos.
+ *
+ * Depois que alguém sai do pool a soma deixa de ser exata, a poda da busca fica mais fraca, e
+ * provar que um preço NÃO fecha passa do orçamento de passos: oferecer esse "indeterminado"
+ * como se fechasse deixava o capitão (ou a escolha automática) levar justamente o jogador
+ * que travava o draft algumas escolhas depois. Com um provado ao lado, ele não entra.
+ */
+function quemFechaParaAVez(estado: EstadoDraft, timeId: string, candidatos: readonly JogadorDoDraft[]): JogadorDoDraft[] {
+  const porValor = new Map<number, Viabilidade>();
+  const resposta = (j: JogadorDoDraft) => {
+    if (!porValor.has(j.pontos)) porValor.set(j.pontos, viabilidadeDepoisDe(estado, timeId, j));
+    return porValor.get(j.pontos)!;
+  };
+  const provados = candidatos.filter((j) => resposta(j) === "fecha");
+  return provados.length > 0 ? provados : candidatos.filter((j) => resposta(j) === "indeterminado");
 }
 
 /**
@@ -282,14 +365,11 @@ export function escolhiveisDaVez(estado: EstadoDraft): string[] {
     estado.fase === "rodando" || estado.fase === "pausado" ? estado.ordem[estado.escolhaAtual] : undefined;
   if (!timeId || vagasAbertasDoTime(estado, timeId) === 0) return [];
   const teto = tetoDaEscolha(estado, timeId);
-  const porValor = new Map<number, boolean>();
-  return jogadoresDisponiveis(estado)
-    .filter((j) => {
-      if (j.pontos > teto) return false;
-      if (!porValor.has(j.pontos)) porValor.set(j.pontos, fechaDepoisDe(estado, timeId, j));
-      return porValor.get(j.pontos)!;
-    })
-    .map((j) => j.id);
+  return quemFechaParaAVez(
+    estado,
+    timeId,
+    jogadoresDisponiveis(estado).filter((j) => j.pontos <= teto),
+  ).map((j) => j.id);
 }
 
 /**
@@ -306,8 +386,17 @@ export function maisBaratoValido(estado: EstadoDraft, timeId: string): JogadorDo
     .sort((a, b) => a.pontos - b.pontos || a.riotId.localeCompare(b.riotId));
 
   // O mais barato quase sempre mantém tudo viável; a checagem existe para o caso em que
-  // ele é justamente o que outro time precisa.
-  return candidatos.find((j) => fechaDepoisDe(estado, timeId, j)) ?? null;
+  // ele é justamente o que outro time precisa. O primeiro provado ganha do "indeterminado"
+  // mais barato (ver `quemFechaParaAVez`); a busca para no primeiro provado.
+  let incerto: JogadorDoDraft | null = null;
+  const porValor = new Map<number, Viabilidade>();
+  for (const j of candidatos) {
+    if (!porValor.has(j.pontos)) porValor.set(j.pontos, viabilidadeDepoisDe(estado, timeId, j));
+    const resposta = porValor.get(j.pontos);
+    if (resposta === "fecha") return j;
+    if (resposta === "indeterminado") incerto ??= j;
+  }
+  return incerto;
 }
 
 // ---------------------------------------------------------------- transições
@@ -401,22 +490,32 @@ export function avancarPorTempo(estado: EstadoDraft, agoraMs: number): EstadoDra
 }
 
 /**
- * Roda todos os estouros pendentes de uma vez.
+ * Atraso a partir do qual paramos de escolher sozinhos e pedimos gente: UMA escolha inteira
+ * (decisão C3 de 2026-10-22; antes eram 10).
  *
- * Necessário porque ninguém garante que o servidor foi acordado a cada 60 segundos:
- * em serverless, entre uma sondagem e outra pode ter passado tempo suficiente para
- * vencerem várias escolhas. Sem isto, o draft "voltaria no tempo" ao acordar.
+ * Com a transmissão no ar, alguém sonda a cada 2 s, e o capitão ausente leva a escolha
+ * automática alguns segundos depois do prazo — o atraso nunca chega perto de uma escolha
+ * inteira. Passar disso quer dizer que NINGUÉM estava sondando (queda de internet da mesa,
+ * da TV, do servidor): com 10 escolhas de folga, uma queda de alguns minutos voltava com
+ * vários times sorteados por auto-pick de uma vez, sem ninguém ver. Agora o draft pausa
+ * sozinho (motivo "atraso") e a organização retoma quando a sala estiver de volta.
  */
-/** Atraso a partir do qual paramos de escolher sozinhos e pedimos gente. */
-const ESCOLHAS_DE_ATRASO_ATE_PAUSAR = 10;
+const ESCOLHAS_DE_ATRASO_ATE_PAUSAR = 1;
 
+/**
+ * Roda os estouros pendentes — no máximo o que cabe em uma escolha de atraso.
+ *
+ * Necessário porque ninguém garante que o servidor foi acordado na hora exata: em
+ * serverless, a sondagem chega alguns segundos depois do prazo. Atraso maior que uma
+ * escolha inteira é queda, e aí o draft PAUSA (ver `ESCOLHAS_DE_ATRASO_ATE_PAUSAR`).
+ */
 export function alcancarORelogio(estado: EstadoDraft, agoraMs: number, maxPassos = 200): EstadoDraft {
   if (estado.fase !== "rodando" || !estado.prazoISO) return estado;
 
-  // Freio contra o cenário "ninguém abriu a página desde ontem". A corrente de prazos
-  // é determinística, então sem isto um draft abandonado à noite acordaria sorteado
-  // inteiro por auto-pick. Atraso grande não é um draft atrasado — é um draft que
-  // parou de acontecer, e aí quem decide é a organização.
+  // Freio contra a queda: a corrente de prazos é determinística, então sem isto um draft
+  // que ficou sem sondagem acordaria com várias escolhas feitas por auto-pick. Atraso de
+  // mais de uma escolha inteira não é capitão ausente — é a sala que caiu, e aí quem
+  // decide a hora de voltar é a organização.
   const atrasoMs = agoraMs - Date.parse(estado.prazoISO);
   const limiteMs = ESCOLHAS_DE_ATRASO_ATE_PAUSAR * estado.segundosPorEscolha * 1000;
   if (atrasoMs > limiteMs) {
@@ -440,9 +539,11 @@ export function alcancarORelogio(estado: EstadoDraft, agoraMs: number, maxPassos
  * Função pura, separada de `montarDraftDosAprovados` (que lê o banco) para que estas
  * duas regras — as que já falharam — sejam verificáveis num teste:
  *
- *  1. quem joga são os "apto", e eles têm de ser EXATAMENTE as vagas. Antes o pool era
- *     cortado por ordem de inscrição, então quem a organização marcou como sobra
- *     entrava se tivesse se inscrito cedo — a decisão dela era apagada em silêncio;
+ *  1. quem joga são os TITULARES da fila que estão "apto" (decisão C4 de 2026-10-22), e
+ *     eles não podem passar das vagas. Quem fica de fora é decidido pela fila, por ordem de
+ *     inscrição (lib/inscricoes/fila.ts) — não mais por "marque N como sobra". Titular que
+ *     ainda não está apto NÃO impede o sorteio: é aviso na mesa (`avisosDoSorteio`), e a
+ *     ordem perde as escolhas que faltam (`ajustarOrdemAoPool`);
  *  2. a soma dos pontos tem de caber no teto total. Sem isto, um draft podia entrar ao
  *     vivo já condenado a travar numa escolha em que ninguém cabe.
  *
@@ -453,24 +554,28 @@ export function impedimentosDoSorteio(params: {
   vagas: number;
   times: number;
   orcamentoPorTime: number;
-  totalDeAprovados: number;
+  /** Quantos entram na conta de times (os elegíveis: todos menos recusado, desistente e excluído). */
+  totalDeElegiveis: number;
 }): string[] {
-  const { pontosDosQueJogam, vagas, times, orcamentoPorTime, totalDeAprovados } = params;
+  const { pontosDosQueJogam, vagas, times, orcamentoPorTime, totalDeElegiveis } = params;
   const problemas: string[] = [];
   const quantos = pontosDosQueJogam.length;
 
   if (times === 0) {
-    problemas.push(`Não há aprovados suficientes para fechar um time: ${totalDeAprovados}.`);
+    problemas.push(`Não há inscritos suficientes para fechar um time: ${totalDeElegiveis}.`);
     return problemas;
   }
 
   if (quantos > vagas) {
+    // Só acontece quando a fila não para nas vagas: sem teto de times em Configuração (todo
+    // inscrito é titular), ou com um teto maior do que os times que fecham.
     problemas.push(
-      `Há ${quantos} aprovados para ${vagas} vagas. Marque ${quantos - vagas} como "sobra" antes de sortear — quem fica de fora é decisão da organização, não da ordem de inscrição.`,
+      `Há ${quantos} titulares aptos para ${vagas} vagas (${times} times). Quem joga é decidido pela fila, por ordem de inscrição: defina ${times} como o número de times em Configuração, e os ${quantos - vagas} últimos inscritos vão para a fila de reserva.`,
     );
-  } else if (quantos < vagas) {
+  } else if (quantos < times) {
+    // Menos que vagas é aviso (`avisosDoSorteio`); menos que TIMES não tem nem o capitão.
     problemas.push(
-      `Há ${quantos} aprovados para ${vagas} vagas. Faltam ${vagas - quantos}: aprove mais alguém ou tire da sobra.`,
+      `Há ${quantos} titulares aptos para ${times} times: cada time precisa ao menos do capitão. Confira os titulares que ainda não estão aptos.`,
     );
   }
 
@@ -478,11 +583,239 @@ export function impedimentosDoSorteio(params: {
   const teto = times * orcamentoPorTime;
   if (total > teto) {
     problemas.push(
-      `Os ${quantos} sorteados somam ${total} pontos para um teto de ${teto} (${times} times × ${orcamentoPorTime}). Não há como fechar os elencos: troque quem entra, suba o orçamento por time, ou deixe alguém de elo alto na sobra.`,
+      `Os ${quantos} sorteados somam ${total} pontos para um teto de ${teto} (${times} times × ${orcamentoPorTime}). Não há como fechar os elencos: troque quem entra ou suba o orçamento por time.`,
     );
   }
 
   return problemas;
+}
+
+/**
+ * O que a mesa precisa saber antes de sortear, SEM impedir (decisão C4 de 2026-10-22): com
+ * menos titulares aptos do que vagas, o sorteio segue com quem está apto, a ordem perde as
+ * escolhas que faltam e um time (ou mais) termina o draft com vaga aberta — a mesma saída de
+ * quem deixa o pool depois do sorteio (C1). A vaga é de um reserva da fila, depois da virada.
+ */
+export function avisosDoSorteio(params: { quantos: number; vagas: number; times: number }): string[] {
+  const { quantos, vagas, times } = params;
+  if (times === 0 || quantos >= vagas || quantos < times) return [];
+  const faltam = vagas - quantos;
+  return [
+    `Há ${quantos} titulares aptos para ${vagas} vagas. Faltam ${faltam}: dá para sortear assim — a ordem perde ${faltam === 1 ? "1 escolha" : `${faltam} escolhas`} e ${faltam === 1 ? "um time termina" : "times terminam"} o draft com vaga aberta, que um reserva da fila ocupa depois de aplicar no site. Se o titular ainda vai ser aprovado, espere por ele; se não vai jogar, recuse ou registre a desistência, e o próximo da fila de reserva sobe.`,
+  ];
+}
+
+// ---------------------------------------------------------------- quem sai do pool (C1)
+
+/**
+ * Os elencos fecham com esta ordem da vez em diante?
+ *
+ * Só a CONTAGEM de escolhas de cada time importa para a conta, não a posição delas.
+ * `fantasmas`: quantas escolhas ainda podem ser cortadas. Entram como jogadores de 0 ponto —
+ * um fantasma num time é exatamente "esse time perde mais uma escolha" —, senão todo corte
+ * intermediário pareceria sem saída (faltaria jogador para as vagas).
+ */
+function ordemFecha(estado: EstadoDraft, futura: readonly string[], custos: readonly number[], fantasmas: number): boolean {
+  const times = estado.times.map((t) => ({
+    vagas: futura.filter((id) => id === t.id).length,
+    folga: estado.orcamentoPorTime - gastoDoTime(estado, t.id),
+  }));
+  return elencosFecham(times, [...custos, ...Array<number>(fantasmas).fill(0)]) !== "nao_fecha";
+}
+
+/**
+ * Fecha SEM tirar a vez corrente (`futura[0]`)? O time da vez leva alguém de verdade agora —
+ * um preço por vez, que jogadores do mesmo preço dão a mesma resposta —, e o resto fecha com
+ * os fantasmas. Sem fantasma, fechar já quer dizer isso: toda escolha recebe um jogador.
+ *
+ * É o que impede o corte de preferir tirar a vez do time no meio do relógio quando existe
+ * outro jeito, mesmo que custe mais escolhas cortadas no fim da ordem.
+ */
+function fechaMantendoAVez(estado: EstadoDraft, futura: readonly string[], custos: readonly number[], fantasmas: number): boolean {
+  const vez = futura[0];
+  if (fantasmas === 0 || vez === undefined) return ordemFecha(estado, futura, custos, fantasmas);
+  const folgaDaVez = estado.orcamentoPorTime - gastoDoTime(estado, vez);
+  const resto = futura.slice(1);
+  const vistos = new Set<number>();
+  return custos.some((preco, i) => {
+    if (vistos.has(preco) || preco > folgaDaVez) return false;
+    vistos.add(preco);
+    const times = estado.times.map((t) => ({
+      vagas: resto.filter((id) => id === t.id).length,
+      folga: estado.orcamentoPorTime - gastoDoTime(estado, t.id) - (t.id === vez ? preco : 0),
+    }));
+    const semEle = custos.filter((_, j) => j !== i);
+    return elencosFecham(times, [...semEle, ...Array<number>(fantasmas).fill(0)]) !== "nao_fecha";
+  });
+}
+
+/**
+ * Tira uma escolha da ordem futura, sem deixar o draft sem saída.
+ *
+ * Qual time perde a escolha importa: a soma da tabela é exata, e tirar a escolha do time
+ * errado pode deixar OUTRO sem como fechar (o jogador que saiu era o barato que cabia nele).
+ * Tenta os times do fim da ordem para o começo — o normal é a última escolha do draft — e
+ * fica com o primeiro corte que mantém os elencos fechando (com `fantasmas` cortes ainda por
+ * vir). Com `manterAVez`, a escolha em andamento (índice 0) não sai, e a conta exige que o
+ * time da vez ainda leve alguém. Devolve null quando nenhum corte serve.
+ */
+function cortarUmaEscolha(
+  estado: EstadoDraft,
+  futura: readonly string[],
+  custos: readonly number[],
+  fantasmas: number,
+  manterAVez: boolean,
+): string[] | null {
+  const ultimaDe = new Map<string, number>();
+  futura.forEach((id, i) => ultimaDe.set(id, i));
+  const candidatos = [...ultimaDe.values()].sort((a, b) => b - a);
+  const fecha = manterAVez ? fechaMantendoAVez : ordemFecha;
+  // Mesmo podendo tirar a vez corrente, ela é a última tentativa: tirá-la passa a vez.
+  for (const permitirAAtual of manterAVez ? [false] : [false, true]) {
+    for (const indice of candidatos) {
+      if (indice === 0 && !permitirAAtual) continue;
+      const resto = futura.filter((_, i) => i !== indice);
+      if (fecha(estado, resto, custos, fantasmas)) return resto;
+    }
+  }
+  return null;
+}
+
+/**
+ * Todas as escolhas que a serpentina ainda dá a cada time — inclusive as cortadas antes —,
+ * com a vez corrente NA FRENTE. As outras seguem a ordem de sempre.
+ *
+ * A vez corrente fica onde está: refazer a ordem da serpentina inteira devolvia uma escolha
+ * cortada ANTES dela, e a vez passava de time no meio do relógio (o prazo de um valia para
+ * o outro, e a escolha que o capitão estava fazendo era recusada com «nao_e_a_vez»).
+ */
+function ordemMaxima(estado: EstadoDraft): string[] {
+  const atual = estado.ordem[estado.escolhaAtual];
+  const pular = new Map<string, number>();
+  for (const id of estado.ordem.slice(0, estado.escolhaAtual)) pular.set(id, (pular.get(id) ?? 0) + 1);
+  if (atual !== undefined) pular.set(atual, (pular.get(atual) ?? 0) + 1);
+  const resto: string[] = [];
+  for (const id of ordemSerpentina(estado.times.map((t) => t.id), rodadasDoDraft(estado.jogadoresPorTime))) {
+    const p = pular.get(id) ?? 0;
+    if (p > 0) pular.set(id, p - 1);
+    else resto.push(id);
+  }
+  return atual !== undefined ? [atual, ...resto] : resto;
+}
+
+/**
+ * Corta de `maxima` o MENOR número de escolhas que faz os elencos fecharem (`fecha` com
+ * `k` fantasmas), uma por vez. Nulo quando nenhum número de cortes serve.
+ *
+ * Com o menor `k`, todo jeito de fechar usa os `k` fantasmas, então sempre há um corte que
+ * deixa fechando com `k − 1` — e o menor continua sendo o menor depois dele. O laço nunca
+ * corta à toa nem fica sem corte possível no meio.
+ */
+function cortarOMinimo(
+  estado: EstadoDraft,
+  maxima: readonly string[],
+  custos: readonly number[],
+  manterAVez: boolean,
+): string[] | null {
+  const fecha = manterAVez ? fechaMantendoAVez : ordemFecha;
+  // Mantendo a vez, ela não pode ser cortada: sobra ao menos uma escolha.
+  const ate = manterAVez ? maxima.length - 1 : maxima.length;
+  for (let k = Math.max(0, maxima.length - custos.length); k <= ate; k++) {
+    if (!fecha(estado, maxima, custos, k)) continue;
+    let futura: readonly string[] | null = maxima;
+    for (let resta = k; resta > 0 && futura !== null; resta--) {
+      futura = cortarUmaEscolha(estado, futura, custos, resta - 1, manterAVez);
+    }
+    if (futura !== null) return [...futura];
+  }
+  return null;
+}
+
+/**
+ * A ordem da vez em diante que cabe no pool de agora: tira as escolhas que não teriam quem
+ * escolher, devolve as que voltaram a ter, e nunca deixa os elencos sem como fechar.
+ *
+ *  1. Com a vez corrente onde está — sempre que existir um jeito de fechar com ela.
+ *  2. Só se o time da vez não tiver mais quem levar (o que cabia nele saiu), ele perde a
+ *     escolha e a vez passa — com relógio novo, ver `atualizarForaDoPool`.
+ *  3. Nada fecha de jeito nenhum: tira só as escolhas que faltam de jogador, a partir do fim,
+ *     e o motor pausa na vez sem saída — como sempre fez quando ninguém cabe.
+ */
+function ordemQueCabeNoPool(estado: EstadoDraft): string[] {
+  const maxima = ordemMaxima(estado);
+  const custos = jogadoresDisponiveis(estado).map((j) => j.pontos);
+  const comAVez = maxima.length > 0 ? cortarOMinimo(estado, maxima, custos, true) : null;
+  if (comAVez) return comAVez;
+  const semAVez = cortarOMinimo(estado, maxima, custos, false);
+  if (semAVez) return semAVez;
+  return maxima.slice(0, Math.max(0, Math.min(maxima.length, custos.length)));
+}
+
+/** Monta o estado com a ordem refeita; se a vez passou de time, o relógio recomeça. */
+function comAOrdemQueCabe(estado: EstadoDraft, agoraMs: number | undefined): EstadoDraft {
+  const futura = ordemQueCabeNoPool(estado);
+  const novo: EstadoDraft = { ...estado, ordem: [...estado.ordem.slice(0, estado.escolhaAtual), ...futura] };
+
+  // Sem escolha nenhuma por fazer, o draft terminou (a mesma regra de `iniciarDraft`).
+  if (novo.escolhaAtual >= novo.ordem.length) {
+    novo.fase = "encerrado";
+    novo.prazoISO = null;
+    delete novo.motivoDaPausa;
+    return novo;
+  }
+  // A vez só troca quando o time da vez não tinha mais quem levar: o time seguinte ganha o
+  // prazo inteiro, não o resto do relógio de quem perdeu a escolha.
+  if (novo.fase === "rodando" && novo.ordem[novo.escolhaAtual] !== estado.ordem[estado.escolhaAtual] && agoraMs !== undefined) {
+    novo.prazoISO = proximoPrazo(novo, agoraMs);
+  }
+  return novo;
+}
+
+/**
+ * Aplica quem saiu do pool depois do sorteio (decisão C1 de 2026-10-22).
+ *
+ * `saidas` são os ids cuja inscrição está fora AGORA (recusado, desistiu, excluído) — quem
+ * chama lê as inscrições; o motor continua sem banco. Só vale para quem ainda não foi
+ * escolhido: quem já está num elenco, ou é capitão, segue no draft (C2).
+ *
+ *  - Quem saiu deixa de ser escolhível na hora (`jogadoresDisponiveis`), inclusive para a
+ *    escolha automática, e a transmissão mostra que saiu.
+ *  - Com menos jogadores do que vagas, a ordem perde as escolhas que não teriam quem
+ *    escolher (`ordemQueCabeNoPool`): o draft termina mais cedo e um time fica com uma vaga
+ *    aberta, que a organização preenche com a fila de reserva depois da virada. Sem isso a
+ *    conta de viabilidade pediria um jogador que não existe e o draft travaria na hora.
+ *  - Quem voltar a valer (recusa desfeita) volta ao pool, e a ordem recupera as escolhas que
+ *    ainda dá para fazer — DEPOIS da vez corrente, que não troca de time.
+ *
+ * `agoraMs`: o instante da leitura. Só é usado no caso raro em que o time da vez perde a
+ * escolha (o único jogador que cabia nele saiu): o próximo time começa com o prazo inteiro.
+ *
+ * Devolve o MESMO objeto quando nada muda — a sondagem só grava quando algo andou.
+ * Draft encerrado não muda mais: o que fazer com quem saiu é a virada que pergunta.
+ */
+export function atualizarForaDoPool(estado: EstadoDraft, saidas: ReadonlySet<string>, agoraMs?: number): EstadoDraft {
+  if (estado.fase === "encerrado") return estado;
+
+  const fora = estado.jogadores.filter((j) => j.timeId === null && saidas.has(j.id)).map((j) => j.id);
+  const antes = saidasDoEstado(estado);
+  if (fora.length === antes.size && fora.every((id) => antes.has(id))) return estado;
+
+  const comAsSaidas: EstadoDraft = { ...estado };
+  if (fora.length > 0) comAsSaidas.foraDoPool = fora;
+  else delete comAsSaidas.foraDoPool;
+  return comAOrdemQueCabe(comAsSaidas, agoraMs);
+}
+
+/**
+ * A ordem do sorteio sem escolha para quem não existe (decisão C4 de 2026-10-22): com menos
+ * titulares aptos do que vagas na hora de sortear, a ordem perde as escolhas que sobram, com
+ * a mesma conta de quem sai do pool — o time que fica com vaga aberta termina o draft com ela,
+ * e um reserva da fila a ocupa depois da virada. Com o pool exato, devolve o mesmo objeto.
+ */
+export function ajustarOrdemAoPool(estado: EstadoDraft): EstadoDraft {
+  if (estado.fase === "encerrado") return estado;
+  if (jogadoresDisponiveis(estado).length >= estado.ordem.length - estado.escolhaAtual) return estado;
+  return comAOrdemQueCabe(estado, undefined);
 }
 
 // ---------------------------------------------------------------- montagem

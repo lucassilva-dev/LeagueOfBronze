@@ -1,3 +1,4 @@
+import { dataDoPrazo } from "@/lib/inscricoes/pagamento";
 import { pixDaInscricao } from "@/lib/pix";
 
 /**
@@ -30,11 +31,15 @@ function reais(centavos: number): string {
   return (centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+/**
+ * O prazo para a mensagem: «04/11» quando vence no fim do dia (o prazo único de 31/10); com a
+ * hora quando não — «04/11 às 15:37 (horário de Brasília)», o reserva chamado tem 48 h
+ * contadas do chamado, não até o fim do dia (ver `dataDoPrazo`).
+ */
 function diaMes(iso: string | null): string | null {
   if (!iso) return null;
-  const data = new Date(iso);
-  if (!Number.isFinite(data.getTime())) return null;
-  return data.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" });
+  if (!Number.isFinite(new Date(iso).getTime())) return null;
+  return dataDoPrazo(iso, "pt-BR", { ano: false });
 }
 
 /** O texto da cobrança. Leva o Pix pronto quando a chave está configurada. */

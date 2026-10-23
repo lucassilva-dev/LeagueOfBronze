@@ -80,12 +80,15 @@ describe("o que o servidor recusa vira bloqueio (PNL-05)", () => {
 });
 
 describe("o que o servidor aceita vira aviso, não bloqueio (PNL-06)", () => {
+  // "Trocou de time DEPOIS" = a linha já estava gravada assim: a série gravada é ela mesma.
+  // A linha NOVA de titular de outro time sem "Jogou por" o servidor recusa (regra 6) — ver
+  // tests/admin/series-substituto-de-outro-time.test.tsx.
   it("jogador que trocou de time depois da série: aviso pelo nick e time atual", () => {
     const s = serie();
     const d = dataset([s]);
     d.players = d.players.map((p) => (p.id === "alfa-mid" ? { ...p, teamId: "gama" } : p));
 
-    const auditoria = auditarSerie(s, d);
+    const auditoria = auditarSerie(s, d, structuredClone(s));
     expect(auditoria.bloqueios).toEqual([]);
     expect(auditoria.avisos.join(" ")).toMatch(/alfa-mid hoje está em Gama/);
     expect(servidorAceita(d)).toBe(true);
@@ -96,7 +99,7 @@ describe("o que o servidor aceita vira aviso, não bloqueio (PNL-06)", () => {
     const d = dataset([s]);
     d.players = d.players.map((p) => (p.id === "alfa-mid" || p.id === "beta-mid" ? { ...p, teamId: "gama" } : p));
 
-    const auditoria = auditarSerie(s, d);
+    const auditoria = auditarSerie(s, d, structuredClone(s));
     expect(auditoria.bloqueios).toEqual([]);
     expect(servidorAceita(d)).toBe(true);
   });

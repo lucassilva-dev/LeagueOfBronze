@@ -6,7 +6,10 @@ import { gerarSenhaProvisoria, hashPassword } from "@/lib/security/password";
 import {
   contarDasLinhas,
   LINHAS_DA_CONTAGEM,
+  MOTIVOS_QUE_NAO_CONTAM,
+  RATE_LIMIT,
   TENTATIVA_EM_ANDAMENTO,
+  TENTATIVA_LIBERADA_PELA_ORGANIZACAO,
   valorDoFiltroOu,
   type RateLimitInput,
 } from "@/lib/security/rate-limit";
@@ -454,4 +457,84 @@ export async function contarTentativasJogador(email: string, ipHash: string): Pr
     ...contarDasLinhas(linhas, ipHash, email),
     ipHadRecentSuccess: (sucessoConhecido.count ?? 0) > 0,
   };
+}
+
+// ---------------------------------------------------------------- liberar login (organização)
+
+/**
+ * A falha que trava a CONTA e que o botão «Liberar login» pode liberar: palpite errado
+ * concluído (senha errada, conta inexistente…). Ficam de fora o que já não conta
+ * (`MOTIVOS_QUE_NAO_CONTAM`), a reserva em voo (tem contagem própria e some em 60 s) e o
+ * cadastro — ele é o selo de posse do par (e-mail, IP), e apagá-lo tiraria do dono a
+ * válvula que o protege.
+ */
+export function falhaLiberavel(linha: Readonly<{ success: boolean | null; reason: string | null }>): boolean {
+  if (linha.success !== false || linha.reason === null) return false;
+  if (linha.reason === TENTATIVA_EM_ANDAMENTO || linha.reason === TENTATIVA_CADASTRO) return false;
+  return !MOTIVOS_QUE_NAO_CONTAM.includes(linha.reason);
+}
+
+/** Início da janela do limitador (15 min), em ISO, para o filtro. */
+function inicioDaJanela(agoraMs: number): string {
+  return new Date(agoraMs - RATE_LIMIT.windowSeconds * 1000).toISOString();
+}
+
+/**
+ * Quantas falhas recentes (janela do limitador) cada conta tem — o número que o painel
+ * mostra ANTES do «Liberar login». Uma leitura só, de todas as falhas da janela; e-mail em
+ * minúsculas (é como as contas são gravadas).
+ */
+export async function falhasRecentesPorEmail(agoraMs = Date.now()): Promise<Map<string, number>> {
+  const { data, error } = await createSupabaseAdminClient()
+    .from("jogador_login_attempts")
+    .select("email, success, reason, occurred_at")
+    .eq("success", false)
+    .gte("occurred_at", inicioDaJanela(agoraMs))
+    .order("occurred_at", { ascending: false })
+    .limit(LINHAS_DA_CONTAGEM * 4);
+
+  if (error) throw new Error(`Falha ao ler as tentativas de login: ${error.message}`);
+  const porEmail = new Map<string, number>();
+  for (const linha of (data ?? []) as { email: string | null; success: boolean | null; reason: string | null }[]) {
+    if (!linha.email || !falhaLiberavel(linha)) continue;
+    const email = linha.email.toLowerCase();
+    porEmail.set(email, (porEmail.get(email) ?? 0) + 1);
+  }
+  return porEmail;
+}
+
+/**
+ * «Liberar login» (decisão F): as falhas recentes da conta deste e-mail passam a
+ * `liberado_pela_organizacao`, que não conta contra a CONTA — mas continua contando para o
+ * IP de onde cada uma veio (`contarDasLinhas`): o IP do atacante segue bloqueado.
+ *
+ * Lê as linhas e troca só as que lidas eram liberáveis, pelo id e com `success = false` na
+ * mesma instrução. Devolve quantas foram liberadas.
+ */
+export async function liberarLoginDaConta(email: string, agoraMs = Date.now()): Promise<number> {
+  const cliente = createSupabaseAdminClient();
+  const alvo = email.trim().toLowerCase();
+  const { data, error } = await cliente
+    .from("jogador_login_attempts")
+    .select("id, success, reason")
+    .eq("email", alvo)
+    .eq("success", false)
+    .gte("occurred_at", inicioDaJanela(agoraMs));
+
+  if (error) throw new Error(`Falha ao ler as tentativas de login: ${error.message}`);
+  const ids = ((data ?? []) as { id: number | string; success: boolean | null; reason: string | null }[])
+    .filter(falhaLiberavel)
+    .map((l) => l.id);
+  if (ids.length === 0) return 0;
+
+  const { data: trocadas, error: erroUpdate } = await cliente
+    .from("jogador_login_attempts")
+    .update({ reason: TENTATIVA_LIBERADA_PELA_ORGANIZACAO })
+    .in("id", ids)
+    .eq("email", alvo)
+    .eq("success", false)
+    .select("id");
+
+  if (erroUpdate) throw new Error(`Falha ao liberar o login: ${erroUpdate.message}`);
+  return trocadas?.length ?? 0;
 }

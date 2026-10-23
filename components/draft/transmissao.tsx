@@ -97,8 +97,19 @@ type DraftPublico = {
   times: TimePublico[];
   elencos: Record<string, JogadorDoElenco[]>;
   disponiveis: JogadorDisponivel[];
+  /**
+   * Quem estava no pool e saiu depois do sorteio (decisão C1): aparece no fim do pool como
+   * "saiu do draft", sem o porquê. Opcional: servidor antigo não manda.
+   */
+  saiuDoPool?: Omit<JogadorDisponivel, "id">[];
   escolhaAtual: number;
   totalEscolhas: number;
+  /**
+   * O time de cada escolha. É a serpentina, menos as escolhas que saíram quando faltou
+   * jogador — e essas podem não ser as do fim. Opcional: servidor antigo não manda, e o
+   * trilho refaz a serpentina.
+   */
+  ordem?: string[];
   timeDaVezId: string | null;
   /** Quem o time da vez pode escolher agora, pela conta do motor. Opcional: servidor antigo. */
   escolhiveis?: string[];
@@ -692,11 +703,13 @@ function AoVivo({
         }}
       >
         {Array.from({ length: draft.totalEscolhas }, (_, i) => {
-          // A ordem serpentina: ímpares 1→N, pares N→1.
+          // O time da escolha vem da ordem do servidor (que pode ter perdido escolhas quando
+          // alguém saiu do pool); sem ela, a serpentina: ímpares 1→N, pares N→1.
           const n = draft.times.length;
           const rodadaDoChip = Math.floor(i / n);
           const dentro = i % n;
-          const indice = rodadaDoChip % 2 === 0 ? dentro : n - 1 - dentro;
+          const pelaOrdem = draft.ordem?.[i] ? draft.times.findIndex((x) => x.id === draft.ordem![i]) : -1;
+          const indice = pelaOrdem >= 0 ? pelaOrdem : rodadaDoChip % 2 === 0 ? dentro : n - 1 - dentro;
           const time = draft.times[indice]!;
           const cor = corDoTime(time, indice);
           const feito = i < draft.escolhaAtual;
@@ -933,6 +946,57 @@ function AoVivo({
                 </div>
               );
             })}
+          {/* Quem saiu do pool depois do sorteio (C1): no fim da fila, riscado e com a
+              etiqueta. Sem o porquê — desistência ou recusa é assunto da organização. A cor
+              apagada é fixa (sem animar opacidade nem filtro). */}
+          {(draft.saiuDoPool ?? []).map((jogador) => (
+            <div
+              key={`saiu-${jogador.riotId}`}
+              data-saiu-do-draft=""
+              title={t.saiuDoDraftNota}
+              style={{
+                flex: "none",
+                display: "flex",
+                alignItems: "center",
+                gap: 9,
+                width: 196,
+                padding: "8px 11px",
+                borderRadius: 7,
+                background: D.superficieVazia,
+                border: `1px dashed ${D.bordaPoolFora}`,
+              }}
+            >
+              <span style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
+                <span
+                  style={{
+                    display: "block",
+                    fontFamily: DISPLAY,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: D.mudo,
+                    textDecoration: "line-through",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {jogador.riotId}
+                </span>
+                <span
+                  style={{
+                    display: "block",
+                    fontFamily: DISPLAY,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: ".14em",
+                    color: D.urgente,
+                  }}
+                >
+                  {t.saiuDoDraft}
+                </span>
+              </span>
+            </div>
+          ))}
         </div>
       </div>
     </div>

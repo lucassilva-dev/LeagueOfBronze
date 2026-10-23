@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 import { alcancarORelogio, aplicarEscolha, podeEscolher, timeDaVez } from "@/lib/draft/motor";
-import { lerDraftCompleto, paraPublico, salvarDraftSeIntacto, timeDoCapitao } from "@/lib/draft/store";
+import { comAsSaidasDoPool, lerDraftCompleto, paraPublico, salvarDraftSeIntacto, timeDoCapitao } from "@/lib/draft/store";
 import { inscricaoIdDoJogador } from "@/lib/inscricoes/store";
 import { getJogadorIdentity } from "@/lib/jogadores/auth";
 import { respostaDeErro } from "@/lib/security/resposta-erro";
@@ -65,8 +65,9 @@ export async function POST(request: NextRequest) {
 
     // O relógio anda ANTES de validar: se a vez do capitão já venceu enquanto a página
     // dele estava aberta, a escolha tem de ser recusada contra o estado de agora — não
-    // contra o que a tela dele mostrava.
-    const atual = alcancarORelogio(estado, Date.now());
+    // contra o que a tela dele mostrava. Quem saiu do pool (C1) também, lido na hora: sem
+    // a leitura guardada da sondagem, o capitão não leva quem acabou de desistir.
+    const atual = alcancarORelogio(await comAsSaidasDoPool(estado, { fresco: true }), Date.now());
 
     const meuTime = timeDoCapitao(atual, inscricaoId);
     if (!meuTime) {

@@ -76,7 +76,9 @@ export async function generateMetadata(): Promise<Metadata> {
  *
  * Segue as 7 seções do PDF oficial, na mesma ordem, mais a seção de Premiação, que
  * nasceu das decisões da organização de 05/10/2026. Onde o PDF e essas decisões
- * divergem, vale a decisão (o PDF será atualizado depois).
+ * divergem, vale a decisão (o PDF será atualizado depois). As decisões de 22/10/2026
+ * entraram no texto das regras que já existiam (4, 6, 8, 19 e 22, o draft e as reservas),
+ * sem numeração nova: a inscrição e o painel linkam /regras#regra-N.
  *
  * Dois números NÃO estão escritos no texto: a taxa de inscrição e a fatia do campeão.
  * Os dois vêm da Configuração da edição (`edicao_config`), a mesma que o formulário de
@@ -605,8 +607,14 @@ export default async function RegrasPage() {
             {t.inscricaoNota}
           </p>
         </div>
+        {/*
+          Fila de reserva (decisão de 22/10/2026): titulares por ordem de inscrição, com os
+          organizadores dentro; o reserva só paga se for chamado. Os números das regras viram
+          link, como na introdução acima.
+        */}
         <p style={{ ...TEXTO, maxWidth: 820, marginTop: 14 }}>
-          <b style={{ color: "#e6c592" }}>{t.inscricaoReservasRotulo}</b> {t.inscricaoReservasTexto}
+          <b style={{ color: "#e6c592" }}>{t.inscricaoReservasRotulo}</b>{" "}
+          {interpolar(t.inscricaoReservasTexto, { r6: linkRegra(6), r22: linkRegra(22) })}
         </p>
       </Secao>
 

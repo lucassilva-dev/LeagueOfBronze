@@ -139,6 +139,27 @@ describe("buildNextSeasonDataset", () => {
     expect(tournamentDatasetSchema.safeParse(next).success).toBe(true);
   });
 
+  it("manter os jogadores mantém o ELENCO de hoje: sem quem saiu de vez e sem o reserva sem time", () => {
+    const base = datasetWithArchive();
+    base.players = [
+      { ...base.players[0]!, saiuEm: "2026-05-20T12:00:00.000Z" },
+      base.players[1]!,
+      { id: "a2", nick: "A2", slug: "a2", teamId: "a", role1: "MID", elo: "OURO" },
+      { id: "r1", nick: "R1", slug: "r1", reserva: true, role1: "TOP", elo: "PRATA" },
+    ];
+    const next = buildNextSeasonDataset(base, {
+      name: "Beta Cup",
+      format: "BO3",
+      keepTeams: true,
+      keepPlayers: true,
+      seasonId: "season-2",
+      now: NOW,
+    });
+
+    expect(next.players.map((p) => p.id)).toEqual(["b1", "a2"]);
+    expect(tournamentDatasetSchema.safeParse(next).success).toBe(true);
+  });
+
   it("keepTeams=false remove times e não deixa jogadores órfãos", () => {
     const next = buildNextSeasonDataset(datasetWithArchive(), {
       name: "Gamma Cup",

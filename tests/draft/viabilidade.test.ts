@@ -195,8 +195,8 @@ describe("o draft da 4ª com os pontos reais não trava mais", () => {
   it("pausa registra o motivo, e retomar limpa", () => {
     const rodando = iniciarDraft(draftReal(30), T0);
     expect(pausarDraft(rodando).motivoDaPausa).toBe("organizacao");
-    // Mais de 10 escolhas sem ninguém sondar: pausa por atraso, não pela organização.
-    expect(alcancarORelogio(rodando, T0 + 11 * 60_000 + 1000).motivoDaPausa).toBe("atraso");
+    // Mais de uma escolha inteira sem ninguém sondar: pausa por atraso, não pela organização.
+    expect(alcancarORelogio(rodando, T0 + 2 * 60_000 + 1000).motivoDaPausa).toBe("atraso");
     const retomado = iniciarDraft(pausarDraft(rodando), T0 + 5000);
     expect(retomado.motivoDaPausa).toBeUndefined();
   });
@@ -366,5 +366,30 @@ describe("a busca de viabilidade com a tabela de soma exata", () => {
     }
     expect(fecham).toBeGreaterThan(200);
     expect(naoFecham).toBeGreaterThan(200);
+  });
+
+  it("jogador de 0 ponto (o «fantasma» do corte de escolhas) cabe até em time sem folga nenhuma", () => {
+    // O motor conta cada escolha que ainda pode ser cortada como um jogador de 0 ponto
+    // (lib/draft/motor.ts). Com a folga exata do time, a conta fazia 0 / 0 = NaN e não tentava
+    // nada: o time que já gastou tudo parecia sem saída, e o corte que resolvia não era achado.
+    expect(elencosFecham([{ vagas: 1, folga: 0 }], [0])).toBe("fecha");
+    expect(elencosFecham([{ vagas: 1, folga: 4 }, { vagas: 1, folga: 0 }], [3, 1, 0])).toBe("fecha");
+    expect(elencosFecham([{ vagas: 2, folga: 0 }], [0, 1])).toBe("nao_fecha");
+
+    const sortear = rng(2310);
+    for (let caso = 0; caso < 800; caso++) {
+      const n = 1 + Math.floor(sortear() * 3);
+      const times: VagasDoTime[] = Array.from({ length: n }, () => ({
+        vagas: 1 + Math.floor(sortear() * 3),
+        folga: Math.floor(sortear() * 8),
+      }));
+      const totalVagas = times.reduce((s, t) => s + t.vagas, 0);
+      const fantasmas = 1 + Math.floor(sortear() * 2);
+      const custos = [
+        ...Array.from({ length: Math.max(0, totalVagas - fantasmas) }, () => 1 + Math.floor(sortear() * 5)),
+        ...Array<number>(fantasmas).fill(0),
+      ];
+      expect(elencosFecham(times, custos), JSON.stringify({ times, custos })).toBe(exaustiva(times, custos) ? "fecha" : "nao_fecha");
+    }
   });
 });

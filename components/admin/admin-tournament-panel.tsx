@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 
 import type { SeriesFormat, TournamentDataset } from "@/lib/schema";
-import { createIndexes, getChampionshipResult, isSeriesComplete } from "@/lib/tournament";
+import { createIndexes, estaNoElenco, getChampionshipResult, isSeriesComplete } from "@/lib/tournament";
 import { useCompacto } from "@/components/admin/responsivo";
 import {
   ActionCard,
@@ -78,7 +78,11 @@ type Resumo = Readonly<{
   formato: SeriesFormat;
   times: number;
   jogadores: number;
-  /** Jogadores cujo time ainda existe — são os únicos que a nova temporada consegue manter. */
+  /**
+   * Os jogadores que a nova temporada consegue manter: os do ELENCO de hoje cujo time ainda
+   * existe — a mesma conta de `buildNextSeasonDataset`. Quem saiu de vez e o reserva (sem
+   * time) não passam para a temporada seguinte.
+   */
   jogadoresComTime: number;
   series: number;
   seriesCompletas: number;
@@ -103,7 +107,9 @@ function resumir(dataset: TournamentDataset): Resumo {
     formato: dataset.tournament.format,
     times: dataset.teams.length,
     jogadores: dataset.players.length,
-    jogadoresComTime: dataset.players.filter((jogador) => idsDeTime.has(jogador.teamId)).length,
+    jogadoresComTime: dataset.players.filter(
+      (jogador) => estaNoElenco(jogador) && jogador.teamId !== undefined && idsDeTime.has(jogador.teamId),
+    ).length,
     series: dataset.seriesMatches.length,
     seriesCompletas: dataset.seriesMatches.filter((serie) => isSeriesComplete(serie, dataset))
       .length,
@@ -674,8 +680,9 @@ function CartaoIniciar({
       ) : null}
 
       {manterTimes && manterJogadores && jogadoresSemTime > 0 ? (
-        <Banner tone="warn" title={`${jogadoresSemTime} jogador(es) sem time válido`}>
-          Eles não têm um time existente e serão descartados na virada.
+        <Banner tone="warn" title={`${jogadoresSemTime} jogador(es) fora do elenco de hoje`}>
+          Sem time existente, reserva (sem time) ou quem saiu do time de vez: não passam para a nova
+          temporada e serão descartados na virada.
         </Banner>
       ) : null}
 

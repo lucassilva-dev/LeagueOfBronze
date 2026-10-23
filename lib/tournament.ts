@@ -65,16 +65,327 @@ export function inferGameMvpPlayerId(rows: PlayerGameStats[]) {
   return ranked[0].playerId;
 }
 
+// ============================================================
+// Substituto avulso, reserva e saída de vez (regra 6 da 4ª Edição)
+// ============================================================
+
+/**
+ * O time pelo qual a linha de K/D/A jogou AQUELE jogo: o da própria linha (substituto
+ * avulso) ou, sem ele, o do jogador. `undefined` só quando nenhum dos dois diz — o que o
+ * schema recusa para o reserva (sem time), e por isso na prática não acontece.
+ *
+ * É a ÚNICA regra de "de que lado esta linha conta": abates do time, vitória, MVP,
+ * histórico do jogador, tabelas da partida, campeões. O mesmo reserva pode cobrir times
+ * diferentes em séries diferentes, e o passado não muda quando ele herda uma vaga, porque
+ * cada linha avulsa carrega o seu próprio time.
+ */
+export function timeDaLinha(
+  linha: Pick<PlayerGameStats, "teamId">,
+  jogador: Pick<Player, "teamId"> | undefined,
+): string | undefined {
+  return linha.teamId ?? jogador?.teamId;
+}
+
+/**
+ * Se o jogador está no ELENCO PÚBLICO do time dele: tem time, não é reserva e não saiu de
+ * vez. É o que conta em /times, no PTS do elenco, no Multi OP.GG e na contagem de 5.
+ *
+ * Quem saiu (`saiuEm`) continua no dataset, com o time, porque o K/D/A dele segue nas
+ * partidas e na ficha — só deixa de ser exibido como titular.
+ */
+export function estaNoElenco(jogador: Pick<Player, "teamId" | "reserva" | "saiuEm">): boolean {
+  return jogador.teamId !== undefined && jogador.reserva !== true && !jogador.saiuEm;
+}
+
+/** Os titulares de HOJE do time (ver `estaNoElenco`), na ordem do dataset. */
+export function elencoAtivo(dataset: Pick<TournamentDataset, "players">, teamId: string): Player[] {
+  return dataset.players.filter((jogador) => jogador.teamId === teamId && estaNoElenco(jogador));
+}
+
+/** Os reservas oficiais (sem time) do dataset, na ordem do dataset. */
+export function reservasDoDataset(dataset: Pick<TournamentDataset, "players">): Player[] {
+  return dataset.players.filter((jogador) => jogador.reserva === true && jogador.teamId === undefined);
+}
+
+/**
+ * O jogador aparece em algum jogo (linha de K/D/A ou MVP gravado). Quem já jogou não pode
+ * ser apagado: o histórico dele é das partidas — o caminho é "Substituir de vez".
+ */
+export function jogadorTemHistorico(dataset: Pick<TournamentDataset, "seriesMatches">, playerId: string): boolean {
+  return dataset.seriesMatches.some((series) =>
+    series.games.some(
+      (game) => game.mvpPlayerId === playerId || game.statsByPlayer.some((linha) => linha.playerId === playerId),
+    ),
+  );
+}
+
+/**
+ * "Substituir de vez" (regra 6): o titular sai do elenco público e o reserva herda a vaga.
+ * Pura — devolve o dataset novo, não grava nada.
+ *
+ *   - o titular ganha `saiuEm` e FICA com o time: as linhas dele sem `teamId` próprio
+ *     continuam contando para o time em que jogou (K/D/A nas partidas e na ficha);
+ *   - o reserva recebe o `teamId` do titular e perde `reserva` — e também um `saiuEm`
+ *     antigo, de quando saiu de outro time e voltou à reserva: com ele o herdeiro recebia o
+ *     time e continuava FORA do elenco (`estaNoElenco`), e o time ficava com 4 no site;
+ *   - as linhas avulsas do reserva (com `teamId` próprio) não mudam: continuam no time em
+ *     que ele jogou cada jogo.
+ *
+ * A marca de capitão de quem sai fica gravada (é histórico), mas deixa de valer: o site só
+ * reconhece capitão no elenco (lib/roster.ts), e a organização marca o novo capitão.
+ *
+ * Lança `Error` com a mensagem em português quando a troca não faz sentido.
+ */
+export function substituirDeVez(
+  dataset: TournamentDataset,
+  titularId: string,
+  reservaId: string,
+  quandoISO: string,
+): TournamentDataset {
+  const titular = dataset.players.find((jogador) => jogador.id === titularId);
+  const reserva = dataset.players.find((jogador) => jogador.id === reservaId);
+  if (!titular) throw new Error("Titular não encontrado.");
+  if (!reserva) throw new Error("Reserva não encontrado.");
+  if (!estaNoElenco(titular) || titular.teamId === undefined) {
+    throw new Error(`${titular.nick} não está no elenco de nenhum time.`);
+  }
+  if (reserva.reserva !== true || reserva.teamId !== undefined) {
+    throw new Error(`${reserva.nick} não é reserva (sem time).`);
+  }
+
+  const teamId = titular.teamId;
+  return {
+    ...dataset,
+    players: dataset.players.map((jogador) => {
+      if (jogador.id === titularId) return { ...jogador, saiuEm: quandoISO };
+      if (jogador.id === reservaId) {
+        const herdeiro: Player = { ...jogador, teamId };
+        delete herdeiro.reserva;
+        delete herdeiro.saiuEm;
+        return herdeiro;
+      }
+      return jogador;
+    }),
+  };
+}
+
+/**
+ * A linha jogou como SUBSTITUTO AVULSO: carrega um time próprio, diferente do time do
+ * jogador (ou o jogador não tem time). Só serve para a exibição marcar a linha — a conta
+ * é sempre por `timeDaLinha`.
+ */
+export function linhaDeSubstituto(
+  linha: Pick<PlayerGameStats, "teamId">,
+  jogador: Pick<Player, "teamId"> | undefined,
+): boolean {
+  return linha.teamId !== undefined && linha.teamId !== jogador?.teamId;
+}
+
+/**
+ * Se a linha deste jogador NESTA série precisa dizer por qual time ele jogou: o jogador é
+ * reserva (sem time) ou o time dele não disputa a série — o substituto avulso. Sem o
+ * `teamId` na linha, o reserva é recusado pelo schema e o titular de outro time some das
+ * duas colunas da partida (a linha conta para o time dele, que não está na série).
+ *
+ * Para quem joga pelo próprio time a linha fica sem `teamId`, como sempre foi.
+ */
+export function linhaPrecisaDeTime(
+  jogador: Pick<Player, "teamId">,
+  series: Pick<SeriesMatch, "teamAId" | "teamBId">,
+): boolean {
+  return jogador.teamId !== series.teamAId && jogador.teamId !== series.teamBId;
+}
+
+/** A linha como texto comparável: jogador, time da linha, campeão e K/D/A. */
+function chaveDaLinha(linha: PlayerGameStats): string {
+  return JSON.stringify([
+    linha.playerId,
+    linha.teamId ?? "",
+    (linha.champion ?? "").trim(),
+    linha.kills,
+    linha.deaths,
+    linha.assists,
+  ]);
+}
+
+/**
+ * A MESMA linha (jogador, "Jogou por", campeão e K/D/A) já está gravada nesta série — em
+ * qualquer jogo dela, para que apagar ou reordenar um jogo não transforme uma sobra antiga
+ * em linha "nova". Sem série gravada (série nova), nenhuma linha está.
+ */
+export function linhaJaGravada(
+  linha: PlayerGameStats,
+  gravada: Pick<SeriesMatch, "games"> | undefined,
+): boolean {
+  if (!gravada) return false;
+  const chave = chaveDaLinha(linha);
+  return gravada.games.some((jogo) => jogo.statsByPlayer.some((outra) => chaveDaLinha(outra) === chave));
+}
+
+/**
+ * Linhas que o envio ACRESCENTA ou MUDA, de titular de um time que não disputa a série, sem
+ * "Jogou por" (`teamId` na linha). É o substituto avulso esquecido: a linha sumia das duas
+ * colunas da partida, e os abates e o jogo iam para o time DELE, que nem jogou a série.
+ *
+ * ⚠ NÃO ESTÁ NO SCHEMA DE PROPÓSITO, como `problemasDeJogoDepoisDaDecisao`: o dado real tem
+ * sobras assim (jogador que trocou de time depois de jogar), e o schema roda em toda
+ * leitura. Por isso só a linha que não está gravada igual na mesma série é recusada — a
+ * sobra antiga, intocada, continua passando.
+ */
+export function problemasDeLinhaSemTime(
+  proposta: TournamentDataset,
+  gravado: Pick<TournamentDataset, "seriesMatches"> | null,
+): string[] {
+  const antes = new Map((gravado?.seriesMatches ?? []).map((serie) => [serie.id, serie]));
+  const nomes = new Map(proposta.teams.map((time) => [time.id, time.name]));
+  const jogadores = new Map(proposta.players.map((jogador) => [jogador.id, jogador]));
+  const nome = (teamId: string) => nomes.get(teamId) ?? teamId;
+  const problemas: string[] = [];
+
+  for (const serie of proposta.seriesMatches) {
+    const anterior = antes.get(serie.id);
+    serie.games.forEach((jogo, indice) => {
+      for (const linha of jogo.statsByPlayer) {
+        if (linha.teamId !== undefined) continue;
+        const jogador = jogadores.get(linha.playerId);
+        // Sem jogador ou sem time (reserva), quem recusa é o schema.
+        if (!jogador || jogador.teamId === undefined) continue;
+        if (!linhaPrecisaDeTime(jogador, serie) || linhaJaGravada(linha, anterior)) continue;
+        problemas.push(
+          `Jogo ${indice + 1} da série ${serie.id} (${nome(serie.teamAId)} x ${nome(serie.teamBId)}): ` +
+            `${jogador.nick} é de ${nome(jogador.teamId)}, que não disputa a série. Se ele cobriu uma vaga ` +
+            `como substituto, marque em “Jogou por” o time que ele cobriu (${nome(serie.teamAId)} ou ` +
+            `${nome(serie.teamBId)}).`,
+        );
+      }
+    });
+  }
+  return problemas;
+}
+
+/**
+ * Linhas de K/D/A do jogador SEM "Jogou por" (`teamId` na linha): as que contam pelo time
+ * do próprio jogador — e por isso mudam de lado junto com ele.
+ */
+export function linhasSemJogouPor(dataset: Pick<TournamentDataset, "seriesMatches">, playerId: string): number {
+  let total = 0;
+  for (const serie of dataset.seriesMatches) {
+    for (const jogo of serie.games) {
+      for (const linha of jogo.statsByPlayer) {
+        if (linha.playerId === playerId && linha.teamId === undefined) total += 1;
+      }
+    }
+  }
+  return total;
+}
+
+/**
+ * Troca de time PELO CADASTRO de quem já jogou pelo time antigo (FB-3, a outra metade do
+ * `problemasDeLinhaSemTime`).
+ *
+ * A linha sem "Jogou por" vale pelo time do JOGADOR (`timeDaLinha`). Trocar o time dele no
+ * campo Time move junto todo o passado: na série ALFA x BETA, a TOP da ALFA fez 9 abates e
+ * passa para a GAMA — a linha some da partida, a ALFA cai de 13 para 4 abates e a GAMA, que
+ * nem disputou a série, fica com 9. As linhas não mudam, então nem `problemasDeLinhaSemTime`
+ * (que só olha linha nova) nem o diff de autorização (que cobra só `players:write`) viam.
+ *
+ * Recusa quando o jogador já tinha time, o envio troca por OUTRO time, e ele tem linha sem
+ * "Jogou por" tanto no gravado (já jogou pelo time antigo) quanto no envio (alguma ainda
+ * mudaria de lado). Fica de fora, de propósito:
+ *   - quem nunca jogou pelo próprio time (sem linha sem "Jogou por" gravada) troca à vontade;
+ *   - "Substituir de vez" não troca o time do titular, e o reserva que herda a vaga não tinha
+ *     time — as linhas dele, de reserva, sempre carregam o próprio `teamId`;
+ *   - virar reserva (sem time) quem recusa é o schema: a linha do reserva precisa do time;
+ *   - quem carimba o time antigo nas linhas (ou as apaga) no mesmo envio: aí nada muda de
+ *     lado, e mexer na linha já custa `results:write` no diff.
+ *
+ * ⚠ Como `problemasDeLinhaSemTime`, NÃO ESTÁ NO SCHEMA: o dado real tem sobras de quem
+ * trocou de time depois de jogar, e o schema roda em toda leitura. Só a gravação que FAZ a
+ * troca é recusada; o dataset gravado assim continua abrindo e salvando.
+ */
+export function problemasDeTrocaDeTimeComHistorico(
+  proposta: TournamentDataset,
+  gravado: (Pick<TournamentDataset, "players" | "seriesMatches"> & Partial<Pick<TournamentDataset, "teams">>) | null,
+): string[] {
+  if (!gravado) return [];
+  const antes = new Map(gravado.players.map((jogador) => [jogador.id, jogador]));
+  const nomes = new Map([...(gravado.teams ?? []), ...proposta.teams].map((time) => [time.id, time.name]));
+  const nome = (teamId: string) => nomes.get(teamId) ?? teamId;
+  const problemas: string[] = [];
+
+  for (const jogador of proposta.players) {
+    const novo = jogador.teamId;
+    const antigo = antes.get(jogador.id)?.teamId;
+    if (novo === undefined || antigo === undefined || novo === antigo) continue;
+    if (linhasSemJogouPor(gravado, jogador.id) === 0) continue;
+    const quantas = linhasSemJogouPor(proposta, jogador.id);
+    if (quantas === 0) continue;
+    problemas.push(
+      `${jogador.nick} tem ${quantas} linha(s) de K/D/A sem “Jogou por”, que contam pelo time dele ` +
+        `(${nome(antigo)}). Trocar o time dele para ${nome(novo)} pelo cadastro levaria esses abates, ` +
+        `jogos e MVPs para ${nome(novo)}. Para tirá-lo do time sem mudar a história, use “Substituir de ` +
+        `vez”; se ele só cobriu uma vaga num jogo, deixe o time dele como está e marque “Jogou por” na ` +
+        `linha desse jogo.`,
+    );
+  }
+  return problemas;
+}
+
+/**
+ * O time pelo qual o jogador jogou ESTE jogo: o da linha dele; sem linha (MVP gravado à
+ * mão num jogo sem estatística), o time do jogador.
+ */
+function timeNoJogo(
+  game: SeriesGame,
+  playerId: string,
+  playersById: ReadonlyMap<string, Player>,
+): string | undefined {
+  const linha = game.statsByPlayer.find((row) => row.playerId === playerId);
+  const jogador = playersById.get(playerId);
+  return linha ? timeDaLinha(linha, jogador) : jogador?.teamId;
+}
+
+/** As linhas do jogo que jogaram por um dos dois times da série (substituto incluso). */
+function linhasDosTimesDaSerie(
+  game: SeriesGame,
+  series: SeriesMatch,
+  playersById: ReadonlyMap<string, Player>,
+): PlayerGameStats[] {
+  return game.statsByPlayer.filter((linha) => {
+    const jogador = playersById.get(linha.playerId);
+    if (!jogador) return false;
+    const time = timeDaLinha(linha, jogador);
+    return time === series.teamAId || time === series.teamBId;
+  });
+}
+
+/**
+ * O MVP do jogo, contando só quem jogou por um dos dois times — pela LINHA, o que inclui o
+ * substituto avulso (ele pode ser MVP). Sem ninguém, vale o `mvpPlayerId` gravado à mão,
+ * como sempre para jogo sem estatística.
+ *
+ * É o caminho das páginas e das agregações. `getGameMvpPlayerId` (com o elenco por
+ * jogador) continua exportado para quem já o usa.
+ */
+export function mvpDoJogo(
+  game: SeriesGame,
+  series: SeriesMatch,
+  playersById: ReadonlyMap<string, Player>,
+): string {
+  return inferGameMvpPlayerId(linhasDosTimesDaSerie(game, series, playersById)) || game.mvpPlayerId;
+}
+
 /**
  * Índice teamId → ids dos jogadores. Montado uma vez e reaproveitado.
  *
  * Existe para o elenco de uma série sair sem varrer `dataset.players` a cada jogo:
  * `applyAutoGameMvpsToDataset` roda em toda gravação E na canonicalização do diff de
- * autorização, então o custo aparece.
+ * autorização, então o custo aparece. O reserva (sem time) não entra em balde nenhum.
  */
 function idsPorTime(dataset: TournamentDataset): Map<string, Set<string>> {
   const mapa = new Map<string, Set<string>>();
   for (const jogador of dataset.players) {
+    if (jogador.teamId === undefined) continue;
     const balde = mapa.get(jogador.teamId);
     if (balde) balde.add(jogador.id);
     else mapa.set(jogador.teamId, new Set([jogador.id]));
@@ -82,16 +393,25 @@ function idsPorTime(dataset: TournamentDataset): Map<string, Set<string>> {
   return mapa;
 }
 
-/** Quem pode ser MVP desta série: o elenco dos DOIS times que a disputam. */
+/**
+ * Quem pode ser MVP desta série: o elenco dos DOIS times que a disputam, MAIS quem jogou
+ * por um deles como substituto avulso (linha com `teamId` de um dos dois).
+ */
 export function elencoDaSerie(
   series: SeriesMatch,
   dataset: TournamentDataset,
   indice = idsPorTime(dataset),
 ): Set<string> {
-  return new Set([
+  const elenco = new Set([
     ...(indice.get(series.teamAId) ?? []),
     ...(indice.get(series.teamBId) ?? []),
   ]);
+  for (const game of series.games) {
+    for (const linha of game.statsByPlayer) {
+      if (linha.teamId === series.teamAId || linha.teamId === series.teamBId) elenco.add(linha.playerId);
+    }
+  }
+  return elenco;
 }
 
 /**
@@ -151,20 +471,24 @@ export function getSeriesStageLabel(series: SeriesMatch) {
  * 403 citando séries que ele nem abriu.
  *
  * O recorte por elenco vive onde ele resolve o problema para o qual foi criado: na
- * EXIBIÇÃO e na AGREGAÇÃO (`buildSeriesPlayerTotals`, `applyGameMvpToAccumulators`,
- * `getPlayerGameHistory` e as duas páginas de partida), que não gravam nada.
+ * EXIBIÇÃO e na AGREGAÇÃO (`mvpDoJogo`: `buildSeriesPlayerTotals`,
+ * `applyGameMvpToAccumulators`, `getPlayerGameHistory` e as duas páginas de partida), que
+ * não gravam nada.
+ *
+ * Os jogos de uma série com W.O. são PRESERVADOS: com o W.O. no meio da série ("jogos
+ * valem, W.O. completa", 22/10/2026), eles fazem parte do placar. Antes esta função
+ * zerava `games` de toda série com W.O. — o que, agora, apagaria os jogos disputados na
+ * primeira gravação.
  */
 export function applyAutoGameMvpsToDataset(dataset: TournamentDataset): TournamentDataset {
   return {
     ...dataset,
     seriesMatches: dataset.seriesMatches.map((series) => ({
       ...series,
-      games: isWalkoverSeries(series)
-        ? []
-        : series.games.map((game) => ({
-            ...game,
-            mvpPlayerId: inferGameMvpPlayerId(game.statsByPlayer) || game.mvpPlayerId,
-          })),
+      games: series.games.map((game) => ({
+        ...game,
+        mvpPlayerId: inferGameMvpPlayerId(game.statsByPlayer) || game.mvpPlayerId,
+      })),
     })),
   };
 }
@@ -174,9 +498,12 @@ export function createIndexes(dataset: TournamentDataset): DatasetIndexes {
   const teamsBySlug = new Map(dataset.teams.map((team) => [team.slug, team]));
   const playersById = new Map(dataset.players.map((player) => [player.id, player]));
   const playersBySlug = new Map(dataset.players.map((player) => [player.slug, player]));
+  // Todos os jogadores do time, INCLUSIVE quem saiu de vez (é o histórico); o elenco
+  // público é `elencoAtivo`. O reserva, sem time, não entra em balde nenhum.
   const playersByTeamId = new Map<string, Player[]>();
 
   for (const player of dataset.players) {
+    if (player.teamId === undefined) continue;
     const bucket = playersByTeamId.get(player.teamId);
     if (bucket) bucket.push(player);
     else playersByTeamId.set(player.teamId, [player]);
@@ -189,16 +516,28 @@ export function createIndexes(dataset: TournamentDataset): DatasetIndexes {
   return { teamsById, teamsBySlug, playersById, playersBySlug, playersByTeamId };
 }
 
-export function getSeriesScore(series: SeriesMatch, dataset?: TournamentDataset): SeriesScore {
-  const targetWins = dataset ? getSeriesTargetWins(series, dataset) : 2;
+/** Placar oficial de uma série, com a parte que veio do W.O. separada. */
+export type PlacarComWalkover = SeriesScore & {
+  /**
+   * Jogos de W.O. somados ao vencedor do W.O. para completar a série (0 sem W.O.). São
+   * jogos que NÃO aconteceram: sem K/D/A, sem MVP, fora de "jogos disputados" de todo
+   * mundo — mas contam no placar e no saldo de games da tabela.
+   */
+  jogosDeWalkover: number;
+};
 
-  if (series.walkoverWinnerTeamId === series.teamAId) {
-    return { teamAWins: targetWins, teamBWins: 0 };
-  }
-  if (series.walkoverWinnerTeamId === series.teamBId) {
-    return { teamAWins: 0, teamBWins: targetWins };
-  }
-
+/**
+ * "Jogos valem, W.O. completa" (decisão de 22/10/2026): vitórias nos jogos disputados +
+ * jogos de W.O. para o vencedor do W.O. até completar a série (MD3: 2; MD5: 3).
+ *
+ *   - A venceu o jogo 1 e B abandonou       → 2x0 A (1 jogo de W.O.);
+ *   - B venceu o jogo 1 e A leva o W.O.     → 2x1 A (2 jogos de W.O.);
+ *   - W.O. sem nenhum jogo (como sempre foi) → 2x0 (MD5: 3x0).
+ *
+ * O schema já recusa W.O. numa série que os jogos tinham decidido, então o vencedor do
+ * W.O. nunca chega aqui com as vitórias completas do OUTRO lado.
+ */
+export function placarComWalkover(series: SeriesMatch, vitoriasParaFechar: number): PlacarComWalkover {
   let teamAWins = 0;
   let teamBWins = 0;
 
@@ -207,7 +546,51 @@ export function getSeriesScore(series: SeriesMatch, dataset?: TournamentDataset)
     if (game.winnerTeamId === series.teamBId) teamBWins += 1;
   }
 
+  if (series.walkoverWinnerTeamId === series.teamAId) {
+    const jogosDeWalkover = Math.max(0, vitoriasParaFechar - teamAWins);
+    return { teamAWins: teamAWins + jogosDeWalkover, teamBWins, jogosDeWalkover };
+  }
+  if (series.walkoverWinnerTeamId === series.teamBId) {
+    const jogosDeWalkover = Math.max(0, vitoriasParaFechar - teamBWins);
+    return { teamAWins, teamBWins: teamBWins + jogosDeWalkover, jogosDeWalkover };
+  }
+
+  return { teamAWins, teamBWins, jogosDeWalkover: 0 };
+}
+
+export function getSeriesScore(series: SeriesMatch, dataset?: TournamentDataset): SeriesScore {
+  const targetWins = dataset ? getSeriesTargetWins(series, dataset) : 2;
+  const { teamAWins, teamBWins } = placarComWalkover(series, targetWins);
   return { teamAWins, teamBWins };
+}
+
+/**
+ * Se a série ainda pode receber W.O.: os jogos lançados não a decidiram. É a mesma regra
+ * que o schema aplica (`validateWalkoverSeries`), exposta para o painel avisar ANTES de
+ * mandar — W.O. depois de 2x0 numa MD3 é recusado pelo servidor.
+ */
+export function walkoverPermitido(series: SeriesMatch, dataset?: TournamentDataset): boolean {
+  const targetWins = dataset ? getSeriesTargetWins(series, dataset) : 2;
+  const soOsJogos = placarComWalkover({ ...series, walkoverWinnerTeamId: undefined }, targetWins);
+  return soOsJogos.teamAWins < targetWins && soOsJogos.teamBWins < targetWins;
+}
+
+/** Um jogo de W.O. da série, para a página da partida mostrar como tal. */
+export type JogoDeWalkover = { gameIndex: number; winnerTeamId: string };
+
+/**
+ * Os jogos de W.O. da série, numerados DEPOIS dos disputados: B venceu o jogo 1 e A levou
+ * o W.O. numa MD3 → jogos 2 e 3, de A. Vazio sem W.O.
+ */
+export function jogosDeWalkoverDaSerie(series: SeriesMatch, dataset?: TournamentDataset): JogoDeWalkover[] {
+  const vencedor = series.walkoverWinnerTeamId;
+  if (!vencedor) return [];
+  const targetWins = dataset ? getSeriesTargetWins(series, dataset) : 2;
+  const { jogosDeWalkover } = placarComWalkover(series, targetWins);
+  return Array.from({ length: jogosDeWalkover }, (_, i) => ({
+    gameIndex: series.games.length + i + 1,
+    winnerTeamId: vencedor,
+  }));
 }
 
 export function isWalkoverSeries(series: SeriesMatch) {
@@ -246,14 +629,13 @@ export function sortSeriesByDateDesc(seriesMatches: SeriesMatch[]) {
   });
 }
 
+/**
+ * Totais por jogador numa série, só de quem jogou por um dos dois times — pela LINHA de
+ * cada jogo, então o substituto avulso entra (e pode ser o MVP da série).
+ */
 function buildSeriesPlayerTotals(series: SeriesMatch, dataset: TournamentDataset) {
   const indexes = createIndexes(dataset);
-  const teamPlayerIds = new Set<string>();
-  for (const teamId of [series.teamAId, series.teamBId]) {
-    for (const player of indexes.playersByTeamId.get(teamId) ?? []) {
-      teamPlayerIds.add(player.id);
-    }
-  }
+  const timesDaSerie = new Set([series.teamAId, series.teamBId]);
 
   const totals = new Map<
     string,
@@ -261,8 +643,9 @@ function buildSeriesPlayerTotals(series: SeriesMatch, dataset: TournamentDataset
   >();
 
   for (const game of series.games) {
-    const gameMvpPlayerId = getGameMvpPlayerId(game, teamPlayerIds);
-    if (teamPlayerIds.has(gameMvpPlayerId)) {
+    const gameMvpPlayerId = mvpDoJogo(game, series, indexes.playersById);
+    const timeDoMvp = timeNoJogo(game, gameMvpPlayerId, indexes.playersById);
+    if (indexes.playersById.has(gameMvpPlayerId) && timeDoMvp !== undefined && timesDaSerie.has(timeDoMvp)) {
       const bucket = totals.get(gameMvpPlayerId) ?? {
         kills: 0,
         deaths: 0,
@@ -273,8 +656,7 @@ function buildSeriesPlayerTotals(series: SeriesMatch, dataset: TournamentDataset
       totals.set(gameMvpPlayerId, bucket);
     }
 
-    for (const stats of game.statsByPlayer) {
-      if (!teamPlayerIds.has(stats.playerId)) continue;
+    for (const stats of linhasDosTimesDaSerie(game, series, indexes.playersById)) {
       const bucket = totals.get(stats.playerId) ?? {
         kills: 0,
         deaths: 0,
@@ -352,8 +734,9 @@ export function getSeriesTeamKillTotals(
     for (const stats of game.statsByPlayer) {
       const player = indexes.playersById.get(stats.playerId);
       if (!player) continue;
-      if (player.teamId === series.teamAId) teamAKills += stats.kills;
-      if (player.teamId === series.teamBId) teamBKills += stats.kills;
+      const time = timeDaLinha(stats, player);
+      if (time === series.teamAId) teamAKills += stats.kills;
+      if (time === series.teamBId) teamBKills += stats.kills;
     }
   }
 
@@ -626,6 +1009,8 @@ function buildSeriesStandingsRows(dataset: TournamentDataset): StandingsRow[] {
     const rowB = rowsByTeamId.get(series.teamBId);
     if (!rowA || !rowB) continue;
 
+    // Com W.O. no meio da série, o placar já traz os jogos de W.O. (placarComWalkover):
+    // eles contam no saldo de games como vitória/derrota, como manda o regulamento.
     const score = getSeriesScore(series, dataset);
     rowA.seriesPlayed += 1;
     rowB.seriesPlayed += 1;
@@ -745,52 +1130,75 @@ function ensurePlayerAccumulator(
   return created;
 }
 
-function applyPlayerGameStats(
-  accumulators: Map<string, PlayerAccumulator>,
-  indexes: DatasetIndexes,
-  filters: AggregationFilters | undefined,
-  game: SeriesGame,
-) {
-  for (const stats of game.statsByPlayer) {
-    const player = indexes.playersById.get(stats.playerId);
-    if (!player) continue;
-    if (filters?.teamId && player.teamId !== filters.teamId) continue;
-
-    const bucket = ensurePlayerAccumulator(accumulators, player.id);
-    bucket.kills += stats.kills;
-    bucket.deaths += stats.deaths;
-    bucket.assists += stats.assists;
-    bucket.gamesPlayed += 1;
-    if (game.winnerTeamId === player.teamId) bucket.wins += 1;
-  }
-}
-
-function applyGameMvpToAccumulators(
-  accumulators: Map<string, PlayerAccumulator>,
-  indexes: DatasetIndexes,
-  filters: AggregationFilters | undefined,
-  game: SeriesGame,
-  elenco: ReadonlySet<string>,
-) {
-  const mvpPlayer = indexes.playersById.get(getGameMvpPlayerId(game, elenco));
-  if (mvpPlayer && (!filters?.teamId || mvpPlayer.teamId === filters.teamId)) {
-    ensurePlayerAccumulator(accumulators, mvpPlayer.id).gameMvps += 1;
-  }
-}
-
-function applySeriesMvpToAccumulators(
-  accumulators: Map<string, PlayerAccumulator>,
-  indexes: DatasetIndexes,
-  filters: AggregationFilters | undefined,
+/**
+ * O time pelo qual o jogador jogou a SÉRIE: o da primeira linha dele nos jogos dela; sem
+ * linha, o time do jogador. É o time em que conta o MVP da série.
+ */
+function timeNaSerie(
   series: SeriesMatch,
-  dataset: TournamentDataset,
-) {
-  const seriesMvp = getSeriesMvp(series, dataset);
-  if (!seriesMvp) return;
+  playerId: string,
+  playersById: ReadonlyMap<string, Player>,
+): string | undefined {
+  const jogador = playersById.get(playerId);
+  for (const game of series.games) {
+    const linha = game.statsByPlayer.find((row) => row.playerId === playerId);
+    if (linha) return timeDaLinha(linha, jogador);
+  }
+  return jogador?.teamId;
+}
 
-  const player = indexes.playersById.get(seriesMvp.playerId);
-  if (player && (!filters?.teamId || player.teamId === filters.teamId)) {
-    ensurePlayerAccumulator(accumulators, player.id).seriesMvps += 1;
+/**
+ * Cada coisa que um jogador soma nas estatísticas, junto do TIME pelo qual ela valeu.
+ *
+ * As linhas de K/D/A valem pelo `timeDaLinha` (o substituto avulso conta para o time em
+ * que jogou, e não para o dele), o MVP do jogo pelo time em que o MVP jogou aquele jogo,
+ * e o MVP da série pelo time em que ele jogou a série. Jogos de W.O. não estão em
+ * `series.games` e por isso não somam nada aqui — nem K/D/A, nem MVP, nem jogo disputado.
+ */
+type Contribuicao =
+  | { tipo: "linha"; jogador: Player; time: string | undefined; stats: PlayerGameStats; venceu: boolean }
+  | { tipo: "mvpDoJogo"; jogador: Player; time: string | undefined }
+  | { tipo: "mvpDaSerie"; jogador: Player; time: string | undefined };
+
+function* contribuicoes(
+  dataset: TournamentDataset,
+  indexes: DatasetIndexes,
+  range?: DateRangeFilter,
+): Generator<Contribuicao> {
+  for (const series of dataset.seriesMatches) {
+    if (!seriesInRange(series, range)) continue;
+
+    for (const game of series.games) {
+      for (const stats of game.statsByPlayer) {
+        const jogador = indexes.playersById.get(stats.playerId);
+        if (!jogador) continue;
+        const time = timeDaLinha(stats, jogador);
+        yield { tipo: "linha", jogador, time, stats, venceu: time !== undefined && game.winnerTeamId === time };
+      }
+
+      const mvp = indexes.playersById.get(mvpDoJogo(game, series, indexes.playersById));
+      if (mvp) yield { tipo: "mvpDoJogo", jogador: mvp, time: timeNoJogo(game, mvp.id, indexes.playersById) };
+    }
+
+    const seriesMvp = getSeriesMvp(series, dataset);
+    const jogador = seriesMvp ? indexes.playersById.get(seriesMvp.playerId) : undefined;
+    if (jogador) {
+      yield { tipo: "mvpDaSerie", jogador, time: timeNaSerie(series, jogador.id, indexes.playersById) };
+    }
+  }
+}
+
+function somarContribuicao(bucket: PlayerAccumulator, contribuicao: Contribuicao) {
+  if (contribuicao.tipo === "linha") {
+    bucket.kills += contribuicao.stats.kills;
+    bucket.deaths += contribuicao.stats.deaths;
+    bucket.assists += contribuicao.stats.assists;
+    bucket.gamesPlayed += 1;
+    if (contribuicao.venceu) bucket.wins += 1;
+  } else if (contribuicao.tipo === "mvpDoJogo") {
+    bucket.gameMvps += 1;
+  } else {
+    bucket.seriesMvps += 1;
   }
 }
 
@@ -804,14 +1212,17 @@ function toPlayerAggregate(
   const assists = bucket?.assists ?? 0;
   const gamesPlayed = bucket?.gamesPlayed ?? 0;
   const wins = bucket?.wins ?? 0;
+  // O reserva não tem time: os três campos saem vazios ("") e a exibição escreve "Reserva".
+  const teamId = player.teamId ?? "";
+  const team = player.teamId === undefined ? undefined : indexes.teamsById.get(player.teamId);
 
   return {
     playerId: player.id,
     playerNick: player.nick,
     playerSlug: player.slug,
-    teamId: player.teamId,
-    teamName: indexes.teamsById.get(player.teamId)?.name ?? player.teamId,
-    teamSlug: indexes.teamsById.get(player.teamId)?.slug ?? player.teamId,
+    teamId,
+    teamName: team?.name ?? teamId,
+    teamSlug: team?.slug ?? teamId,
     kills,
     deaths,
     assists,
@@ -824,6 +1235,10 @@ function toPlayerAggregate(
   };
 }
 
+/**
+ * Estatística por jogador. Com `filters.teamId`, só o que o jogador fez POR AQUELE TIME
+ * (o substituto avulso conta para o time em que jogou), e só os jogadores do time.
+ */
 export function calculatePlayerAggregates(
   dataset: TournamentDataset,
   filters?: AggregationFilters,
@@ -831,18 +1246,9 @@ export function calculatePlayerAggregates(
   const indexes = createIndexes(dataset);
   const accumulators = new Map<string, PlayerAccumulator>();
 
-  const indice = idsPorTime(dataset);
-
-  for (const series of dataset.seriesMatches) {
-    if (!seriesInRange(series, filters)) continue;
-
-    const elenco = elencoDaSerie(series, dataset, indice);
-    for (const game of series.games) {
-      applyPlayerGameStats(accumulators, indexes, filters, game);
-      applyGameMvpToAccumulators(accumulators, indexes, filters, game, elenco);
-    }
-
-    applySeriesMvpToAccumulators(accumulators, indexes, filters, series, dataset);
+  for (const contribuicao of contribuicoes(dataset, indexes, filters)) {
+    if (filters?.teamId && contribuicao.time !== filters.teamId) continue;
+    somarContribuicao(ensurePlayerAccumulator(accumulators, contribuicao.jogador.id), contribuicao);
   }
 
   return dataset.players
@@ -889,8 +1295,14 @@ export function buildLeaderboards(
   };
 }
 
+/**
+ * Estatística por time, somada pelo time em que cada coisa VALEU (`contribuicoes`): os
+ * abates do substituto avulso vão para o time pelo qual ele jogou, e não para o dele —
+ * somar pelos jogadores (como antes) jogava esses números no time errado, ou em time
+ * nenhum, no caso do reserva.
+ */
 export function calculateTeamAggregates(dataset: TournamentDataset): TeamAggregate[] {
-  const playerAggs = calculatePlayerAggregates(dataset);
+  const indexes = createIndexes(dataset);
   const gameDiffByTeam = new Map<string, number>();
 
   for (const team of dataset.teams) {
@@ -909,34 +1321,10 @@ export function calculateTeamAggregates(dataset: TournamentDataset): TeamAggrega
     );
   }
 
-  const acc = new Map<
-    string,
-    {
-      kills: number;
-      deaths: number;
-      assists: number;
-      gamesPlayed: number;
-      gameMvps: number;
-      seriesMvps: number;
-    }
-  >();
-
-  for (const row of playerAggs) {
-    const bucket = acc.get(row.teamId) ?? {
-      kills: 0,
-      deaths: 0,
-      assists: 0,
-      gamesPlayed: 0,
-      gameMvps: 0,
-      seriesMvps: 0,
-    };
-    bucket.kills += row.kills;
-    bucket.deaths += row.deaths;
-    bucket.assists += row.assists;
-    bucket.gamesPlayed += row.gamesPlayed;
-    bucket.gameMvps += row.gameMvps;
-    bucket.seriesMvps += row.seriesMvps;
-    acc.set(row.teamId, bucket);
+  const acc = new Map<string, PlayerAccumulator>();
+  for (const contribuicao of contribuicoes(dataset, indexes)) {
+    if (contribuicao.time === undefined) continue;
+    somarContribuicao(ensurePlayerAccumulator(acc, contribuicao.time), contribuicao);
   }
 
   return dataset.teams
@@ -978,6 +1366,10 @@ export function getLatestSeries(dataset: TournamentDataset, limit = 3) {
   return getSeriesSummaries(dataset).slice(0, limit);
 }
 
+/**
+ * Todos os jogadores com este time, INCLUSIVE quem saiu de vez (é o histórico). O elenco
+ * público — só os titulares de hoje — é `elencoAtivo`.
+ */
 export function getPlayersForTeam(dataset: TournamentDataset, teamId: string) {
   return [...(createIndexes(dataset).playersByTeamId.get(teamId) ?? [])];
 }
@@ -991,6 +1383,8 @@ export function getTeamSeriesHistory(dataset: TournamentDataset, teamId: string)
 export interface PlayerGameHistoryRow {
   seriesId: string;
   date: string;
+  /** O time pelo qual o jogador jogou ESTE jogo (`timeDaLinha`). */
+  teamId: string;
   opponentTeamId: string;
   opponentTeamName: string;
   gameIndex: number;
@@ -999,6 +1393,8 @@ export interface PlayerGameHistoryRow {
   deaths: number;
   assists: number;
   mvp: boolean;
+  /** Jogou como substituto avulso (`linhaDeSubstituto`). */
+  substituto: boolean;
 }
 
 export interface GameDurationRow {
@@ -1042,28 +1438,29 @@ export function getPlayerGameHistory(
   const player = indexes.playersById.get(playerId);
   if (!player) return [];
 
+  // Jogo a jogo, pelo time da LINHA: o reserva aparece com cada time que cobriu, e quem
+  // herdou uma vaga continua com os jogos avulsos no time em que jogou cada um.
   const rows: PlayerGameHistoryRow[] = [];
-  const indice = idsPorTime(dataset);
   for (const series of dataset.seriesMatches) {
-    if (series.teamAId !== player.teamId && series.teamBId !== player.teamId) continue;
-    const opponentTeamId = series.teamAId === player.teamId ? series.teamBId : series.teamAId;
-    const opponentTeamName = indexes.teamsById.get(opponentTeamId)?.name ?? opponentTeamId;
-    const elencoDestaSerie = elencoDaSerie(series, dataset, indice);
-
     series.games.forEach((game, gameIdx) => {
       const stat = game.statsByPlayer.find((row) => row.playerId === playerId);
       if (!stat) return;
+      const teamId = timeDaLinha(stat, player);
+      if (teamId !== series.teamAId && teamId !== series.teamBId) return;
+      const opponentTeamId = teamId === series.teamAId ? series.teamBId : series.teamAId;
       rows.push({
         seriesId: series.id,
         date: series.date,
+        teamId,
         opponentTeamId,
-        opponentTeamName,
+        opponentTeamName: indexes.teamsById.get(opponentTeamId)?.name ?? opponentTeamId,
         gameIndex: gameIdx + 1,
         champion: stat.champion,
         kills: stat.kills,
         deaths: stat.deaths,
         assists: stat.assists,
-        mvp: getGameMvpPlayerId(game, elencoDestaSerie) === playerId,
+        mvp: mvpDoJogo(game, series, indexes.playersById) === playerId,
+        substituto: linhaDeSubstituto(stat, player),
       });
     });
   }
@@ -1114,36 +1511,51 @@ export function getGameTeamKills(
   for (const stats of game.statsByPlayer) {
     const player = indexes.playersById.get(stats.playerId);
     if (!player) continue;
-    if (player.teamId === series.teamAId) teamAKills += stats.kills;
-    if (player.teamId === series.teamBId) teamBKills += stats.kills;
+    const time = timeDaLinha(stats, player);
+    if (time === series.teamAId) teamAKills += stats.kills;
+    if (time === series.teamBId) teamBKills += stats.kills;
   }
 
   return { teamAKills, teamBKills };
 }
 
+/** Uma linha da tabela de um jogo na página da partida. */
+export type LinhaDoJogo = PlayerGameStats & {
+  playerNick: string;
+  /** O time pelo qual jogou este jogo (`timeDaLinha`) — decide a coluna. */
+  teamId: string;
+  /** Jogou como substituto avulso: a página marca a linha. */
+  substituto: boolean;
+};
+
+/**
+ * Os jogos da série com as linhas separadas por time. A coluna de cada linha é o time pelo
+ * qual ela jogou — o substituto avulso aparece na coluna do time que ele cobriu.
+ */
 export function getSeriesGamesWithTeamRows(
   series: SeriesMatch,
   dataset: TournamentDataset,
 ): Array<{
   game: SeriesGame;
   gameIndex: number;
-  teamARows: Array<PlayerGameStats & { playerNick: string; teamId: string }>;
-  teamBRows: Array<PlayerGameStats & { playerNick: string; teamId: string }>;
+  teamARows: LinhaDoJogo[];
+  teamBRows: LinhaDoJogo[];
 }> {
   const indexes = createIndexes(dataset);
 
   return series.games.map((game, idx) => {
-    const rows = game.statsByPlayer
-      .map((stats) => {
-        const player = indexes.playersById.get(stats.playerId);
-        if (!player) return null;
-        return {
-          ...stats,
-          playerNick: player.nick,
-          teamId: player.teamId,
-        };
-      })
-      .filter(Boolean) as Array<PlayerGameStats & { playerNick: string; teamId: string }>;
+    const rows: LinhaDoJogo[] = [];
+    for (const stats of game.statsByPlayer) {
+      const player = indexes.playersById.get(stats.playerId);
+      const teamId = timeDaLinha(stats, player);
+      if (!player || teamId === undefined) continue;
+      rows.push({
+        ...stats,
+        playerNick: player.nick,
+        teamId,
+        substituto: linhaDeSubstituto(stats, player),
+      });
+    }
 
     return {
       game,
@@ -1258,6 +1670,10 @@ export function buildArchivedSeason(
 
 // Constrói o dataset da nova temporada: limpa séries/standings, mantém
 // teams/players conforme as flags, preserva o histórico arquivado.
+//
+// "Manter os jogadores" mantém o ELENCO de hoje (`estaNoElenco`): quem saiu de vez
+// (`saiuEm`) e o reserva sem time ficam só no arquivo — sem isto, o titular que saiu
+// nascia na edição nova escondido do elenco, mas ocupando o cadastro.
 export function buildNextSeasonDataset(
   dataset: TournamentDataset,
   options: {
@@ -1272,7 +1688,9 @@ export function buildNextSeasonDataset(
   const teams = options.keepTeams ? dataset.teams : [];
   const teamIds = new Set(teams.map((team) => team.id));
   const players = options.keepPlayers
-    ? dataset.players.filter((player) => teamIds.has(player.teamId))
+    ? dataset.players.filter(
+        (player) => estaNoElenco(player) && player.teamId !== undefined && teamIds.has(player.teamId),
+      )
     : [];
 
   return {
@@ -1357,8 +1775,9 @@ export function calculateChampionAggregates(dataset: TournamentDataset): Champio
     return bucket;
   };
 
+  // Os jogos DISPUTADOS de uma série com W.O. no meio também contam ("jogos valem"); os
+  // jogos de W.O. não estão em `series.games` e não somam nada (nem no total de jogos).
   for (const series of dataset.seriesMatches) {
-    if (isWalkoverSeries(series)) continue;
     series.games.forEach((game, gameIndex) => {
       totalGames += 1;
       const gameKey = `${series.id}#${gameIndex}`;
@@ -1372,8 +1791,8 @@ export function calculateChampionAggregates(dataset: TournamentDataset): Champio
         bucket.kills += stats.kills;
         bucket.deaths += stats.deaths;
         bucket.assists += stats.assists;
-        const player = indexes.playersById.get(stats.playerId);
-        if (player && game.winnerTeamId === player.teamId) bucket.wins += 1;
+        const time = timeDaLinha(stats, indexes.playersById.get(stats.playerId));
+        if (time !== undefined && game.winnerTeamId === time) bucket.wins += 1;
       }
 
       for (const ban of game.bans ?? []) {

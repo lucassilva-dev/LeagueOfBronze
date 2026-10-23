@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { resolveElo, resolveRole } from "@/lib/design";
+import { estaFora } from "@/lib/inscricoes/pagamento";
 import { LIMITES_INSCRICAO } from "@/lib/inscricoes/passo1";
 import { TURNOS } from "@/lib/inscricoes/turnos";
 import { normalizarChavePix } from "@/lib/pix";
@@ -327,7 +328,10 @@ export const fichaPatchSchema = z.object({
   // banco ainda tiver essa situação — senão 409 e nada muda. Não é mudança por si só (ver
   // `fichaTemMudanca`).
   situacaoAnterior: z.enum(SITUACOES).optional(),
+  // NOTA INTERNA: só a organização vê (decisão G, 2026-10-22). O jogador lê só o recado.
   observacao: z.string().trim().max(LIMITES_INSCRICAO.texto).nullable().optional(),
+  // "Recado para o jogador": aparece em Minha inscrição. Vazio ou nulo apaga.
+  recadoJogador: z.string().trim().max(LIMITES_INSCRICAO.texto).nullable().optional(),
   organizador: z.boolean().optional(),
   eloVerificado: z
     .string()
@@ -424,7 +428,10 @@ export function motivoDaRecusaDoInscrito(caminho: readonly PropertyKey[], dados:
     return `A observação do requisito${letra} passa de ${LIMITES_INSCRICAO.texto} caracteres.`;
   }
   if (parte === "ficha" && posicao === "observacao") {
-    return `A observação da ficha passa de ${LIMITES_INSCRICAO.texto} caracteres.`;
+    return `A observação da ficha (nota interna) passa de ${LIMITES_INSCRICAO.texto} caracteres.`;
+  }
+  if (parte === "ficha" && posicao === "recadoJogador") {
+    return `O recado para o jogador passa de ${LIMITES_INSCRICAO.texto} caracteres.`;
   }
   if (parte === "ficha" && posicao === "nomeReal") {
     return `Nome: use nome e sobrenome, com até ${LIMITES_INSCRICAO.nome} caracteres.`;
@@ -450,6 +457,8 @@ export const configPatchSchema = z.object({
   min_ranqueadas: z.number().int().min(0).max(999).optional(),
   dias_no_grupo: z.number().int().min(0).max(3650).optional(),
   prazo_pagamento_dias: z.number().int().min(1).max(365).optional(),
+  // Prazo único dos titulares (D3). Nulo volta ao prazo em dias contados do envio.
+  prazo_pagamento_ate: dataOpcional,
   segundos_por_escolha: z.number().int().min(5).max(600).optional(),
   taxa_centavos: z.number().int().min(0).max(1_000_000).optional(),
   pct_campeao: z.number().int().min(0).max(100).optional(),
@@ -536,7 +545,8 @@ export function estadoDaJanela(
  * (`montarDraftDosAprovados`): pendente não é sorteado — tem de ser conferido antes.
  */
 export function contaParaTimes(situacao: string): boolean {
-  return situacao !== "recusado" && situacao !== "desistiu" && situacao !== "excluido";
+  // A mesma regra de "fora" da fila de reserva e da cobrança (`estaFora`): uma lista só.
+  return !estaFora(situacao);
 }
 
 /**

@@ -15,7 +15,7 @@ import { AUTOR_RIOT } from "@/lib/riot/decidir";
  * - a gaveta gravava sem dizer o que tinha visto: uma tela velha desfazia a decisão de outro;
  * - «Vira Apto sozinho» aparecia para quem o servidor ia SEGURAR;
  * - a resposta do «atualizar da Riot» ficava atrás da gaveta;
- * - a «Observação da ficha» não avisava que o jogador a lê;
+ * - a «Observação da ficha» não avisava que o jogador a lê (hoje: nota interna × recado, decisão G);
  * - a conta da Riot repetida (mesmo PUUID) não acendia alerta nenhum.
  */
 
@@ -344,13 +344,17 @@ describe("«atualizar da Riot» de dentro da gaveta", () => {
 
 // ---------------------------------------------------------------- INS-05 / SEG-04
 
-describe("«Observação da ficha»", () => {
-  it("avisa, junto do campo, que o jogador lê o texto em «Minha inscrição»", () => {
+// Decisão G (2026-10-22): a observação da ficha virou dois campos, e cada um diz quem o lê.
+describe("nota interna × recado para o jogador", () => {
+  it("cada campo diz, junto dele, quem lê o texto", () => {
     montar(dados());
     abrir();
     aba("Ficha");
-    const campo = screen.getByLabelText("Observação da ficha");
-    expect(campo.closest("label")!.textContent).toMatch(/O jogador lê esta observação em «Minha inscrição»/);
+    const nota = screen.getByLabelText("Nota interna");
+    expect(nota.closest("label")!.textContent).toMatch(/só a organização vê/);
+    expect(nota.closest("label")!.textContent).toMatch(/o jogador NÃO lê este campo/);
+    const recado = screen.getByLabelText("Recado para o jogador");
+    expect(recado.closest("label")!.textContent).toMatch(/aparece em «Minha inscrição»/);
   });
 });
 

@@ -1,7 +1,7 @@
 import type { ChampStatRow, PlayerStatRow } from "@/components/lob/stats-toggles";
 import type { TournamentDataset } from "@/lib/schema";
 import { formatKda } from "@/lib/format";
-import { buildDesignPlayers } from "@/lib/roster";
+import { buildDesignPlayers, type RotulosDoElenco } from "@/lib/roster";
 import {
   buildChampionLeaderboards,
   buildLeaderboards,
@@ -36,11 +36,16 @@ export type RoleBestGroup = {
 const ROLE_ORDER = ["TOP", "SEL", "MID", "ADC", "SUP"];
 
 // Melhor jogador de cada rota, por KDA (desempate: mais jogos, mais MVPs, mais abates).
-// Só entram jogadores que efetivamente jogaram.
-export function buildRoleBests(dataset: TournamentDataset, limit = 3): RoleBestGroup[] {
+// Só entram jogadores que efetivamente jogaram — o reserva que entrou como substituto
+// também, com o rótulo "Reserva" no lugar do time (`rotulos`, no idioma da página).
+export function buildRoleBests(
+  dataset: TournamentDataset,
+  limit = 3,
+  rotulos?: RotulosDoElenco,
+): RoleBestGroup[] {
   const aggById = new Map(calculatePlayerAggregates(dataset).map((a) => [a.playerId, a] as const));
 
-  const rows = buildDesignPlayers(dataset)
+  const rows = buildDesignPlayers(dataset, rotulos)
     .map((p) => {
       const agg = aggById.get(p.id);
       return { p, agg };
@@ -107,6 +112,8 @@ export type StatsRowLabels = {
    * tabela logo abaixo.
    */
   localeTag?: string;
+  /** No lugar do time, para o reserva (sem time) que jogou como substituto. */
+  reserva?: string;
 };
 
 const LABELS_PT: StatsRowLabels = {
@@ -116,6 +123,7 @@ const LABELS_PT: StatsRowLabels = {
   pick: "P",
   ban: "B",
   dosJogos: "dos jogos",
+  reserva: "Reserva",
 };
 
 // Monta as linhas dos rankings (jogadores + campeões) do <StatsToggles> a partir de um dataset
@@ -127,12 +135,17 @@ export function buildStatsRows(
   playerRankings: Record<string, PlayerStatRow[]>;
   champRankings: Record<string, ChampStatRow[]>;
 } {
-  const players = buildDesignPlayers(dataset);
+  const rotuloReserva = labels.reserva ?? "Reserva";
+  const players = buildDesignPlayers(dataset, { reserva: rotuloReserva });
   const designById = new Map(players.map((p) => [p.id, p] as const));
   const pboards = buildLeaderboards(dataset);
 
   const toRow = (
-    r: { position: number; value: number; player: { playerId: string; playerNick: string; teamName: string } },
+    r: {
+      position: number;
+      value: number;
+      player: { playerId: string; playerNick: string; teamId: string; teamName: string };
+    },
     valueLabel: string,
   ): PlayerStatRow => {
     const d = designById.get(r.player.playerId);
@@ -140,7 +153,8 @@ export function buildStatsRows(
       rank: r.position,
       nick: d?.displayNick ?? r.player.playerNick,
       roleLabel: d ? (labels.rotas?.[d.roleMeta.short] ?? d.roleMeta.label) : "",
-      teamName: r.player.teamName,
+      // O reserva não tem time: a agregação devolve "" e aqui entra o rótulo.
+      teamName: r.player.teamId === "" ? rotuloReserva : r.player.teamName,
       teamColor: d?.teamColor ?? "#c98a4b",
       teamImageUrl: d?.teamImageUrl,
       imageUrl: d?.imageUrl,

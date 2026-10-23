@@ -6,7 +6,7 @@ import Link from "next/link";
 
 import { resolveRole } from "@/lib/design";
 import type { Messages } from "@/lib/i18n/messages";
-import { foraDaCobranca, inscricaoEsperaPagamento } from "@/lib/inscricoes/pagamento";
+import { dataDoPrazo, foraDaCobranca, inscricaoEsperaPagamento } from "@/lib/inscricoes/pagamento";
 import { TURNOS } from "@/lib/inscricoes/turnos";
 
 /**
@@ -53,7 +53,18 @@ type MinhaInscricao = {
   rotaSecundaria: string;
   disponibilidade: string[];
   situacao: keyof Rotulos["situacoes"];
-  observacao: string | null;
+  /** Recado da organização para o jogador (G). A nota interna da ficha nunca vem. */
+  recado?: string | null;
+  /**
+   * Lugar na fila (D1). Ausente = resposta de antes da fila: vale como titular. `indefinido` =
+   * o servidor não conseguiu ler a fila: na dúvida, sem Pix (pode ser reserva).
+   */
+  fila?:
+    | { tipo: "titular" }
+    | { tipo: "reserva"; posicao: number }
+    | { tipo: "fora" }
+    | { tipo: "indefinido" }
+    | null;
   criadoEm: string;
   pagamento: { estado: keyof Rotulos["pagamentos"]; valorCentavos: number; venceEm: string | null } | null;
   conferencias: Conferencia[];
@@ -255,6 +266,19 @@ export default function MinhaInscricaoCliente({ t }: Readonly<{ t: Rotulos }>) {
   // pagamento · R$ 20,00 — Vence em …" era o convite a pagar que a rota evita ao esconder
   // o QR. Mesma regra do painel (`foraDaCobranca`).
   const semCobranca = foraDaCobranca(i.situacao, pag?.estado);
+  // Fila de reserva (D2): reserva só paga se for chamado — sem Pix, sem JÁ PAGUEI e sem
+  // prazo. Quem já pagou ou declarou continua vendo o que fez (fica registrado).
+  const reserva = i.fila?.tipo === "reserva" ? i.fila : null;
+  const reservaSemPagar = reserva !== null && pag?.estado === "aguardando";
+  const reservaComDinheiro = reserva !== null && (pag?.estado === "pago" || pag?.estado === "declarado");
+  // «Sobra» é decisão da organização: vai para o fim da fila e NÃO é chamada sozinha quando um
+  // titular sai (`montarFila` a marca como `manual`; é exatamente a situação «sobra»). Prometer
+  // a ela o chamado pela ordem de inscrição seria prometer o que a fila não faz.
+  const emSobra = reserva !== null && i.situacao === "sobra";
+  // O servidor não conseguiu ler a fila: não se sabe se é titular ou reserva. Na dúvida, nem Pix,
+  // nem «JÁ PAGUEI», nem prazo (`inscricaoEsperaPagamento` já diz não) — e a tela diz por quê.
+  const filaIndefinida = i.fila?.tipo === "indefinido" && !semCobranca;
+  const semPagarNaDuvida = filaIndefinida && pag?.estado === "aguardando";
   // Na ordem do dia, e só os turnos que esta tela conhece.
   const turnos = TURNOS.filter((x) => i.disponibilidade.includes(x)).map((x) => t.turnos[x]);
 
@@ -281,6 +305,14 @@ export default function MinhaInscricaoCliente({ t }: Readonly<{ t: Rotulos }>) {
             </div>
             <Chip tom={TOM_SITUACAO[i.situacao] ?? "espera"}>{t.situacoes[i.situacao] ?? i.situacao}</Chip>
           </div>
+          {reserva && (
+            <div>
+              <div style={{ fontSize: 10, letterSpacing: ".2em", color: "var(--lob-bronze)", marginBottom: 6 }}>
+                {t.filaLabel}
+              </div>
+              <Chip tom="atencao">{t.filaPosicao.replace("{posicao}", String(reserva.posicao))}</Chip>
+            </div>
+          )}
           {pag && (
             <div>
               <div style={{ fontSize: 10, letterSpacing: ".2em", color: "var(--lob-bronze)", marginBottom: 6 }}>
@@ -288,22 +320,65 @@ export default function MinhaInscricaoCliente({ t }: Readonly<{ t: Rotulos }>) {
               </div>
               {semCobranca ? (
                 <Chip tom="espera">{t.semCobranca}</Chip>
+              ) : reservaSemPagar ? (
+                <Chip tom="espera">{t.reservaSemCobranca}</Chip>
+              ) : semPagarNaDuvida ? (
+                <Chip tom="espera">{t.filaIndefinidaPagamento}</Chip>
               ) : (
                 <Chip tom={TOM_PAGAMENTO[pag.estado] ?? "espera"}>
                   {t.pagamentos[pag.estado] ?? pag.estado} · {moeda(pag.valorCentavos)}
                 </Chip>
               )}
-              {pag.venceEm && pag.estado === "aguardando" && !semCobranca && (
+              {pag.venceEm && pag.estado === "aguardando" && !semCobranca && !reserva && !filaIndefinida && (
                 <div style={{ marginTop: 6, fontSize: 11.5, color: "var(--lob-muted)" }}>
-                  {t.venceEm} {new Date(pag.venceEm).toLocaleDateString()}
+                  {t.venceEm} {dataDoPrazo(pag.venceEm, t.localeDatas)}
                 </div>
               )}
             </div>
           )}
         </div>
 
-        {i.observacao && (
-          <p style={{ margin: "16px 0 0", fontSize: 13, color: "var(--lob-muted)" }}>{i.observacao}</p>
+        {reserva && (
+          <div style={{ marginTop: 16 }}>
+            <p style={{ margin: 0, fontSize: 13.5, color: "var(--lob-text)" }}>
+              {t.minhaReserva.replace("{posicao}", String(reserva.posicao))}
+            </p>
+            <p style={{ margin: "6px 0 0", fontSize: 12.5, color: "var(--lob-muted)", maxWidth: "62ch" }}>
+              {emSobra
+                ? [t.minhaSobraAjuda, reservaComDinheiro ? t.reservaComPagamento : null].filter(Boolean).join(" ")
+                : reservaComDinheiro
+                  ? t.reservaComPagamento
+                  : t.minhaReservaAjuda}
+            </p>
+          </div>
+        )}
+
+        {filaIndefinida && (
+          <div style={{ marginTop: 16 }}>
+            <p role="status" style={{ margin: 0, fontSize: 13, color: "#f3d69a", maxWidth: "62ch" }}>
+              {t.filaIndefinida}
+            </p>
+            <button
+              type="button"
+              className="lob-btn-ghost"
+              style={{ marginTop: 10 }}
+              onClick={() => {
+                setCarregando(true);
+                void carregar();
+              }}
+            >
+              {t.tentarDeNovo}
+            </button>
+          </div>
+        )}
+
+        {i.recado && (
+          <div style={{ marginTop: 16 }}>
+            <div style={{ fontSize: 10, letterSpacing: ".2em", color: "var(--lob-bronze)", marginBottom: 6 }}>
+              {t.recadoLabel}
+            </div>
+            <p style={{ margin: 0, fontSize: 13, color: "var(--lob-muted)", whiteSpace: "pre-line" }}>{i.recado}</p>
+          </div>
         )}
 
         {podeAvisar && pag && dados.pix ? (

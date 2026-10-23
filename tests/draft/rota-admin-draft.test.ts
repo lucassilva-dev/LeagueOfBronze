@@ -115,7 +115,8 @@ function draftEncerrado(n = 8): EstadoDraft {
   });
   e = iniciarDraft(e, Date.parse("2026-11-15T20:00:00Z"));
   // N escolhas (uma por time), todas pelo relógio: o auto-pick leva o mais barato válido.
-  e = alcancarORelogio(e, Date.parse("2026-11-15T20:00:00Z") + n * 60_000 + 1);
+  // Uma por vez — com mais de uma escolha de atraso o draft pausa (decisão C3).
+  for (let k = 1; k <= n; k++) e = alcancarORelogio(e, Date.parse("2026-11-15T20:00:00Z") + k * 60_000 + 1);
   expect(e.fase).toBe("encerrado");
   return e;
 }
