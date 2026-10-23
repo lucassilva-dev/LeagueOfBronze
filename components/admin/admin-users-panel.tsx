@@ -62,7 +62,7 @@ type UsuarioAdmin = {
 /** Confirmação pendente de uma ação destrutiva (uma por vez, sempre nomeando a conta). */
 type Confirmacao = {
   id: string;
-  tipo: "desativar" | "sessoes" | "remover";
+  tipo: "desativar" | "sessoes" | "remover" | "senha";
 };
 
 const ESCOPOS_ATRIBUIVEIS = SCOPES.filter((s) => !s.masterOnly);
@@ -103,13 +103,13 @@ function iconeDoEscopo(chave: string): Icone {
 
 /**
  * Regra de senha ESPELHADA de validatePasswordStrength (lib/security/password.ts).
- * Antes o painel só cobrava 12 caracteres, mas o servidor também exige letras + números:
+ * Antes o painel só cobrava o tamanho, mas o servidor também exige letras + números:
  * a pessoa preenchia tudo, clicava e tomava um erro que a interface tinha prometido que
  * não viria. Se aquela função mudar, esta lista tem que mudar junto.
  */
 function avaliarSenha(senha: string) {
   return [
-    { ok: senha.length >= 12, texto: "Pelo menos 12 caracteres" },
+    { ok: senha.length >= 5, texto: "Pelo menos 5 caracteres" },
     { ok: /[a-zA-Z]/.test(senha) && /[0-9]/.test(senha), texto: "Combina letras e números" },
     { ok: senha.length <= 200, texto: "No máximo 200 caracteres" },
   ];
@@ -385,6 +385,15 @@ function AcoesDaConta({
       >
         {rotulo(LogOut, "Encerrar sessões")}
       </Button>
+      <Button
+        tone="ghost"
+        small={!compacto}
+        fullWidth={compacto}
+        disabled={ocupado}
+        onClick={() => onConfirmar("senha")}
+      >
+        {rotulo(KeyRound, "Senha provisória")}
+      </Button>
       {u.disabled ? (
         <Button tone="ghost" small={!compacto} fullWidth={compacto} disabled={ocupado} onClick={onReativar}>
           {rotulo(RotateCcw, "Reativar")}
@@ -421,10 +430,13 @@ function ConfirmacoesDaConta({
   compacto,
   textoRemocao,
   onTextoRemocao,
+  senhaGerada,
   onEncerrarSessoes,
+  onGerarSenha,
   onDesativar,
   onRemover,
   onCancelar,
+  onEsquecerSenha,
 }: Readonly<{
   u: UsuarioAdmin;
   confirmando: Confirmacao["tipo"] | null;
@@ -432,18 +444,106 @@ function ConfirmacoesDaConta({
   compacto: boolean;
   textoRemocao: string;
   onTextoRemocao: (v: string) => void;
+  /** A provisória que acabou de ser gerada para ESTA conta — nulo nas outras. */
+  senhaGerada: string | null;
   onEncerrarSessoes: () => void;
+  onGerarSenha: () => void;
   onDesativar: () => void;
   onRemover: () => void;
   onCancelar: () => void;
+  onEsquecerSenha: () => void;
 }>) {
   const caixa = useRef<HTMLDivElement>(null);
+  const [copiada, setCopiada] = useState<"ok" | "falhou" | null>(null);
 
   // No celular os botões moram no fim da folha: a confirmação nasce abaixo do botão tocado
   // e podia ficar fora da tela — parecia que o toque não tinha feito nada.
   useEffect(() => {
-    if (compacto && confirmando) caixa.current?.scrollIntoView?.({ block: "nearest" });
-  }, [compacto, confirmando]);
+    if (compacto && (confirmando || senhaGerada)) caixa.current?.scrollIntoView?.({ block: "nearest" });
+  }, [compacto, confirmando, senhaGerada]);
+
+  /*
+   * A senha aparece UMA vez: mora só no estado do painel e some ao fechar este aviso, a
+   * folha da conta ou a página. O servidor não a guarda — perdeu, gera outra.
+   */
+  if (senhaGerada) {
+    const copiar = async () => {
+      try {
+        await navigator.clipboard.writeText(senhaGerada);
+        setCopiada("ok");
+      } catch {
+        setCopiada("falhou");
+      }
+    };
+    return (
+      <div ref={caixa} style={{ marginTop: 14 }} role="status">
+        <Banner
+          tone="ok"
+          title={`Senha provisória de ${u.displayName}`}
+          actions={
+            <Button tone="ghost" small onClick={onEsquecerSenha}>
+              Já repassei
+            </Button>
+          }
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", margin: "2px 0 10px" }}>
+            <code
+              style={{
+                padding: "6px 10px",
+                borderRadius: 3,
+                border: `1px solid ${C.line2}`,
+                background: "rgba(0,0,0,.35)",
+                color: C.bronzeHi,
+                fontSize: 15,
+                letterSpacing: ".06em",
+                userSelect: "all",
+                overflowWrap: "anywhere",
+              }}
+            >
+              {senhaGerada}
+            </code>
+            <Button small onClick={() => void copiar()}>
+              Copiar
+            </Button>
+            {copiada === "ok" ? (
+              <span style={{ fontSize: 12, color: C.okSoft }}>Copiada.</span>
+            ) : copiada === "falhou" ? (
+              <span style={{ fontSize: 12, color: C.dangerSoft }}>
+                O navegador não deixou copiar — selecione e copie à mão.
+              </span>
+            ) : null}
+          </div>
+          Mande no PRIVADO de <strong>@{u.username}</strong>. Ele entra com o usuário <strong>{u.username}</strong>{" "}
+          e esta senha, e o painel obriga a trocar por uma dele na hora. Ela aparece só agora: o servidor não a
+          guarda.
+        </Banner>
+      </div>
+    );
+  }
+
+  if (confirmando === "senha") {
+    return (
+      <div ref={caixa} style={{ marginTop: 14 }}>
+        <Banner
+          tone="danger"
+          title={`Gerar uma senha provisória para ${u.displayName}?`}
+          actions={
+            <>
+              <Button tone="gold" small disabled={ocupado} onClick={onGerarSenha}>
+                {ocupado ? "Gerando..." : "Gerar senha"}
+              </Button>
+              <Button tone="ghost" small disabled={ocupado} onClick={onCancelar}>
+                Cancelar
+              </Button>
+            </>
+          }
+        >
+          Para quem esqueceu a senha. A senha atual de <strong>@{u.username}</strong> deixa de valer e as sessões
+          abertas caem na hora. Você recebe a provisória para repassar, e ele troca no primeiro acesso.
+        </Banner>
+      </div>
+    );
+  }
 
   if (confirmando === "sessoes") {
     return (
@@ -922,6 +1022,8 @@ export function AdminUsersPanel({ onAlert }: Readonly<{ onAlert: (kind: "ok" | "
   const [confirmacao, setConfirmacao] = useState<Confirmacao | null>(null);
   // Para remover é preciso digitar o @usuário: é a única ação sem volta do painel.
   const [textoRemocao, setTextoRemocao] = useState("");
+  /** A provisória recém-gerada, mostrada uma vez para a conta `id`. Nunca vai para o navegador além disto. */
+  const [senhaGerada, setSenhaGerada] = useState<Readonly<{ id: string; senha: string }> | null>(null);
 
   // Celular: a conta aberta na folha e a folha de conta nova. O formulário continua aqui no
   // painel, então fechar a folha não perde o que foi digitado.
@@ -1025,6 +1127,33 @@ export function AdminUsersPanel({ onAlert }: Readonly<{ onAlert: (kind: "ok" | "
     }
   };
 
+  /** «Esqueci a senha» de admin: o servidor sorteia a provisória e a devolve só nesta resposta. */
+  const gerarSenha = async (u: UsuarioAdmin) => {
+    setSalvandoId(u.id);
+    try {
+      const r = await fetch(`/api/admin/users/${u.id}`, {
+        method: "PATCH",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gerarSenhaProvisoria: true }),
+        cache: "no-store",
+      });
+      const d = (await r.json().catch(() => ({}))) as { error?: string; senhaProvisoria?: unknown };
+      if (!r.ok || typeof d.senhaProvisoria !== "string") {
+        onAlert("erro", d.error ?? "Não foi possível gerar a senha provisória.");
+        return;
+      }
+      setSenhaGerada({ id: u.id, senha: d.senhaProvisoria });
+      setConfirmacao(null);
+      await carregar();
+    } catch {
+      // A resposta pode ter se perdido DEPOIS de a senha mudar: gerar de novo resolve.
+      onAlert("erro", "Não foi possível falar com o servidor. Se a senha chegou a mudar, gere de novo: vale sempre a última.");
+    } finally {
+      setSalvandoId(null);
+    }
+  };
+
   const remover = async (u: UsuarioAdmin) => {
     setSalvandoId(u.id);
     try {
@@ -1057,6 +1186,7 @@ export function AdminUsersPanel({ onAlert }: Readonly<{ onAlert: (kind: "ok" | "
 
   const abrirConfirmacao = (id: string, tipo: Confirmacao["tipo"]) => {
     setTextoRemocao("");
+    setSenhaGerada(null);
     setConfirmacao((atual) => (atual?.id === id && atual.tipo === tipo ? null : { id, tipo }));
   };
 
@@ -1068,6 +1198,7 @@ export function AdminUsersPanel({ onAlert }: Readonly<{ onAlert: (kind: "ok" | "
   /** Fechar a folha da conta leva junto a confirmação pendente: ela era daquela tela. */
   const fecharConta = () => {
     setAbertaId(null);
+    setSenhaGerada(null);
     cancelarConfirmacao();
   };
 
@@ -1090,9 +1221,12 @@ export function AdminUsersPanel({ onAlert }: Readonly<{ onAlert: (kind: "ok" | "
       compacto={compacto}
       textoRemocao={textoRemocao}
       onTextoRemocao={setTextoRemocao}
+      senhaGerada={senhaGerada?.id === u.id ? senhaGerada.senha : null}
       onEncerrarSessoes={() =>
         void atualizar(u.id, { revokeSessions: true }, `Sessões de ${u.displayName} encerradas.`)
       }
+      onGerarSenha={() => void gerarSenha(u)}
+      onEsquecerSenha={() => setSenhaGerada(null)}
       onDesativar={() => void atualizar(u.id, { disabled: true }, `${u.displayName} desativado.`)}
       onRemover={() => void remover(u)}
       onCancelar={cancelarConfirmacao}

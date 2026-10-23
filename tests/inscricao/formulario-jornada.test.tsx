@@ -306,7 +306,7 @@ describe("acessibilidade (INS-14)", () => {
 
 describe("erros das rotas no idioma da tela (INS-15)", () => {
   it("site em inglês: a senha curta recusada pelo cadastro sai em inglês, no aviso geral e no campo", async () => {
-    const pt = "A senha precisa ter pelo menos 12 caracteres.";
+    const pt = "A senha precisa ter pelo menos 5 caracteres.";
     roteador({
       "POST /api/conta/cadastro": json(
         { error: pt, codigo: "senha_curta", problemas: [{ campo: "senha", mensagem: pt }] },
@@ -316,7 +316,7 @@ describe("erros das rotas no idioma da tela (INS-15)", () => {
     render(<FormularioInscricao t={en} config={CONFIG} elos={ELOS} jogadorInicial={null} />);
     preencherPasso1(en);
     fireEvent.change(campo(en.emailLabel), { target: { value: "fulano@exemplo.com" } });
-    fireEvent.change(campo(en.senhaLabel), { target: { value: "curta1" } });
+    fireEvent.change(campo(en.senhaLabel), { target: { value: "ab1" } });
     fireEvent.click(screen.getByRole("button", { name: en.continuar }));
 
     const alertas = (await screen.findAllByRole("alert")).map((a) => a.textContent);
@@ -362,9 +362,9 @@ describe("erros das rotas no idioma da tela (INS-15)", () => {
   });
 
   it("a ajuda da conta diz a regra da senha ANTES do erro, nos dois idiomas", () => {
-    expect(t.contaAjuda).toMatch(/12 caracteres/);
+    expect(t.contaAjuda).toMatch(/5 caracteres/);
     expect(t.contaAjuda).toMatch(/letras e números/);
-    expect(en.contaAjuda).toMatch(/12 characters/);
+    expect(en.contaAjuda).toMatch(/5 characters/);
     expect(en.contaAjuda).toMatch(/letters and numbers/);
   });
 

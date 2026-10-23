@@ -34,7 +34,7 @@ export const dynamic = "force-dynamic";
  * Textos das respostas, nos dois idiomas.
  *
  * O formulário mostra o `error` da resposta tal como vem. No site em inglês, o jogador
- * lia "Já existe uma conta com esse e-mail…" e "A senha precisa ter pelo menos 12
+ * lia "Já existe uma conta com esse e-mail…" e "A senha precisa ter pelo menos 5
  * caracteres." em português. O idioma é o mesmo que o site usa (cookie `lob_locale` >
  * Accept-Language > pt) — resolvido aqui porque o proxy não roda nas rotas de API.
  *

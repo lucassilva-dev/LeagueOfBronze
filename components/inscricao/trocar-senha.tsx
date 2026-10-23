@@ -37,7 +37,7 @@ export function problemaDaSenhaNova(
   campos: Readonly<{ atual: string; nova: string; confirmacao: string }>,
 ): string | null {
   const { atual, nova, confirmacao } = campos;
-  if (nova.length < 12) return t.erros.senha_curta;
+  if (nova.length < 5) return t.erros.senha_curta;
   if (nova.length > 200) return t.erros.senha_longa;
   if (!/[a-zA-Z]/.test(nova) || !/[0-9]/.test(nova)) return t.erros.senha_fraca;
   if (nova !== confirmacao) return t.contaSenhaNaoConfere;

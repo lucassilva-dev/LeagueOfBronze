@@ -95,11 +95,11 @@ describe("a regra da senha é dita antes, e conferida antes de enviar", () => {
     const campo = screen.getByLabelText(t.contaSenhaNovaLabel);
     const ajuda = document.getElementById(campo.getAttribute("aria-describedby") ?? "");
     expect(ajuda?.textContent).toBe(t.contaSenhaRegra);
-    expect(t.contaSenhaRegra).toMatch(/12 caracteres/);
+    expect(t.contaSenhaRegra).toMatch(/5 caracteres/);
   });
 
   it.each([
-    ["curta", "abc123", "abc123", t.erros.senha_curta],
+    ["curta", "ab12", "ab12", t.erros.senha_curta],
     ["sem número", "senhasemnumeroalgum", "senhasemnumeroalgum", t.erros.senha_fraca],
     ["confirmação diferente", NOVA, `${NOVA}x`, t.contaSenhaNaoConfere],
     ["igual à atual", PROVISORIA, PROVISORIA, t.contaSenhaIgual],
@@ -129,7 +129,7 @@ describe("respostas do servidor", () => {
   });
 
   it("400 com código conhecido: no idioma da tela", async () => {
-    servidor(resposta({ error: "A senha precisa ter pelo menos 12 caracteres.", codigo: "senha_curta" }, 400));
+    servidor(resposta({ error: "A senha precisa ter pelo menos 5 caracteres.", codigo: "senha_curta" }, 400));
     render(<TrocarSenha t={en} obrigatoria={false} email="c@x.com" />);
     preencher(PROVISORIA, NOVA, NOVA, en);
     expect((await screen.findByRole("alert")).textContent).toBe(en.erros.senha_curta);

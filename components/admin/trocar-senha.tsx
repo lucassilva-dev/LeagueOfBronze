@@ -135,7 +135,7 @@ export function TrocarSenha({
         />
       </Field>
       <div style={{ height: compacto ? 12 : 8 }} />
-      <Field label="Nova senha" hint="Ao menos 12 caracteres, com letras e números.">
+      <Field label="Nova senha" hint="Ao menos 5 caracteres, com letras e números.">
         <Input value={nova} onChange={setNova} type="password" ariaLabel="Nova senha" autoComplete="new-password" />
       </Field>
       <div style={{ height: compacto ? 12 : 8 }} />

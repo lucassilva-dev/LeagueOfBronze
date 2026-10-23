@@ -44,7 +44,7 @@ describe("a senha provisória que a pessoa recebe", () => {
   it("'1234' é recusada — e a recusa vale para quem cria a conta também", () => {
     // Vale registrar por escrito: a senha provisória é digitada por quem CRIA a conta,
     // no mesmo campo, e passa pela mesma regra. Não existe atalho para senha temporária.
-    expect(validatePasswordStrength("1234")).toBe("A senha precisa ter pelo menos 12 caracteres.");
+    expect(validatePasswordStrength("1234")).toBe("A senha precisa ter pelo menos 5 caracteres.");
     expect(validatePasswordStrength("1234567890123")).toBe("A senha precisa combinar letras e números.");
     expect(validatePasswordStrength("bronze1234567")).toBeNull();
   });

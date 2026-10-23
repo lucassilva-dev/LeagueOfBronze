@@ -56,7 +56,7 @@ export const inscricao = definir({
     // A regra da senha é a de `validatePasswordStrength` (lib/security/password.ts). Dita
     // aqui, a pessoa a lê ANTES de errar, e não só na mensagem de erro.
     contaAjuda:
-      "É com esse e-mail e senha que você entra no site. Se você for capitão, é assim que abre o seu painel no dia do draft. A senha precisa ter pelo menos 12 caracteres, misturando letras e números.",
+      "É com esse e-mail e senha que você entra no site. Se você for capitão, é assim que abre o seu painel no dia do draft. A senha precisa ter pelo menos 5 caracteres, misturando letras e números.",
     discordLabel: "USUÁRIO DO DISCORD",
     discordPlaceholder: "seuusuario",
     discordAjuda: "Sua conta da Riot precisa estar vinculada a este Discord (regra 21).",
@@ -118,7 +118,7 @@ export const inscricao = definir({
     // A regra é a de `validatePasswordStrength` (lib/security/password.ts): dita ANTES, e
     // não só no erro depois de enviar.
     contaSenhaRegra:
-      "A senha nova precisa ter pelo menos 12 caracteres, misturando letras e números, e ser diferente da atual.",
+      "A senha nova precisa ter pelo menos 5 caracteres, misturando letras e números, e ser diferente da atual.",
     contaSenhaBotao: "TROCAR SENHA",
     contaSenhaEnviando: "TROCANDO…",
     contaSenhaNaoConfere: "As duas senhas novas não são iguais.",
@@ -230,7 +230,7 @@ export const inscricao = definir({
       pagamento_ja_tratado: "Esse pagamento já foi tratado pela organização. Fale com ela se algo estiver errado.",
       indisponivel: "Contas ainda não estão disponíveis.",
       muitas_tentativas: "Muitas tentativas. Tente novamente mais tarde.",
-      senha_curta: "A senha precisa ter pelo menos 12 caracteres.",
+      senha_curta: "A senha precisa ter pelo menos 5 caracteres.",
       senha_longa: "A senha é longa demais (máximo de 200 caracteres).",
       senha_fraca: "A senha precisa combinar letras e números.",
       email_existe: "Já existe uma conta com esse e-mail. Entre com ela ou fale com a organização.",
@@ -348,7 +348,7 @@ export const inscricao = definir({
     emailPlaceholder: "you@email.com",
     senhaLabel: "CREATE A PASSWORD",
     contaAjuda:
-      "You sign in with this e-mail and password. If you're a captain, this is how you open your panel on draft day. The password needs at least 12 characters, mixing letters and numbers.",
+      "You sign in with this e-mail and password. If you're a captain, this is how you open your panel on draft day. The password needs at least 5 characters, mixing letters and numbers.",
     discordLabel: "DISCORD USERNAME",
     discordPlaceholder: "yourhandle",
     discordAjuda: "Your Riot account must be linked to this Discord (rule 21).",
@@ -394,7 +394,7 @@ export const inscricao = definir({
     contaSenhaNovaLabel: "NEW PASSWORD",
     contaSenhaConfirmarLabel: "REPEAT THE NEW PASSWORD",
     contaSenhaRegra:
-      "The new password needs at least 12 characters, mixing letters and numbers, and must differ from the current one.",
+      "The new password needs at least 5 characters, mixing letters and numbers, and must differ from the current one.",
     contaSenhaBotao: "CHANGE PASSWORD",
     contaSenhaEnviando: "CHANGING…",
     contaSenhaNaoConfere: "The two new passwords don't match.",
@@ -484,7 +484,7 @@ export const inscricao = definir({
       pagamento_ja_tratado: "The organizers have already handled this payment. Talk to them if something looks wrong.",
       indisponivel: "Accounts are not available yet.",
       muitas_tentativas: "Too many attempts. Please try again later.",
-      senha_curta: "The password needs at least 12 characters.",
+      senha_curta: "The password needs at least 5 characters.",
       senha_longa: "The password is too long (200 characters max).",
       senha_fraca: "The password must mix letters and numbers.",
       email_existe: "There's already an account with this e-mail. Sign in with it or talk to the organizers.",

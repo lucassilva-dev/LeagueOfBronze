@@ -5,7 +5,7 @@ import { criarBancoEmMemoria, type BancoEmMemoria } from "../security/_banco-em-
 
 /**
  * INS-15 (parte da conta): no site em inglês, o cadastro de jogador respondia em
- * português — "A senha precisa ter pelo menos 12 caracteres.", "Já existe uma conta com
+ * português — "A senha precisa ter pelo menos 5 caracteres.", "Já existe uma conta com
  * esse e-mail…", "Confira os campos destacados." — e o formulário mostra o `error` tal
  * como vem. Agora a rota responde no idioma do site (cookie `lob_locale` >
  * Accept-Language > pt) e cada recusa leva um `codigo` estável.
@@ -57,11 +57,11 @@ beforeEach(() => {
 
 describe("cadastro de jogador no idioma do site", () => {
   it("senha curta, no site em inglês: a mensagem sai em inglês, com código estável", async () => {
-    const r = await cadastro(pedido({ email: "novo@x.com", nome: "Novo Jogador", senha: "curta1" }, { cookie: "en" }));
+    const r = await cadastro(pedido({ email: "novo@x.com", nome: "Novo Jogador", senha: "ab1" }, { cookie: "en" }));
     expect(r.status).toBe(400);
     const c = await corpo(r);
-    expect(c).toMatchObject({ codigo: "senha_curta", error: "The password must be at least 12 characters long." });
-    expect(c.problemas).toEqual([{ campo: "senha", mensagem: "The password must be at least 12 characters long." }]);
+    expect(c).toMatchObject({ codigo: "senha_curta", error: "The password must be at least 5 characters long." });
+    expect(c.problemas).toEqual([{ campo: "senha", mensagem: "The password must be at least 5 characters long." }]);
   });
 
   it("senha sem número, no site em inglês", async () => {
@@ -96,16 +96,16 @@ describe("cadastro de jogador no idioma do site", () => {
 
   it("sem cookie, o Accept-Language em inglês decide", async () => {
     const r = await cadastro(
-      pedido({ email: "novo@x.com", nome: "Novo Jogador", senha: "curta1" }, { acceptLanguage: "en-US,en;q=0.9" }),
+      pedido({ email: "novo@x.com", nome: "Novo Jogador", senha: "ab1" }, { acceptLanguage: "en-US,en;q=0.9" }),
     );
-    expect((await corpo(r)).error).toBe("The password must be at least 12 characters long.");
+    expect((await corpo(r)).error).toBe("The password must be at least 5 characters long.");
   });
 
   it("controle: o site em português continua em português, com os mesmos códigos", async () => {
-    const curta = await cadastro(pedido({ email: "novo@x.com", nome: "Novo Jogador", senha: "curta1" }));
+    const curta = await cadastro(pedido({ email: "novo@x.com", nome: "Novo Jogador", senha: "ab1" }));
     expect(await corpo(curta)).toMatchObject({
       codigo: "senha_curta",
-      error: "A senha precisa ter pelo menos 12 caracteres.",
+      error: "A senha precisa ter pelo menos 5 caracteres.",
     });
 
     const campos = await cadastro(pedido({ email: "nao-e-email", nome: "A", senha: "senhaBoa12345" }, { cookie: "pt" }));

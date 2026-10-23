@@ -112,19 +112,21 @@ export type MotivoDeSenhaFraca = "senha_curta" | "senha_longa" | "senha_fraca";
 
 export const MENSAGENS_DE_SENHA_FRACA: Record<"pt" | "en", Record<MotivoDeSenhaFraca, string>> = {
   pt: {
-    senha_curta: "A senha precisa ter pelo menos 12 caracteres.",
+    senha_curta: "A senha precisa ter pelo menos 5 caracteres.",
     senha_longa: "A senha é longa demais (máximo de 200 caracteres).",
     senha_fraca: "A senha precisa combinar letras e números.",
   },
   en: {
-    senha_curta: "The password must be at least 12 characters long.",
+    senha_curta: "The password must be at least 5 characters long.",
     senha_longa: "The password is too long (200 characters at most).",
     senha_fraca: "The password must mix letters and numbers.",
   },
 };
 
+// Mínimo de 5 desde 2026-10-22, a pedido do Lucas (eram 12): os jogadores esqueciam a senha.
+// O que segura chute é o limitador de tentativas do login, não o tamanho.
 export function motivoDeSenhaFraca(password: string): MotivoDeSenhaFraca | null {
-  if (password.length < 12) return "senha_curta";
+  if (password.length < 5) return "senha_curta";
   if (password.length > 200) return "senha_longa";
   if (!/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) return "senha_fraca";
   return null;

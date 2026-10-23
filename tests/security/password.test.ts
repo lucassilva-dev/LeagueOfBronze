@@ -85,7 +85,9 @@ describe("hash de senha (scrypt + pepper)", () => {
 
 describe("força da senha", () => {
   it("exige tamanho mínimo", () => {
-    expect(validatePasswordStrength("curta1")).toBeTruthy();
+    // Mínimo de 5 desde 2026-10-22 (eram 12): 4 recusa, 5 passa.
+    expect(validatePasswordStrength("ab12")).toBeTruthy();
+    expect(validatePasswordStrength("abc12")).toBeNull();
     expect(validatePasswordStrength("umasenhaqualquer1")).toBeNull();
   });
 

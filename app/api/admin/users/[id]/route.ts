@@ -4,21 +4,31 @@ import { z } from "zod";
 
 import { getPasswordPepper } from "@/lib/admin-auth";
 import { createSupabaseAdminClient } from "@/lib/data-store";
-import { hashPassword, validatePasswordStrength } from "@/lib/security/password";
+import { gerarSenhaProvisoria, hashPassword, validatePasswordStrength } from "@/lib/security/password";
 import { requireAdmin } from "@/lib/security/route-guard";
 import { sanitizeScopes } from "@/lib/security/scopes";
 
 export const dynamic = "force-dynamic";
 
-const atualizarSchema = z.object({
-  displayName: z.string().trim().min(1).max(120).optional(),
-  scopes: z.array(z.string()).max(40).optional(),
-  disabled: z.boolean().optional(),
-  /** nova senha definida pelo master (o usuário será obrigado a trocar) */
-  newPassword: z.string().min(1).max(200).optional(),
-  /** encerra todas as sessões do usuário */
-  revokeSessions: z.boolean().optional(),
-});
+const atualizarSchema = z
+  .object({
+    displayName: z.string().trim().min(1).max(120).optional(),
+    scopes: z.array(z.string()).max(40).optional(),
+    disabled: z.boolean().optional(),
+    /** nova senha definida pelo master (o usuário será obrigado a trocar) */
+    newPassword: z.string().min(1).max(200).optional(),
+    /**
+     * O servidor sorteia a senha provisória e a devolve UMA vez — é o «esqueci a senha» de
+     * admin (o site não manda e-mail). Mesmo efeito de `newPassword`: troca obrigatória no
+     * próximo acesso e todas as sessões caem.
+     */
+    gerarSenhaProvisoria: z.literal(true).optional(),
+    /** encerra todas as sessões do usuário */
+    revokeSessions: z.boolean().optional(),
+  })
+  .refine((d) => !(d.newPassword !== undefined && d.gerarSenhaProvisoria), {
+    message: "Escolha uma senha OU gere uma provisória.",
+  });
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const guarda = await requireAdmin(request, "users:manage");
@@ -48,10 +58,11 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
   if (erroBusca) return NextResponse.json({ error: "Falha ao consultar usuário." }, { status: 500 });
   if (!alvo) return NextResponse.json({ error: "Usuário não encontrado." }, { status: 404 });
 
-  // Trava de segurança: ninguém desativa nem rebaixa a conta master pela API.
-  if (alvo.is_master && (parsed.data.disabled === true || parsed.data.scopes)) {
+  // Trava de segurança: ninguém desativa nem rebaixa a conta master pela API — nem gera
+  // senha provisória para ela (a master troca a própria senha na tela dela).
+  if (alvo.is_master && (parsed.data.disabled === true || parsed.data.scopes || parsed.data.gerarSenhaProvisoria)) {
     return NextResponse.json(
-      { error: "A conta master não pode ser desativada nem ter permissões alteradas pela API." },
+      { error: "A conta master não pode ser desativada, ter permissões alteradas nem receber senha provisória pela API." },
       { status: 400 },
     );
   }
@@ -63,14 +74,17 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     patch.disabled_at = parsed.data.disabled ? new Date().toISOString() : null;
   }
 
-  if (parsed.data.newPassword !== undefined) {
-    const fraca = validatePasswordStrength(parsed.data.newPassword);
+  const senhaProvisoria = parsed.data.gerarSenhaProvisoria ? gerarSenhaProvisoria() : undefined;
+  const novaSenha = parsed.data.newPassword ?? senhaProvisoria;
+
+  if (novaSenha !== undefined) {
+    const fraca = validatePasswordStrength(novaSenha);
     if (fraca) return NextResponse.json({ error: fraca }, { status: 400 });
     const pepper = getPasswordPepper();
     if (!pepper) {
       return NextResponse.json({ error: "ADMIN_PASSWORD_PEPPER não configurado." }, { status: 500 });
     }
-    patch.password_hash = await hashPassword(parsed.data.newPassword, pepper);
+    patch.password_hash = await hashPassword(novaSenha, pepper);
     patch.password_updated_at = new Date().toISOString();
     patch.must_change_password = true;
   }
@@ -79,7 +93,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
   const derrubarSessoes =
     parsed.data.revokeSessions === true ||
     parsed.data.disabled === true ||
-    parsed.data.newPassword !== undefined;
+    novaSenha !== undefined;
 
   if (derrubarSessoes) patch.session_epoch = alvo.session_epoch + 1;
 
@@ -96,6 +110,13 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
       .update({ revoked_at: new Date().toISOString(), revoked_reason: "admin" })
       .eq("user_id", id)
       .is("revoked_at", null);
+  }
+
+  if (senhaProvisoria) {
+    // A senha vai na resposta e em lugar nenhum mais: nem log, nem cache.
+    const resposta = NextResponse.json({ ok: true, message: "Senha provisória gerada.", senhaProvisoria });
+    resposta.headers.set("Cache-Control", "no-store, private");
+    return resposta;
   }
 
   return NextResponse.json({ ok: true, message: "Usuário atualizado." });
