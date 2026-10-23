@@ -40,6 +40,8 @@ import {
 import { useCompacto } from "@/components/admin/responsivo";
 import { ELO_ORDER, resolveElo, resolveRole } from "@/lib/design";
 import { compararForca, forcaDoElo, type ForcaDoElo } from "@/lib/draft/capitaes";
+import { eloDoJogadorDaInscricao } from "@/lib/draft/elo-da-inscricao";
+import { previaDosPrecos } from "@/lib/draft/previa-de-precos";
 import { formatDateTimeLabel } from "@/lib/format";
 import { alertasDoInscrito, type Alerta } from "@/lib/inscricoes/alertas";
 import { LIMITES_INSCRICAO } from "@/lib/inscricoes/passo1";
@@ -303,11 +305,38 @@ function divisaoEPdl(inscrito: Inscrito): string | null {
   return partes.length > 0 ? partes.join(" · ") : null;
 }
 
+/**
+ * "II · 45 PDL" do CONGELAMENTO: a divisão e o PDL guardados com o elo congelado, que são os
+ * que dão o preço e a ordem desta lista. Nulo sem congelar (ou congelado sem leitura do mesmo
+ * elo — aí o preço é o do meio do elo).
+ */
+function divisaoEPdlCongelados(inscrito: Inscrito): string | null {
+  if (!inscrito.elo_congelado) return null;
+  const partes: string[] = [];
+  const divisao = inscrito.divisao_congelada ?? null;
+  if (divisao && !SEM_DIVISAO.has(resolveElo(inscrito.elo_congelado)?.label ?? inscrito.elo_congelado)) partes.push(divisao);
+  if (inscrito.pdl_congelado !== null && inscrito.pdl_congelado !== undefined) partes.push(`${inscrito.pdl_congelado} PDL`);
+  return partes.length > 0 ? partes.join(" · ") : null;
+}
+
 /** A Riot leu o MESMO degrau do elo em uso? Só aí a divisão e os PDL dela descrevem esse elo. */
 function riotNoMesmoDegrau(inscrito: Inscrito): boolean {
   const emUso = resolveElo(eloExibido(inscrito).bruto);
   const naRiot = resolveElo(inscrito.elo_riot);
   return Boolean(emUso && naRiot && emUso.key === naRiot.key);
+}
+
+/**
+ * Congelado, a leitura de HOJE da Riot é outra que a do congelamento (outro elo, outra divisão
+ * ou outro PDL)? É o caso em que a tela mostra "Riot hoje: …" embaixo — o preço continua o do
+ * congelamento.
+ */
+function riotHojeDiferenteDoCongelado(inscrito: Inscrito): boolean {
+  if (!inscrito.elo_congelado || !inscrito.elo_riot) return false;
+  if (!riotNoMesmoDegrau(inscrito)) return true;
+  const divisaoHoje = SEM_DIVISAO.has(inscrito.elo_riot) ? null : (inscrito.riot_divisao ?? null);
+  const divisaoCongelada = SEM_DIVISAO.has(inscrito.elo_riot) ? null : (inscrito.divisao_congelada ?? null);
+  return divisaoHoje !== divisaoCongelada || (inscrito.riot_pdl ?? null) !== (inscrito.pdl_congelado ?? null);
 }
 
 /**
@@ -320,12 +349,9 @@ function riotNoMesmoDegrau(inscrito: Inscrito): boolean {
  * capitão.
  */
 function forcaDoInscrito(inscrito: Inscrito): ForcaDoElo {
-  return forcaDoElo({
-    elo: eloExibido(inscrito).bruto,
-    eloRiot: inscrito.elo_riot ?? null,
-    divisao: inscrito.riot_divisao ?? null,
-    pdl: inscrito.riot_pdl ?? null,
-  });
+  // A mesma fotografia do servidor: congelado, valem a divisão e o PDL do congelamento, e
+  // não o que o robô leu hoje (ver lib/draft/elo-da-inscricao.ts).
+  return forcaDoElo(eloDoJogadorDaInscricao(inscrito));
 }
 
 /**
@@ -345,19 +371,33 @@ function EloDoInscrito({ inscrito, tamanho = 28 }: Readonly<{ inscrito: Inscrito
   );
 }
 
-/** Divisão/PDL (se a Riot leu o mesmo degrau) e a origem: "II · 45 PDL · Riot". */
+/**
+ * Divisão/PDL e a origem: "II · 45 PDL · Riot". Congelado, são os do CONGELAMENTO ("I · 82 PDL
+ * · congelado") — os que dão o preço —, e não os que o robô leu hoje; sem congelar, os da Riot
+ * quando ela leu o mesmo degrau.
+ */
 function detalheDoElo(inscrito: Inscrito): string {
-  const daRiot = riotNoMesmoDegrau(inscrito) ? divisaoEPdl(inscrito) : null;
-  return [daRiot, eloExibido(inscrito).origem].filter(Boolean).join(" · ");
+  const divisao = inscrito.elo_congelado
+    ? divisaoEPdlCongelados(inscrito)
+    : riotNoMesmoDegrau(inscrito)
+      ? divisaoEPdl(inscrito)
+      : null;
+  return [divisao, eloExibido(inscrito).origem].filter(Boolean).join(" · ");
 }
 
-/** A Riot mostra OUTRO degrau que o elo em uso (travado ou congelado): a leitura dela, com emblema. */
+/**
+ * A leitura da Riot que NÃO é a que vale, com emblema: sem congelar, quando ela mostra outro
+ * degrau que o elo em uso (travado); congelado, quando a leitura de hoje é outra que a do
+ * congelamento — "Riot hoje: …", para ninguém achar que o preço está errado.
+ */
 function LeituraDaRiotDiferente({ inscrito }: Readonly<{ inscrito: Inscrito }>) {
-  if (!inscrito.elo_riot || riotNoMesmoDegrau(inscrito)) return null;
+  if (!inscrito.elo_riot) return null;
+  const congelado = Boolean(inscrito.elo_congelado);
+  if (congelado ? !riotHojeDiferenteDoCongelado(inscrito) : riotNoMesmoDegrau(inscrito)) return null;
   const daRiot = divisaoEPdl(inscrito);
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10.5, color: C.ink4 }}>
-      Riot: <Elo elo={inscrito.elo_riot} tamanho={16} />
+      {congelado ? "Riot hoje:" : "Riot:"} <Elo elo={inscrito.elo_riot} tamanho={16} />
       {daRiot ? <span style={tabular}>{daRiot}</span> : null}
     </span>
   );
@@ -882,6 +922,11 @@ type PropsGaveta = Readonly<{
   podeRedefinirSenha: boolean;
   /** Posição na lista filtrada; nulo quando o filtro atual esconde quem está aberto. */
   posicao: Readonly<{ atual: number; total: number }> | null;
+  /**
+   * O preço na PRÉVIA da tabela automática (lib/draft/previa-de-precos.ts); nulo sem time
+   * fechado ainda. Não é a coluna `pontos` — essa é a tabela fixa da 3ª, que o draft não usa.
+   */
+  precoNoDraft: number | null;
   anterior: Inscrito | null;
   proximo: Inscrito | null;
   onIr: (id: string) => void;
@@ -900,6 +945,7 @@ function GavetaInscrito({
   ultimaMensagem,
   podeRedefinirSenha,
   posicao,
+  precoNoDraft,
   anterior,
   proximo,
   onIr,
@@ -1546,17 +1592,29 @@ function GavetaInscrito({
           <Metric
             small
             label="Elo em uso"
-            value={<Elo elo={elo.bruto} tamanho={30} mostrarNome />}
+            value={<Elo elo={elo.bruto} tamanho={30} mostrarNome detalhe={divisaoEPdlCongelados(inscrito)} />}
             detail={elo.origem}
           />
           {/*
             NÃO existe campo de pontos aqui, e não é esquecimento.
-            O preço do jogador no draft é derivado do elo pelo servidor (`pontosDoElo`).
-            Um campo editável reabriria pela porta dos fundos exatamente o que o formulário
-            público fecha: mandar "elo: Ferro, pontos: 15" e adulterar o sorteio.
-            Para mudar o preço de alguém, corrija o ELO VERIFICADO na aba Ficha.
+            O preço do jogador no draft sai da tabela automática (lib/draft/precos.ts), calculada
+            a partir do elo e da divisão de quem joga — nunca digitado. Um campo editável
+            reabriria pela porta dos fundos exatamente o que o formulário público fecha: mandar
+            "elo: Ferro, pontos: 15" e adulterar o sorteio. Para mudar o preço de alguém,
+            corrija o ELO VERIFICADO na aba Ficha.
+            O número aqui é a PRÉVIA da tabela (a mesma de Times e vagas), e não a coluna
+            `pontos` do banco: essa é a tabela fixa da 3ª, que o draft não usa mais.
           */}
-          <Metric small label="Pontos no draft" value={inscrito.pontos} detail="derivado do elo — não editável" />
+          <Metric
+            small
+            label="Pontos no draft"
+            value={precoNoDraft ?? "—"}
+            detail={
+              precoNoDraft === null
+                ? "sai da tabela automática quando fechar um time"
+                : "prévia da tabela automática — a oficial sai na conferência do draft"
+            }
+          />
           <Metric
             small
             label="Na Riot (solo/duo)"
@@ -1837,7 +1895,11 @@ function GavetaInscrito({
             }}
           >
             <EloDoInscrito inscrito={inscrito} tamanho={30} />
-            <span style={{ color: C.ink3 }}>{inscrito.pontos} pts</span>
+            {precoNoDraft !== null ? (
+              <span style={{ color: C.ink3 }} title="Prévia da tabela de pontos automática">
+                {precoNoDraft} pts
+              </span>
+            ) : null}
             <span style={{ color: C.ink3 }} title={rotas.longo}>
               {rotas.curto}
             </span>
@@ -2256,6 +2318,23 @@ export function SecaoInscritos({
   const { config, inscritos, conferencias, pagamentos, panorama } = dados;
   const janelaAberta = estadoDaJanela(config, agora) === "aberta";
 
+  /**
+   * O preço de cada um na PRÉVIA da tabela automática — a mesma conta de Times e vagas. A
+   * coluna `pontos` do banco é a tabela fixa da 3ª, e mostrar ela aqui era mostrar um preço
+   * que o draft não usa.
+   */
+  const previaDePrecos = useMemo(
+    () =>
+      previaDosPrecos({
+        inscritos,
+        jogadoresPorTime: config.jogadores_por_time,
+        orcamentoPorTime: config.orcamento_por_time,
+        maxTimes: config.max_times ?? null,
+      }),
+    [inscritos, config.jogadores_por_time, config.orcamento_por_time, config.max_times],
+  );
+  const precoDaPrevia = (inscrito: Inscrito) => previaDePrecos.preco(inscrito);
+
   /** Conferências indexadas por inscrito e item — a tabela lê isto 6 vezes por linha. */
   const porInscrito = useMemo(() => {
     const mapa = new Map<string, Map<ItemConferencia, (typeof conferencias)[number]>>();
@@ -2591,7 +2670,8 @@ export function SecaoInscritos({
                         <span style={{ display: "block", ...tabular }}>{detalheDoElo(inscrito)}</span>
                         <LeituraDaRiotDiferente inscrito={inscrito} />
                         <span style={{ display: "block", ...tabular }} title={rotas.longo}>
-                          {rotas.curto} · {inscrito.pontos} pts
+                          {rotas.curto}
+                          {precoDaPrevia(inscrito) !== null ? ` · ${precoDaPrevia(inscrito)} pts` : ""}
                         </span>
                       </>
                     }
@@ -2648,7 +2728,11 @@ export function SecaoInscritos({
                   >
                     Elo
                   </th>
-                  <th scope="col" style={{ ...th, textAlign: "right" }} title="Derivado do elo">
+                  <th
+                    scope="col"
+                    style={{ ...th, textAlign: "right" }}
+                    title="Prévia da tabela de pontos automática (a oficial sai na conferência do draft)"
+                  >
                     Pts
                   </th>
                   <th scope="col" style={{ ...th, textAlign: "left" }}>
@@ -2755,7 +2839,7 @@ export function SecaoInscritos({
                         <EloDoInscrito inscrito={inscrito} />
                       </td>
 
-                      <td style={{ ...td, textAlign: "right", ...tabular }}>{inscrito.pontos}</td>
+                      <td style={{ ...td, textAlign: "right", ...tabular }}>{precoDaPrevia(inscrito) ?? "—"}</td>
 
                       <td style={td} title={rotas.longo}>
                         {rotas.curto}
@@ -2809,6 +2893,7 @@ export function SecaoInscritos({
           ultimaMensagem={ultimaMensagem}
           podeRedefinirSenha={podeRedefinirSenha}
           posicao={vizinhos.posicao}
+          precoNoDraft={precoDaPrevia(selecionado)}
           anterior={vizinhos.anterior}
           proximo={vizinhos.proximo}
           onIr={setSelecionadoId}

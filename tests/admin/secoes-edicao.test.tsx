@@ -315,11 +315,16 @@ describe("regras do produto que a tela não pode contrariar", () => {
     expect(lido).toContain("1/6 congelados");
   });
 
-  it("orçamento, elos e rotas são calculados sobre os elegíveis, no próprio cliente", () => {
-    // Elegíveis: 8+4+4+1+3+5+2+15+4 = 46 pontos; 1 time = 5 vagas, os 5 mais baratos
-    // somam 1+2+3+4+4 = 14. Só com aprovados seria "soma 34 … usa 19".
+  it("a prévia da tabela de pontos, elos e rotas são calculados sobre os elegíveis, no próprio cliente", () => {
+    // 9 elegíveis, 1 time = 5 vagas. Fora da sobra são 8 (não batem as vagas), então a
+    // prévia usa os 5 de elo mais baixo: o Ferro e quatro Ouros. A tabela automática dá
+    // Ferro 2 e Ouro 7 — soma exata 30. A coluna `pontos` (tabela fixa) não entra.
     const lido = texto(renderToStaticMarkup(<SecaoTimes {...props()} />));
-    expect(lido).toContain("O pool inteiro soma 46 pontos; a conta usa 14");
+    expect(lido).toContain("Calculada com os 5 de elo mais baixo entre os 9 elegíveis");
+    expect(lido).toContain("somam exatamente 30 pontos (1 × 30)");
+    expect(lido).toContain("30 de 30 (1 × 30) ✓");
+    expect(lido).not.toContain("O pool inteiro soma");
+    expect(lido).not.toContain("Cabe no orçamento");
   });
 
   it("com pendentes, mostra ao lado o que o draft montaria só com os aprovados de hoje", () => {

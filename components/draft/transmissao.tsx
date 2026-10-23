@@ -57,6 +57,8 @@ type JogadorDoElenco = {
   rota1: string;
   rota2: string;
   elo: string;
+  /** A classe de preço ("Ouro II", "Mestre · 200–299 PDL"). Ausente em drafts antigos. */
+  classe?: string;
   capitao: boolean;
 };
 
@@ -67,7 +69,17 @@ type JogadorDisponivel = {
   rota1: string;
   rota2: string;
   elo: string;
+  classe?: string;
 };
+
+/**
+ * O elo escrito ao lado do preço: a classe de preço quando o draft a tem ("Ouro II",
+ * "Mestre · 200–299 PDL") — o preço é por divisão, e dois Ouros podem custar diferente —,
+ * senão o nome do elo (drafts montados antes da tabela por divisão). O emblema não muda.
+ */
+function rotuloDoElo(jogador: Readonly<{ elo: string; classe?: string }>): string {
+  return jogador.classe ?? resolveElo(jogador.elo)?.label ?? jogador.elo;
+}
 
 type EntradaHistorico = { escolha: number; timeId: string; riotId: string; automatica: boolean };
 
@@ -237,8 +249,8 @@ function Slot({
         <span style={{ display: "block", fontSize: 10.5, color: D.mudo2 }}>
           {jogador
             ? capitao
-              ? `${t.capitao.toUpperCase()} · ${resolveElo(jogador.elo)?.label ?? jogador.elo}`
-              : (resolveElo(jogador.elo)?.label ?? jogador.elo)
+              ? `${t.capitao.toUpperCase()} · ${rotuloDoElo(jogador)}`
+              : rotuloDoElo(jogador)
             : t.vagaAberta}
         </span>
       </span>
@@ -454,7 +466,7 @@ function Sorteio({
 
               <div style={{ fontSize: 12, color: D.mudo, marginTop: 6 }}>
                 {pronto && capitao
-                  ? `${resolveElo(capitao.elo)?.label ?? capitao.elo} · ${capitao.pontos} ${t.pontos} · ${abrevDaRota(capitao.rota1)}`
+                  ? `${rotuloDoElo(capitao)} · ${capitao.pontos} ${t.pontos} · ${abrevDaRota(capitao.rota1)}`
                   : t.sorteando}
               </div>
             </div>
@@ -858,9 +870,18 @@ function AoVivo({
                     >
                       {jogador.riotId}
                     </span>
-                    <span style={{ display: "block", fontSize: 10.5, color: D.mudo }}>
+                    <span
+                      style={{
+                        display: "block",
+                        fontSize: 10.5,
+                        color: D.mudo,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
                       {abrevDaRota(jogador.rota1)} / {abrevDaRota(jogador.rota2)} ·{" "}
-                      {elo?.label ?? jogador.elo}
+                      {rotuloDoElo(jogador)}
                     </span>
                   </span>
                   <span
@@ -1097,7 +1118,7 @@ function Revelacao({
               {entrada.riotId}
             </div>
             <div style={{ marginTop: 7, fontSize: 15, color: D.secundario }}>
-              {elo?.label ?? jogador?.elo ?? ""}
+              {jogador ? rotuloDoElo(jogador) : ""}
               {jogador ? ` · ${abrevDaRota(jogador.rota1)}` : ""}
             </div>
           </div>

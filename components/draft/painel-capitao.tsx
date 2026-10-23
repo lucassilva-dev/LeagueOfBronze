@@ -43,6 +43,8 @@ type JogadorDoElenco = Readonly<{
   rota1: string;
   rota2: string;
   elo: string;
+  /** A classe de preço ("Ouro II", "Mestre · 200–299 PDL"). Ausente em drafts antigos. */
+  classe?: string;
   capitao: boolean;
 }>;
 
@@ -53,6 +55,7 @@ type JogadorDisponivel = Readonly<{
   rota1: string;
   rota2: string;
   elo: string;
+  classe?: string;
 }>;
 
 type DraftPublico = Readonly<{
@@ -162,11 +165,16 @@ function Etiqueta({ children }: Readonly<{ children: React.ReactNode }>) {
   );
 }
 
-function EloTexto({ elo }: Readonly<{ elo: string }>) {
+/**
+ * O elo ao lado do preço. Com a classe de preço do draft ("Ouro II", "Mestre · 200–299 PDL"),
+ * ela no lugar do nome do elo: o preço é por divisão, e dois Ouros podem custar diferente.
+ * Drafts montados antes da tabela por divisão não têm a classe — fica o nome do elo.
+ */
+function EloTexto({ elo, classe }: Readonly<{ elo: string; classe?: string }>) {
   const meta = resolveElo(elo);
   return (
     <span style={{ fontSize: 12, color: meta?.color ?? "var(--lob-muted)", whiteSpace: "nowrap" }}>
-      {meta?.label ?? elo}
+      {classe ?? meta?.label ?? elo}
     </span>
   );
 }
@@ -330,7 +338,7 @@ export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
           const elo = resolveElo(jogador.elo);
           const r1 = resolveRole(jogador.rota1);
           const r2 = resolveRole(jogador.rota2);
-          return [jogador.riotId, jogador.elo, elo?.label ?? "", r1.label, r1.short, r2.label, r2.short]
+          return [jogador.riotId, jogador.elo, elo?.label ?? "", jogador.classe ?? "", r1.label, r1.short, r2.label, r2.short]
             .some((campo) => normalizar(campo).includes(alvo));
         })
       : base;
@@ -711,7 +719,7 @@ export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
                   <span style={{ fontSize: 11.5, color: "#a98a5f" }}>{t.automatica}</span>
                 ) : null}
                 <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
-                  <EloTexto elo={jogador.elo} />
+                  <EloTexto elo={jogador.elo} classe={jogador.classe} />
                   <span
                     className="lob-display"
                     style={{ color: "var(--lob-gold-1)", fontSize: 16, fontVariantNumeric: "tabular-nums" }}
@@ -814,7 +822,7 @@ export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
                   >
                     {jogador.riotId}
                   </strong>
-                  <EloTexto elo={jogador.elo} />
+                  <EloTexto elo={jogador.elo} classe={jogador.classe} />
 
                   <span
                     style={{

@@ -14,7 +14,10 @@ import {
   type EstadoDraft,
   type JogadorDoDraft,
 } from "@/lib/draft/motor";
-import { elencosFecham } from "@/lib/draft/viabilidade";
+import { rankingDeCapitaes } from "@/lib/draft/capitaes";
+import { calcularTabela, precoNaTabela } from "@/lib/draft/precos";
+import { elencosFecham, ORCAMENTO_DA_MONTAGEM, ORCAMENTO_DE_PASSOS, type VagasDoTime } from "@/lib/draft/viabilidade";
+import { TITULARES_4A, type JogadorDoPool } from "./_pool-4a";
 
 const T0 = Date.parse("2026-11-15T20:00:00.000Z");
 
@@ -196,5 +199,172 @@ describe("o draft da 4ª com os pontos reais não trava mais", () => {
     expect(alcancarORelogio(rodando, T0 + 11 * 60_000 + 1000).motivoDaPausa).toBe("atraso");
     const retomado = iniciarDraft(pausarDraft(rodando), T0 + 5000);
     expect(retomado.motivoDaPausa).toBeUndefined();
+  });
+});
+
+/*
+ * A busca sem "indeterminado" no tamanho da 4ª (revisão de 22/10).
+ *
+ * Com a tabela de soma exata, a busca estourava o orçamento de passos já na 1ª escolha do
+ * pool real — e "indeterminado" conta como "fecha". Com curvatura 0,1, uma escolha de 1 ponto
+ * era aceita assim, e o draft travava na escolha 2 de 24. Dois cortes (times iguais tentados
+ * uma vez só; com todo mundo escolhido, a sobra total é fixa) resolvem sem mudar a resposta.
+ */
+describe("a busca de viabilidade com a tabela de soma exata", () => {
+  const id = (j: JogadorDoPool) => `j${String(j.posicao).padStart(2, "0")}`;
+
+  function draftDoPoolReal(curvatura: number): EstadoDraft {
+    const tabela = calcularTabela({ pool: TITULARES_4A, times: 6, jogadoresPorTime: 5, orcamentoPorTime: 30, curvatura });
+    const jogadores: JogadorDoDraft[] = TITULARES_4A.map((j) => ({
+      id: id(j),
+      riotId: `Jogador${j.posicao}#BR1`,
+      pontos: precoNaTabela(tabela, j),
+      rota1: j.rota1,
+      rota2: j.rota2,
+      elo: j.elo,
+      timeId: null,
+    }));
+    const ranking = rankingDeCapitaes(
+      TITULARES_4A.map((j) => ({ id: id(j), riotId: id(j), organizador: j.organizador, elo: j.elo, eloRiot: j.eloRiot, divisao: j.divisao, pdl: j.pdl })),
+      6,
+    );
+    return montarDraft({
+      times: ranking.escolhidos.map((capitaoId, i) => ({ id: `time-${i + 1}`, nome: `T${i + 1}`, cor: "#fff", capitaoId })),
+      jogadores,
+      jogadoresPorTime: 5,
+      orcamentoPorTime: 30,
+      segundosPorEscolha: 60,
+    });
+  }
+
+  /** As sondagens que `escolhiveisDaVez` faz: uma por valor de pontos que cabe no teto. */
+  function sondagensDaVez(e: EstadoDraft) {
+    const vez = timeDaVez(e)!;
+    const livres = e.jogadores.filter((j) => j.timeId === null);
+    const gasto = (t: string) => e.jogadores.filter((j) => j.timeId === t).reduce((s, j) => s + j.pontos, 0);
+    const vagas = (t: string) => 5 - e.jogadores.filter((j) => j.timeId === t).length;
+    return [...new Set(livres.map((j) => j.pontos))].map((v) => {
+      const levado = livres.find((j) => j.pontos === v)!;
+      const times = e.times.map((t) => ({
+        vagas: vagas(t.id) - (t.id === vez ? 1 : 0),
+        folga: 30 - gasto(t.id) - (t.id === vez ? v : 0),
+      }));
+      return { v, resposta: elencosFecham(times, livres.filter((j) => j !== levado).map((j) => j.pontos), ORCAMENTO_DE_PASSOS) };
+    });
+  }
+
+  it("1ª escolha do pool real, com 0,075 (a padrão) e com 0,1: nenhuma sondagem indeterminada", () => {
+    for (const curvatura of [0.075, 0.1]) {
+      const respostas = sondagensDaVez(iniciarDraft(draftDoPoolReal(curvatura), T0));
+      expect(respostas.length).toBeGreaterThan(5);
+      expect(respostas.filter((r) => r.resposta === "indeterminado"), `curvatura ${curvatura}`).toEqual([]);
+    }
+  });
+
+  it("curvatura 0,1: a escolha de 1 ponto que travava o draft na escolha 2 agora é recusada, e o auto-pick vai até o fim", () => {
+    let e = iniciarDraft(draftDoPoolReal(0.1), T0);
+    expect(estadoFecha(e, ORCAMENTO_DA_MONTAGEM)).toBe(true);
+    const vez = timeDaVez(e)!;
+    const umPonto = e.jogadores
+      .filter((j) => j.timeId === null && j.pontos === 1)
+      .sort((a, b) => a.riotId.localeCompare(b.riotId))[0]!;
+    // A resposta verdadeira é "não fecha": antes a busca estourava e a escolha passava.
+    expect(podeEscolher(e, vez, umPonto.id).ok).toBe(false);
+    expect(escolhiveisDaVez(e)).not.toContain(umPonto.id);
+
+    // Quem o motor oferece leva o draft até o fim, só com auto-pick.
+    e = aplicarEscolha(e, vez, escolhiveisDaVez(e)[0]!, T0);
+    for (let k = 1; k <= 30 && e.fase === "rodando"; k++) e = alcancarORelogio(e, T0 + k * 60_000 + 1);
+    expect(e.motivoDaPausa).toBeUndefined();
+    expect(e.fase).toBe("encerrado");
+  });
+
+  it("curvatura 0,1 só com auto-pick: o mais barato da 1ª escolha era a armadilha, e agora o draft vai até o fim", () => {
+    // O auto-pick leva o mais barato que "fecha". Com a busca estourando, o Prata de 1 ponto
+    // da 1ª escolha passava como "fecha" — e o draft pausava sem jogador logo depois.
+    let e = iniciarDraft(draftDoPoolReal(0.1), T0);
+    for (let k = 1; k <= 30 && e.fase === "rodando"; k++) e = alcancarORelogio(e, T0 + k * 60_000 + 1);
+    expect(e.motivoDaPausa).toBeUndefined();
+    expect(e.fase).toBe("encerrado");
+    for (const t of e.times) {
+      const elenco = e.jogadores.filter((j) => j.timeId === t.id);
+      expect(elenco).toHaveLength(5);
+      expect(elenco.reduce((s, j) => s + j.pontos, 0)).toBe(30);
+    }
+  });
+
+  it("drafts sorteados com curvatura 0,1 não travam (escolha uniforme entre o que o motor oferece)", () => {
+    const estado = draftDoPoolReal(0.1);
+    for (const semente of [1, 2, 3, 4, 5, 6]) {
+      const sortear = rng(semente);
+      let e = iniciarDraft(estado, T0);
+      while (e.fase === "rodando") {
+        const opcoes = escolhiveisDaVez(e);
+        expect(opcoes.length, `semente ${semente}, escolha ${e.escolhaAtual}`).toBeGreaterThan(0);
+        e = aplicarEscolha(e, timeDaVez(e)!, opcoes[Math.floor(sortear() * opcoes.length)]!, T0);
+      }
+      expect(e.fase).toBe("encerrado");
+    }
+  }, 60_000);
+
+  /**
+   * Tenta todas as distribuições, uma pessoa por vez (fica de fora, ou vai para qualquer time
+   * com vaga e folga), sem nenhum dos cortes da busca de verdade — só memória de estado.
+   */
+  function exaustiva(times: readonly VagasDoTime[], custos: readonly number[]): boolean {
+    const vagas = times.map((t) => t.vagas);
+    const folgas = times.map((t) => t.folga);
+    const total = vagas.reduce((s, v) => s + v, 0);
+    if (folgas.some((f, i) => f < 0 && vagas[i]! > 0)) return false;
+    const visto = new Map<string, boolean>();
+    const ir = (k: number, faltam: number): boolean => {
+      if (faltam === 0) return true;
+      if (custos.length - k < faltam) return false;
+      const chave = `${k}|${vagas.join(",")}|${folgas.join(",")}`;
+      const guardado = visto.get(chave);
+      if (guardado !== undefined) return guardado;
+      let ok = ir(k + 1, faltam);
+      for (let t = 0; t < times.length && !ok; t++) {
+        if (vagas[t]! === 0 || folgas[t]! < custos[k]!) continue;
+        vagas[t]!--;
+        folgas[t]! -= custos[k]!;
+        ok = ir(k + 1, faltam - 1);
+        vagas[t]!++;
+        folgas[t]! += custos[k]!;
+      }
+      visto.set(chave, ok);
+      return ok;
+    };
+    return ir(0, total);
+  }
+
+  it("a resposta é exata: bate com a busca exaustiva em casos sorteados (times iguais, soma exata, sobra de gente)", () => {
+    const sortear = rng(2210);
+    let fecham = 0;
+    let naoFecham = 0;
+    for (let caso = 0; caso < 1500; caso++) {
+      const n = 1 + Math.floor(sortear() * 4);
+      const folgas = [3 + Math.floor(sortear() * 12), 3 + Math.floor(sortear() * 12)];
+      const vagasIguais = 1 + Math.floor(sortear() * 3);
+      const times: VagasDoTime[] = Array.from({ length: n }, () => ({
+        vagas: caso % 2 === 0 ? vagasIguais : 1 + Math.floor(sortear() * 3),
+        folga: folgas[Math.floor(sortear() * 2)]!,
+      }));
+      const totalVagas = times.reduce((s, t) => s + t.vagas, 0);
+      const extra = caso % 3 === 0 ? 1 + Math.floor(sortear() * 2) : 0;
+      const custos = Array.from({ length: totalVagas + extra }, () => 1 + Math.floor(sortear() * 7));
+      if (caso % 3 === 1) {
+        // Soma exata: a folga do 1º time fecha Σ folgas = Σ custos.
+        const resto = custos.reduce((s, c) => s + c, 0) - times.slice(1).reduce((s, t) => s + t.folga, 0);
+        if (resto >= 0) times[0]!.folga = resto;
+      }
+      const esperado = exaustiva(times, custos);
+      const resposta = elencosFecham(times, custos);
+      expect(resposta, JSON.stringify({ times, custos })).toBe(esperado ? "fecha" : "nao_fecha");
+      if (esperado) fecham++;
+      else naoFecham++;
+    }
+    expect(fecham).toBeGreaterThan(200);
+    expect(naoFecham).toBeGreaterThan(200);
   });
 });

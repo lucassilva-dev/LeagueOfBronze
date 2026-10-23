@@ -15,6 +15,7 @@ import {
   UserRoundPlus,
 } from "lucide-react";
 
+import { TabelaDePontos, TotalDaTabela } from "@/components/admin/e4/tabela-de-pontos";
 import { useCompacto } from "@/components/admin/responsivo";
 import {
   ActionCard,
@@ -641,7 +642,14 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
   const sorteioVisto = draft?.sorteioId ?? null;
   const confirmoDescartar = descarteConfirmado !== null && descarteConfirmado.sorteioId === sorteioVisto;
   const manuaisOk = manuais.length === previa.times;
-  const metodoOk = metodo === "manual" ? manuaisOk : capitaesPelaRegra.length === previa.times;
+  /**
+   * Com a tabela de soma exata, há pools em que os capitães da regra não deixam os elencos
+   * fecharem (`fechaComOsCapitaesDaRegra === false`). O servidor recusaria o sorteio de
+   * qualquer forma; o botão já nasce apagado e o aviso abaixo diz por quê. Servidor anterior
+   * (campo ausente) não trava nada.
+   */
+  const regraNaoFecha = previa.fechaComOsCapitaesDaRegra === false;
+  const metodoOk = metodo === "manual" ? manuaisOk : capitaesPelaRegra.length === previa.times && !regraNaoFecha;
   const timeDaVez = draft?.times.find((t) => t.id === draft.timeDaVezId) ?? null;
   const escolhaPeloTime =
     draft && selecao && selecao.escolha === draft.escolhaAtual && draft.escolhiveis.includes(selecao.id)
@@ -948,12 +956,16 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
         <Metric
           label="Pontos de quem joga"
           value={previa.totalDePontos}
-          detail={previa.times > 0 ? `teto ${previa.times * previa.config.orcamentoPorTime}` : undefined}
+          detail={
+            previa.times > 0
+              ? `${previa.tabela?.folga === 0 && !previa.tabela.poolIncompleto ? "exato: " : ""}${previa.times} × ${previa.config.orcamentoPorTime} = ${previa.times * previa.config.orcamentoPorTime}`
+              : undefined
+          }
         />
         <Metric
           label="Orçamento por time"
           value={previa.config.orcamentoPorTime}
-          detail={previa.orcamentoSugerido !== null ? `regra (média + 15%): ${previa.orcamentoSugerido}` : "regra: média + 15%"}
+          detail="fixo · os preços saem da tabela abaixo"
         />
       </div>
 
@@ -967,12 +979,6 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
         </Banner>
       ) : null}
 
-      {previa.orcamentoSugerido !== null && previa.orcamentoSugerido !== previa.config.orcamentoPorTime ? (
-        <Banner tone="warn" title={`O orçamento configurado (${previa.config.orcamentoPorTime}) não é o da regra (${previa.orcamentoSugerido})`}>
-          O regulamento manda média de pontos por time + 15%, arredondada para cima. Ajuste em Configuração antes de
-          sortear — o orçamento entra no draft no momento do sorteio e não muda depois.
-        </Banner>
-      ) : null}
 
       {semConta.length > 0 ? (
         <Banner tone="warn" title={`${semConta.length} jogador(es) aptos sem conta ligada`}>
@@ -982,8 +988,9 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
 
       {previa.semEloCongelado.length > 0 && !draft ? (
         <Banner tone="warn" title={`${previa.semEloCongelado.length} apto(s) com o elo ainda solto`}>
-          O preço que entra no draft é o de agora, e o robô da Riot ainda mexe no elo toda manhã. Congele os elos
-          (aba Times e vagas → «Congelar o elo dos aprovados») antes de divulgar a tabela e de sortear:{" "}
+          O preço que entra no draft é o de agora, e o robô da Riot ainda mexe no elo e na divisão toda manhã — a
+          tabela de pontos muda junto. Congele os elos (aba Times e vagas → «Congelar o elo dos aprovados») antes de
+          divulgar a tabela e de sortear:{" "}
           {previa.semEloCongelado.slice(0, 12).join(", ")}
           {previa.semEloCongelado.length > 12 ? ` e mais ${previa.semEloCongelado.length - 12}` : ""}.
         </Banner>
@@ -993,6 +1000,50 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
         <Banner tone="warn" title="As inscrições ainda estão abertas">
           Quem se inscrever agora recebe a cobrança da taxa sem ter vaga nos times. Feche as inscrições em
           Configuração (chave ou data de fechamento) antes do draft.
+        </Banner>
+      ) : null}
+
+      {/* ------------------------------------------------ a tabela de pontos */}
+      {/* A regra antiga ("orçamento = média + 15%") saiu: o orçamento é fixo e os preços são
+          calculados a partir de quem joga. Esta é a tabela OFICIAL — a de Times e vagas é
+          prévia. Os preços de cada jogador, abaixo, já vêm dela, do servidor. */}
+      <BlockTitle
+        right={
+          previa.tabela ? (
+            <span style={{ fontSize: 11.5 }}>
+              <TotalDaTabela tabela={previa.tabela} />
+            </span>
+          ) : undefined
+        }
+      >
+        Tabela de pontos desta edição
+      </BlockTitle>
+      {previa.tabela === undefined ? (
+        // Resposta de um servidor anterior à tabela automática (painel aberto durante o deploy).
+        <p style={{ ...nota, marginBottom: 14 }}>
+          A tabela de pontos automática não veio nesta resposta (o servidor ainda é da versão anterior). Toque em
+          Atualizar depois que o site terminar de atualizar.
+        </p>
+      ) : previa.tabela === null ? (
+        <Empty title="A tabela ainda não existe">
+          Ela é calculada a partir de quem joga: aparece quando houver aptos para fechar pelo menos um time.
+        </Empty>
+      ) : (
+        <div style={{ marginBottom: 14 }}>
+          <TabelaDePontos tabela={previa.tabela} compacto={compacto} />
+        </div>
+      )}
+
+      {/* Só quando NADA fecha: a conta já tentou descer a curvatura e a soma (o motivo de uma
+          queda que deu certo aparece no rodapé da tabela, acima). */}
+      {regraNaoFecha ? (
+        <Banner tone="danger" title="Com os capitães da regra, os elencos não fecham">
+          A tabela soma exatamente {previa.times} × {previa.config.orcamentoPorTime}, então cada time precisa terminar
+          com os {previa.config.orcamentoPorTime} pontos certinhos — e, com os capitães pela regra, não existe divisão
+          dos outros jogadores que feche todos os elencos, nem baixando a curvatura até 0 e a soma em até{" "}
+          {previa.times} {previa.times === 1 ? "ponto" : "pontos"}. O sorteio pela regra seria recusado. Decida com a
+          organização: capitães à mão (o servidor confere de novo) ou outro orçamento por time em Configuração, que
+          recalcula a tabela.
         </Banner>
       ) : null}
 

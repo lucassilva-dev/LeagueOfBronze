@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { UserRoundSearch } from "lucide-react";
 
 import { EloPorRota } from "@/components/admin/e4/elo-por-rota";
 import type { Inscrito, PropsSecao } from "@/components/admin/e4/painel-edicao";
+import { TabelaDePontos } from "@/components/admin/e4/tabela-de-pontos";
 import { useCompacto } from "@/components/admin/responsivo";
 import {
   ActionCard,
@@ -29,7 +30,10 @@ import {
 } from "@/components/admin/ui";
 import { RoleIcon } from "@/components/lob/ui";
 import { ELO_ORDER, resolveElo, resolveRole, type EloMeta } from "@/lib/design";
-import { contaParaTimes, distribuirTimes, viabilidadeDeOrcamento } from "@/lib/inscricoes/schema";
+import { podeSubstituir, precosDoSorteio, previaDosPrecos, type PreviaDosPrecos } from "@/lib/draft/previa-de-precos";
+import { retratoDaTabela, type RetratoDaTabela } from "@/lib/draft/precos";
+import type { DraftPublico } from "@/lib/draft/store";
+import { contaParaTimes, distribuirTimes } from "@/lib/inscricoes/schema";
 
 /**
  * A conta que decide se o draft é possível.
@@ -58,7 +62,56 @@ import { contaParaTimes, distribuirTimes, viabilidadeDeOrcamento } from "@/lib/i
  * O quadro de elo por rota (`elo-por-rota.tsx`) é a única peça daqui feita para SAIR do
  * painel — a organização tira print e manda no grupo. Por isso ele recebe só nick, elo de
  * preço e rotas: os pontos nem chegam até ele.
+ *
+ * PREÇOS: desde a 4ª o preço não é mais a tabela fixa por elo (a coluna `pontos`, da 3ª) —
+ * é a tabela automática calculada a partir de quem joga (lib/draft/precos.ts), com soma
+ * exata `times × orçamento`. Aqui ela é PRÉVIA (`previaDosPrecos`): a mesma função do
+ * servidor, sobre a melhor previsão de quem entra. A oficial sai na conferência do draft,
+ * com a lista de aptos fechada. Todo número de pontos desta aba — tabela, sobra,
+ * substituto — vem dessa prévia, para a organização nunca ver um preço que o draft não usa.
+ *
+ * Depois do sorteio, a regra 6 (quem pode substituir) passa a usar a TABELA DO SORTEIO: quem
+ * está no draft custa o que custou nele, e quem está fora recebe o preço da reta do sorteio
+ * (o retrato vem da rota pública do draft, /api/draft/estado). Uma desistência depois do
+ * draft muda a prévia — e não pode mudar o preço com que o substituto é comparado.
  */
+
+/** O que a regra 6 precisa do draft sorteado: o retrato da tabela e o preço de cada um. */
+type TabelaDoSorteio = { retrato: RetratoDaTabela; pontos: ReadonlyMap<string, number> };
+
+/**
+ * Lê o draft da rota pública uma vez (e a cada mudança da lista): só a tabela do sorteio e os
+ * preços por Riot ID. Sem draft, sem a tabela (draft antigo) ou sem rede, fica nulo — e a
+ * regra 6 segue com a prévia, como antes do sorteio.
+ */
+function useTabelaDoSorteio(chave: unknown): TabelaDoSorteio | null {
+  const [lida, setLida] = useState<TabelaDoSorteio | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    void (async () => {
+      try {
+        const resposta = await fetch("/api/draft/estado", { cache: "no-store" });
+        if (!resposta.ok) return;
+        const corpo = (await resposta.json().catch(() => ({}))) as { draft?: DraftPublico | null };
+        const draft = corpo.draft;
+        if (!vivo) return;
+        if (!draft?.tabelaDePontos) {
+          setLida(null);
+          return;
+        }
+        const pontos = new Map<string, number>();
+        for (const j of [...Object.values(draft.elencos ?? {}).flat(), ...(draft.disponiveis ?? [])]) pontos.set(j.riotId, j.pontos);
+        setLida({ retrato: draft.tabelaDePontos, pontos });
+      } catch {
+        // Sem rede ou sem draft legível: a regra 6 fica com a prévia.
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [chave]);
+  return lida;
+}
 
 // ---------------------------------------------------------------- estilos de tabela
 
@@ -114,13 +167,22 @@ function eloDePreco(inscrito: Inscrito): string {
   return inscrito.elo_congelado ?? inscrito.elo_verificado ?? inscrito.elo_declarado;
 }
 
-function porPontosDesc(a: Inscrito, b: Inscrito) {
-  return b.pontos - a.pontos || a.nick.localeCompare(b.nick, "pt-BR");
+/** Do mais forte para o mais fraco, pela régua da tabela (a ordem antiga era pelos pontos fixos). */
+function porForcaDesc(previa: PreviaDosPrecos) {
+  return (a: Inscrito, b: Inscrito) =>
+    (previa.forca(b) ?? -1) - (previa.forca(a) ?? -1) || a.nick.localeCompare(b.nick, "pt-BR");
 }
 
 /** Só para o <select> do substituto: opção nativa não mostra imagem, então o nome vai escrito. */
 function rotuloElo(inscrito: Inscrito): string {
   return resolveElo(eloDePreco(inscrito))?.label ?? eloDePreco(inscrito);
+}
+
+/** O preço de prévia escrito: "—" quando ainda não há tabela (ou o elo não é reconhecido). */
+function textoDoPreco(preco: number | null, curto = false): string {
+  if (preco === null) return "—";
+  if (curto) return `${preco} pt`;
+  return `${preco} ${preco === 1 ? "ponto" : "pontos"}`;
 }
 
 /**
@@ -218,9 +280,11 @@ function BarraDeProporcao({ cor, fracao, style }: Readonly<{ cor: string; fracao
  */
 function CartaoDoAprovado({
   inscrito,
+  preco,
+  deOnde = "Prévia da tabela automática",
   fim,
   children,
-}: Readonly<{ inscrito: Inscrito; fim?: ReactNode; children?: ReactNode }>) {
+}: Readonly<{ inscrito: Inscrito; preco: number | null; deOnde?: string; fim?: ReactNode; children?: ReactNode }>) {
   return (
     <li>
       <CartaoLinha
@@ -235,8 +299,8 @@ function CartaoDoAprovado({
           <span style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "2px 10px" }}>
             <RotaCurta rota={inscrito.rota_primaria} />
             <RotaCurta rota={inscrito.rota_secundaria} secundaria />
-            <span style={tabular}>
-              {inscrito.pontos} {inscrito.pontos === 1 ? "ponto" : "pontos"}
+            <span style={tabular} title={deOnde}>
+              {textoDoPreco(preco)}
             </span>
           </span>
         }
@@ -250,7 +314,7 @@ function CartaoDoAprovado({
 
 /**
  * Distribuição de elos no celular: uma linha por elo, emblema · barra · quantas pessoas.
- * A tabela de cinco colunas não cabia; preço e soma descem para a linha miúda da barra.
+ * Sem preço: o preço é por divisão e sai da tabela de pontos, logo acima.
  */
 function DistribuicaoCompacta({
   linhas,
@@ -274,9 +338,6 @@ function DistribuicaoCompacta({
             <Elo elo={meta.label} tamanho={36} />
             <span style={{ minWidth: 0 }}>
               <BarraDeProporcao cor={meta.color} fracao={maiorGrupo > 0 ? quantidade / maiorGrupo : 0} />
-              <span style={{ display: "block", marginTop: 6, fontSize: 11.5, color: C.ink4, ...tabular }}>
-                {meta.pts} {meta.pts === 1 ? "ponto" : "pontos"} cada · soma {quantidade * meta.pts}
-              </span>
             </span>
             <span style={{ textAlign: "right", lineHeight: 1 }}>
               <span style={{ display: "block", fontFamily: display, fontSize: 22, color: C.bronzeHi, ...tabular }}>
@@ -327,10 +388,32 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
   // derrubaria a aba inteira em branco; aqui a conta é pulada e o problema aparece.
   const configValida = Number.isInteger(jogadoresPorTime) && jogadoresPorTime > 0;
 
+  // A prévia da tabela de pontos: a mesma função do servidor, sobre quem deve jogar.
+  const previa = useMemo(
+    () =>
+      previaDosPrecos({
+        inscritos,
+        jogadoresPorTime,
+        orcamentoPorTime: config.orcamento_por_time,
+        maxTimes: config.max_times ?? null,
+      }),
+    [inscritos, jogadoresPorTime, config.orcamento_por_time, config.max_times],
+  );
+  const precoDe = (i: Inscrito) => previa.preco(i);
+
+  // A regra 6 depois do sorteio: a tabela do sorteio; antes, a prévia.
+  const sorteio = useTabelaDoSorteio(inscritos);
+  const precosDaRegra6 = useMemo(
+    () => (sorteio ? precosDoSorteio({ retrato: sorteio.retrato, pontosDoDraft: sorteio.pontos, inscritos }) : previa),
+    [sorteio, inscritos, previa],
+  );
+  const precoNaRegra6 = (i: Inscrito) => precosDaRegra6.preco(i);
+  const ondeOPreco = sorteio ? "na tabela do sorteio" : "na prévia";
+
   const analise = useMemo(() => {
     // A conta: todo mundo que ainda pode jogar, igual ao servidor (`panorama`). `filter`
     // já devolve array novo, então o `sort` não mexe na lista que veio por prop.
-    const pool = inscritos.filter((i) => contaParaTimes(i.situacao)).sort(porPontosDesc);
+    const pool = inscritos.filter((i) => contaParaTimes(i.situacao)).sort(porForcaDesc(previa));
     // O definitivo: aprovado = apto + sobra, o mesmo pool que o servidor congela.
     const aprovados = pool.filter((i) => i.situacao === "apto" || i.situacao === "sobra");
 
@@ -340,17 +423,6 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
     // estoura no meio do laço — e o que já passou fica congelado. Ver o cartão final.
     const eloIlegivel = pool.filter((i) => resolveElo(eloDePreco(i)) === null);
     const eloIlegivelAprovado = eloIlegivel.filter((i) => i.situacao === "apto" || i.situacao === "sobra");
-
-    const viabilidade = configValida
-      ? viabilidadeDeOrcamento(
-          pool.map((i) => i.pontos),
-          jogadoresPorTime,
-          config.orcamento_por_time,
-          config.max_times ?? null,
-        )
-      : null;
-
-    const totalDoPool = pool.reduce((soma, i) => soma + i.pontos, 0);
 
     const porElo = ELO_ORDER.map((meta) => ({
       meta,
@@ -391,21 +463,23 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
       jaCongelados: aprovados.length - semCongelar.length,
       eloIlegivel,
       eloIlegivelAprovado,
-      viabilidade,
-      totalDoPool,
       porElo,
       maiorGrupo,
       rotas,
       escassa,
     };
-  }, [inscritos, jogadoresPorTime, config.orcamento_por_time, config.max_times, configValida]);
+  }, [inscritos, previa]);
 
   const alvo = analise.aprovados.find((i) => i.id === alvoId) ?? null;
 
-  /** Regra (g): substituto do mesmo elo ou abaixo. Pontos são o preço do elo. */
+  /**
+   * Regra 6: substituto de valor igual ou menor ao do substituído — pelo preço da tabela
+   * automática: a do SORTEIO quando já houve draft, a prévia antes. Sem tabela ainda (nenhum
+   * time fecha), pela régua de força, que é a ordem em que os preços crescem.
+   */
   const substitutos = useMemo(
-    () => (alvo ? analise.aprovados.filter((i) => i.id !== alvo.id && i.pontos <= alvo.pontos) : []),
-    [alvo, analise.aprovados],
+    () => (alvo ? analise.aprovados.filter((i) => i.id !== alvo.id && podeSubstituir(precosDaRegra6, i, alvo)) : []),
+    [alvo, analise.aprovados, precosDaRegra6],
   );
 
   const dataCongelamento = useMemo(
@@ -442,15 +516,16 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
     void executar("ficha", { inscricaoId: inscrito.id, situacao, situacaoAnterior: inscrito.situacao });
   };
 
-  const v = analise.viabilidade;
-  const apertado = v !== null && v.cabe && v.times > 0 && v.folga <= v.times;
+  const tabela =
+    previa.tabela && previa.tabela.linhas.length > 0 ? { ...retratoDaTabela(previa.tabela), queda: previa.queda } : null;
+  const precoDoAlvo = alvo ? precoNaRegra6(alvo) : null;
 
   return (
     <div>
       <SectionHead
         eyebrow="4ª Edição"
         title="Times e viabilidade"
-        description="A conta que decide se o draft é possível: quantos times fecham (contando todo inscrito que não foi recusado nem desistiu), se os pontos cabem no orçamento, quem sobrou e quem pode substituir quem."
+        description="A conta que decide se o draft é possível: quantos times fecham (contando todo inscrito que não foi recusado nem desistiu), a prévia da tabela de pontos, quem sobrou e quem pode substituir quem."
       />
 
       {!podeConferir ? (
@@ -554,144 +629,123 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
         ) : null}
       </Card>
 
-      {/* ---------------------------------------------------- 2. viabilidade de orçamento */}
+      {/* ---------------------------------------------------- 2. tabela de pontos (prévia) */}
 
-      <BlockTitle right={<Chip>{config.orcamento_por_time} pontos por time</Chip>}>
-        Cabe no orçamento?
+      <BlockTitle
+        right={
+          <Chip tone="warn" title="A tabela oficial sai na conferência do draft, com a lista de aptos fechada.">
+            prévia
+          </Chip>
+        }
+      >
+        Tabela de pontos
       </BlockTitle>
 
-      {v === null ? (
-        <Banner tone="warn" title="Sem conta de orçamento">
+      {!configValida ? (
+        <Banner tone="warn" title="Sem tabela de pontos">
           Corrija os jogadores por time para esta conta voltar.
         </Banner>
-      ) : v.times === 0 ? (
-        <Banner tone="warn" title="Ainda não dá para avaliar">
-          Sem nenhum time fechado não existe teto para comparar — o teto é times ×{" "}
-          {config.orcamento_por_time}, e times é zero. A resposta aparece quando o primeiro time
-          fechar.
-        </Banner>
-      ) : v.cabe ? (
-        <Banner
-          tone={apertado ? "warn" : "ok"}
-          title={apertado ? "Cabe, mas sem folga nenhuma" : "Cabe no orçamento"}
-        >
-          Os {v.vagas} que entram somam {v.total} pontos contra um teto de {v.teto} ({v.times} times
-          × {config.orcamento_por_time}). Folga de {v.folga}{" "}
-          {v.folga === 1 ? "ponto" : "pontos"} no total
-          {apertado ? " — menos de um ponto por time, qualquer troca de elo derruba a conta." : "."}
+      ) : tabela === null ? (
+        <Banner tone="warn" title="Ainda não dá para calcular">
+          A tabela sai de quem joga — o elo mais baixo custa 1 ponto e o jogador médio custa{" "}
+          {config.orcamento_por_time} ÷ {jogadoresPorTime} —, então precisa de pelo menos um time
+          fechado. Ela aparece quando o primeiro time fechar.
         </Banner>
       ) : (
-        <Banner tone="danger" title="Os pontos não cabem no teto">
-          Os {v.vagas} que entram somam {v.total} pontos e o teto é {v.teto}: passa em{" "}
-          {Math.abs(v.folga)}. Três saídas: aceitar gente de elo mais baixo, subir o orçamento por
-          time na aba Configuração, ou tirar alguém de elo alto do pool (recusa/desistência — marcar
-          como sobra não muda esta conta). Atenção: ela já monta o cenário mais barato possível,
-          deixando os mais caros de fora, então se não cabe assim não cabe com nenhuma escolha de
-          quem entra.
-        </Banner>
-      )}
-
-      {v !== null ? (
         <>
-          <FieldGrid min={150}>
-            <Metric label="Pontos que entram" value={v.total} detail={`os ${v.vagas} mais baratos`} />
-            <Metric
-              label="Teto total"
-              value={v.teto}
-              detail={`${v.times} × ${config.orcamento_por_time}`}
-            />
-            <Metric
-              label="Folga"
-              value={v.cabe ? v.folga : `−${Math.abs(v.folga)}`}
-              detail={v.cabe ? "sobra de pontos" : "estouro"}
-            />
-            <Metric
-              label="Média por time"
-              value={v.times > 0 ? (v.total / v.times).toFixed(1) : "—"}
-              detail={`de ${config.orcamento_por_time} disponíveis`}
-            />
-          </FieldGrid>
+          {tabela.folga === 0 ? (
+            <Banner tone="ok" title="A conta fecha">
+              Os {previa.vagas} que entram somam exatamente {tabela.alvo} pontos ({tabela.times} ×{" "}
+              {tabela.orcamentoPorTime}): todo time termina o draft gastando os {tabela.orcamentoPorTime}.
+            </Banner>
+          ) : tabela.folga > 0 ? (
+            <Banner tone="warn" title={`Sobram ${tabela.folga} ${tabela.folga === 1 ? "ponto" : "pontos"}`}>
+              {tabela.queda
+                ? `A soma exata não fechava os elencos com os capitães da regra, então a conta baixou a soma: os ${previa.vagas} que entram somam ${tabela.soma} de ${tabela.alvo}, e um time pode terminar gastando menos que outro.`
+                : `Não existe tabela inteira com a soma exata para este pool: os ${previa.vagas} que entram somam ${tabela.soma} de ${tabela.alvo}, e um time pode terminar gastando menos que outro.`}
+            </Banner>
+          ) : (
+            <Banner tone="danger" title="O orçamento não paga 1 ponto por jogador">
+              Com {tabela.orcamentoPorTime} pontos por time e {tabela.jogadoresPorTime} jogadores, nem todo
+              mundo a 1 ponto cabe. Suba o orçamento por time na aba Configuração.
+            </Banner>
+          )}
+
+          <TabelaDePontos tabela={tabela} compacto={compacto} />
 
           <Card padding="14px 16px" style={{ marginTop: 12, display: "grid", gap: 8 }}>
             <p style={nota}>
-              O pool inteiro soma {analise.totalDoPool} pontos; a conta usa {v.total}, dos {v.vagas}{" "}
-              mais baratos, porque a sobra fica de fora dos times.
+              {previa.origem === "titulares"
+                ? `Calculada com os ${previa.vagas} elegíveis que não estão marcados como sobra — o pool que o draft vai usar quando a conferência acabar.`
+                : `Calculada com os ${previa.vagas} de elo mais baixo entre os ${previa.elegiveis} elegíveis — o cenário mais barato possível, enquanto não está decidido quem fica na sobra.`}{" "}
+              Quem fica de fora recebe o preço da reta, preso entre as linhas vizinhas.
             </p>
             <p style={{ ...nota, color: C.warnSoft }}>
-              Indicador, não garantia: a soma é do pool inteiro contra o teto TOTAL. Caber no total
-              não prova que dê para montar cada elenco — com muita gente de elo alto, um time
-              específico ainda pode estourar os {config.orcamento_por_time} pontos dele. Quem
-              confirma isso é o sorteio.
+              Prévia: muda conforme a conferência anda, o robô da Riot lê os elos e a organização marca a
+              sobra. A tabela oficial sai na conferência do draft (aba Draft), com a lista de aptos
+              fechada e os elos congelados.
             </p>
           </Card>
-
-          <BlockTitle>Distribuição de elos dos elegíveis</BlockTitle>
-
-          {analise.porElo.length === 0 ? (
-            <Empty title="Ninguém na conta ainda">
-              A distribuição aparece com a primeira inscrição que não foi recusada.
-            </Empty>
-          ) : compacto ? (
-            <DistribuicaoCompacta linhas={analise.porElo} maiorGrupo={analise.maiorGrupo} />
-          ) : (
-            <ScrollX>
-              <table style={{ width: "100%", minWidth: 460, borderCollapse: "collapse" }}>
-                <thead>
-                  <tr>
-                    <th scope="col" style={th}>
-                      Elo
-                    </th>
-                    <th scope="col" style={{ ...th, textAlign: "right" }}>
-                      Preço
-                    </th>
-                    <th scope="col" style={{ ...th, textAlign: "right" }}>
-                      Pessoas
-                    </th>
-                    <th scope="col" style={{ ...th, width: "100%" }}>
-                      Proporção
-                    </th>
-                    <th scope="col" style={{ ...th, textAlign: "right" }}>
-                      Soma
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {analise.porElo.map(({ meta, quantidade }) => (
-                    <tr key={meta.key}>
-                      <td style={td}>
-                        <Elo elo={meta.label} tamanho={24} />
-                      </td>
-                      <td style={tdNum}>{meta.pts}</td>
-                      <td style={tdNum}>{quantidade}</td>
-                      <td style={{ ...td, width: "100%" }}>
-                        <BarraDeProporcao
-                          cor={meta.color}
-                          fracao={analise.maiorGrupo > 0 ? quantidade / analise.maiorGrupo : 0}
-                          style={{ minWidth: 80 }}
-                        />
-                      </td>
-                      <td style={tdNum}>{quantidade * meta.pts}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </ScrollX>
-          )}
-
-          {analise.eloIlegivel.length > 0 ? (
-            <div style={{ marginTop: 12 }}>
-              <Banner tone="danger" title="Elo não reconhecido em algumas fichas">
-                {analise.eloIlegivel.length}{" "}
-                {analise.eloIlegivel.length === 1 ? "ficha está" : "fichas estão"} com um elo que a
-                tabela do site não resolve ({analise.eloIlegivel.map((i) => i.nick).join(", ")}).
-                Ficam fora da distribuição
-                {analise.eloIlegivelAprovado.length > 0
-                  ? ", e o congelamento não roda enquanto as aprovadas não forem corrigidas na ficha."
-                  : "; corrija na ficha antes de aprovar."}
-              </Banner>
-            </div>
-          ) : null}
         </>
+      )}
+
+      <BlockTitle>Distribuição de elos dos elegíveis</BlockTitle>
+
+      {analise.porElo.length === 0 ? (
+        <Empty title="Ninguém na conta ainda">
+          A distribuição aparece com a primeira inscrição que não foi recusada.
+        </Empty>
+      ) : compacto ? (
+        <DistribuicaoCompacta linhas={analise.porElo} maiorGrupo={analise.maiorGrupo} />
+      ) : (
+        <ScrollX>
+          <table style={{ width: "100%", minWidth: 400, borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th scope="col" style={th}>
+                  Elo
+                </th>
+                <th scope="col" style={{ ...th, textAlign: "right" }}>
+                  Pessoas
+                </th>
+                <th scope="col" style={{ ...th, width: "100%" }}>
+                  Proporção
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {analise.porElo.map(({ meta, quantidade }) => (
+                <tr key={meta.key}>
+                  <td style={td}>
+                    <Elo elo={meta.label} tamanho={24} />
+                  </td>
+                  <td style={tdNum}>{quantidade}</td>
+                  <td style={{ ...td, width: "100%" }}>
+                    <BarraDeProporcao
+                      cor={meta.color}
+                      fracao={analise.maiorGrupo > 0 ? quantidade / analise.maiorGrupo : 0}
+                      style={{ minWidth: 80 }}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </ScrollX>
+      )}
+
+      {analise.eloIlegivel.length > 0 ? (
+        <div style={{ marginTop: 12 }}>
+          <Banner tone="danger" title="Elo não reconhecido em algumas fichas">
+            {analise.eloIlegivel.length}{" "}
+            {analise.eloIlegivel.length === 1 ? "ficha está" : "fichas estão"} com um elo que a
+            tabela do site não resolve ({analise.eloIlegivel.map((i) => i.nick).join(", ")}).
+            Ficam fora da distribuição e da tabela de pontos
+            {analise.eloIlegivelAprovado.length > 0
+              ? ", e o congelamento não roda enquanto as aprovadas não forem corrigidas na ficha."
+              : "; corrija na ficha antes de aprovar."}
+          </Banner>
+        </div>
       ) : null}
 
       {/* ------------------------------------------------------- 2b. elo por rota */}
@@ -746,7 +800,7 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
         // última coluna, a que mais se perdia fora da tela.
         <ul style={listaDeCartoes}>
           {analise.marcadosSobra.map((i) => (
-            <CartaoDoAprovado key={i.id} inscrito={i}>
+            <CartaoDoAprovado key={i.id} inscrito={i} preco={precoDe(i)}>
               <Button
                 small
                 fullWidth
@@ -793,7 +847,7 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
                   <td style={td}>
                     <Elo elo={eloDePreco(i)} tamanho={24} />
                   </td>
-                  <td style={tdNum}>{i.pontos}</td>
+                  <td style={tdNum}>{precoDe(i) ?? "—"}</td>
                   <td style={td}>
                     <CelulaRota rota={i.rota_primaria} />
                   </td>
@@ -819,7 +873,20 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
 
       {/* ---------------------------------------------------------- 4. substituição */}
 
-      <BlockTitle right={<Chip>regra 6</Chip>}>Quem pode substituir</BlockTitle>
+      <BlockTitle
+        right={
+          <span style={{ display: "inline-flex", gap: 6 }}>
+            <Chip>regra 6</Chip>
+            {sorteio ? (
+              <Chip tone="ok" title="Os preços que o draft usou: quem está no draft, o que custou nele; quem está fora, a reta do sorteio.">
+                tabela do sorteio
+              </Chip>
+            ) : null}
+          </span>
+        }
+      >
+        Quem pode substituir
+      </BlockTitle>
 
       <Card padding={compacto ? "14px 14px" : "16px 18px"} style={{ display: "grid", gap: 12 }}>
         <p style={{ margin: 0, fontSize: 12.5, color: C.ink3, lineHeight: 1.6 }}>
@@ -827,6 +894,13 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
           organização. Ele também precisa cumprir as regras 3, 4, 5 e 21, e ninguém é obrigado a
           aceitar. Consulta pura: nada aqui grava nada.
         </p>
+        {sorteio ? (
+          <p style={nota}>
+            Com o draft sorteado, os pontos aqui são os da tabela do sorteio: quem está no draft custa o que
+            custou nele, e quem está fora recebe o preço da reta daquela tabela — uma desistência depois do
+            draft não muda o valor de ninguém.
+          </p>
+        ) : null}
 
         <Field label="Jogador a substituir" hint="Só aprovados (apto ou sobra) aparecem na lista.">
           {/* A opção nativa não mostra imagem: o elo vai escrito nela, e o emblema de quem
@@ -850,7 +924,7 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
                 .sort((a, b) => a.nick.localeCompare(b.nick, "pt-BR"))
                 .map((i) => (
                   <option key={i.id} value={i.id}>
-                    {i.nick}#{i.tag} — {rotuloElo(i)} · {i.pontos} pt
+                    {i.nick}#{i.tag} — {rotuloElo(i)} · {textoDoPreco(precoNaRegra6(i), true)}
                   </option>
                 ))}
             </Select>
@@ -863,16 +937,18 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
           </p>
         ) : substitutos.length === 0 ? (
           <Empty title="Nenhum aprovado serve">
-            {alvo.nick} é o aprovado mais barato ({alvo.pontos}{" "}
-            {alvo.pontos === 1 ? "ponto" : "pontos"}), então não há aprovado de elo igual ou
-            inferior para substituí-lo. Pendentes não entram nesta lista: confira-os primeiro.
+            {alvo.nick} é o aprovado mais barato
+            {precoDoAlvo !== null ? ` (${textoDoPreco(precoDoAlvo)} ${ondeOPreco})` : ""}, então não há
+            aprovado de valor igual ou menor para substituí-lo. Pendentes não entram nesta lista:
+            confira-os primeiro.
           </Empty>
         ) : (
           <>
             <p style={{ margin: 0, fontSize: 12.5, color: C.ink2, lineHeight: 1.7 }}>
               {substitutos.length}{" "}
               {substitutos.length === 1 ? "aprovado pode" : "aprovados podem"} entrar no lugar de{" "}
-              <strong style={{ color: C.bronzeLit }}>{alvo.nick}</strong> — pontos ≤ {alvo.pontos}{" "}
+              <strong style={{ color: C.bronzeLit }}>{alvo.nick}</strong> —{" "}
+              {precoDoAlvo !== null ? `pontos ≤ ${precoDoAlvo} ${ondeOPreco}` : "elo igual ou abaixo"}{" "}
               <Elo elo={eloDePreco(alvo)} tamanho={18} />.
             </p>
             {compacto ? (
@@ -881,6 +957,8 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
                   <CartaoDoAprovado
                     key={i.id}
                     inscrito={i}
+                    preco={precoNaRegra6(i)}
+                    deOnde={sorteio ? "Tabela do sorteio" : undefined}
                     fim={
                       i.situacao === "sobra" ? (
                         <Chip tone="ok" title="Aprovado sem vaga — a origem mais provável de um substituto.">
@@ -929,7 +1007,7 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
                         <td style={td}>
                           <Elo elo={eloDePreco(i)} tamanho={24} />
                         </td>
-                        <td style={tdNum}>{i.pontos}</td>
+                        <td style={tdNum}>{precoNaRegra6(i) ?? "—"}</td>
                         <td style={td}>
                           <CelulaRota rota={i.rota_primaria} />
                         </td>
@@ -1091,11 +1169,13 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
         }
         description={
           <>
-            Fixa o elo — e portanto o preço em pontos — de todos os aprovados que ainda não têm elo
-            congelado. Usa o elo verificado, ou o declarado quando não houver verificação. Depois
-            disto o preço para de acompanhar o elo real: é o que torna o draft possível, porque elo
-            muda todo dia e um sorteio em que o preço muda no meio não é sorteio. Data-âncora
-            combinada: {dataCongelamento}.
+            Fixa o elo de todos os aprovados que ainda não têm elo congelado — e, junto, a divisão e
+            o PDL que a Riot mostra hoje, que decidem a classe de cada um na tabela de pontos. Usa o
+            elo verificado, ou o declarado quando não houver verificação; a divisão só é guardada se
+            a leitura da Riot for do mesmo elo (senão, conta o meio do elo). Depois disto o preço
+            para de acompanhar o elo real: é o que torna o draft possível, porque elo muda todo dia
+            e um sorteio em que o preço muda no meio não é sorteio. Data-âncora combinada:{" "}
+            {dataCongelamento}.
           </>
         }
       >

@@ -34,6 +34,12 @@ export type JogadorDoDraft = {
   rota1: string;
   rota2: string;
   elo: string;
+  /**
+   * A classe de preço na tabela do sorteio ("Ouro II", "Mestre · 200–299 PDL"): o preço varia
+   * por divisão, e as telas mostram a classe ao lado do elo. Opcional: estados gravados antes
+   * da tabela por divisão não têm, e o motor não olha para ela.
+   */
+  classe?: string;
   /** null enquanto não foi escolhido. */
   timeId: string | null;
 };

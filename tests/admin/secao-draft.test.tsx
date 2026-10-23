@@ -3,7 +3,9 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SecaoDraft } from "@/components/admin/e4/secao-draft";
+import { calcularTabela, retratoDaTabela } from "@/lib/draft/precos";
 import type { DraftPublico, PreviaDoDraft } from "@/lib/draft/store";
+import { TITULARES_4A } from "../draft/_pool-4a";
 
 /**
  * A mesa do draft no painel. Antes dela a rota /api/admin/draft existia, mas nenhuma tela
@@ -59,8 +61,106 @@ describe("a mesa do draft", () => {
     await screen.findByText("Sortear capitães e ordem de escolha");
     expect(screen.getAllByText(/Luiz#BR1/).length).toBeGreaterThan(0);
     expect(screen.getByText("organização · não capitaneia")).toBeTruthy();
-    // Orçamento fora da regra (30 x 33) vira aviso antes de sortear.
-    expect(screen.getByText(/não é o da regra \(33\)/)).toBeTruthy();
+  });
+
+  it("servidor anterior à tabela automática: nada de «média + 15%», e a tela avisa que falta a tabela", async () => {
+    // A resposta velha ainda manda `orcamentoSugerido` (33) e não manda `tabela`. A regra
+    // mudou para orçamento fixo: a tela não pode mandar subir o orçamento para 33.
+    responder({ draft: null, sorteio: null, semSaida: null, previa: previa() });
+    renderizar();
+    await screen.findByText("Tabela de pontos desta edição");
+    expect(document.body.textContent).not.toMatch(/não é o da regra|média \+ 15%/);
+    expect(screen.getByText(/não veio nesta resposta/)).toBeTruthy();
+  });
+
+  it("com a tabela do servidor: as linhas, o total exato com ✓, o erro e como foi calculada", async () => {
+    const tabela = retratoDaTabela(calcularTabela({ pool: TITULARES_4A, times: 6, jogadoresPorTime: 5, orcamentoPorTime: 30 }));
+    responder({ draft: null, sorteio: null, semSaida: null, previa: previa({ tabela, fechaComOsCapitaesDaRegra: true }) });
+    renderizar();
+    await screen.findByText("Tabela de pontos desta edição");
+    const texto = document.body.textContent ?? "";
+    expect(texto).toContain("180 de 180 (6 × 30) ✓");
+    expect(texto).toContain("200–299 PDL");
+    expect(texto).toContain("Como foi calculada");
+    expect(texto).toContain(`${tabela.erroMaximoEmDegraus.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} divisão`);
+    expect(texto).toContain("1,08 divisão");
+    expect(texto).toContain("exato: 6 × 30 = 180");
+    expect(texto).toContain("os degraus de cima valem um pouco mais");
+    expect(texto).toContain("arredondados para a soma dar exatamente 6 × 30 = 180");
+    expect(texto).not.toMatch(/média \+ 15%/);
+    // 18 linhas de preço, uma por classe.
+    const linhas = [...document.querySelectorAll("table")].find((t) => t.textContent?.includes("Pela reta"));
+    expect(linhas?.querySelectorAll("tbody tr")).toHaveLength(18);
+  });
+
+  it("aptos ≠ vagas (pool incompleto): a tabela aparece, mas sem ✓ e sem «exato», e a tela explica", async () => {
+    const tabela = {
+      ...retratoDaTabela(calcularTabela({ pool: TITULARES_4A, times: 6, jogadoresPorTime: 5, orcamentoPorTime: 30 })),
+      poolIncompleto: true,
+    };
+    responder({
+      draft: null,
+      sorteio: null,
+      semSaida: null,
+      previa: previa({ tabela, aptos: 36, impedimentos: ["Há 36 aprovados para 30 vagas."], fechaComOsCapitaesDaRegra: null }),
+    });
+    renderizar();
+    await screen.findByText("Tabela de pontos desta edição");
+    const texto = document.body.textContent ?? "";
+    expect(texto).toContain("180 de 180 (6 × 30) · pool incompleto");
+    expect(texto).not.toContain("✓");
+    expect(texto).not.toContain("exato:");
+    expect(texto).not.toContain("soma dar exatamente");
+    expect(texto).toContain("Pool incompleto: os aptos não batem com as vagas");
+  });
+
+  it("a conta desceu a curvatura: o motivo aparece, e não há aviso de que os elencos não fecham", async () => {
+    const tabela = {
+      ...retratoDaTabela(calcularTabela({ pool: TITULARES_4A, times: 6, jogadoresPorTime: 5, orcamentoPorTime: 30, curvatura: 0.0625 })),
+      queda: { curvaturaPedida: 0.075, motivo: "A curvatura caiu de 0,075 para 0,0625: com 0,075, o Mestre · 400–499 PDL custaria 19." },
+    };
+    responder({ draft: null, sorteio: null, semSaida: null, previa: previa({ tabela, fechaComOsCapitaesDaRegra: true }) });
+    renderizar();
+    await screen.findByText("Tabela de pontos desta edição");
+    expect(screen.getByText(/A curvatura caiu de 0,075 para 0,0625/)).toBeTruthy();
+    expect(screen.queryByText("Com os capitães da regra, os elencos não fecham")).toBeNull();
+  });
+
+  it("como foi calculada: sem curvatura não fala em degraus que valem mais; com folga não fala em soma exata", async () => {
+    const tabela = retratoDaTabela(
+      calcularTabela({ pool: TITULARES_4A, times: 6, jogadoresPorTime: 5, orcamentoPorTime: 30, curvatura: 0, somaMaxima: 178 }),
+    );
+    expect(tabela).toMatchObject({ curvatura: 0, soma: 178, folga: 2 });
+    responder({ draft: null, sorteio: null, semSaida: null, previa: previa({ tabela, fechaComOsCapitaesDaRegra: true }) });
+    renderizar();
+    await screen.findByText("Tabela de pontos desta edição");
+    const texto = document.body.textContent ?? "";
+    expect(texto).toContain("Como foi calculada");
+    expect(texto).not.toContain("degraus de cima valem");
+    expect(texto).toContain("todo degrau vale o mesmo");
+    expect(texto).not.toContain("soma dar exatamente");
+    expect(texto).not.toContain("exato:");
+    expect(texto).toContain("arredondados para a soma ficar em 178, 2 abaixo de 6 × 30 = 180");
+  });
+
+  it("sem time fechado ainda, a tabela não existe — e a tela diz isso", async () => {
+    responder({ draft: null, sorteio: null, semSaida: null, previa: previa({ tabela: null }) });
+    renderizar();
+    expect(await screen.findByText("A tabela ainda não existe")).toBeTruthy();
+  });
+
+  it("capitães da regra que não fecham os elencos: aviso, e «Sortear» pela regra apagado", async () => {
+    const tabela = retratoDaTabela(calcularTabela({ pool: TITULARES_4A, times: 6, jogadoresPorTime: 5, orcamentoPorTime: 30 }));
+    responder({
+      draft: null,
+      sorteio: null,
+      semSaida: null,
+      previa: previa({ tabela, fechaComOsCapitaesDaRegra: false, times: 1, vagas: 5, aptos: 5, aprovados: 5 }),
+    });
+    renderizar();
+    await screen.findByText("Com os capitães da regra, os elencos não fecham");
+    const botao = screen.getByRole("button", { name: "Sortear" }) as HTMLButtonElement;
+    expect(botao.disabled).toBe(true);
   });
 
   it("empate no corte bloqueia o automático e explica", async () => {

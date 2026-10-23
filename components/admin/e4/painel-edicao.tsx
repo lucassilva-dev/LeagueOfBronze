@@ -75,6 +75,14 @@ export type Inscrito = {
   elo_declarado: string;
   elo_verificado: string | null;
   elo_congelado: string | null;
+  /**
+   * Divisão e PDL lidos na Riot no dia do congelamento (só do mesmo tier do elo congelado).
+   * São eles que dão a classe na tabela de pontos depois de congelar. Opcionais: banco sem a
+   * migração (supabase/migracao-precos-por-divisao.sql) não tem as colunas.
+   */
+  divisao_congelada?: string | null;
+  pdl_congelado?: number | null;
+  /** Tabela FIXA por elo (a da 3ª): continua para o robô e os alertas, o draft não usa mais. */
   pontos: number;
   rota_primaria: string;
   rota_secundaria: string;

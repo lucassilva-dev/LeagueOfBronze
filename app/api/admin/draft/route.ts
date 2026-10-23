@@ -152,6 +152,21 @@ export async function POST(request: NextRequest) {
             semente: novo.sorteio?.semente,
             capitaesAntesDoSorteio: novo.sorteio?.capitaes,
             ordemSorteada: novo.times.map((t) => ({ time: t.nome, capitao: t.capitaoId })),
+            // A tabela de pontos que entrou neste sorteio. O estado é sobrescrito no próximo;
+            // aqui ela fica para sempre, com a semente.
+            tabelaDePontos: novo.tabelaDePontos
+              ? {
+                  granularidade: novo.tabelaDePontos.granularidade,
+                  curvatura: novo.tabelaDePontos.curvatura,
+                  linhas: novo.tabelaDePontos.linhas.map((l) => ({ classe: l.rotulo, quantos: l.quantos, pontos: l.pontos })),
+                  alvo: novo.tabelaDePontos.alvo,
+                  soma: novo.tabelaDePontos.soma,
+                  folga: novo.tabelaDePontos.folga,
+                  erroMaximoEmDegraus: novo.tabelaDePontos.erroMaximoEmDegraus,
+                  // Quando a conta desceu da tabela pedida (curvatura, soma), o porquê.
+                  queda: novo.tabelaDePontos.queda ?? null,
+                }
+              : undefined,
           },
         });
         return NextResponse.json({ ok: true, draft: paraPublico(novo, revisao + 1) });

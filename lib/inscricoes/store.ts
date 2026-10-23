@@ -21,6 +21,7 @@ import { AUTOR_SISTEMA, situacaoSugerida } from "@/lib/inscricoes/situacao";
 import { criarClienteRiot } from "@/lib/riot/cliente";
 import { AUTOR_RIOT, type DecisaoDoRobo } from "@/lib/riot/decidir";
 import { ErroDeRegra } from "@/lib/security/erros";
+import { leituraParaCongelar } from "@/lib/draft/elo-da-inscricao";
 
 export { AUTOR_RIOT, AUTOR_SISTEMA, ErroDeConflito };
 
@@ -782,12 +783,24 @@ export async function congelarElos(autor: string): Promise<number> {
   const cliente = createSupabaseAdminClient();
   const agora = new Date().toISOString();
 
+  // A leitura da Riot vem junto: o preço do draft é por DIVISÃO (lib/draft/precos.ts), e o
+  // robô continua atualizando `riot_divisao`/`riot_pdl` depois daqui — sem guardar a
+  // divisão de hoje, a tabela mudaria depois de divulgada.
   const { data, error } = await cliente
     .from("inscricoes")
-    .select("id,elo_declarado,elo_verificado")
+    .select("id,elo_declarado,elo_verificado,elo_riot,riot_divisao,riot_pdl")
     .in("situacao", ["apto", "sobra"])
     .is("elo_congelado", null)
-    .returns<{ id: string; elo_declarado: string; elo_verificado: string | null }[]>();
+    .returns<
+      {
+        id: string;
+        elo_declarado: string;
+        elo_verificado: string | null;
+        elo_riot: string | null;
+        riot_divisao: string | null;
+        riot_pdl: number | null;
+      }[]
+    >();
 
   if (error) throw new Error(`Falha ao ler os aprovados: ${error.message}`);
   if (!data || data.length === 0) return 0;
@@ -797,12 +810,20 @@ export async function congelarElos(autor: string): Promise<number> {
     const elo = linha.elo_verificado ?? linha.elo_declarado;
     const pontos = pontosDoElo(elo);
     if (pontos === null) throw new ErroDeRegra(`Elo não reconhecido em ${linha.id}: ${elo}`);
+    // Só a leitura do MESMO tier do elo congelado: elo travado à mão em outro tier fica sem
+    // divisão (meio do elo), em vez de herdar a divisão de um elo que não é o dele.
+    const leitura = leituraParaCongelar({
+      elo,
+      eloRiot: linha.elo_riot,
+      divisao: linha.riot_divisao,
+      pdl: linha.riot_pdl,
+    });
 
     // `is elo_congelado null` também no UPDATE: o cron diário e o botão podem rodar ao
     // mesmo tempo, e quem chegar depois não pode recongelar com outro valor nem contar de novo.
     const { data: congelada, error: erroUpdate } = await cliente
       .from("inscricoes")
-      .update({ elo_congelado: elo, congelado_em: agora, pontos, atualizado_em: agora })
+      .update({ elo_congelado: elo, ...leitura, congelado_em: agora, pontos, atualizado_em: agora })
       .eq("id", linha.id)
       .is("elo_congelado", null)
       .select("id");

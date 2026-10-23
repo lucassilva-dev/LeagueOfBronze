@@ -14,9 +14,19 @@ import {
   type MotivoDaPausa,
   type TimeDoDraft,
 } from "@/lib/draft/motor";
-import { lerConfig, listarInscricoes, type Inscricao } from "@/lib/inscricoes/store";
-import { distribuirTimes, estadoDaJanela, orcamentoSugerido } from "@/lib/inscricoes/schema";
+import { lerConfig, listarInscricoes, type EdicaoConfig, type Inscricao } from "@/lib/inscricoes/store";
+import { distribuirTimes, estadoDaJanela } from "@/lib/inscricoes/schema";
 import { forcaDoElo, rankingDeCapitaes, type CandidatoACapitao } from "@/lib/draft/capitaes";
+import { eloDoJogadorDaInscricao, eloQueVale, temEloReconhecido } from "@/lib/draft/elo-da-inscricao";
+import {
+  calcularTabela,
+  precoNaTabela,
+  retratoDaTabela,
+  rotuloDaClasse,
+  type RetratoDaTabela,
+  type TabelaDePontos,
+} from "@/lib/draft/precos";
+import { tabelaQueFecha, tentativasDaQueda, type TabelaQueFecha } from "@/lib/draft/tabela-que-fecha";
 import { ORCAMENTO_DA_MONTAGEM } from "@/lib/draft/viabilidade";
 import { jogadoresForaDoDraft, type ForaDoDraft } from "@/lib/draft/virada";
 import { embaralhar, novaSemente } from "@/lib/series/sorteio";
@@ -79,21 +89,87 @@ export async function salvarDraftSeIntacto(
  */
 export type MetodoDeCapitao = "maior_elo" | "mid" | "adc" | "pior" | "manual";
 
-/** O elo que vale: o congelado; sem ele, o verificado; sem ele, o declarado. */
-function eloQueVale(i: Pick<Inscricao, "elo_congelado" | "elo_verificado" | "elo_declarado">): string {
-  return i.elo_congelado ?? i.elo_verificado ?? i.elo_declarado;
-}
-
+/**
+ * O candidato a capitão com a MESMA fotografia do preço (`eloDoJogadorDaInscricao`): depois
+ * do congelamento, divisão e PDL congelados; antes, a última leitura da Riot. Sem isso o
+ * corte dos capitães andaria com o robô enquanto o preço ficou parado — o capitão "de maior
+ * elo" poderia mudar depois de a tabela ser divulgada.
+ */
 function candidatoACapitao(i: Inscricao): CandidatoACapitao {
+  const elo = eloDoJogadorDaInscricao(i);
   return {
     id: i.id,
     riotId: i.riot_id,
     organizador: i.organizador,
-    elo: eloQueVale(i),
-    eloRiot: i.elo_riot ?? null,
-    divisao: i.riot_divisao ?? null,
-    pdl: i.riot_pdl ?? null,
+    elo: elo.elo,
+    eloRiot: elo.eloRiot ?? null,
+    divisao: elo.divisao ?? null,
+    pdl: elo.pdl ?? null,
   };
+}
+
+/**
+ * A tabela de pontos automática de quem joga (lib/draft/precos.ts) e o preço de cada um.
+ *
+ * O pool são os `apto` — exatamente quem o sorteio usa. Elo que a tabela do site não
+ * reconhece não tem preço: fica de fora da conta e volta como impedimento (a ficha precisa
+ * ser corrigida antes de sortear), em vez de derrubar a tela inteira.
+ *
+ * `inscricoes.pontos` (a tabela fixa por elo da 3ª) continua no banco para o robô e os
+ * alertas, mas o draft não a usa mais.
+ */
+function tabelaDosQueJogam(vaoJogar: readonly Inscricao[], times: number, config: EdicaoConfig) {
+  const comElo = vaoJogar.filter((i) => temEloReconhecido(i));
+  const tabela = calcularTabela({
+    pool: comElo.map(eloDoJogadorDaInscricao),
+    times,
+    jogadoresPorTime: config.jogadores_por_time,
+    orcamentoPorTime: config.orcamento_por_time,
+  });
+  const precoDe = new Map(comElo.map((i) => [i.id, precoNaTabela(tabela, eloDoJogadorDaInscricao(i))]));
+  const semElo = vaoJogar
+    .filter((i) => !temEloReconhecido(i))
+    .map((i) => `O elo de ${i.riot_id} (${eloQueVale(i)}) não é reconhecido e não tem preço na tabela: corrija na ficha antes de sortear.`);
+  return { tabela, precoDe, semElo };
+}
+
+/**
+ * A tabela com OS CAPITÃES: a pedida (curvatura padrão, soma exata) se os elencos fecham com
+ * eles; senão a primeira que fecha descendo a curvatura e, no limite, a soma
+ * (lib/draft/tabela-que-fecha.ts). A prévia usa os capitães da regra; a montagem, os
+ * escolhidos. Os dois chegam na mesma tabela para os mesmos capitães.
+ */
+function tabelaComOsCapitaes(vaoJogar: readonly Inscricao[], capitaes: readonly string[], times: number, config: EdicaoConfig): TabelaQueFecha {
+  return tabelaQueFecha({
+    pool: vaoJogar.filter((i) => temEloReconhecido(i)).map((i) => ({ id: i.id, elo: eloDoJogadorDaInscricao(i) })),
+    capitaes,
+    times,
+    jogadoresPorTime: config.jogadores_por_time,
+    orcamentoPorTime: config.orcamento_por_time,
+  });
+}
+
+/** O retrato que sai do servidor: a tabela, de onde a conta desceu e se o pool é o do sorteio. */
+function retratoComQueda(conta: Pick<TabelaQueFecha, "tabela" | "queda">, poolIncompleto: boolean): RetratoDaTabela {
+  return {
+    ...retratoDaTabela(conta.tabela),
+    queda: conta.queda,
+    ...(poolIncompleto ? { poolIncompleto: true } : {}),
+  };
+}
+
+/**
+ * Por que o sorteio não fecha, no recado de recusa da montagem. Com a soma exata o motivo é
+ * outro que o de antes ("orçamento curto"): é a repartição — e subir o orçamento não resolve
+ * sozinho, porque a tabela é recalculada junto. A conta já tentou descer a curvatura e a
+ * soma antes de chegar aqui. A mesa diz o mesmo no aviso da prévia.
+ */
+function motivoDeNaoFechar(tabela: TabelaDePontos, times: number, orcamento: number): string {
+  const ultima = tentativasDaQueda(tabela.curvatura, times).at(-1)?.menos ?? 0;
+  const tentou = ` A conta também tentou baixar a curvatura até 0 e a soma até ${tabela.alvo - ultima}, e nenhuma fechou.`;
+  return tabela.folga === 0
+    ? `A tabela de pontos soma exatamente ${tabela.alvo} (${times} × ${orcamento}), então cada time precisa terminar com os ${orcamento} pontos certinhos — e com estes capitães não existe divisão dos outros jogadores que feche todos os elencos.${tentou}`
+    : `Com estes capitães, não há como fechar os ${times} elencos dentro de ${orcamento} pontos por time com os jogadores aprovados.${tentou}`;
 }
 
 /** `listarInscricoes` lê `*`; o tipo não declara a conta porque o resto do código não a usa. */
@@ -125,17 +201,34 @@ export async function previaDoDraft(draftLido?: DraftGravado | Promise<DraftGrav
   const maxTimes = config.max_times ?? null;
   const { times, vagas } = distribuirTimes(aprovados.length, config.jogadores_por_time, maxTimes);
 
-  const impedimentos = impedimentosDoSorteio({
-    pontosDosQueJogam: vaoJogar.map((i) => i.pontos),
-    vagas,
-    times,
-    orcamentoPorTime: config.orcamento_por_time,
-    totalDeAprovados: aprovados.length,
-  });
+  // O preço de cada um sai da tabela automática, calculada sobre quem joga.
+  const pedida = tabelaDosQueJogam(vaoJogar, times, config);
 
-  const totalDePontos = vaoJogar.reduce((soma, i) => soma + i.pontos, 0);
+  const impedimentos = [
+    ...impedimentosDoSorteio({
+      pontosDosQueJogam: vaoJogar.map((i) => pedida.precoDe.get(i.id) ?? 0),
+      vagas,
+      times,
+      orcamentoPorTime: config.orcamento_por_time,
+      totalDeAprovados: aprovados.length,
+    }),
+    ...pedida.semElo,
+  ];
+
   const ranking = rankingDeCapitaes(vaoJogar.map(candidatoACapitao), times);
   const porId = new Map(vaoJogar.map((i) => [i.id, i]));
+
+  // Com a lista certa (sem impedimento) e os capitães da regra definidos, a tabela é a que
+  // fecha com eles — a pedida ou a primeira que fecha descendo a curvatura e a soma. Sem
+  // isso, é a pedida, e não dá para saber ainda se fecha.
+  const comCapitaes =
+    impedimentos.length === 0 && ranking.escolhidos.length === times && times > 0
+      ? tabelaComOsCapitaes(vaoJogar, ranking.escolhidos, times, config)
+      : null;
+  const conta = comCapitaes ?? { tabela: pedida.tabela, precoDe: pedida.precoDe, queda: null };
+  const fechaComOsCapitaesDaRegra = comCapitaes ? comCapitaes.fecha : null;
+  const precoDoInscrito = (i: Inscricao) => conta.precoDe.get(i.id) ?? 0;
+  const totalDePontos = vaoJogar.reduce((soma, i) => soma + precoDoInscrito(i), 0);
 
   return {
     config: {
@@ -152,7 +245,19 @@ export async function previaDoDraft(draftLido?: DraftGravado | Promise<DraftGrav
     pendentes: inscritos.filter((i) => i.situacao === "pendente").length,
     impedimentos,
     totalDePontos,
-    orcamentoSugerido: times > 0 && vaoJogar.length === vagas ? orcamentoSugerido(totalDePontos, times) : null,
+    /**
+     * Sempre nulo: a regra antiga (média + 15%) saiu. Continua na resposta por uma versão
+     * porque o painel anterior ao deploy testa `!== null` — sem a chave, ele mostrava o
+     * banner "O orçamento configurado (30) não é o da regra (undefined)".
+     */
+    orcamentoSugerido: null,
+    // A tabela de pontos desta edição (substitui a regra antiga "média + 15%"). Nula sem
+    // time fechado ou sem ninguém com preço. Com aptos ≠ vagas ela vem marcada como pool
+    // incompleto: dá ideia dos preços, mas a tela não a mostra como fechada.
+    tabela: times > 0 && conta.precoDe.size > 0 ? retratoComQueda(conta, vaoJogar.length !== vagas) : null,
+    // Os capitães da regra fecham os elencos com esta tabela (já com a queda, se houve)? Nulo
+    // quando não dá para saber ainda (lista com impedimento, empate no corte, faltam capitães).
+    fechaComOsCapitaesDaRegra,
     // Quem joga, do maior elo para o menor, com os organizadores no fim (não capitaneiam).
     jogadores: [
       ...ranking.ranking.map((c) => c.id),
@@ -164,7 +269,7 @@ export async function previaDoDraft(draftLido?: DraftGravado | Promise<DraftGrav
         riotId: i.riot_id,
         elo: eloQueVale(i),
         forca: forcaDoElo(candidatoACapitao(i)).rotulo,
-        pontos: i.pontos,
+        pontos: precoDoInscrito(i),
         rota1: i.rota_primaria,
         rota2: i.rota_secundaria,
         organizador: i.organizador,
@@ -185,10 +290,32 @@ export async function previaDoDraft(draftLido?: DraftGravado | Promise<DraftGrav
   };
 }
 
-/** `foraDoDraft` é opcional no tipo: a tela aguenta a resposta de um servidor anterior a ele. */
-export type PreviaDoDraft = Omit<Awaited<ReturnType<typeof previaDoDraft>>, "foraDoDraft"> & {
+/**
+ * Os campos mais novos são opcionais no tipo: a tela aguenta a resposta de um servidor
+ * anterior a eles (o painel aberto durante um deploy recebe a resposta velha).
+ */
+export type PreviaDoDraft = Omit<
+  Awaited<ReturnType<typeof previaDoDraft>>,
+  "foraDoDraft" | "tabela" | "fechaComOsCapitaesDaRegra" | "orcamentoSugerido"
+> & {
   foraDoDraft?: ForaDoDraft[];
+  tabela?: RetratoDaTabela | null;
+  fechaComOsCapitaesDaRegra?: boolean | null;
+  /**
+   * O orçamento pela regra antiga (média + 15%): um número só na resposta de um servidor
+   * anterior à tabela automática; o atual manda sempre nulo. A tela não usa mais — a regra
+   * mudou para orçamento fixo.
+   */
+  orcamentoSugerido?: number | null;
 };
+
+/**
+ * O estado do draft com o retrato da tabela de pontos usada no sorteio. Opcional: drafts
+ * montados antes da tabela automática não têm, e o motor nem olha para ele — é o registro
+ * de onde saiu cada preço, e a transmissão e o painel o leem (`paraPublico`) para
+ * precificar reservas com a tabela do sorteio.
+ */
+export type EstadoDraftComTabela = EstadoDraft & { tabelaDePontos?: RetratoDaTabela };
 
 /**
  * Monta o draft a partir de quem foi aprovado — e SORTEIA a ordem.
@@ -207,7 +334,7 @@ export type PreviaDoDraft = Omit<Awaited<ReturnType<typeof previaDoDraft>>, "for
 export async function montarDraftDosAprovados(params: {
   metodo: MetodoDeCapitao;
   capitaesManuais?: string[];
-}): Promise<EstadoDraft> {
+}): Promise<EstadoDraftComTabela> {
   const config = await lerConfig();
   const inscritos = await listarInscricoes();
 
@@ -222,14 +349,20 @@ export async function montarDraftDosAprovados(params: {
     config.max_times ?? null,
   );
 
-  // Os pontos já vêm derivados no banco, então não são recalculados aqui.
+  // O preço de cada um sai da tabela automática desta edição, calculada sobre quem joga —
+  // não da coluna `pontos` do banco, que é a tabela fixa por elo da 3ª. Esta é a PEDIDA; com
+  // os capitães escolhidos, mais abaixo, ela pode descer (`tabelaComOsCapitaes`).
+  const { precoDe, semElo } = tabelaDosQueJogam(vaoJogar, quantosTimes, config);
   const pool: JogadorDoDraft[] = vaoJogar.map((i) => ({
     id: i.id,
     riotId: i.riot_id,
-    pontos: i.pontos,
+    pontos: precoDe.get(i.id) ?? 0,
     rota1: i.rota_primaria,
     rota2: i.rota_secundaria,
     elo: eloQueVale(i),
+    // A classe de preço ("Ouro II", "Mestre · 200–299 PDL"): o preço varia por divisão, e a
+    // transmissão mostra por que dois Ouros custam diferente.
+    ...(temEloReconhecido(i) ? { classe: rotuloDaClasse(eloDoJogadorDaInscricao(i)) } : {}),
     timeId: null,
   }));
 
@@ -237,13 +370,16 @@ export async function montarDraftDosAprovados(params: {
   // quem joga tem de ser exatamente as vagas (senão a decisão da organização sobre
   // quem sobra era apagada por um corte na ordem de inscrição), e a soma dos pontos
   // tem de caber no teto (senão o draft entra ao vivo já condenado a travar).
-  const impedimentos = impedimentosDoSorteio({
-    pontosDosQueJogam: pool.map((j) => j.pontos),
-    vagas,
-    times: quantosTimes,
-    orcamentoPorTime: config.orcamento_por_time,
-    totalDeAprovados: aprovados.length,
-  });
+  const impedimentos = [
+    ...impedimentosDoSorteio({
+      pontosDosQueJogam: pool.map((j) => j.pontos),
+      vagas,
+      times: quantosTimes,
+      orcamentoPorTime: config.orcamento_por_time,
+      totalDeAprovados: aprovados.length,
+    }),
+    ...semElo,
+  ];
 
   if (impedimentos.length > 0) throw new ErroDeRegra(impedimentos.join(" "));
 
@@ -264,6 +400,12 @@ export async function montarDraftDosAprovados(params: {
     const riotId = pool.find((j) => j.id === organizadorCapitao)?.riotId ?? organizadorCapitao;
     throw new ErroDeRegra(`${riotId} é da organização, e organizador não é capitão nesta edição.`);
   }
+
+  // A tabela com ESTES capitães: a pedida, se os elencos fecham com ela; senão a primeira
+  // que fecha descendo a curvatura e a soma. Os preços do pool passam a ser os dela.
+  const conta = tabelaComOsCapitaes(vaoJogar, capitaes, quantosTimes, config);
+  const tabela = conta.tabela;
+  for (const jogador of pool) jogador.pontos = conta.precoDe.get(jogador.id) ?? jogador.pontos;
 
   const semente = novaSemente();
   const sorteados = embaralhar(semente, "capitaes", capitaes);
@@ -316,16 +458,22 @@ export async function montarDraftDosAprovados(params: {
   });
 
   // A conta de verdade, com os preços que existem: sem ela, a checagem acima (1 ponto por
-  // vaga) deixava ir ao ar um draft que travaria no meio — o pool da 4ª começa em 3 pontos.
+  // vaga) deixava ir ao ar um draft que travaria no meio. Com a soma da tabela exata, é
+  // aqui que aparece o pool em que os capitães não deixam os elencos fecharem.
   // Depende só de capitães e orçamento, não da ordem sorteada.
   if (!estadoFecha(estado, ORCAMENTO_DA_MONTAGEM)) {
-    const sugerido = orcamentoSugerido(pool.reduce((soma, j) => soma + j.pontos, 0), quantosTimes);
     throw new ErroDeRegra(
-      `Com esses capitães e orçamento de ${orcamento} por time, não há como fechar os ${quantosTimes} elencos com os jogadores aprovados. Suba o orçamento em Configuração${sugerido ? ` (a regra dá ${sugerido})` : ""} ou troque os capitães.`,
+      `${motivoDeNaoFechar(tabela, quantosTimes, orcamento)} Troque os capitães (à mão) ou mude o orçamento por time em Configuração — a tabela é recalculada com o orçamento novo.`,
     );
   }
 
-  return { ...estado, sorteio: { semente, capitaes, emISO: new Date().toISOString() } };
+  return {
+    ...estado,
+    sorteio: { semente, capitaes, emISO: new Date().toISOString() },
+    // De onde saiu cada preço: fica gravado com o sorteio, para conferir depois — e é a
+    // tabela que a regra do substituto usa depois do draft.
+    tabelaDePontos: retratoComQueda(conta, false),
+  };
 }
 
 /**
@@ -422,8 +570,15 @@ export type DraftPublico = {
   revisao: number;
   fase: EstadoDraft["fase"];
   times: { id: string; nome: string; cor: string; capitaoRiotId: string; gasto: number; vagas: number }[];
-  elencos: Record<string, { riotId: string; pontos: number; rota1: string; rota2: string; elo: string; capitao: boolean }[]>;
-  disponiveis: { id: string; riotId: string; pontos: number; rota1: string; rota2: string; elo: string }[];
+  /**
+   * `classe` é a classe de preço na tabela do sorteio ("Ouro II", "Mestre · 200–299 PDL"),
+   * opcional porque drafts montados antes da tabela por divisão não têm.
+   */
+  elencos: Record<
+    string,
+    { riotId: string; pontos: number; rota1: string; rota2: string; elo: string; classe?: string; capitao: boolean }[]
+  >;
+  disponiveis: { id: string; riotId: string; pontos: number; rota1: string; rota2: string; elo: string; classe?: string }[];
   escolhaAtual: number;
   totalEscolhas: number;
   timeDaVezId: string | null;
@@ -445,6 +600,13 @@ export type DraftPublico = {
   orcamentoPorTime: number;
   jogadoresPorTime: number;
   historico: { escolha: number; timeId: string; riotId: string; automatica: boolean }[];
+  /**
+   * A tabela de pontos do SORTEIO (só classes e números, nada de quem é quem). O painel a usa
+   * para precificar quem está fora do pool com os preços que valeram — a regra do substituto
+   * depois do draft. Nula em drafts montados antes da tabela automática; ausente na resposta
+   * de um servidor anterior a este campo.
+   */
+  tabelaDePontos?: RetratoDaTabela | null;
 };
 
 /**
@@ -469,8 +631,10 @@ function escolhiveisDoEstado(estado: EstadoDraft, revisao: number): string[] {
   return calculado;
 }
 
-export function paraPublico(estado: EstadoDraft, revisao: number): DraftPublico {
+export function paraPublico(estado: EstadoDraftComTabela, revisao: number): DraftPublico {
   const nomePor = new Map(estado.jogadores.map((j) => [j.id, j]));
+  // Só com o campo: estado antigo continua saindo sem `classe`, como antes.
+  const classeDe = (j: JogadorDoDraft) => (j.classe ? { classe: j.classe } : {});
 
   const elencos: DraftPublico["elencos"] = {};
   for (const time of estado.times) {
@@ -482,6 +646,7 @@ export function paraPublico(estado: EstadoDraft, revisao: number): DraftPublico 
         rota1: j.rota1,
         rota2: j.rota2,
         elo: j.elo,
+        ...classeDe(j),
         capitao: j.id === time.capitaoId,
       }));
   }
@@ -506,7 +671,7 @@ export function paraPublico(estado: EstadoDraft, revisao: number): DraftPublico 
     // confere de quem é a vez de qualquer forma.
     disponiveis: estado.jogadores
       .filter((j) => j.timeId === null)
-      .map((j) => ({ id: j.id, riotId: j.riotId, pontos: j.pontos, rota1: j.rota1, rota2: j.rota2, elo: j.elo })),
+      .map((j) => ({ id: j.id, riotId: j.riotId, pontos: j.pontos, rota1: j.rota1, rota2: j.rota2, elo: j.elo, ...classeDe(j) })),
     escolhaAtual: estado.escolhaAtual,
     totalEscolhas: estado.ordem.length,
     // `timeDaVez` do motor, e não a indexação crua da ordem: o motor devolve null fora de
@@ -527,6 +692,7 @@ export function paraPublico(estado: EstadoDraft, revisao: number): DraftPublico 
       riotId: nomePor.get(e.jogadorId)?.riotId ?? "—",
       automatica: e.automatica,
     })),
+    tabelaDePontos: estado.tabelaDePontos ?? null,
   };
 }
 
