@@ -1,13 +1,30 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { createPortal } from "react-dom";
-import { Crown, Flame, Maximize2, TrendingUp, UserRoundX, type LucideIcon } from "lucide-react";
+import { CircleAlert, CircleCheck, Crown, Flame, Maximize2, TrendingUp, UserRoundX, type LucideIcon } from "lucide-react";
 
 import { useCompacto } from "@/components/admin/responsivo";
 import { Button, C, ChipFiltro, Elo, RolagemX, Toolbar, display, tabular } from "@/components/admin/ui";
 import { RoleIcon } from "@/components/lob/ui";
 import { ELO_ORDER, resolveElo, resolveRole, type EloMeta, type RoleMeta } from "@/lib/design";
+import {
+  ROTAS_IDEAIS,
+  montarRotasIdeais,
+  type Encaixe,
+  type LugarNaRota,
+  type RotaIdeal,
+  type RotasIdeais,
+} from "@/lib/draft/rotas-ideais";
 import { SITE_DOMINIO } from "@/lib/site-url";
 
 /**
@@ -22,9 +39,15 @@ import { SITE_DOMINIO } from "@/lib/site-url";
  * 2. O quadro se explica sozinho: título, quantos jogadores, que rota está contando,
  *    data e o endereço do site vão dentro da moldura, para o print não precisar de
  *    legenda.
- * 3. Os nicks ficam só no `title` das células do quadro DA ABA (passar o mouse, no
- *    monitor) — nunca na tela de print, onde um tooltip parado sairia na imagem. Quem quer
- *    saber quem é o Diamante da selva pergunta à organização; o print não expõe ninguém.
+ * 3. Na MATRIZ (principal, secundária, as duas) os nicks ficam só no `title` das células
+ *    do quadro DA ABA (passar o mouse, no monitor) — nunca na tela de print, onde um
+ *    tooltip parado sairia na imagem. A exceção é o modo IDEAL, que existe justamente para
+ *    mostrar quem seria cada um dos N de cada rota (pedido do Lucas em 23/10): lá o nick vai
+ *    escrito, ainda sem ponto nenhum.
+ *
+ * Quatro modos: rota principal, só a secundária, principal + secundária, e o ideal — a
+ * simulação de `lib/draft/rotas-ideais.ts`, que tenta fechar N por rota (N = times) usando
+ * só a principal e a secundária de cada um.
  *
  * A matriz é a mesma no monitor e no celular — linhas são os elos (do mais alto ao mais
  * baixo, como uma escada), colunas as cinco rotas. Cinco colunas cabem num telefone de
@@ -38,8 +61,14 @@ import { SITE_DOMINIO } from "@/lib/site-url";
 /** Ordem do jogo, a mesma de "Cobertura de rotas". O banco grava JUNG, não SEL. */
 export const ROTAS_DO_QUADRO = ["TOP", "JUNG", "MID", "ADC", "SUP"] as const;
 
-/** `principal` = cada pessoa conta uma vez; `ambas` = conta também na secundária. */
-export type ModoDasRotas = "principal" | "ambas";
+/**
+ * Que rota a MATRIZ conta: `principal` e `secundaria` contam cada pessoa uma vez (numa ou
+ * noutra); `ambas` conta também na secundária.
+ */
+export type ModoDasRotas = "principal" | "secundaria" | "ambas";
+
+/** O que o quadro mostra: uma das contagens da matriz, ou o ideal de N por rota. */
+export type ModoDoQuadro = ModoDasRotas | "ideal";
 
 /** O que o quadro precisa saber de cada inscrito — e nada além disso. */
 export type JogadorDoQuadro = Readonly<{
@@ -96,7 +125,9 @@ function eloDoDegrau(media: number | null): EloMeta | null {
  * Elo ou rota ilegível fica FORA (e é contado em `foraDoQuadro`) em vez de cair numa
  * coluna "outros": a aba já tem um aviso vermelho para elo não reconhecido, e uma linha
  * a mais aqui viraria lixo no print. No modo `ambas`, quem marcou a mesma rota duas
- * vezes conta uma só nela — senão a rota ganhava gente que não existe.
+ * vezes conta uma só nela — senão a rota ganhava gente que não existe. No modo
+ * `secundaria`, quem conta é a rota que a pessoa marcou em segundo; a principal só entra
+ * na cobertura, que é sempre de titular.
  */
 export function montarEloPorRota(jogadores: readonly JogadorDoQuadro[], modo: ModoDasRotas): QuadroEloPorRota {
   const rotas: ColunaDaRota[] = ROTAS_DO_QUADRO.map((chave) => ({
@@ -122,12 +153,16 @@ export function montarEloPorRota(jogadores: readonly JogadorDoQuadro[], modo: Mo
     // A cobertura só depende da rota: um elo ilegível tira a pessoa da escada, mas ela
     // continua sendo titular da rota que marcou.
     if (principal) principal.principais += 1;
-    if (!elo || !principal) {
+    const secundaria = porChave.get(resolveRole(jogador.secundaria).key);
+    // A rota que este modo conta precisa ser legível; no `ambas`, a principal manda e a
+    // secundária ilegível só deixa de somar.
+    const exigida = modo === "secundaria" ? secundaria : principal;
+    if (!elo || !exigida) {
       foraDoQuadro += 1;
       continue;
     }
-    const secundaria = porChave.get(resolveRole(jogador.secundaria).key);
-    const colunas = modo === "ambas" && secundaria && secundaria !== principal ? [principal, secundaria] : [principal];
+    const colunas =
+      modo === "ambas" && secundaria && secundaria !== exigida ? [exigida, secundaria] : [exigida];
     const degrau = DEGRAU.get(elo.key) ?? 0;
 
     for (const coluna of colunas) {
@@ -456,24 +491,387 @@ function EmblemaMudo({ elo, tamanho }: Readonly<{ elo: EloMeta; tamanho: number 
   );
 }
 
+// ---------------------------------------------------------------- ideal
+
+/** O que vem depois de "N jogadores" no subtítulo, em cada modo. */
+const SUBTITULO_DO_MODO: Record<ModoDoQuadro, (ideal: RotasIdeais<JogadorDoQuadro> | null) => string> = {
+  principal: () => " · rota principal",
+  secundaria: () => " · só a rota secundária",
+  ambas: () => " · principal + secundária (cada um conta nas duas)",
+  // Fala das VAGAS, não das pessoas: com gente sobrando, "cada um na principal ou na
+  // secundária" mentiria sobre quem ficou sem vaga.
+  ideal: (ideal) =>
+    !ideal
+      ? " · nenhum time fecha ainda"
+      : ideal.fecha
+        ? ` · ${ideal.vagasPorRota} times, toda vaga com alguém na principal ou na secundária`
+        : ` · ${ideal.vagasPorRota} times, mas nem toda vaga fecha com a principal ou a secundária`,
+};
+
+/** O resumo de quem ficou onde: "33 na principal · 7 na secundária". */
+function resumoDoIdeal(ideal: RotasIdeais<JogadorDoQuadro>): string {
+  const partes = [`${ideal.contagem.principal} na principal`, `${ideal.contagem.secundaria} na secundária`];
+  if (ideal.contagem.fora > 0) partes.push(`${ideal.contagem.fora} fora das duas`);
+  if (ideal.semVaga.length > 0) partes.push(`${ideal.semVaga.length} sem vaga`);
+  return partes.join(" · ");
+}
+
+/** Esconde da tela e deixa para o leitor de tela (o `sr-only` de sempre, em objeto). */
+const soParaLeitor: CSSProperties = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: "hidden",
+  clip: "rect(0, 0, 0, 0)",
+  whiteSpace: "nowrap",
+  border: 0,
+};
+
+/**
+ * "FECHA" ou "NÃO FECHA", grande — é a primeira pergunta de quem recebe o print. No celular
+ * sai `curto`, na linha do título (quando cabe ao lado dele; senão, logo abaixo): o resumo
+ * desce para o subtítulo, e o print do telefone ganha a altura de uma linha.
+ */
+function VereditoDoIdeal({ ideal, curto = false }: Readonly<{ ideal: RotasIdeais<JogadorDoQuadro>; curto?: boolean }>) {
+  const cor = ideal.fecha ? C.ok : C.danger;
+  const Icone = ideal.fecha ? CircleCheck : CircleAlert;
+  return (
+    <div
+      role="status"
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: curto ? 7 : 12,
+        padding: curto ? "5px 9px" : "10px 16px",
+        borderRadius: 4,
+        border: `1px solid ${comAlfa(cor, 0.5)}`,
+        background: `linear-gradient(135deg, ${comAlfa(cor, 0.18)}, rgba(0,0,0,.3) 75%)`,
+        boxShadow: `0 0 22px ${comAlfa(cor, 0.18)}`,
+      }}
+    >
+      <Icone size={curto ? 16 : 26} color={cor} aria-hidden />
+      <span style={{ display: "grid", gap: 2 }}>
+        <span
+          style={{
+            fontFamily: display,
+            fontSize: curto ? 14 : 22,
+            letterSpacing: ".05em",
+            lineHeight: 1.05,
+            textTransform: "uppercase",
+            whiteSpace: "nowrap",
+            color: ideal.fecha ? C.okSoft : C.dangerSoft,
+          }}
+        >
+          {ideal.fecha ? (curto ? "Fecha" : `Fecha ${ideal.vagasPorRota} de cada`) : "Não fecha"}
+        </span>
+        {curto ? null : <span style={{ fontSize: 11.5, color: C.ink2, ...tabular }}>{resumoDoIdeal(ideal)}</span>}
+      </span>
+    </div>
+  );
+}
+
+/** O que o leitor de tela ouve no lugar da marca visual. A principal não precisa de aviso. */
+const ENCAIXE_POR_EXTENSO: Record<Encaixe, string> = {
+  principal: "",
+  secundaria: ", na rota secundária",
+  fora: ", fora das duas rotas que marcou",
+};
+
+/**
+ * Um jogador na vaga: emblema, nick e, se não for a principal, a marca do porquê. A marca
+ * mora DENTRO da célula do nick (e não numa terceira coluna da grade): coluna vazia ainda
+ * cobraria o vão, e em coluna estreita cada pixel é uma letra do nome.
+ */
+function LinhaDoIdeal({ lugar, miudo }: Readonly<{ lugar: LugarNaRota<JogadorDoQuadro>; miudo: boolean }>) {
+  const { jogador, encaixe } = lugar;
+  const meta = resolveElo(jogador.elo);
+  return (
+    <li
+      style={{
+        position: "relative",
+        display: "flex",
+        alignItems: "center",
+        gap: miudo ? 5 : 7,
+        // Em cartão a linha é baixa de propósito: são 40 nomes num print de telefone.
+        minHeight: miudo ? 21 : 32,
+        padding: miudo ? "1px 5px 1px 3px" : "3px 7px 3px 5px",
+        borderRadius: 3,
+        background:
+          encaixe === "principal" ? "rgba(0,0,0,.24)" : encaixe === "secundaria" ? "rgba(224,163,58,.09)" : "rgba(212,87,74,.13)",
+        border: `1px solid ${encaixe === "principal" ? "rgba(201,138,75,.08)" : encaixe === "secundaria" ? "rgba(224,163,58,.28)" : "rgba(212,87,74,.4)"}`,
+      }}
+    >
+      <span aria-hidden style={{ display: "inline-flex", flexShrink: 0 }}>
+        <Elo elo={jogador.elo} tamanho={miudo ? 16 : 24} />
+      </span>
+      <span
+        style={{
+          flex: 1,
+          minWidth: 0,
+          fontSize: miudo ? 11.5 : 13,
+          fontWeight: 600,
+          color: C.ink,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {jogador.nick}
+        <span style={soParaLeitor}>
+          , {meta?.label ?? jogador.elo}
+          {ENCAIXE_POR_EXTENSO[encaixe]}
+        </span>
+      </span>
+      {encaixe === "principal" ? null : (
+        <span
+          aria-hidden
+          style={{
+            flexShrink: 0,
+            fontSize: miudo ? 8.5 : 9,
+            fontWeight: 700,
+            letterSpacing: ".04em",
+            textTransform: "uppercase",
+            padding: "0 4px",
+            borderRadius: 2,
+            color: encaixe === "secundaria" ? C.warnSoft : C.dangerSoft,
+            border: `1px solid ${encaixe === "secundaria" ? "rgba(224,163,58,.45)" : "rgba(212,87,74,.5)"}`,
+          }}
+        >
+          {encaixe === "secundaria" ? "2ª" : "fora"}
+        </span>
+      )}
+    </li>
+  );
+}
+
+/**
+ * Uma rota do ideal: as N vagas com quem ficou nelas. Em espaço largo é uma coluna (cinco
+ * lado a lado, a escalação inteira num print); em espaço estreito — o celular, ou o painel
+ * numa janela de meia tela — é um cartão com os nomes em duas colunas: cinco cartões de
+ * oito nomes numa coluna só passariam de dois mil pixels.
+ */
+function RotaDoIdeal({
+  rota,
+  lugares,
+  vagas,
+  emCartao,
+}: Readonly<{ rota: RotaIdeal; lugares: readonly LugarNaRota<JogadorDoQuadro>[]; vagas: number; emCartao: boolean }>) {
+  const meta = resolveRole(rota);
+  const naSecundaria = lugares.filter((l) => l.encaixe === "secundaria").length;
+  const foraDaRota = lugares.filter((l) => l.encaixe === "fora").length;
+  const abertas = Math.max(0, vagas - lugares.length);
+  const degraus = lugares.map((l) => DEGRAU.get(resolveElo(l.jogador.elo)?.key ?? "") ?? null).filter((d): d is number => d !== null);
+  const medio = eloDoDegrau(degraus.length > 0 ? degraus.reduce((s, d) => s + d, 0) / degraus.length : null);
+  const detalhe = [
+    `${lugares.length - naSecundaria - foraDaRota} na principal`,
+    naSecundaria > 0 ? `${naSecundaria} na 2ª` : null,
+    foraDaRota > 0 ? `${foraDaRota} fora` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  const contador = (
+    <span
+      style={{
+        fontFamily: display,
+        fontSize: emCartao ? 15 : 24,
+        lineHeight: 1,
+        color: lugares.length === vagas ? C.ink : C.dangerSoft,
+        ...tabular,
+      }}
+    >
+      {lugares.length}/{vagas}
+    </span>
+  );
+
+  return (
+    <section
+      aria-label={`${meta.label}: ${lugares.length} de ${vagas} vagas, ${detalhe}`}
+      style={{
+        minWidth: 0,
+        borderRadius: 5,
+        border: `1px solid ${comAlfa(meta.color, 0.32)}`,
+        background: `linear-gradient(180deg, ${comAlfa(meta.color, 0.11)}, rgba(0,0,0,.22) 38%)`,
+        boxShadow: `inset 0 2px 0 ${comAlfa(meta.color, 0.7)}`,
+        padding: emCartao ? "7px 8px 8px" : "14px 10px 12px",
+      }}
+    >
+      {emCartao ? (
+        // Cabeçalho numa linha só: no print do telefone cada pixel de altura conta cinco vezes.
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+          <HexDaRota meta={meta} tamanho={22} />
+          <span style={{ fontFamily: display, fontSize: 13, letterSpacing: ".06em", textTransform: "uppercase", color: meta.color }}>
+            {meta.label}
+          </span>
+          <span
+            style={{
+              flex: 1,
+              minWidth: 0,
+              fontSize: 10,
+              color: C.ink3,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              ...tabular,
+            }}
+          >
+            {detalhe}
+          </span>
+          {contador}
+        </div>
+      ) : (
+        <div style={{ display: "grid", justifyItems: "center", gap: 6, textAlign: "center", marginBottom: 12 }}>
+          <HexDaRota meta={meta} tamanho={42} />
+          <span style={{ fontFamily: display, fontSize: 15, letterSpacing: ".06em", textTransform: "uppercase", color: meta.color }}>
+            {meta.label}
+          </span>
+          {contador}
+          <span style={{ fontSize: 10.5, color: C.ink3, ...tabular }}>{detalhe}</span>
+        </div>
+      )}
+
+      <ul
+        style={{
+          listStyle: "none",
+          margin: 0,
+          padding: 0,
+          display: "grid",
+          gridTemplateColumns: emCartao ? "repeat(2, minmax(0, 1fr))" : "minmax(0, 1fr)",
+          gap: emCartao ? 3 : 5,
+        }}
+      >
+        {lugares.map((lugar, i) => (
+          <LinhaDoIdeal key={`${lugar.jogador.nick}-${i}`} lugar={lugar} miudo={emCartao} />
+        ))}
+        {Array.from({ length: abertas }, (_, i) => (
+          <li
+            key={`aberta-${i}`}
+            style={{
+              display: "grid",
+              placeItems: "center",
+              minHeight: emCartao ? 21 : 32,
+              borderRadius: 3,
+              border: "1px dashed rgba(212,87,74,.45)",
+              color: C.dangerSoft,
+              fontSize: 11,
+            }}
+          >
+            vaga aberta
+          </li>
+        ))}
+      </ul>
+
+      {!emCartao && medio ? (
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "2px 6px",
+            marginTop: 10,
+            paddingTop: 9,
+            borderTop: `1px solid ${C.line}`,
+            fontSize: 11,
+            color: C.ink3,
+          }}
+        >
+          elo médio <EmblemaMudo elo={medio} tamanho={22} />
+          <strong style={{ color: medio.color }}>{medio.label}</strong>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+/**
+ * Largura que o miolo do quadro tem de verdade. O painel no monitor vai de 900px (com o
+ * trilho lateral) a monitores largos, e o quadro também roda na tela de print: decidir o
+ * arranjo pelo modo compacto deixava cinco colunas de ~60px numa janela de meia tela.
+ * Sem `ResizeObserver` (jsdom), fica com o arranjo largo.
+ */
+function useLarguraDe(no: RefObject<HTMLElement | null>): number | null {
+  const [largura, setLargura] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const el = no.current;
+    if (!el || typeof ResizeObserver !== "function") return;
+    const medir = () => setLargura(el.clientWidth);
+    medir();
+    const observador = new ResizeObserver(medir);
+    observador.observe(el);
+    return () => observador.disconnect();
+  }, [no]);
+  return largura;
+}
+
+/** Colunas por largura de miolo: 5 lado a lado (≥ 920px), 3 + 2 (≥ 560px) ou cartões. */
+function colunasDoIdeal(largura: number | null, compacto: boolean): 5 | 3 | 1 {
+  if (compacto) return 1;
+  if (largura === null || largura >= 920) return 5;
+  return largura >= 560 ? 3 : 1;
+}
+
+/**
+ * As cinco rotas do ideal e, se houver, quantos não couberam em vaga nenhuma. Os nomes de
+ * quem ficaria sem vaga NÃO saem: a simulação não sabe quem a organização marcou como sobra
+ * (nem a ordem de inscrição), e um print dizendo o nome errado de quem fica de fora é pior
+ * do que só o número.
+ */
+function CorpoIdeal({ ideal }: Readonly<{ ideal: RotasIdeais<JogadorDoQuadro> }>) {
+  const compacto = useCompacto();
+  const caixa = useRef<HTMLDivElement>(null);
+  const colunas = colunasDoIdeal(useLarguraDe(caixa), compacto);
+  const emCartao = colunas === 1;
+  return (
+    <div ref={caixa}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: `repeat(${colunas}, minmax(0, 1fr))`,
+          gap: emCartao ? 6 : 10,
+        }}
+      >
+        {ROTAS_IDEAIS.map((rota) => (
+          <RotaDoIdeal key={rota} rota={rota} lugares={ideal.porRota[rota]} vagas={ideal.vagasPorRota} emCartao={emCartao} />
+        ))}
+      </div>
+
+      {ideal.semVaga.length > 0 ? (
+        <p style={{ margin: "12px 0 0", fontSize: 12, color: C.ink2, ...tabular }}>
+          <strong style={{ color: C.warnSoft }}>
+            {ideal.semVaga.length} {ideal.semVaga.length === 1 ? "inscrito fica" : "inscritos ficam"} sem vaga
+          </strong>{" "}
+          — há mais gente que vagas. Quem fica de fora é decisão da organização.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 /** A moldura com tudo dentro — o que vai para o print. Não tem estado: quem manda é `EloPorRota`. */
 function Quadro({
   quadro,
   destaques,
   modo,
+  ideal,
   times,
   hoje,
   paraPrint = false,
 }: Readonly<{
   quadro: QuadroEloPorRota;
   destaques: DestaquesDoQuadro;
-  modo: ModoDasRotas;
+  modo: ModoDoQuadro;
+  /** A simulação de N por rota — só no modo `ideal`, e nula enquanto nenhum time fecha. */
+  ideal: RotasIdeais<JogadorDoQuadro> | null;
   times: number;
   hoje: string;
-  /** Dentro da tela de print: sem nicks nem no `title`. */
+  /** Dentro da tela de print: sem nicks nem no `title` (na matriz). */
   paraPrint?: boolean;
 }>) {
   const compacto = useCompacto();
+  const noIdeal = modo === "ideal";
 
   // Rótulo do elo · 5 rotas · total (o total sai no celular: não cabe ao lado de cinco).
   const colunasDaGrade = compacto
@@ -540,31 +938,39 @@ function Quadro({
             <span aria-hidden style={{ width: 22, height: 1, background: C.bronze, flexShrink: 0 }} />
             4ª Edição · League of Bronze
           </div>
-          {/* Folga em cima e embaixo: o gradiente recortado no texto só pinta dentro da
-              caixa, e o til de "DIVISÃO" ficaria sem tinta com a linha apertada. */}
-          <h4
-            className="gold-text"
-            style={{
-              fontFamily: display,
-              fontSize: compacto ? 27 : 36,
-              lineHeight: 1.12,
-              letterSpacing: ".01em",
-              textTransform: "uppercase",
-              margin: "4px 0 0",
-              padding: "0.12em 0 0.06em",
-            }}
-          >
-            Divisão de elo por rota
-          </h4>
+          {/* No celular o veredito curto divide a linha com o título (e desce se não couber). */}
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 10px", marginTop: 4 }}>
+            {/* Folga em cima e embaixo: o gradiente recortado no texto só pinta dentro da
+                caixa, e o til de "DIVISÃO" ficaria sem tinta com a linha apertada. */}
+            <h4
+              className="gold-text"
+              style={{
+                fontFamily: display,
+                fontSize: compacto ? 27 : 36,
+                lineHeight: 1.12,
+                letterSpacing: ".01em",
+                textTransform: "uppercase",
+                margin: 0,
+                padding: "0.12em 0 0.06em",
+              }}
+            >
+              {noIdeal && ideal ? `O ideal: ${ideal.vagasPorRota} por rota` : "Divisão de elo por rota"}
+            </h4>
+            {noIdeal && ideal && compacto ? <VereditoDoIdeal ideal={ideal} curto /> : null}
+          </div>
           <p style={{ margin: "2px 0 0", fontSize: 12.5, color: C.ink2, ...tabular }}>
-            <strong style={{ color: C.bronzeHi }}>{pessoasPorExtenso(quadro.pessoas)}</strong>
-            {modo === "principal" ? " · rota principal" : " · principal + secundária (cada um conta nas duas)"}
+            <strong style={{ color: C.bronzeHi }}>
+              {pessoasPorExtenso(noIdeal ? quadro.pessoas + quadro.foraDoQuadro : quadro.pessoas)}
+            </strong>
+            {noIdeal && ideal && compacto ? ` · ${resumoDoIdeal(ideal)}` : SUBTITULO_DO_MODO[modo](ideal)}
           </p>
         </div>
 
+        {noIdeal && ideal && !compacto ? <VereditoDoIdeal ideal={ideal} /> : null}
+
         {/* No monitor, o elo médio de todo mundo fecha o cabeçalho; no celular ele custaria
             uma linha inteira de altura, e o print do telefone já é apertado. */}
-        {!compacto && quadro.medioGeral ? (
+        {!noIdeal && !compacto && quadro.medioGeral ? (
           <div
             style={{
               display: "flex",
@@ -587,7 +993,15 @@ function Quadro({
         ) : null}
       </div>
 
-      {quadro.pessoas === 0 ? (
+      {noIdeal ? (
+        ideal ? (
+          <CorpoIdeal ideal={ideal} />
+        ) : (
+          <p style={{ margin: 0, padding: "18px 0", fontSize: 13, color: C.ink3, textAlign: "center" }}>
+            Nenhum time fecha ainda — o ideal aparece quando houver gente para pelo menos um time.
+          </p>
+        )
+      ) : quadro.pessoas === 0 ? (
         <p style={{ margin: 0, padding: "18px 0", fontSize: 13, color: C.ink3, textAlign: "center" }}>
           {quadro.foraDoQuadro > 0
             ? `${quadro.foraDoQuadro} ${quadro.foraDoQuadro === 1 ? "ficha está" : "fichas estão"} com elo ou rota que a tabela do site não reconhece — corrija na aba Inscritos para o quadro aparecer.`
@@ -826,14 +1240,27 @@ function Quadro({
           borderTop: `1px solid ${C.line}`,
         }}
       >
-        <p style={{ margin: 0, fontSize: 11, lineHeight: 1.55, color: C.ink4, maxWidth: 560 }}>
-          Conta todo inscrito que ainda pode jogar — pendentes inclusos, recusados e desistentes
-          fora. Elo que vale para o draft: o congelado; sem ele, o verificado (pela Riot ou pela
-          organização); sem os dois, o declarado.
-          {quadro.foraDoQuadro > 0
-            ? ` ${quadro.foraDoQuadro} ${quadro.foraDoQuadro === 1 ? "ficha ficou" : "fichas ficaram"} de fora por elo ou rota não reconhecida.`
-            : ""}
-        </p>
+        {noIdeal ? (
+          // O ideal precisa dizer que é simulação: no draft a rota não é travada, e um print
+          // com nomes por rota sem esse aviso viraria "escalação oficial" no grupo.
+          <p style={{ margin: 0, fontSize: compacto ? 10.5 : 11, lineHeight: 1.5, color: C.ink4, maxWidth: 620 }}>
+            Simulação: cada um fica na rota principal sempre que dá. Onde falta gente, entra quem
+            marcou aquela rota como secundária e, entre os jeitos possíveis, muda de rota sempre o
+            mais fraco — o mais forte joga onde prefere. <strong style={{ color: C.warnSoft }}>2ª</strong> = jogando a
+            secundária. No draft a rota não é travada — cada capitão escolhe quem quiser.
+            {/* No celular a última frase sai: o print do telefone já é o mais apertado. */}
+            {compacto ? null : " Conta todo inscrito que ainda pode jogar, pendentes inclusos."}
+          </p>
+        ) : (
+          <p style={{ margin: 0, fontSize: 11, lineHeight: 1.55, color: C.ink4, maxWidth: 560 }}>
+            Conta todo inscrito que ainda pode jogar — pendentes inclusos, recusados e desistentes
+            fora. Elo que vale para o draft: o congelado; sem ele, o verificado (pela Riot ou pela
+            organização); sem os dois, o declarado.
+            {quadro.foraDoQuadro > 0
+              ? ` ${quadro.foraDoQuadro} ${quadro.foraDoQuadro === 1 ? "ficha ficou" : "fichas ficaram"} de fora por elo ou rota não reconhecida.`
+              : ""}
+          </p>
+        )}
         <span style={{ fontSize: 10, letterSpacing: ".2em", textTransform: "uppercase", color: C.bronze, whiteSpace: "nowrap", ...tabular }}>
           {SITE_DOMINIO} · {hoje}
         </span>
@@ -867,13 +1294,25 @@ const ALTURA_DO_AVISO = 46;
  * remonta a aba inteira — a tela de print fecha junto. É do painel, não daqui; quem gira
  * abre de novo.
  */
-function TelaDePrint({ onFechar, children }: Readonly<{ onFechar: () => void; children: ReactNode }>) {
+function TelaDePrint({
+  onFechar,
+  rotulo,
+  largo = false,
+  children,
+}: Readonly<{
+  onFechar: () => void;
+  /** O que o leitor de tela anuncia: o nome do quadro que está na tela. */
+  rotulo: string;
+  /** Desenho mais largo no monitor (o ideal: cinco colunas de nomes). */
+  largo?: boolean;
+  children: ReactNode;
+}>) {
   const compacto = useCompacto();
   const dialogo = useRef<HTMLDivElement>(null);
   const caixa = useRef<HTMLDivElement>(null);
   // A largura de desenho do quadro é a do telefone, ou a de um monitor comum; a altura sai
   // do conteúdo e decide a escala.
-  const [medida, setMedida] = useState(() => ({ largura: larguraDoPrint(compacto), altura: 0, escala: 1 }));
+  const [medida, setMedida] = useState(() => ({ largura: larguraDoPrint(compacto, largo), altura: 0, escala: 1 }));
   const [aviso, setAviso] = useState(true);
   const fechar = useRef(onFechar);
   useEffect(() => {
@@ -884,7 +1323,7 @@ function TelaDePrint({ onFechar, children }: Readonly<{ onFechar: () => void; ch
 
   useLayoutEffect(() => {
     const medir = () => {
-      const largura = larguraDoPrint(compacto);
+      const largura = larguraDoPrint(compacto, largo);
       const no = caixa.current;
       if (!no) return;
       // `offsetHeight` ignora o `transform`: é a altura de verdade, sem a escala atual. Se a
@@ -907,7 +1346,7 @@ function TelaDePrint({ onFechar, children }: Readonly<{ onFechar: () => void; ch
       observador?.disconnect();
       window.removeEventListener("resize", medir);
     };
-  }, [compacto, reserva]);
+  }, [compacto, largo, reserva]);
 
   useEffect(() => {
     // O mesmo cuidado da `Folha`: o foco entra no diálogo (senão o Tab seguiria pelos
@@ -939,7 +1378,7 @@ function TelaDePrint({ onFechar, children }: Readonly<{ onFechar: () => void; ch
       ref={dialogo}
       role="dialog"
       aria-modal="true"
-      aria-label="Divisão de elo por rota, em tela cheia para print"
+      aria-label={`${rotulo}, em tela cheia para print`}
       aria-describedby={aviso ? "elo-por-rota-aviso" : undefined}
       tabIndex={-1}
       onClick={() => fechar.current()}
@@ -992,10 +1431,15 @@ function TelaDePrint({ onFechar, children }: Readonly<{ onFechar: () => void; ch
   );
 }
 
-function larguraDoPrint(compacto: boolean): number {
-  if (typeof window === "undefined") return compacto ? 375 : 1040;
-  const disponivel = window.innerWidth - MARGEM_DO_PRINT * 2;
-  return compacto ? Math.min(disponivel, 440) : Math.min(disponivel, 1040);
+/**
+ * Largura de desenho do print. O ideal (`largo`) ganha até 1280 no monitor: em 1040 as
+ * cinco colunas deixavam ~90px para o nick, e um "samuelvenancio" com a marca 2ª saía com
+ * reticências — no print não há como recuperar o nome cortado.
+ */
+function larguraDoPrint(compacto: boolean, largo = false): number {
+  const teto = compacto ? 440 : largo ? 1280 : 1040;
+  if (typeof window === "undefined") return compacto ? 375 : teto;
+  return Math.min(window.innerWidth - MARGEM_DO_PRINT * 2, teto);
 }
 
 // ---------------------------------------------------------------- bloco da aba
@@ -1008,16 +1452,60 @@ export function EloPorRota({
   /** Times que fecham hoje (`panorama.times`) — quantos titulares cada rota precisa. */
   times: number;
 }>) {
-  const [modo, setModo] = useState<ModoDasRotas>("principal");
+  const compacto = useCompacto();
+  const [modo, setModo] = useState<ModoDoQuadro>("principal");
   const [paraPrint, setParaPrint] = useState(false);
-  const quadro = useMemo(() => montarEloPorRota(jogadores, modo), [jogadores, modo]);
+  // No ideal a matriz não aparece, mas o cabeçalho ainda conta as pessoas por ela.
+  const modoDaMatriz: ModoDasRotas = modo === "ideal" ? "principal" : modo;
+  const quadro = useMemo(() => montarEloPorRota(jogadores, modoDaMatriz), [jogadores, modoDaMatriz]);
   const destaques = useMemo(() => destaquesDoQuadro(quadro), [quadro]);
+  // Ordem fixa (elo, depois nick) antes da simulação: o empate total cai na ordem de
+  // entrada, e o mesmo pool tem de dar o mesmo print em qualquer recarga.
+  const ideal = useMemo(() => {
+    if (modo !== "ideal" || times <= 0) return null;
+    const degrauDe = (j: JogadorDoQuadro) => DEGRAU.get(resolveElo(j.elo)?.key ?? "") ?? -1;
+    const ordenados = [...jogadores].sort((a, b) => degrauDe(b) - degrauDe(a) || a.nick.localeCompare(b.nick, "pt-BR"));
+    return montarRotasIdeais(ordenados, times);
+  }, [jogadores, modo, times]);
   // O print circula dias depois: a data diz de quando é o retrato.
   const [hoje] = useState(() =>
     new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" }),
   );
 
-  const props = { quadro, destaques, modo, times, hoje };
+  const props = { quadro, destaques, modo, ideal, times, hoje };
+  const semNada = modo === "ideal" ? ideal === null : quadro.pessoas === 0;
+
+  // Rótulo de mesa e de bolso. Os quatro por extenso somam ~500px: no telefone o do ideal
+  // ficava inteiro fora da tela, numa fileira sem barra de rolagem à vista. O nome por
+  // extenso continua sendo o nome acessível nos dois arranjos.
+  const opcoes: ReadonlyArray<{ modo: ModoDoQuadro; longo: string; curto: string }> = [
+    { modo: "principal", longo: "Rota principal", curto: "Principal" },
+    { modo: "secundaria", longo: "Só secundária", curto: "Secundária" },
+    { modo: "ambas", longo: "Principal + secundária", curto: "As duas" },
+    {
+      modo: "ideal",
+      longo: times > 0 ? `Ideal: ${times} por rota` : "Ideal por rota",
+      curto: times > 0 ? `Ideal: ${times}` : "Ideal",
+    },
+  ];
+  const chips = opcoes.map((o) => (
+    <ChipFiltro
+      key={o.modo}
+      ativo={modo === o.modo}
+      onClick={() => setModo(o.modo)}
+      rotulo={o.longo}
+      disabled={o.modo === "ideal" && times <= 0}
+      title={
+        o.modo !== "ideal"
+          ? o.longo
+          : times <= 0
+            ? "Nenhum time fecha ainda."
+            : `Simula ${times} jogadores em cada rota, só com a principal e a secundária.`
+      }
+    >
+      {compacto ? o.curto : o.longo}
+    </ChipFiltro>
+  ));
 
   return (
     <div>
@@ -1026,26 +1514,30 @@ export function EloPorRota({
       <Toolbar
         style={{ marginBottom: 10 }}
         right={
-          <Button small tone="gold" disabled={quadro.pessoas === 0} onClick={() => setParaPrint(true)}>
+          <Button small tone="gold" disabled={semNada} onClick={() => setParaPrint(true)}>
             <Maximize2 size={14} aria-hidden />
             Abrir para print
           </Button>
         }
       >
-        <RolagemX rotulo="Que rota contar">
-          <ChipFiltro ativo={modo === "principal"} onClick={() => setModo("principal")}>
-            Rota principal
-          </ChipFiltro>
-          <ChipFiltro ativo={modo === "ambas"} onClick={() => setModo("ambas")}>
-            + secundária
-          </ChipFiltro>
-        </RolagemX>
+        {compacto ? (
+          // No celular a fileira QUEBRA em vez de rolar: as quatro opções sempre à vista.
+          <div role="group" aria-label="O que mostrar" style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {chips}
+          </div>
+        ) : (
+          <RolagemX rotulo="O que mostrar">{chips}</RolagemX>
+        )}
       </Toolbar>
 
       <Quadro {...props} />
 
       {paraPrint ? (
-        <TelaDePrint onFechar={() => setParaPrint(false)}>
+        <TelaDePrint
+          onFechar={() => setParaPrint(false)}
+          rotulo={modo === "ideal" && ideal ? `O ideal: ${ideal.vagasPorRota} por rota` : "Divisão de elo por rota"}
+          largo={modo === "ideal"}
+        >
           <Quadro {...props} paraPrint />
         </TelaDePrint>
       ) : null}

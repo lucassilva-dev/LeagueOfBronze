@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   EloPorRota,
@@ -15,8 +15,9 @@ import { ModoCompacto } from "@/components/admin/responsivo";
 /**
  * Elo por rota — o quadro que a organização tira print e manda no grupo.
  *
- * O que não pode quebrar: a conta (quem conta onde, no modo principal e com a
- * secundária), e as duas promessas do print — nenhum ponto e nenhum nick à vista.
+ * O que não pode quebrar: a conta (quem conta onde, no modo principal, só na secundária e
+ * nas duas), e as promessas do print — nenhum ponto nunca, e nenhum nick à vista na matriz.
+ * O modo ideal é a exceção pedida: ele mostra QUEM fica em cada rota, mas ainda sem ponto.
  */
 
 afterEach(() => {
@@ -80,6 +81,23 @@ describe("montarEloPorRota", () => {
     expect(por.SUP.nicksPorElo.prata).toEqual(["Edu"]);
     // O total por elo é de PESSOAS, não de presenças.
     expect(q.totalPorElo.diamante).toBe(2);
+  });
+
+  it("só a secundária: cada pessoa conta uma vez, na rota que marcou em segundo", () => {
+    const q = montarEloPorRota(POOL, "secundaria");
+    const por = Object.fromEntries(q.rotas.map((c) => [c.meta.key, c]));
+
+    expect(q.pessoas).toBe(5);
+    expect(q.rotas.map((c) => c.total)).toEqual([0, 1, 2, 0, 2]);
+    expect(por.MID.porElo).toEqual({ diamante: 1, platina: 1 });
+    expect(por.JUNG.nicksPorElo.mestre).toEqual(["Ana"]);
+    // A cobertura continua sendo de titular, pela principal.
+    expect(por.ADC.principais).toBe(2);
+    expect(por.MID.principais).toBe(0);
+    // Secundária ilegível tira a pessoa deste modo (e só deste).
+    const ilegivel = montarEloPorRota([jogador("X", "Ouro", "TOP", "???")], "secundaria");
+    expect(ilegivel.foraDoQuadro).toBe(1);
+    expect(ilegivel.pessoas).toBe(0);
   });
 
   it("elo ou rota principal ilegível fica fora e é contado; secundária ilegível só não soma", () => {
@@ -185,14 +203,25 @@ describe("<EloPorRota>", () => {
 
   it("o modo com secundária muda a conta e o subtítulo, some com a cobertura e troca Total por Pessoas", () => {
     render(<EloPorRota jogadores={POOL} times={2} />);
-    fireEvent.click(screen.getByRole("button", { name: "+ secundária" }));
+    fireEvent.click(screen.getByRole("button", { name: "Principal + secundária" }));
 
-    expect(screen.getByText(/principal \+ secundária/)).toBeTruthy();
+    expect(screen.getByText(/principal \+ secundária \(cada um/)).toBeTruthy();
     expect(screen.getByRole("cell", { name: "Meio, Diamante: 1" })).toBeTruthy();
     expect(screen.queryByText(/^falta/)).toBeNull();
     // Diamante aparece em quatro rotas, mas são duas pessoas.
     expect(screen.getByRole("columnheader", { name: "Pessoas" })).toBeTruthy();
     expect(screen.getByRole("cell", { name: "Diamante, pessoas: 2" })).toBeTruthy();
+    semPontosNemNicks(document.body);
+  });
+
+  it("só a secundária: a matriz conta a segunda rota e não mostra cobertura", () => {
+    render(<EloPorRota jogadores={POOL} times={2} />);
+    fireEvent.click(screen.getByRole("button", { name: "Só secundária" }));
+
+    expect(screen.getByText(/só a rota secundária/)).toBeTruthy();
+    expect(screen.getByRole("cell", { name: "Meio, Diamante: 1" })).toBeTruthy();
+    expect(screen.getByRole("cell", { name: "Atirador, Diamante: 0" })).toBeTruthy();
+    expect(screen.queryByText(/^falta/)).toBeNull();
     semPontosNemNicks(document.body);
   });
 
@@ -245,6 +274,120 @@ describe("<EloPorRota>", () => {
     render(<EloPorRota jogadores={[jogador("X", "Lendário", "ADC", "SUP")]} times={0} />);
     expect(screen.queryByText(/Ninguém na conta ainda/)).toBeNull();
     expect(screen.getByText(/1 ficha está com elo ou rota que a tabela do site não reconhece/)).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------- o ideal
+
+/** Dez jogadores, dois times: a Selva tem um só na principal, o Atirador tem três. */
+const POOL_IDEAL: JogadorDoQuadro[] = [
+  jogador("Ana", "Mestre", "TOP", "JUNG"),
+  jogador("Beto", "Ouro", "TOP", "MID"),
+  jogador("Cris", "Diamante", "JUNG", "MID"),
+  jogador("Davi", "Esmeralda", "MID", "TOP"),
+  jogador("Eva", "Prata", "MID", "SUP"),
+  jogador("Fabi", "Diamante", "ADC", "JUNG"),
+  jogador("Gui", "Platina", "ADC", "SUP"),
+  jogador("Hugo", "Prata", "ADC", "JUNG"),
+  jogador("Ivo", "Ouro", "SUP", "ADC"),
+  jogador("Juca", "Ferro", "SUP", "TOP"),
+];
+
+describe("<EloPorRota> no modo ideal", () => {
+  it("mostra quem fica em cada rota, com o veredito e a marca de quem foi para a secundária", () => {
+    render(<EloPorRota jogadores={POOL_IDEAL} times={2} />);
+    fireEvent.click(screen.getByRole("button", { name: "Ideal: 2 por rota" }));
+
+    expect(screen.getByRole("heading", { name: "O ideal: 2 por rota" })).toBeTruthy();
+    expect(screen.getByText("Fecha 2 de cada")).toBeTruthy();
+    expect(screen.getByText("9 na principal · 1 na secundária")).toBeTruthy();
+    // O Atirador lotado manda para a Selva quem tem o elo mais baixo e marcou Selva: o Hugo.
+    const selva = screen.getByRole("region", { name: /^Selva: 2 de 2 vagas/ });
+    expect(within(selva).getByText("Hugo")).toBeTruthy();
+    expect(within(selva).getByText("2ª")).toBeTruthy();
+    // O leitor de tela ouve o nick, o elo e o porquê (a marca "2ª" é só visual).
+    const hugo = within(selva).getByText("Hugo").closest("li")!;
+    expect(hugo.textContent).toContain("Hugo, Prata, na rota secundária");
+    expect(hugo.getAttribute("aria-label")).toBeNull();
+    const atirador = screen.getByRole("region", { name: /^Atirador: 2 de 2 vagas/ });
+    expect(within(atirador).getByText("Fabi")).toBeTruthy();
+    expect(within(atirador).queryByText("Hugo")).toBeNull();
+    // Nicks à vista é o pedido deste modo; ponto continua proibido. E não é matriz.
+    expect(screen.queryByRole("table")).toBeNull();
+    expect(document.body.textContent ?? "").not.toMatch(/ponto|\bpts?\b/i);
+    expect(screen.getByText(/No draft a rota não é travada/)).toBeTruthy();
+  });
+
+  it("quando não fecha, diz isso e marca quem fica fora das duas rotas", () => {
+    const soAdcEMid = [
+      ...["Mestre", "Diamante", "Esmeralda", "Platina", "Ouro"].map((e, i) => jogador(`A${i}`, e, "ADC", "MID")),
+      ...["Mestre", "Diamante", "Esmeralda", "Platina", "Prata"].map((e, i) => jogador(`M${i}`, e, "MID", "ADC")),
+    ];
+    render(<EloPorRota jogadores={soAdcEMid} times={2} />);
+    fireEvent.click(screen.getByRole("button", { name: "Ideal: 2 por rota" }));
+
+    expect(screen.getByText("Não fecha")).toBeTruthy();
+    expect(screen.getByText(/nem toda vaga fecha com a principal ou a secundária/)).toBeTruthy();
+    expect(screen.getAllByText("fora")).toHaveLength(6);
+  });
+
+  it("no celular vira cartões por rota, e a tela de print leva os nomes sem ponto", () => {
+    render(
+      <ModoCompacto ativo>
+        <EloPorRota jogadores={POOL_IDEAL} times={2} />
+      </ModoCompacto>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Ideal: 2 por rota" }));
+    expect(document.querySelector("table")).toBeNull();
+    expect(screen.getAllByRole("region")).toHaveLength(5);
+    // As quatro opções cabem na tela: rótulo curto e fileira que quebra (não rola).
+    const grupo = screen.getByRole("group", { name: "O que mostrar" });
+    expect(within(grupo).getByText("As duas")).toBeTruthy();
+    expect(within(grupo).getByText("Ideal: 2")).toBeTruthy();
+    expect(grupo.className).not.toContain("adm-rolagem-x");
+
+    fireEvent.click(screen.getByRole("button", { name: /Abrir para print/ }));
+    const tela = screen.getByRole("dialog", { name: "O ideal: 2 por rota, em tela cheia para print" });
+    expect(within(tela).getByText("Hugo")).toBeTruthy();
+    expect(tela.textContent ?? "").not.toMatch(/ponto|\bpts?\b/i);
+  });
+
+  it("com mais gente que vagas, diz quantos ficam sem vaga — sem dar o nome de ninguém", () => {
+    const comSobra = [...POOL_IDEAL, jogador("Zeca", "Ferro", "ADC", "JUNG")];
+    render(<EloPorRota jogadores={comSobra} times={2} />);
+    fireEvent.click(screen.getByRole("button", { name: "Ideal: 2 por rota" }));
+
+    expect(screen.getByText(/1 inscrito fica sem vaga/)).toBeTruthy();
+    // Os 11 nomes não cabem nas 10 vagas, e quem sobrou não aparece por nome.
+    const aparecem = comSobra.filter((x) => screen.queryByText(x.nick));
+    expect(aparecem).toHaveLength(10);
+    // O subtítulo fala das vagas, não de "cada um" (há alguém sem vaga).
+    expect(screen.getByText(/toda vaga com alguém na principal ou na secundária/)).toBeTruthy();
+  });
+
+  it("no monitor estreito (meia tela), as rotas viram 3 + 2 em vez de cinco colunas espremidas", () => {
+    class Observador {
+      observe() {}
+      disconnect() {}
+    }
+    const largura = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientWidth");
+    vi.stubGlobal("ResizeObserver", Observador);
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", { configurable: true, get: () => 700 });
+    try {
+      render(<EloPorRota jogadores={POOL_IDEAL} times={2} />);
+      fireEvent.click(screen.getByRole("button", { name: "Ideal: 2 por rota" }));
+      const grade = screen.getAllByRole("region")[0].parentElement!;
+      expect(grade.style.gridTemplateColumns).toBe("repeat(3, minmax(0, 1fr))");
+    } finally {
+      if (largura) Object.defineProperty(HTMLElement.prototype, "clientWidth", largura);
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("sem time fechado, o ideal fica desligado", () => {
+    render(<EloPorRota jogadores={POOL} times={0} />);
+    const ideal = screen.getByRole("button", { name: "Ideal por rota" }) as HTMLButtonElement;
+    expect(ideal.disabled).toBe(true);
   });
 });
 
