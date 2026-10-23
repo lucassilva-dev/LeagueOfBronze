@@ -92,6 +92,10 @@ function dados(lista: Inscrito[]): DadosEdicao {
       inscricoes_abertas: false,
       jogadores_por_time: 5,
       orcamento_por_time: 30,
+      // O caminho do capitão PAGO pelo orçamento (o modelo até a 3ª): a tabela destes casos
+      // conta os 5 de cada time. O capitão sem preço tem os testes dele em
+      // tests/admin/capitao-sem-preco-nas-abas.test.tsx.
+      capitao_com_preco: true,
       min_ranqueadas: 5,
       dias_no_grupo: 60,
       prazo_pagamento_dias: 14,

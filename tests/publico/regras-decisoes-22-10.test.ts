@@ -52,9 +52,9 @@ beforeEach(() => {
 });
 
 describe("regulamento de 22/10/2026: o que mudou, nos dois idiomas", () => {
-  it("a data de atualização é 22/10/2026", () => {
-    expect(pt.regrasSubtitulo).toContain("Atualizado em 22/10/2026.");
-    expect(en.regrasSubtitulo).toContain("Updated on 22 October 2026.");
+  it("a data de atualização é 23/10/2026 (as decisões de 22/10 e, por cima, as dos capitães de 23/10)", () => {
+    expect(pt.regrasSubtitulo).toContain("Atualizado em 23/10/2026.");
+    expect(en.regrasSubtitulo).toContain("Updated on 23 October 2026.");
   });
 
   it("regra 4: remake não conta", () => {

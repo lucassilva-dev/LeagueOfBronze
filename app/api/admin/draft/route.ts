@@ -34,6 +34,7 @@ import {
   montarDraftDosAprovados,
   paraPublico,
   previaDoDraft,
+  salvarCapitaesDefinidos,
   salvarDraftSeIntacto,
   type MetodoDeCapitao,
 } from "@/lib/draft/store";
@@ -60,9 +61,17 @@ export const dynamic = "force-dynamic";
  * tempo, e um painel carregado antes do sorteio do colega continuava oferecendo «Sortear»:
  * o clique trocava, na frente do público, o sorteio que a TV acabara de animar. Se o
  * sorteio de agora não é o que a tela viu, a resposta é 409 e o painel se atualiza.
+ *
+ * "Capitães" grava os capitães DEFINIDOS pela organização (`inscricoes.capitao`, decisão de
+ * 23/10/2026) — os que o sorteio pelo método «definidos» usa. Só antes do sorteio: depois, os
+ * capitães já estão no draft, e trocar a marca deixaria o banco dizendo uma coisa e a
+ * transmissão outra (para trocar, sorteia-se de novo, à mão).
  */
 
-const METODOS: MetodoDeCapitao[] = ["maior_elo", "manual", "mid", "adc", "pior"];
+const METODOS: MetodoDeCapitao[] = ["definidos", "maior_elo", "manual", "mid", "adc", "pior"];
+
+/** Teto da lista de capitães num pedido: nenhuma edição chega perto de 64 times. */
+const MAXIMO_DE_CAPITAES = 64;
 
 /**
  * O que a tela do draft no painel precisa: o estado (a mesma visão da transmissão) e a
@@ -162,6 +171,8 @@ export async function POST(request: NextRequest) {
           acao: "draft_montado",
           detalhe: {
             metodo,
+            // O capitão entrou sem preço (0 ponto) e a tabela é só de quem vai ser escolhido.
+            capitaoGratis: novo.capitaoGratis === true,
             times: novo.times.length,
             escolhas: novo.ordem.length,
             semente: novo.sorteio?.semente,
@@ -185,6 +196,31 @@ export async function POST(request: NextRequest) {
           },
         });
         return NextResponse.json({ ok: true, draft: paraPublico(novo, revisao + 1) });
+      }
+
+      case "capitaes": {
+        // Depois do sorteio os capitães já estão no draft: a marca nova não mudaria nada nele.
+        if (estado) {
+          return NextResponse.json(
+            {
+              error:
+                "O draft já foi sorteado, e os capitães dele já estão no sorteio. Para trocar um capitão, sorteie de novo com «À mão».",
+              desatualizado: true,
+            },
+            { status: 409 },
+          );
+        }
+        if (!Array.isArray(corpo.capitaes) || corpo.capitaes.some((c) => typeof c !== "string")) {
+          return NextResponse.json({ error: "Envie a lista de capitães (ids das inscrições)." }, { status: 400 });
+        }
+        const capitaes = corpo.capitaes as string[];
+        if (capitaes.length > MAXIMO_DE_CAPITAES) {
+          return NextResponse.json({ error: "Capitães demais nesta lista." }, { status: 400 });
+        }
+
+        const { antes, depois } = await salvarCapitaesDefinidos(capitaes);
+        await registrarAuditoria({ autor, acao: "draft_capitaes_definidos", detalhe: { antes, depois } });
+        return NextResponse.json({ ok: true, capitaes: depois });
       }
 
       case "iniciar":

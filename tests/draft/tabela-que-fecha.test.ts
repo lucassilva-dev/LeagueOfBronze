@@ -133,7 +133,8 @@ describe("a tabela que fecha com os capitães", () => {
       riot_divisao: j.divisao,
       riot_pdl: j.pdl,
     }));
-    const previa = previaDosPrecos({ inscritos, jogadoresPorTime: 5, orcamentoPorTime: 30, maxTimes: 8 });
+    // O capitão pago pelo orçamento (o caminho antigo): o Mestre #1 paga a curvatura que desceu.
+    const previa = previaDosPrecos({ inscritos, jogadoresPorTime: 5, orcamentoPorTime: 30, maxTimes: 8, capitaoComPreco: true });
     expect(previa.origem).toBe("titulares");
     expect(previa.times).toBe(8);
     expect(previa.tabela).toMatchObject({ curvatura: 0.0875, soma: 240 });

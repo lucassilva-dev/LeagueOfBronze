@@ -72,6 +72,9 @@ beforeEach(() => {
     jogadores_por_time: 5,
     max_times: 8,
     orcamento_por_time: 30,
+    // O caminho do capitão PAGO pelo orçamento (o modelo até a 3ª). O capitão sem preço, a
+    // decisão de 23/10/2026, tem os testes dele em tests/draft/capitaes-definidos.test.ts.
+    capitao_com_preco: true,
     segundos_por_escolha: 60,
     inscricoes_abertas: false,
     fechamento_inscricoes: null,

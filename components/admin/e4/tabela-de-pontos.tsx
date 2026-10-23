@@ -3,7 +3,7 @@
 import type { CSSProperties } from "react";
 
 import { C, Card, Elo, ScrollX, display, tabular } from "@/components/admin/ui";
-import type { RetratoDaTabela } from "@/lib/draft/precos";
+import { precoDeTodasAsDivisoes, tabelaDoRetrato, type RetratoDaTabela } from "@/lib/draft/precos";
 
 /**
  * A tabela de pontos automática de uma edição, do jeito que a organização confere.
@@ -94,13 +94,15 @@ export function ComoFoiCalculada({ tabela }: Readonly<{ tabela: RetratoDaTabela 
     );
   }
   const exata = tabela.folga === 0 && tabela.poolIncompleto !== true;
+  // Com o capitão sem preço, a régua é só de quem vai ser escolhido.
+  const quem = tabela.capitaoGratis ? "Quem vai ser escolhido" : "Quem joga";
   return (
     <p style={nota}>
       Como foi calculada: cada divisão é um degrau (no Mestre, cada 100 PDL)
       {tabela.curvatura > 0
         ? ", e os degraus de cima valem um pouco mais que os de baixo, como já era na tabela da 3ª"
         : ", e todo degrau vale o mesmo"}
-      . Quem joga com o elo mais baixo custa 1 ponto e o jogador médio custa {medio} ({conta}); os outros
+      . {quem} com o elo mais baixo custa 1 ponto e o jogador médio custa {medio} ({conta}); os outros
       ficam na régua entre os dois,{" "}
       {exata ? (
         <>
@@ -130,6 +132,84 @@ export function MotivoDaQueda({ tabela }: Readonly<{ tabela: RetratoDaTabela }>)
   return <p style={{ ...nota, color: C.warnSoft }}>{tabela.queda.motivo}</p>;
 }
 
+/**
+ * O capitão fora da tabela (decisão de 23/10/2026): quem lê a tabela precisa saber que os
+ * capitães não estão nela e que o orçamento inteiro é das escolhas — senão "8 × 30 = 240" com
+ * 32 pessoas parece conta errada.
+ */
+export function CapitaesForaDaTabela({ tabela }: Readonly<{ tabela: RetratoDaTabela }>) {
+  if (!tabela.capitaoGratis) return null;
+  const escolhas = tabela.jogadoresPorTime;
+  return (
+    <p style={{ ...nota, color: C.ink2 }}>
+      {tabela.times === 1 ? "O capitão não entra" : `Os ${tabela.times} capitães não entram`} nesta tabela: capitão não tem
+      preço, e cada time tem os{" "}
+      {tabela.orcamentoPorTime} pontos para as {escolhas} {escolhas === 1 ? "escolha" : "escolhas"}. A tabela é só de
+      quem vai ser escolhido ({tabela.times * escolhas} pessoas), e a soma dá exatamente {tabela.times} ×{" "}
+      {tabela.orcamentoPorTime} = {tabela.alvo}.
+    </p>
+  );
+}
+
+/**
+ * «Preço de todas as divisões»: a régua desta tabela para qualquer elo, recolhida por padrão.
+ * É o que a organização consulta para reserva, substituto (regra 6) e para quem mudou de elo
+ * até o congelamento, sem conta à mão. Quem não está no pool sai da reta, presa entre as
+ * linhas vizinhas (`precoNaTabela`) — a mesma conta que precifica a fila de reserva.
+ */
+export function PrecoDeTodasAsDivisoes({ tabela }: Readonly<{ tabela: RetratoDaTabela }>) {
+  const todas = precoDeTodasAsDivisoes(tabelaDoRetrato(tabela));
+  return (
+    <details style={{ marginTop: 10 }}>
+      <summary style={{ cursor: "pointer", fontSize: 12.5, fontWeight: 600, color: C.bronzeHi }}>
+        Preço de todas as divisões
+      </summary>
+      <p style={{ ...nota, margin: "8px 0" }}>
+        O preço de qualquer elo nesta tabela — para reserva, substituto e para quem mudar de elo até o congelamento.
+        As classes marcadas com «fora do pool» não têm ninguém entre quem vai ser escolhido: o preço delas sai da
+        régua, preso entre as classes vizinhas.
+      </p>
+      <ul
+        aria-label="Preço de todas as divisões"
+        style={{
+          listStyle: "none",
+          margin: 0,
+          padding: 0,
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))",
+          gap: "4px 14px",
+        }}
+      >
+        {todas.map((d) => (
+          <li
+            key={d.chave}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 8,
+              padding: "5px 0",
+              borderBottom: "1px solid rgba(201,138,75,.09)",
+              fontSize: 12.5,
+              color: d.noPool ? C.ink2 : C.ink3,
+            }}
+          >
+            <span style={{ minWidth: 0 }}>
+              <Elo elo={d.elo} tamanho={20} mostrarNome detalhe={detalheDaClasse(d.rotulo, d.elo)} />
+              {d.noPool ? null : (
+                <span style={{ display: "block", fontSize: 10, color: C.ink4, marginTop: 2 }}>fora do pool</span>
+              )}
+            </span>
+            <b style={{ color: C.bronzeHi, ...tabular }}>
+              {d.pontos} <span style={{ fontSize: 10, fontWeight: 400, color: C.ink4 }}>{d.pontos === 1 ? "pt" : "pts"}</span>
+            </b>
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 export function TabelaDePontos({
   tabela,
   compacto,
@@ -146,6 +226,7 @@ export function TabelaDePontos({
           Erro máximo do arredondamento: <b style={{ color: C.ink }}>{divisoes(tabela.erroMaximoEmDegraus)}</b>
         </span>
       </div>
+      <CapitaesForaDaTabela tabela={tabela} />
       <MotivoDaQueda tabela={tabela} />
       {tabela.folga > 0 && !tabela.queda ? (
         <p style={{ ...nota, color: C.warnSoft }}>
@@ -167,6 +248,7 @@ export function TabelaDePontos({
         </p>
       ) : null}
       <ComoFoiCalculada tabela={tabela} />
+      <PrecoDeTodasAsDivisoes tabela={tabela} />
     </Card>
   );
 

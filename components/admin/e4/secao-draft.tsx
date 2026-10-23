@@ -100,6 +100,9 @@ type Props = Readonly<{
   onDatasetMudou: () => void;
 }>;
 
+/** Os métodos que a mesa oferece (a rota aceita outros, antigos, que o painel não mostra). */
+type MetodoDaMesa = "definidos" | "maior_elo" | "manual";
+
 type Disponivel = DraftPublico["disponiveis"][number];
 type TimePublico = DraftPublico["times"][number];
 type JogadorDaPrevia = PreviaDoDraft["jogadores"][number];
@@ -228,6 +231,27 @@ function Preco({ pontos }: Readonly<{ pontos: number }>) {
       <span style={{ fontSize: 9.5, letterSpacing: ".12em", textTransform: "uppercase", color: C.ink4 }}>pts</span>
     </span>
   );
+}
+
+/**
+ * A tag do capitão sem preço (decisão de 23/10/2026), no lugar dos pontos: o capitão não custa
+ * nada, e cada time tem o orçamento inteiro para as escolhas.
+ */
+function TagCapitao() {
+  return (
+    <Chip tone="gold" title="Capitão: não tem preço. Cada time tem o orçamento inteiro para as escolhas.">
+      <Crown size={11} aria-hidden />
+      capitão
+    </Chip>
+  );
+}
+
+/**
+ * O organizador na lista de quem joga. Pela regra do maior elo ele não capitaneia; quando a
+ * organização define os capitães (definidos, à mão), pode — foi o que decidiu em 23/10/2026.
+ */
+function ChipDoOrganizador({ metodo }: Readonly<{ metodo: MetodoDaMesa }>) {
+  return <Chip tone="off">{metodo === "maior_elo" ? "organização · não capitaneia" : "organização"}</Chip>;
 }
 
 /**
@@ -488,8 +512,14 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
   const [dados, setDados] = useState<RespostaDoPainel | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
-  const [metodo, setMetodo] = useState<"maior_elo" | "manual">("maior_elo");
+  /**
+   * O método escolhido na tela. Nulo = o padrão do servidor (`metodoPadrao`): os capitães
+   * definidos pela organização quando há marcados, senão a regra do maior elo.
+   */
+  const [metodoEscolhido, setMetodoEscolhido] = useState<MetodoDaMesa | null>(null);
   const [manuais, setManuais] = useState<string[]>([]);
+  /** Editando os capitães definidos: a marcação aparece na lista de quem joga, e «Salvar capitães» grava. */
+  const [editandoDefinidos, setEditandoDefinidos] = useState(false);
   /**
    * «Sortear de novo APAGA o draft» marcado — guardado junto do sorteio que estava na tela.
    * Se outro sorteio entrar enquanto a caixa está marcada, ela desmarca sozinha: a
@@ -670,6 +700,16 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
   }
   if (!dados || !previa) return <p style={{ color: C.ink3, fontSize: 13 }}>Carregando o draft…</p>;
 
+  const metodo: MetodoDaMesa = metodoEscolhido ?? (previa.metodoPadrao === "definidos" ? "definidos" : "maior_elo");
+  /** A marcação de capitão na lista de quem joga: à mão, ou editando os definidos. */
+  const marcando = metodo === "manual" || (metodo === "definidos" && editandoDefinidos);
+  /** O capitão não tem preço: a tag CAPITÃO no lugar dos pontos. Servidor anterior: sem o campo. */
+  const capitaoGratis = previa.capitaoGratis === true;
+  const capitaesDefinidos = (previa.capitaesDefinidos ?? [])
+    .map((id) => jogadorPorId.get(id))
+    .filter((j): j is JogadorDaPrevia => j !== undefined);
+  const avisosDosCapitaes = previa.avisosDosCapitaes ?? [];
+  const definidosNaoFecham = previa.fechaComOsCapitaesDefinidos === false;
   const podeSortear = podeConduzir && !ocupado && previa.impedimentos.length === 0 && previa.times > 0;
   const precisaConfirmarDescarte = Boolean(draft && draft.fase !== "preparando");
   /** O sorteio que esta tela está mostrando — vai no pedido de «Sortear» e de «Iniciar». */
@@ -683,7 +723,20 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
    * (campo ausente) não trava nada.
    */
   const regraNaoFecha = previa.fechaComOsCapitaesDaRegra === false;
-  const metodoOk = metodo === "manual" ? manuaisOk : capitaesPelaRegra.length === previa.times && !regraNaoFecha;
+  const metodoOk =
+    metodo === "manual"
+      ? manuaisOk
+      : metodo === "definidos"
+        ? !editandoDefinidos && previa.capitaesDaTabela === "definidos" && !definidosNaoFecham
+        : capitaesPelaRegra.length === previa.times && !regraNaoFecha;
+  /** «Salvar capitães» grava a marcação de agora como os capitães definidos (só antes do sorteio). */
+  const podeSalvarCapitaes = podeConduzir && !ocupado && !draft && manuaisOk;
+  const salvarCapitaes = () =>
+    void agir({ acao: "capitaes", capitaes: manuais }, `Capitães definidos: ${manuais.length}.`).then((r) => {
+      if (!r) return;
+      setEditandoDefinidos(false);
+      setMetodoEscolhido("definidos");
+    });
   const timeDaVez = draft?.times.find((t) => t.id === draft.timeDaVezId) ?? null;
   const escolhaPeloTime =
     draft && selecao && selecao.escolha === draft.escolhaAtual && draft.escolhiveis.includes(selecao.id)
@@ -1057,7 +1110,7 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
           }
         />
         <Metric
-          label="Pontos de quem joga"
+          label={capitaoGratis ? "Pontos das escolhas" : "Pontos de quem joga"}
           value={previa.totalDePontos}
           detail={
             previa.times > 0
@@ -1068,7 +1121,11 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
         <Metric
           label="Orçamento por time"
           value={previa.config.orcamentoPorTime}
-          detail="fixo · os preços saem da tabela abaixo"
+          detail={
+            capitaoGratis
+              ? `fixo · para as ${Math.max(0, previa.config.jogadoresPorTime - 1)} escolhas (capitão sem preço)`
+              : "fixo · os preços saem da tabela abaixo"
+          }
         />
       </div>
 
@@ -1157,7 +1214,34 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
 
       {/* Só quando NADA fecha: a conta já tentou descer a curvatura e a soma (o motivo de uma
           queda que deu certo aparece no rodapé da tabela, acima). */}
-      {regraNaoFecha ? (
+      {capitaoGratis && previa.tabela && previa.capitaesDaTabela === null && !draft ? (
+        <Banner tone="warn" title="A tabela ainda inclui os capitães">
+          O capitão não tem preço nesta edição, mas a conta ainda não sabe quem são os capitães (nenhum definido, e a
+          regra do maior elo não fecha o corte): a tabela acima é de todo mundo. Defina os {previa.times} capitães
+          abaixo para ver a tabela de quem vai ser escolhido — a do sorteio.
+        </Banner>
+      ) : null}
+
+      {avisosDosCapitaes.length > 0 && !draft ? (
+        <Banner tone="warn" title="Capitães definidos: confira">
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            {avisosDosCapitaes.map((a) => (
+              <li key={a}>{a}</li>
+            ))}
+          </ul>
+        </Banner>
+      ) : null}
+
+      {definidosNaoFecham && metodo === "definidos" ? (
+        <Banner tone="danger" title="Com os capitães definidos, os elencos não fecham">
+          A tabela soma exatamente {previa.times} × {previa.config.orcamentoPorTime}, e com estes capitães não existe
+          divisão dos outros jogadores que feche todos os elencos, nem baixando a curvatura até 0 e a soma em até{" "}
+          {previa.times} {previa.times === 1 ? "ponto" : "pontos"}. O sorteio seria recusado: troque um capitão em
+          «Editar capitães» ou mude o orçamento por time em Configuração.
+        </Banner>
+      ) : null}
+
+      {regraNaoFecha && metodo === "maior_elo" ? (
         <Banner tone="danger" title="Com os capitães da regra, os elencos não fecham">
           A tabela soma exatamente {previa.times} × {previa.config.orcamentoPorTime}, então cada time precisa terminar
           com os {previa.config.orcamentoPorTime} pontos certinhos — e, com os capitães pela regra, não existe divisão
@@ -1171,19 +1255,38 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
       <ActionCard
         tone="gold"
         title="Sortear capitães e ordem de escolha"
-        description="Os capitães saem pela regra (maior elo na solo/duo, sem organizador) ou à mão. Depois o servidor sorteia qual time cada capitão capitaneia e a ordem do draft — a semente fica gravada para conferência."
+        description={
+          capitaoGratis
+            ? "Os capitães são os definidos pela organização (abaixo), ou saem pela regra (maior elo na solo/duo, sem organizador), ou à mão. Capitão não tem preço: cada time tem o orçamento inteiro para as escolhas. Depois o servidor sorteia qual time cada capitão capitaneia e a ordem do draft — a semente fica gravada para conferência."
+            : "Os capitães são os definidos pela organização (abaixo), ou saem pela regra (maior elo na solo/duo, sem organizador), ou à mão. Depois o servidor sorteia qual time cada capitão capitaneia e a ordem do draft — a semente fica gravada para conferência."
+        }
         badge={draft ? <Chip tone="warn">já existe um sorteio</Chip> : undefined}
       >
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-          <Select value={metodo} onChange={(v) => setMetodo(v === "manual" ? "manual" : "maior_elo")} ariaLabel="Como escolher os capitães">
+          <Select
+            value={metodo}
+            onChange={(v) => {
+              setMetodoEscolhido(v === "manual" ? "manual" : v === "definidos" ? "definidos" : "maior_elo");
+              setEditandoDefinidos(false);
+            }}
+            ariaLabel="Como escolher os capitães"
+          >
+            <option value="definidos">
+              Definidos pela organização ({capitaesDefinidos.length} de {previa.times})
+            </option>
             <option value="maior_elo">Pela regra: maior elo, sem organizador</option>
             <option value="manual">À mão</option>
           </Select>
-          {metodo === "manual" ? (
+          {marcando ? (
             <>
               <span style={{ fontSize: 12.5, color: manuaisOk ? C.okSoft : C.warnSoft, ...tabular }}>
                 {manuais.length} de {previa.times} marcados
               </span>
+              {capitaesDefinidos.length > 0 && metodo === "manual" ? (
+                <Button small onClick={() => setManuais(previa.capitaesDefinidos ?? [])}>
+                  Partir dos definidos
+                </Button>
+              ) : null}
               {capitaesPelaRegra.length > 0 ? (
                 <Button small onClick={() => setManuais(previa.capitaesPelaRegra)}>
                   Partir dos da regra
@@ -1192,6 +1295,74 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
             </>
           ) : null}
         </div>
+
+        {/* Definir capitães: a mesma marcação do «À mão», gravada no banco (`inscricoes.capitao`).
+            Só antes do sorteio — depois, os capitães já estão no draft. */}
+        {metodo === "definidos" ? (
+          editandoDefinidos ? (
+            <div style={{ display: "grid", gap: 8 }}>
+              <p style={{ ...nota, color: C.ink2 }}>
+                Marque os {previa.times} capitães na lista de quem joga, abaixo, e salve. Pode ser organizador: quem
+                define é a organização.
+              </p>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <Button tone="gold" small disabled={!podeSalvarCapitaes} onClick={salvarCapitaes}>
+                  <Crown size={13} aria-hidden />
+                  Salvar capitães
+                </Button>
+                <Button small onClick={() => setEditandoDefinidos(false)}>
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gap: 8 }}>
+              {capitaesDefinidos.length === 0 ? (
+                <p style={{ ...nota, color: C.warnSoft }}>
+                  Nenhum capitão definido ainda. Defina os {previa.times} capitães para sortear por eles.
+                </p>
+              ) : (
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px 16px", fontSize: 12.5, color: C.ink3 }}>
+                  <span>Definidos:</span>
+                  {capitaesDefinidos.map((j) => (
+                    <span key={j.id} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                      <b style={{ color: C.ink }}>{j.riotId}</b>
+                      <Elo elo={j.elo} tamanho={20} detalhe={detalheDaForca(j.elo, j.forca)} />
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div>
+                <Button
+                  small
+                  disabled={!podeConduzir || ocupado || Boolean(draft)}
+                  title={draft ? "Com o draft sorteado, os capitães já estão no sorteio: para trocar, sorteie de novo à mão." : undefined}
+                  onClick={() => {
+                    setManuais(previa.capitaesDefinidos ?? []);
+                    setEditandoDefinidos(true);
+                  }}
+                >
+                  <Crown size={13} aria-hidden />
+                  {capitaesDefinidos.length === 0 ? "Definir capitães" : "Editar capitães"}
+                </Button>
+              </div>
+            </div>
+          )
+        ) : null}
+
+        {metodo === "manual" ? (
+          <div>
+            <Button
+              small
+              disabled={!podeSalvarCapitaes}
+              title="Grava estes capitães como os definidos pela organização, para o sorteio pelo método «Definidos»."
+              onClick={salvarCapitaes}
+            >
+              <Crown size={13} aria-hidden />
+              Salvar como capitães definidos
+            </Button>
+          </div>
+        ) : null}
 
         {metodo === "maior_elo" ? (
           previa.empateNoCorte ? (
@@ -1216,6 +1387,14 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
               ))}
             </div>
           )
+        ) : null}
+
+        {capitaoGratis && marcando ? (
+          <p style={nota}>
+            Os pontos na lista abaixo são os da tabela com os capitães{" "}
+            {previa.capitaesDaTabela === "definidos" ? "definidos" : "da regra"}. Ao sortear com outros capitães, o servidor
+            recalcula a tabela sem eles.
+          </p>
         ) : null}
 
         {precisaConfirmarDescarte ? (
@@ -1279,10 +1458,12 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
           {listaAberta ? (
             <ul style={{ ...listaDeCartoes, marginTop: draft ? 10 : 0 }}>
               {previa.jogadores.map((j) => {
-                const pelaRegra = previa.capitaesPelaRegra.includes(j.id);
+                const pelaRegra = metodo === "maior_elo" && previa.capitaesPelaRegra.includes(j.id);
+                const definido = metodo === "definidos" && j.capitaoDefinido === true;
                 const marcado = manuais.includes(j.id);
                 const detalhe = detalheDaForca(j.elo, j.forca);
-                const temChip = pelaRegra || j.organizador || !j.temConta;
+                const semPreco = capitaoGratis && j.capitao === true;
+                const temChip = pelaRegra || definido || j.organizador || !j.temConta;
                 return (
                   <li key={j.id}>
                     <CartaoLinha
@@ -1294,10 +1475,10 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
                           <Rotas rota1={j.rota1} rota2={j.rota2} />
                         </>
                       }
-                      fim={<Preco pontos={j.pontos} />}
-                      selecionado={metodo === "manual" && marcado}
+                      fim={semPreco ? <TagCapitao /> : <Preco pontos={j.pontos} />}
+                      selecionado={marcando && marcado}
                     >
-                      {temChip || metodo === "manual" ? (
+                      {temChip || marcando ? (
                         <div style={{ display: "grid", gap: 6 }}>
                           {temChip ? (
                             <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -1307,12 +1488,18 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
                                   capitão pela regra
                                 </Chip>
                               ) : null}
-                              {j.organizador ? <Chip tone="off">organização · não capitaneia</Chip> : null}
+                              {definido && !semPreco ? (
+                                <Chip tone="gold">
+                                  <Crown size={11} aria-hidden />
+                                  capitão definido
+                                </Chip>
+                              ) : null}
+                              {j.organizador ? <ChipDoOrganizador metodo={metodo} /> : null}
                               {!j.temConta ? <Chip tone="warn">sem conta</Chip> : null}
                             </span>
                           ) : null}
-                          {metodo === "manual" ? (
-                            <Check checked={marcado} disabled={j.organizador} onChange={() => alternarManual(j.id)}>
+                          {marcando ? (
+                            <Check checked={marcado} onChange={() => alternarManual(j.id)}>
                               Marcar como capitão<span style={somenteLeitor}>: {j.riotId}</span>
                             </Check>
                           ) : null}
@@ -1330,7 +1517,7 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5, minWidth: 640 }}>
             <thead>
               <tr style={{ textAlign: "left", color: C.bronze, fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase" }}>
-                {metodo === "manual" ? <th style={{ padding: "8px 10px" }}>Capitão</th> : null}
+                {marcando ? <th style={{ padding: "8px 10px" }}>Capitão</th> : null}
                 <th style={{ padding: "8px 10px" }}>Riot ID</th>
                 <th style={{ padding: "8px 10px" }}>Elo (solo/duo)</th>
                 <th style={{ padding: "8px 10px" }}>Pts</th>
@@ -1340,16 +1527,17 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
             </thead>
             <tbody>
               {previa.jogadores.map((j) => {
-                const pelaRegra = previa.capitaesPelaRegra.includes(j.id);
+                const pelaRegra = metodo === "maior_elo" && previa.capitaesPelaRegra.includes(j.id);
+                const definido = metodo === "definidos" && j.capitaoDefinido === true;
+                const semPreco = capitaoGratis && j.capitao === true;
                 return (
                   <tr key={j.id} style={{ borderTop: `1px solid ${C.line}` }}>
-                    {metodo === "manual" ? (
+                    {marcando ? (
                       <td style={{ padding: "8px 10px" }}>
                         <input
                           type="checkbox"
                           aria-label={`Marcar ${j.riotId} como capitão`}
                           checked={manuais.includes(j.id)}
-                          disabled={j.organizador}
                           onChange={() => alternarManual(j.id)}
                           style={{ accentColor: C.bronze, width: 15, height: 15 }}
                         />
@@ -1359,14 +1547,17 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
                     <td style={{ padding: "8px 10px", color: C.ink2 }}>
                       <Elo elo={j.elo} tamanho={24} detalhe={detalheDaForca(j.elo, j.forca)} />
                     </td>
-                    <td style={{ padding: "8px 10px", color: C.bronzeHi, ...tabular }}>{j.pontos}</td>
+                    <td style={{ padding: "8px 10px", color: C.bronzeHi, ...tabular }}>
+                      {semPreco ? <TagCapitao /> : j.pontos}
+                    </td>
                     <td style={{ padding: "8px 10px", color: C.ink3 }}>
                       {j.rota1} / {j.rota2}
                     </td>
                     <td style={{ padding: "8px 10px" }}>
                       <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
                         {pelaRegra ? <Chip tone="gold">capitão pela regra</Chip> : null}
-                        {j.organizador ? <Chip tone="off">organização · não capitaneia</Chip> : null}
+                        {definido && !semPreco ? <Chip tone="gold">capitão definido</Chip> : null}
+                        {j.organizador ? <ChipDoOrganizador metodo={metodo} /> : null}
                         {!j.temConta ? <Chip tone="warn">sem conta</Chip> : null}
                       </span>
                     </td>
@@ -1413,9 +1604,13 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
                     <li key={j.riotId} style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
                       <RoleIcon role={j.rota1} size={12} color={resolveRole(j.rota1).color} />
                       <span style={{ minWidth: 0, overflowWrap: "anywhere" }}>
-                        {j.riotId} <span style={{ color: C.ink4 }}>({j.pontos})</span>
+                        {j.riotId}{" "}
+                        {/* Capitão sem preço: a tag no lugar dos pontos (o gasto do time é só das escolhas). */}
+                        {j.capitao && draft.capitaoGratis ? null : <span style={{ color: C.ink4 }}>({j.pontos})</span>}
                       </span>
-                      {j.capitao ? (
+                      {j.capitao && draft.capitaoGratis ? (
+                        <TagCapitao />
+                      ) : j.capitao ? (
                         <span
                           role="img"
                           aria-label="capitão"

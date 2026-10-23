@@ -249,10 +249,12 @@ export type TabelaDePontos = {
 /**
  * A tabela de pontos para um pool.
  *
- * `pool` são os jogadores que VÃO jogar — exatamente `times × jogadoresPorTime`, com os
- * capitães (eles custam pontos como qualquer um). Quem está na sobra ou na fila de reserva
- * NÃO entra: o preço deles sai da mesma reta (`precoNaTabela`), mas eles não podem mexer
- * na conta de quem joga.
+ * `pool` são os jogadores que PAGAM no draft — exatamente `times × jogadoresPorTime`. Com o
+ * capitão pago pelo orçamento (o modelo até a 3ª), são todos os que jogam, capitães inclusive.
+ * Com o capitão SEM PREÇO (decisão de 23/10/2026, a da 4ª), são só os que vão ser escolhidos,
+ * e `jogadoresPorTime` é o de escolhas por time (5 − 1 = 4): quem chama tira os capitães
+ * (lib/draft/tabela-que-fecha.ts). Quem está na sobra ou na fila de reserva NÃO entra: o preço
+ * deles sai da mesma reta (`precoNaTabela`), mas eles não podem mexer na conta de quem joga.
  *
  * `somaMaxima` (opcional) baixa a soma pedida abaixo de `times × orçamento`: é a última
  * saída de quem calcula a tabela quando a soma exata não deixa os elencos fecharem (ver
@@ -409,6 +411,14 @@ export type RetratoDaTabela = {
    * ter ideia dos preços, mas não fecha nada — a tela não a mostra como fechada.
    */
   poolIncompleto?: boolean;
+  /**
+   * CAPITÃO SEM PREÇO (decisão da organização de 23/10/2026): os capitães não entram na
+   * tabela, e cada time tem o orçamento inteiro para as escolhas. Aí a tabela é só de quem vai
+   * ser escolhido — `jogadoresPorTime` aqui é o de PAGOS por time (5 − 1 = 4) e o preço médio
+   * é `orçamento ÷ 4`. Ausente ou falso: o capitão é pago pelo orçamento, como até a 3ª — e
+   * retratos gravados antes deste campo existir.
+   */
+  capitaoGratis?: boolean;
 };
 
 export function retratoDaTabela(tabela: TabelaDePontos): RetratoDaTabela {
@@ -472,6 +482,70 @@ export function tabelaDoRetrato(retrato: RetratoDaTabela): TabelaDePontos {
 /** "Ouro II", "Mestre · 200–299 PDL": o rótulo da classe de um jogador, para as telas do draft. */
 export function rotuloDaClasse(jogador: EloDoJogador, granularidade: Granularidade = GRANULARIDADE_PADRAO): string {
   return classeDoElo(jogador, granularidade).rotulo;
+}
+
+// ---------------------------------------------------------------- todas as divisões
+
+export type PrecoDaDivisao = {
+  chave: string;
+  /** "Prata III", "Mestre · 100–199 PDL", "Grão-Mestre". */
+  rotulo: string;
+  /** O nome do elo ("Prata"): o emblema que a tela mostra. */
+  elo: string;
+  forca: number;
+  pontos: number;
+  /** Existe alguém do pool da tabela nesta classe (o preço é o da linha, não o da reta). */
+  noPool: boolean;
+};
+
+/**
+ * O PREÇO DE TODAS AS DIVISÕES nesta tabela — de quem está no pool e de quem não está.
+ *
+ * É a lista que a organização usa sem conta à mão: o preço de um reserva ou de um substituto
+ * (regra 6), e o preço novo de quem subiu ou desceu de elo até o congelamento. Cada classe sai
+ * de `precoNaTabela`, a mesma função que precifica a fila de reserva: a linha da tabela quando
+ * alguém do pool está nela; senão o preço da reta, preso entre as linhas vizinhas.
+ *
+ * A lista, do mais baixo para o mais alto:
+ *  - Ferro IV … Diamante I, uma linha por divisão (na granularidade "elo", uma por elo);
+ *  - Mestre por faixa de 100 PDL, da 0–99 até a mais alta do pool MAIS UMA (quem subir de PDL
+ *    até o congelamento já tem preço);
+ *  - Grão-Mestre e Desafiante, sem PDL (o meio da faixa em que costumam ficar).
+ */
+export function precoDeTodasAsDivisoes(tabela: TabelaDePontos): PrecoDaDivisao[] {
+  const { granularidade } = tabela;
+  const jogadores: EloDoJogador[] = [];
+
+  const mestre = ELO_ORDER[TIER_MESTRE]!.label;
+  if (granularidade === "elo") {
+    for (const meta of ELO_ORDER) jogadores.push({ elo: meta.label });
+  } else {
+    for (const meta of ELO_ORDER.slice(0, TIER_MESTRE)) {
+      for (const romano of ROMANOS) jogadores.push({ elo: meta.label, eloRiot: meta.label, divisao: romano });
+    }
+    // A faixa mais alta de Mestre no pool (chave "mestre-200" → 2); sem Mestre, a 0–99.
+    const faixaMaisAlta = tabela.linhas.reduce((maior, l) => {
+      const casou = /^mestre-(\d+)$/.exec(l.classe.chave);
+      return casou ? Math.max(maior, Number(casou[1]) / 100) : maior;
+    }, 0);
+    for (let faixa = 0; faixa <= faixaMaisAlta + 1; faixa++) {
+      jogadores.push({ elo: mestre, eloRiot: mestre, pdl: faixa * 100 });
+    }
+    for (const meta of ELO_ORDER.slice(TIER_MESTRE + 1)) jogadores.push({ elo: meta.label });
+  }
+
+  const forcasDoPool = new Set(tabela.linhas.map((l) => l.classe.forca));
+  return jogadores.map((jogador) => {
+    const classe = classeDoElo(jogador, granularidade);
+    return {
+      chave: classe.chave,
+      rotulo: classe.rotulo,
+      elo: ELO_ORDER[classe.tier]?.label ?? classe.rotulo,
+      forca: classe.forca,
+      pontos: precoNaTabela(tabela, jogador),
+      noPool: forcasDoPool.has(classe.forca),
+    };
+  });
 }
 
 // ---------------------------------------------------------------- a reta

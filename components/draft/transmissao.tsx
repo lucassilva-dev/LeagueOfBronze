@@ -120,6 +120,11 @@ type DraftPublico = {
   orcamentoPorTime: number;
   jogadoresPorTime: number;
   historico: EntradaHistorico[];
+  /**
+   * O capitão entrou SEM PREÇO (decisão de 23/10/2026): a tag CAPITÃO no lugar dos pontos, e o
+   * gasto de cada time é só o das escolhas. Opcional: servidor antigo não manda.
+   */
+  capitaoGratis?: boolean;
 };
 
 type RespostaEstado = { draft: DraftPublico | null; souCapitaoDe: string | null; agoraServidorISO?: string };
@@ -226,14 +231,18 @@ function Slot({
   jogador,
   cor,
   compacto,
+  capitaoGratis = false,
   t,
 }: Readonly<{
   jogador: JogadorDoElenco | null;
   cor: string;
   compacto: boolean;
+  /** O capitão não tem preço: a tag CAPITÃO vai no lugar dos pontos. */
+  capitaoGratis?: boolean;
   t: Rotulos;
 }>) {
   const capitao = jogador?.capitao === true;
+  const tagNoPreco = capitao && capitaoGratis;
   const rota = jogador ? abrevDaRota(jogador.rota1) : "—";
   // As classes `lobd-slot*` só fazem diferença dentro de uma coluna estreita da grade
   // (@container em app/globals.css): ali a etiqueta de rota some e a rota vai, em texto,
@@ -291,23 +300,45 @@ function Slot({
             </span>
           ) : null}
           {jogador
-            ? capitao
+            ? capitao && !tagNoPreco
               ? `${t.capitao.toUpperCase()} · ${rotuloDoElo(jogador)}`
               : rotuloDoElo(jogador)
             : t.vagaAberta}
         </span>
       </span>
-      <span
-        style={{
-          flex: "none",
-          fontFamily: DISPLAY,
-          fontSize: 13,
-          fontWeight: 700,
-          color: jogador ? D.ouro : D.vazioPts,
-        }}
-      >
-        {jogador ? jogador.pontos : "·"}
-      </span>
+      {tagNoPreco ? (
+        // Capitão sem preço: a tag no lugar dos pontos. Curta e em caixa alta, para caber na
+        // coluna estreita de 8 times (~115px num projetor de 1024px).
+        <span
+          style={{
+            flex: "none",
+            padding: "2px 5px",
+            borderRadius: 3,
+            border: `1px solid ${alfa(cor, "77")}`,
+            background: alfa(cor, "1f"),
+            fontFamily: DISPLAY,
+            fontSize: 8.5,
+            fontWeight: 700,
+            letterSpacing: ".1em",
+            textTransform: "uppercase",
+            color: cor,
+          }}
+        >
+          {t.capitao}
+        </span>
+      ) : (
+        <span
+          style={{
+            flex: "none",
+            fontFamily: DISPLAY,
+            fontSize: 13,
+            fontWeight: 700,
+            color: jogador ? D.ouro : D.vazioPts,
+          }}
+        >
+          {jogador ? jogador.pontos : "·"}
+        </span>
+      )}
     </div>
   );
 }
@@ -509,7 +540,9 @@ function Sorteio({
 
               <div style={{ fontSize: 12, color: D.mudo, marginTop: 6 }}>
                 {pronto && capitao
-                  ? `${rotuloDoElo(capitao)} · ${capitao.pontos} ${t.pontos} · ${abrevDaRota(capitao.rota1)}`
+                  ? draft.capitaoGratis
+                    ? `${rotuloDoElo(capitao)} · ${t.capitao.toUpperCase()} · ${abrevDaRota(capitao.rota1)}`
+                    : `${rotuloDoElo(capitao)} · ${capitao.pontos} ${t.pontos} · ${abrevDaRota(capitao.rota1)}`
                   : t.sorteando}
               </div>
             </div>
@@ -850,7 +883,14 @@ function AoVivo({
 
               <div style={{ display: "flex", flexDirection: "column", gap: 5, padding: 8 }}>
                 {linhasDoTime(elenco, draft.jogadoresPorTime).map((jogador, k) => (
-                  <Slot key={jogador?.riotId ?? `vaga-${k}`} jogador={jogador} cor={cor} compacto t={t} />
+                  <Slot
+                    key={jogador?.riotId ?? `vaga-${k}`}
+                    jogador={jogador}
+                    cor={cor}
+                    compacto
+                    capitaoGratis={draft.capitaoGratis === true}
+                    t={t}
+                  />
                 ))}
               </div>
             </div>
@@ -1109,6 +1149,7 @@ function Fim({ draft, t }: Readonly<{ draft: DraftPublico; t: Rotulos }>) {
                       jogador={jogador}
                       cor={cor}
                       compacto={false}
+                      capitaoGratis={draft.capitaoGratis === true}
                       t={t}
                     />
                   ))}

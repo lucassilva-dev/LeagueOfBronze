@@ -84,6 +84,11 @@ type DraftPublico = Readonly<{
     riotId: string;
     automatica: boolean;
   }>[];
+  /**
+   * O capitão entrou SEM PREÇO (decisão de 23/10/2026): a tag de capitão vai no lugar dos
+   * pontos, e o orçamento inteiro é das escolhas. Opcional: servidor antigo não manda.
+   */
+  capitaoGratis?: boolean;
 }>;
 
 type RespostaEstado = Readonly<{
@@ -289,6 +294,8 @@ export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
   const vagas = meuTime?.vagas ?? 0;
   const orcamento = draft?.orcamentoPorTime ?? 0;
   const restante = meuTime ? orcamento - meuTime.gasto : 0;
+  /** O capitão não tem preço (decisão de 23/10/2026): o gasto do time é só o das escolhas. */
+  const capitaoGratis = draft?.capitaoGratis === true;
   // teto = orçamento − gasto − (vagas abertas − 1). Cada vaga que sobrar depois desta
   // precisa de pelo menos 1 ponto, e esse mínimo fica reservado.
   const tetoPelaConta = vagas > 0 ? restante - (vagas - 1) : 0;
@@ -714,19 +721,24 @@ export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
                 <strong style={{ color: "var(--lob-text)", fontSize: 13.5, minWidth: 0, wordBreak: "break-word" }}>
                   {jogador.riotId}
                 </strong>
-                {jogador.capitao ? <span className="lob-pill">{t.capitao}</span> : null}
+                {jogador.capitao && !capitaoGratis ? <span className="lob-pill">{t.capitao}</span> : null}
                 {entraramSozinhos.has(jogador.riotId) ? (
                   <span style={{ fontSize: 11.5, color: "#a98a5f" }}>{t.automatica}</span>
                 ) : null}
                 <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
                   <EloTexto elo={jogador.elo} classe={jogador.classe} />
-                  <span
-                    className="lob-display"
-                    style={{ color: "var(--lob-gold-1)", fontSize: 16, fontVariantNumeric: "tabular-nums" }}
-                  >
-                    {jogador.pontos}
-                    <span style={{ fontSize: 11, color: "var(--lob-muted)" }}> {t.pontos}</span>
-                  </span>
+                  {jogador.capitao && capitaoGratis ? (
+                    // Capitão sem preço: a tag no lugar dos pontos.
+                    <span className="lob-pill">{t.capitao}</span>
+                  ) : (
+                    <span
+                      className="lob-display"
+                      style={{ color: "var(--lob-gold-1)", fontSize: 16, fontVariantNumeric: "tabular-nums" }}
+                    >
+                      {jogador.pontos}
+                      <span style={{ fontSize: 11, color: "var(--lob-muted)" }}> {t.pontos}</span>
+                    </span>
+                  )}
                 </span>
               </div>
             );

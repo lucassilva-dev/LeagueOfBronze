@@ -153,14 +153,87 @@ export async function comAsSaidasDoPool(estado: EstadoDraft, opcoes: { fresco?: 
 /**
  * Como os capitães são escolhidos.
  *
- * `maior_elo` é o do regulamento da 4ª: maior elo na solo/duo, qualquer rota, sem
- * organizador (ver lib/draft/capitaes.ts). `manual` é a saída quando há empate no corte
- * ou a organização decide outra coisa. `mid`, `adc` e `pior` vêm do design entregue e
- * continuam aceitos pela rota, mas o painel não os oferece — nenhum cumpre a regra.
- * (`voluntarios` saiu: o formulário da 4ª não pergunta mais quem quer ser capitão, e o
- * método nunca encontraria ninguém.)
+ * `definidos` é o da 4ª desde 23/10/2026: os capitães que a ORGANIZAÇÃO marcou
+ * (`inscricoes.capitao`, gravado pela mesa do draft — `salvarCapitaesDefinidos`). Pode
+ * incluir organizador: quem define é a organização. É o método padrão quando há marcados.
+ * `maior_elo` é a regra automática de antes: maior elo na solo/duo, qualquer rota, sem
+ * organizador (ver lib/draft/capitaes.ts). `manual` é a saída quando a organização decide
+ * outra coisa na hora. `mid`, `adc` e `pior` vêm do design entregue e continuam aceitos pela
+ * rota, mas o painel não os oferece. (`voluntarios` saiu: o formulário da 4ª não pergunta mais
+ * quem quer ser capitão, e o método nunca encontraria ninguém.)
  */
-export type MetodoDeCapitao = "maior_elo" | "mid" | "adc" | "pior" | "manual";
+export type MetodoDeCapitao = "definidos" | "maior_elo" | "mid" | "adc" | "pior" | "manual";
+
+/**
+ * As colunas que o resto do código não declara: `listarInscricoes` e `lerConfig` leem `*`, e
+ * as colunas de 23/10/2026 (supabase/migracao-capitaes-definidos.sql) vêm junto. Ficam aqui,
+ * e não nos tipos de lib/inscricoes/store.ts, porque só o draft as usa.
+ */
+type InscricaoComCapitao = Inscricao & { capitao?: boolean | null };
+type ConfigComCapitao = EdicaoConfig & { capitao_com_preco?: boolean | null };
+
+/** A organização marcou esta inscrição como capitã (`inscricoes.capitao`). */
+export function ehCapitaoDefinido(i: Inscricao): boolean {
+  return (i as InscricaoComCapitao).capitao === true;
+}
+
+/**
+ * O capitão NÃO tem preço nesta edição (`edicao_config.capitao_com_preco = false`, o padrão
+ * desde 23/10/2026): cada time tem o orçamento inteiro para as escolhas, e a tabela é calculada
+ * só sobre quem vai ser escolhido (lib/draft/tabela-que-fecha.ts). Só `true` devolve o modelo
+ * antigo, com o capitão pago pelo orçamento — banco sem a coluna fica com a decisão da 4ª.
+ */
+export function capitaoSemPreco(config: EdicaoConfig): boolean {
+  return (config as ConfigComCapitao).capitao_com_preco !== true;
+}
+
+/**
+ * Os capitães definidos pela organização, do jeito que o sorteio os enxerga.
+ *
+ *  - `ids`: os marcados que estão no pool do sorteio (titulares aptos), na ordem da lista;
+ *  - `foraDoPool`: marcados que ainda podem jogar mas NÃO estão no pool (pendente, reserva,
+ *    sobra) — enquanto houver algum, os definidos não valem (seria sortear sem um capitão que a
+ *    organização escolheu);
+ *  - `saiu`: marcados cuja inscrição está fora (recusado, desistente, excluído) — não contam, e
+ *    a mesa avisa para desmarcar;
+ *  - `valem`: exatamente um por time, todos no pool.
+ */
+function capitaesDefinidos(inscritos: readonly Inscricao[], vaoJogar: readonly Inscricao[], times: number) {
+  const noPool = new Set(vaoJogar.map((i) => i.id));
+  const marcados = inscritos.filter(ehCapitaoDefinido);
+  const ids = vaoJogar.filter(ehCapitaoDefinido).map((i) => i.id);
+  const foraDoPool = marcados.filter((i) => !noPool.has(i.id) && !estaFora(i.situacao));
+  const saiu = marcados.filter((i) => estaFora(i.situacao));
+  return {
+    marcados: marcados.length,
+    ids,
+    foraDoPool,
+    saiu,
+    valem: times > 0 && ids.length === times && foraDoPool.length === 0,
+  };
+}
+
+/** Os recados da mesa sobre os capitães definidos (número errado, marcado fora do pool, quem saiu). */
+function avisosDosCapitaes(definidos: ReturnType<typeof capitaesDefinidos>, times: number): string[] {
+  if (definidos.marcados === 0) return [];
+  const avisos: string[] = [];
+  if (definidos.foraDoPool.length > 0) {
+    const nomes = definidos.foraDoPool.map((i) => `${i.riot_id} (${i.situacao})`).join(", ");
+    avisos.push(
+      `${nomes} ${definidos.foraDoPool.length === 1 ? "está marcado" : "estão marcados"} como capitão, mas não ${definidos.foraDoPool.length === 1 ? "está" : "estão"} entre os titulares aptos (quem joga o draft). Aprove a inscrição ou troque o capitão em «Definir capitães».`,
+    );
+  }
+  if (definidos.saiu.length > 0) {
+    const nomes = definidos.saiu.map((i) => `${i.riot_id} (${i.situacao})`).join(", ");
+    avisos.push(`${nomes} tinha a marca de capitão e saiu do campeonato: não conta. Desmarque em «Definir capitães».`);
+  }
+  if (definidos.ids.length !== times) {
+    avisos.push(
+      `Há ${definidos.ids.length} ${definidos.ids.length === 1 ? "capitão definido" : "capitães definidos"} entre os titulares aptos para ${times} times: marque exatamente ${times} em «Definir capitães». Até lá, o sorteio pelos capitães definidos é recusado.`,
+    );
+  }
+  return avisos;
+}
 
 /**
  * O candidato a capitão com a MESMA fotografia do preço (`eloDoJogadorDaInscricao`): depois
@@ -209,8 +282,9 @@ function tabelaDosQueJogam(vaoJogar: readonly Inscricao[], times: number, config
 /**
  * A tabela com OS CAPITÃES: a pedida (curvatura padrão, soma exata) se os elencos fecham com
  * eles; senão a primeira que fecha descendo a curvatura e, no limite, a soma
- * (lib/draft/tabela-que-fecha.ts). A prévia usa os capitães da regra; a montagem, os
- * escolhidos. Os dois chegam na mesma tabela para os mesmos capitães.
+ * (lib/draft/tabela-que-fecha.ts). A prévia usa os capitães definidos (ou os da regra); a
+ * montagem, os escolhidos. Os dois chegam na mesma tabela para os mesmos capitães. Com o
+ * capitão sem preço (`capitaoSemPreco`), a tabela é só de quem vai ser escolhido.
  */
 function tabelaComOsCapitaes(vaoJogar: readonly Inscricao[], capitaes: readonly string[], times: number, config: EdicaoConfig): TabelaQueFecha {
   return tabelaQueFecha({
@@ -219,15 +293,24 @@ function tabelaComOsCapitaes(vaoJogar: readonly Inscricao[], capitaes: readonly 
     times,
     jogadoresPorTime: config.jogadores_por_time,
     orcamentoPorTime: config.orcamento_por_time,
+    capitaoGratis: capitaoSemPreco(config),
   });
 }
 
-/** O retrato que sai do servidor: a tabela, de onde a conta desceu e se o pool é o do sorteio. */
-function retratoComQueda(conta: Pick<TabelaQueFecha, "tabela" | "queda">, poolIncompleto: boolean): RetratoDaTabela {
+/**
+ * O retrato que sai do servidor: a tabela, de onde a conta desceu, se o pool é o do sorteio e
+ * se o capitão ficou fora dela (sem preço).
+ */
+function retratoComQueda(
+  conta: Pick<TabelaQueFecha, "tabela" | "queda">,
+  poolIncompleto: boolean,
+  capitaoGratis: boolean,
+): RetratoDaTabela {
   return {
     ...retratoDaTabela(conta.tabela),
     queda: conta.queda,
     ...(poolIncompleto ? { poolIncompleto: true } : {}),
+    ...(capitaoGratis ? { capitaoGratis: true } : {}),
   };
 }
 
@@ -321,18 +404,30 @@ export async function previaDoDraft(draftLido?: DraftGravado | Promise<DraftGrav
 
   const ranking = rankingDeCapitaes(vaoJogar.map(candidatoACapitao), times);
   const porId = new Map(vaoJogar.map((i) => [i.id, i]));
+  const capitaoGratis = capitaoSemPreco(config);
 
-  // Com a lista certa (sem impedimento) e os capitães da regra definidos, a tabela é a que
-  // fecha com eles — a pedida ou a primeira que fecha descendo a curvatura e a soma. Sem
-  // isso, é a pedida, e não dá para saber ainda se fecha.
-  const comCapitaes =
-    impedimentos.length === 0 && ranking.escolhidos.length === times && times > 0
-      ? tabelaComOsCapitaes(vaoJogar, ranking.escolhidos, times, config)
-      : null;
-  const conta = comCapitaes ?? { tabela: pedida.tabela, precoDe: pedida.precoDe, queda: null };
-  const fechaComOsCapitaesDaRegra = comCapitaes ? comCapitaes.fecha : null;
+  // Os capitães que a organização DEFINIU (decisão de 23/10/2026). Valendo — um por time,
+  // todos no pool —, são eles que dão a tabela; senão, os da regra, como antes.
+  const definidos = capitaesDefinidos(inscritos, vaoJogar, times);
+
+  // Com a lista certa (sem impedimento) e os capitães conhecidos, a tabela é a que fecha com
+  // eles — a pedida ou a primeira que fecha descendo a curvatura e a soma. Sem isso, é a
+  // pedida, e não dá para saber ainda se fecha.
+  const podeContar = impedimentos.length === 0 && times > 0;
+  const comOsDefinidos =
+    podeContar && definidos.valem ? tabelaComOsCapitaes(vaoJogar, definidos.ids, times, config) : null;
+  const comOsDaRegra =
+    podeContar && ranking.escolhidos.length === times ? tabelaComOsCapitaes(vaoJogar, ranking.escolhidos, times, config) : null;
+  const capitaesDaTabela = comOsDefinidos ? "definidos" : comOsDaRegra ? "regra" : null;
+  const idsDosCapitaesDaTabela = new Set(comOsDefinidos ? definidos.ids : comOsDaRegra ? ranking.escolhidos : []);
+  const conta = comOsDefinidos ?? comOsDaRegra ?? { tabela: pedida.tabela, precoDe: pedida.precoDe, queda: null };
+  const fechaComOsCapitaesDaRegra = comOsDaRegra ? comOsDaRegra.fecha : null;
+  const fechaComOsCapitaesDefinidos = comOsDefinidos ? comOsDefinidos.fecha : null;
   const precoDoInscrito = (i: Inscricao) => conta.precoDe.get(i.id) ?? 0;
   const totalDePontos = vaoJogar.reduce((soma, i) => soma + precoDoInscrito(i), 0);
+  // Sem capitães conhecidos, a tabela é a de todo mundo (a pedida): com o capitão sem preço, ela
+  // não é a do sorteio — a tela avisa.
+  const tabelaGratis = capitaoGratis && capitaesDaTabela !== null;
 
   return {
     config: {
@@ -368,11 +463,25 @@ export async function previaDoDraft(draftLido?: DraftGravado | Promise<DraftGrav
     // time fechado ou sem ninguém com preço. Com mais aptos que vagas ela vem marcada como pool
     // incompleto: dá ideia dos preços, mas a tela não a mostra como fechada. Com MENOS (titular
     // ainda não apto, C4) ela é a do sorteio, se a organização sortear agora.
-    tabela: times > 0 && conta.precoDe.size > 0 ? retratoComQueda(conta, vaoJogar.length > vagas) : null,
+    tabela: times > 0 && conta.precoDe.size > 0 ? retratoComQueda(conta, vaoJogar.length > vagas, tabelaGratis) : null,
     // Os capitães da regra fecham os elencos com esta tabela (já com a queda, se houve)? Nulo
     // quando não dá para saber ainda (lista com impedimento, empate no corte, faltam capitães).
     fechaComOsCapitaesDaRegra,
-    // Quem joga, do maior elo para o menor, com os organizadores no fim (não capitaneiam).
+    // O mesmo para os capitães definidos pela organização. Nulo sem eles valendo.
+    fechaComOsCapitaesDefinidos,
+    /** O capitão não tem preço nesta edição: a tela mostra a tag CAPITÃO no lugar dos pontos. */
+    capitaoGratis,
+    /** Com quais capitães a tabela foi calculada: os definidos, os da regra ou nenhum (a pedida). */
+    capitaesDaTabela,
+    /** Os capitães definidos pela organização que estão no pool, na ordem da lista. */
+    capitaesDefinidos: definidos.ids,
+    /** Quantas inscrições têm a marca de capitão (no pool ou não). */
+    capitaesMarcados: definidos.marcados,
+    /** Número errado, marcado fora do pool, quem saiu: o que a mesa precisa saber dos definidos. */
+    avisosDosCapitaes: avisosDosCapitaes(definidos, times),
+    /** O método que a mesa oferece primeiro: os definidos, quando há marcados. */
+    metodoPadrao: (definidos.marcados > 0 ? "definidos" : "maior_elo") as MetodoDeCapitao,
+    // Quem joga, do maior elo para o menor, com os organizadores no fim.
     jogadores: [
       ...ranking.ranking.map((c) => c.id),
       ...vaoJogar.filter((i) => i.organizador).map((i) => i.id),
@@ -388,6 +497,10 @@ export async function previaDoDraft(draftLido?: DraftGravado | Promise<DraftGrav
         rota2: i.rota_secundaria,
         organizador: i.organizador,
         temConta: temConta(i),
+        /** Capitão na tabela desta prévia (definido ou pela regra). Sem preço: a tela mostra a tag. */
+        capitao: idsDosCapitaesDaTabela.has(i.id),
+        /** A organização marcou como capitão (`inscricoes.capitao`). */
+        capitaoDefinido: ehCapitaoDefinido(i),
       };
     }),
     capitaesPelaRegra: ranking.escolhidos,
@@ -418,7 +531,30 @@ export type PreviaDoDraft = Omit<
   | "naFila"
   | "titularesNaoAptos"
   | "avisosDoSorteio"
+  | "fechaComOsCapitaesDefinidos"
+  | "capitaoGratis"
+  | "capitaesDaTabela"
+  | "capitaesDefinidos"
+  | "capitaesMarcados"
+  | "avisosDosCapitaes"
+  | "metodoPadrao"
+  | "jogadores"
 > & {
+  /**
+   * Os campos de 23/10/2026 (capitães definidos, capitão sem preço) são opcionais: a resposta
+   * de um servidor anterior não os tem, e a tela segue como antes.
+   */
+  jogadores: (Omit<Awaited<ReturnType<typeof previaDoDraft>>["jogadores"][number], "capitao" | "capitaoDefinido"> & {
+    capitao?: boolean;
+    capitaoDefinido?: boolean;
+  })[];
+  fechaComOsCapitaesDefinidos?: boolean | null;
+  capitaoGratis?: boolean;
+  capitaesDaTabela?: "definidos" | "regra" | null;
+  capitaesDefinidos?: string[];
+  capitaesMarcados?: number;
+  avisosDosCapitaes?: string[];
+  metodoPadrao?: MetodoDeCapitao;
   foraDoDraft?: ForaDoDraft[];
   /** Titulares da fila (C4). Ausente na resposta de um servidor anterior à fila. */
   titulares?: number;
@@ -444,7 +580,15 @@ export type PreviaDoDraft = Omit<
  * de onde saiu cada preço, e a transmissão e o painel o leem (`paraPublico`) para
  * precificar reservas com a tabela do sorteio.
  */
-export type EstadoDraftComTabela = EstadoDraft & { tabelaDePontos?: RetratoDaTabela };
+export type EstadoDraftComTabela = EstadoDraft & {
+  tabelaDePontos?: RetratoDaTabela;
+  /**
+   * O capitão entrou no draft SEM PREÇO (0 ponto, decisão de 23/10/2026): as telas mostram a
+   * tag CAPITÃO no lugar dos pontos, e o gasto de cada time é só o das escolhas. Ausente em
+   * drafts montados antes (o capitão custava os pontos dele).
+   */
+  capitaoGratis?: boolean;
+};
 
 /**
  * Monta o draft a partir dos titulares aptos da fila — e SORTEIA a ordem.
@@ -509,23 +653,29 @@ export async function montarDraftDosAprovados(params: {
   const capitaes = escolherCapitaes({
     aprovados: pool,
     inscritos: vaoJogar,
+    todosOsInscritos: inscritos,
     rotaPorInscrito: new Map(vaoJogar.map((i) => [i.id, i.rota_primaria])),
     quantos: quantosTimes,
     metodo: params.metodo,
     manuais: params.capitaesManuais ?? [],
   });
 
-  // Organizador não capitaneia (regulamento) — nem à mão. Quem marcou à mão um
-  // organizador estava prestes a quebrar a regra publicada na frente do grupo.
-  const organizadores = new Set(vaoJogar.filter((i) => i.organizador).map((i) => i.id));
-  const organizadorCapitao = capitaes.find((id) => organizadores.has(id));
-  if (organizadorCapitao) {
-    const riotId = pool.find((j) => j.id === organizadorCapitao)?.riotId ?? organizadorCapitao;
-    throw new ErroDeRegra(`${riotId} é da organização, e organizador não é capitão nesta edição.`);
+  // Organizador não capitaneia — só no método AUTOMÁTICO (a regra do maior elo). Quando a
+  // organização define os capitães (definidos ou à mão), pode escolher um organizador: foi o
+  // que ela decidiu em 23/10/2026. O ranking da regra já pula a organização; isto é a rede.
+  if (params.metodo === "maior_elo") {
+    const organizadores = new Set(vaoJogar.filter((i) => i.organizador).map((i) => i.id));
+    const organizadorCapitao = capitaes.find((id) => organizadores.has(id));
+    if (organizadorCapitao) {
+      const riotId = pool.find((j) => j.id === organizadorCapitao)?.riotId ?? organizadorCapitao;
+      throw new ErroDeRegra(`${riotId} é da organização, e a regra do maior elo não escolhe organizador.`);
+    }
   }
 
   // A tabela com ESTES capitães: a pedida, se os elencos fecham com ela; senão a primeira
-  // que fecha descendo a curvatura e a soma. Os preços do pool passam a ser os dela.
+  // que fecha descendo a curvatura e a soma. Os preços do pool passam a ser os dela — com o
+  // capitão sem preço, o capitão entra com 0 e a tabela é só de quem vai ser escolhido.
+  const capitaoGratis = capitaoSemPreco(config);
   const conta = tabelaComOsCapitaes(vaoJogar, capitaes, quantosTimes, config);
   const tabela = conta.tabela;
   for (const jogador of pool) jogador.pontos = conta.precoDe.get(jogador.id) ?? jogador.pontos;
@@ -600,7 +750,8 @@ export async function montarDraftDosAprovados(params: {
     sorteio: { semente, capitaes, emISO: new Date().toISOString() },
     // De onde saiu cada preço: fica gravado com o sorteio, para conferir depois — e é a
     // tabela que a regra do substituto usa depois do draft.
-    tabelaDePontos: retratoComQueda(conta, false),
+    tabelaDePontos: retratoComQueda(conta, false, capitaoGratis),
+    ...(capitaoGratis ? { capitaoGratis: true } : {}),
   };
 }
 
@@ -613,13 +764,39 @@ export async function montarDraftDosAprovados(params: {
  */
 function escolherCapitaes(params: {
   aprovados: readonly JogadorDoDraft[];
+  /** Quem joga o draft (os titulares aptos). */
   inscritos: readonly Inscricao[];
+  /** Todas as inscrições — para achar quem foi marcado como capitão e não está no pool. */
+  todosOsInscritos: readonly Inscricao[];
   rotaPorInscrito: Map<string, string>;
   quantos: number;
   metodo: MetodoDeCapitao;
   manuais: readonly string[];
 }): string[] {
-  const { aprovados, inscritos, rotaPorInscrito, quantos, metodo, manuais } = params;
+  const { aprovados, inscritos, todosOsInscritos, rotaPorInscrito, quantos, metodo, manuais } = params;
+
+  if (metodo === "definidos") {
+    // Os capitães que a organização marcou (`inscricoes.capitao`). A recusa diz o que fazer:
+    // sortear sem um capitão escolhido, ou com um a mais, não é o que a organização definiu.
+    const definidos = capitaesDefinidos(todosOsInscritos, inscritos, quantos);
+    if (definidos.marcados === 0) {
+      throw new ErroDeRegra(
+        `Nenhum capitão foi definido pela organização. Marque os ${quantos} capitães em «Definir capitães» (aba Draft ao vivo) e salve, ou sorteie pela regra ou à mão.`,
+      );
+    }
+    if (definidos.foraDoPool.length > 0) {
+      const nomes = definidos.foraDoPool.map((i) => `${i.riot_id} (${i.situacao})`).join(", ");
+      throw new ErroDeRegra(
+        `Capitão definido fora de quem joga o draft: ${nomes}. Só titulares aptos podem ser capitães — aprove a inscrição ou troque o capitão em «Definir capitães».`,
+      );
+    }
+    if (definidos.ids.length !== quantos) {
+      throw new ErroDeRegra(
+        `Há ${definidos.ids.length} ${definidos.ids.length === 1 ? "capitão definido" : "capitães definidos"} entre os titulares aptos para ${quantos} times. Marque exatamente ${quantos} em «Definir capitães» e salve antes de sortear.`,
+      );
+    }
+    return definidos.ids;
+  }
 
   if (metodo === "manual") {
     if (manuais.length !== quantos) {
@@ -656,8 +833,8 @@ function escolherCapitaes(params: {
     return ranking.escolhidos;
   }
 
-  // Os métodos antigos também pulam a organização: a regra de que organizador não é
-  // capitão vale para qualquer método, e o manual é conferido em quem chama.
+  // Os métodos antigos também pulam a organização, como a regra do maior elo: só quem a
+  // organização define (definidos, à mão) pode ser organizador.
   const organizadores = new Set(inscritos.filter((i) => i.organizador).map((i) => i.id));
   const elegiveis = aprovados.filter((j) => !organizadores.has(j.id));
   const porPontosDesc = [...elegiveis].sort((a, b) => b.pontos - a.pontos || a.id.localeCompare(b.id));
@@ -747,6 +924,11 @@ export type DraftPublico = {
    * de um servidor anterior a este campo.
    */
   tabelaDePontos?: RetratoDaTabela | null;
+  /**
+   * O capitão entrou SEM PREÇO (0 ponto): a transmissão, o painel do capitão e a mesa mostram a
+   * tag CAPITÃO no lugar dos pontos, e `gasto` é só o das escolhas. Opcional: servidor anterior.
+   */
+  capitaoGratis?: boolean;
 };
 
 /**
@@ -859,7 +1041,70 @@ export function paraPublico(estado: EstadoDraftComTabela, revisao: number): Draf
       automatica: e.automatica,
     })),
     tabelaDePontos: estado.tabelaDePontos ?? null,
+    capitaoGratis: estado.capitaoGratis === true,
   };
+}
+
+// ---------------------------------------------------------------- capitães definidos
+
+/**
+ * Grava os capitães DEFINIDOS pela organização (`inscricoes.capitao`): marca os pedidos e
+ * desmarca os outros. É o que a mesa do draft salva em «Definir capitães» — e o que o sorteio
+ * pelo método «definidos» usa.
+ *
+ * Quem chama (a rota) já confere o escopo e que o draft ainda não foi sorteado. Aqui: todo id
+ * precisa ser de uma inscrição que existe e ainda pode jogar (recusado, desistente e excluído
+ * não capitaneiam). O número pode ser diferente do de times — a prévia avisa e o sorteio
+ * recusa —, para dar para salvar no meio da conferência. Lista vazia desmarca todo mundo.
+ *
+ * Duas gravações (marcar, depois desmarcar), não uma transação: se a segunda falhar, sobra
+ * um capitão a mais, a prévia mostra o número errado e o sorteio recusa — nunca um capitão a
+ * menos sem ninguém ver. Devolve os Riot IDs de antes e de depois, para a auditoria.
+ */
+export async function salvarCapitaesDefinidos(pedidos: readonly string[]): Promise<{ antes: string[]; depois: string[] }> {
+  const cliente = createSupabaseAdminClient();
+  const { data, error } = await cliente
+    .from("inscricoes")
+    .select("id,riot_id,situacao,capitao")
+    .returns<{ id: string; riot_id: string; situacao: string; capitao: boolean | null }[]>();
+  if (error) {
+    // Sem a coluna (migração não aplicada), o recado diz o que rodar.
+    if (/capitao/.test(error.message)) {
+      throw new Error(`A coluna inscricoes.capitao não existe: rode supabase/migracao-capitaes-definidos.sql. (${error.message})`);
+    }
+    throw new Error(`Falha ao ler as inscrições: ${error.message}`);
+  }
+
+  const linhas = data ?? [];
+  const porId = new Map(linhas.map((l) => [l.id, l]));
+  const ids = [...new Set(pedidos)];
+  for (const id of ids) {
+    const linha = porId.get(id);
+    if (!linha) throw new ErroDeRegra("Um dos capitães marcados não está entre os inscritos. Atualize o painel e marque de novo.");
+    if (estaFora(linha.situacao)) {
+      throw new ErroDeRegra(`${linha.riot_id} está fora do campeonato (${linha.situacao}) e não pode ser capitão.`);
+    }
+  }
+
+  const antes = linhas.filter((l) => l.capitao === true).map((l) => l.id);
+  const pedido = new Set(ids);
+  const jaEra = new Set(antes);
+  const marcar = ids.filter((id) => !jaEra.has(id));
+  const desmarcar = antes.filter((id) => !pedido.has(id));
+  const agora = new Date().toISOString();
+
+  // Marca primeiro: se a segunda gravação falhar, sobra capitão (a prévia avisa), não falta.
+  if (marcar.length > 0) {
+    const { error: erro } = await cliente.from("inscricoes").update({ capitao: true, atualizado_em: agora }).in("id", marcar);
+    if (erro) throw new Error(`Falha ao marcar os capitães: ${erro.message}`);
+  }
+  if (desmarcar.length > 0) {
+    const { error: erro } = await cliente.from("inscricoes").update({ capitao: false, atualizado_em: agora }).in("id", desmarcar);
+    if (erro) throw new Error(`Falha ao desmarcar os capitães antigos: ${erro.message}`);
+  }
+
+  const riotIdDe = (id: string) => porId.get(id)?.riot_id ?? id;
+  return { antes: antes.map(riotIdDe), depois: ids.map(riotIdDe) };
 }
 
 /** O time que este jogador capitaneia, ou null. Base da autorização da escolha. */

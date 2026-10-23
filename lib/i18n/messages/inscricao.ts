@@ -161,7 +161,7 @@ export const inscricao = definir({
     },
     capitaesTitulo: "QUEM É CAPITÃO",
     capitaesTexto:
-      "Os capitães são os inscritos de maior elo, independentemente da rota — não é preciso se candidatar. Quem organiza esta edição não é capitão.",
+      "Os capitães são definidos pela organização, um por time — não é preciso se candidatar. O capitão não tem preço: cada time tem o orçamento inteiro para as escolhas.",
 
     // ---------------------------------------------------------------- passo 3
     resumoTitulo: "SUA INSCRIÇÃO",
@@ -470,7 +470,7 @@ export const inscricao = definir({
     },
     capitaesTitulo: "WHO CAPTAINS",
     capitaesTexto:
-      "Captains are the highest-ranked players signed up, regardless of role — there's no need to apply. The organizers of this edition are not captains.",
+      "Captains are chosen by the organizers, one per team — there's no need to apply. The captain has no price: each team has its whole budget for its picks.",
 
     resumoTitulo: "YOUR SIGN-UP",
     taxaTitulo: "ENTRY FEE",

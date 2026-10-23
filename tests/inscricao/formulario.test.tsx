@@ -77,7 +77,7 @@ describe("passo 2", () => {
     expect((html.match(/type="checkbox"/g) ?? []).length).toBe(3);
   });
 
-  it("não tem mais a caixa QUERO SER CAPITÃO — capitão é o maior elo na solo/duo", () => {
+  it("não tem mais a caixa QUERO SER CAPITÃO — os capitães são definidos pela organização", () => {
     const html = passo2("pt");
     expect(html).not.toMatch(/quero ser capit/i);
     expect(html).toContain(MESSAGES.pt.inscricao.capitaesTitulo);

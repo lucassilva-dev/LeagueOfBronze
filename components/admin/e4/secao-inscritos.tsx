@@ -963,6 +963,11 @@ type PropsGaveta = Readonly<{
    * fechado ainda. Não é a coluna `pontos` — essa é a tabela fixa da 3ª, que o draft não usa.
    */
   precoNoDraft: number | null;
+  /**
+   * Capitão sem preço (decisão de 23/10/2026): a gaveta mostra a tag CAPITÃO no lugar dos
+   * pontos. Opcional: falso quando não é capitão, ou com o capitão pago pelo orçamento.
+   */
+  capitaoNoDraft?: boolean;
   /** O lugar na fila de reserva (D1); nulo quando a edição não tem teto de vagas (não há fila). */
   lugar: LugarNaFila | null;
   /**
@@ -1000,6 +1005,7 @@ function GavetaInscrito({
   podeRedefinirSenha,
   posicao,
   precoNoDraft,
+  capitaoNoDraft = false,
   lugar,
   primeiroDaFila,
   simularFila,
@@ -1890,11 +1896,13 @@ function GavetaInscrito({
           <Metric
             small
             label="Pontos no draft"
-            value={precoNoDraft ?? "—"}
+            value={capitaoNoDraft ? "Capitão" : (precoNoDraft ?? "—")}
             detail={
-              precoNoDraft === null
-                ? "sai da tabela automática quando fechar um time"
-                : "prévia da tabela automática — a oficial sai na conferência do draft"
+              capitaoNoDraft
+                ? "capitão não tem preço: cada time tem o orçamento inteiro para as escolhas"
+                : precoNoDraft === null
+                  ? "sai da tabela automática quando fechar um time"
+                  : "prévia da tabela automática — a oficial sai na conferência do draft"
             }
           />
           <Metric
@@ -2207,7 +2215,11 @@ function GavetaInscrito({
             }}
           >
             <EloDoInscrito inscrito={inscrito} tamanho={30} />
-            {precoNoDraft !== null ? (
+            {capitaoNoDraft ? (
+              <Chip tone="gold" title="Capitão definido pela organização: não tem preço.">
+                capitão
+              </Chip>
+            ) : precoNoDraft !== null ? (
               <span style={{ color: C.ink3 }} title="Prévia da tabela de pontos automática">
                 {precoNoDraft} pts
               </span>
@@ -2729,10 +2741,13 @@ export function SecaoInscritos({
         jogadoresPorTime: config.jogadores_por_time,
         orcamentoPorTime: config.orcamento_por_time,
         maxTimes: config.max_times ?? null,
+        capitaoComPreco: config.capitao_com_preco ?? null,
       }),
-    [inscritos, config.jogadores_por_time, config.orcamento_por_time, config.max_times],
+    [inscritos, config.jogadores_por_time, config.orcamento_por_time, config.max_times, config.capitao_com_preco],
   );
   const precoDaPrevia = (inscrito: Inscrito) => previaDePrecos.preco(inscrito);
+  /** Capitão sem preço (decisão de 23/10/2026): a tag CAPITÃO no lugar dos pontos. */
+  const capitaoSemPreco = (inscrito: Inscrito) => previaDePrecos.semPreco(inscrito);
 
   /** Conferências indexadas por inscrito e item — a tabela lê isto 6 vezes por linha. */
   const porInscrito = useMemo(() => {
@@ -3121,7 +3136,11 @@ export function SecaoInscritos({
                         <LeituraDaRiotDiferente inscrito={inscrito} />
                         <span style={{ display: "block", ...tabular }} title={rotas.longo}>
                           {rotas.curto}
-                          {precoDaPrevia(inscrito) !== null ? ` · ${precoDaPrevia(inscrito)} pts` : ""}
+                          {capitaoSemPreco(inscrito)
+                            ? " · capitão"
+                            : precoDaPrevia(inscrito) !== null
+                              ? ` · ${precoDaPrevia(inscrito)} pts`
+                              : ""}
                         </span>
                       </>
                     }
@@ -3299,7 +3318,15 @@ export function SecaoInscritos({
                         <EloDoInscrito inscrito={inscrito} />
                       </td>
 
-                      <td style={{ ...td, textAlign: "right", ...tabular }}>{precoDaPrevia(inscrito) ?? "—"}</td>
+                      <td style={{ ...td, textAlign: "right", ...tabular }}>
+                        {capitaoSemPreco(inscrito) ? (
+                          <Chip tone="gold" title="Capitão definido pela organização: não tem preço.">
+                            capitão
+                          </Chip>
+                        ) : (
+                          (precoDaPrevia(inscrito) ?? "—")
+                        )}
+                      </td>
 
                       <td style={td} title={rotas.longo}>
                         {rotas.curto}
@@ -3365,6 +3392,7 @@ export function SecaoInscritos({
           podeRedefinirSenha={podeRedefinirSenha}
           posicao={vizinhos.posicao}
           precoNoDraft={precoDaPrevia(selecionado)}
+          capitaoNoDraft={capitaoSemPreco(selecionado)}
           lugar={comFila ? lugarDoInscrito(selecionado.id) : null}
           primeiroDaFila={primeiro && primeiro.id !== selecionado.id ? primeiro : null}
           simularFila={(mudanca) => simularFila(selecionado.id, mudanca)}

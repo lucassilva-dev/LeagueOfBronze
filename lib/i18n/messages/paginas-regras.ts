@@ -5,10 +5,11 @@ import { definir } from "@/lib/i18n/definir";
  *
  * /regras publica o regulamento da 4ª Edição (4º Campeonato dos Bronzes), seção por seção
  * do PDF oficial, com as decisões da organização de 05/10/2026 aplicadas por cima dele
- * (capitães pela solo/duo, organizadores sem taxa e sem capitania, 100% do arrecadado
- * vira prêmio) e as de 22/10/2026 (remake não conta na regra 4, substituto por jogo e saída
- * de vez na regra 6, W.O. no meio da série na regra 8, fila de reserva e prazo de pagamento
- * na regra 22, desistência depois do sorteio no draft). Nada de valor em R$ ou percentual
+ * (organizadores sem taxa, 100% do arrecadado vira prêmio), as de 22/10/2026 (remake não
+ * conta na regra 4, substituto por jogo e saída de vez na regra 6, W.O. no meio da série na
+ * regra 8, fila de reserva e prazo de pagamento na regra 22, desistência depois do sorteio no
+ * draft) e as de 23/10/2026 (os capitães são definidos pela organização e não têm preço; cada
+ * time tem 30 pontos para as 4 escolhas; a tabela é calculada pelo site). Nada de valor em R$ ou percentual
  * cravado aqui: a taxa e a fatia do campeão vêm da Configuração da edição (`edicao_config`),
  * e o texto tem a versão com e a versão sem esses números para quando a configuração não
  * puder ser lida.
@@ -24,7 +25,7 @@ const pt = {
   regrasSobretitulo: "Regulamento oficial",
   regrasTitulo: "REGRAS",
   regrasSubtitulo:
-    "Regulamento do 4º Campeonato dos Bronzes (League of Bronze, 4ª Edição) — League of Legends 5v5. Atualizado em 22/10/2026.",
+    "Regulamento do 4º Campeonato dos Bronzes (League of Bronze, 4ª Edição) — League of Legends 5v5. Atualizado em 23/10/2026.",
   sumarioRotulo: "Nesta página",
 
   // ---------- app/regras: 1. visão geral ----------
@@ -73,21 +74,21 @@ const pt = {
   // ---------- app/regras: 3. formação dos times ----------
   formacaoTitulo: "FORMAÇÃO DOS TIMES",
   formacaoIntro:
-    "Os capitães são os inscritos de maior elo na fila solo/duo, e os times são montados em um draft por pontos, no mesmo modelo da 3ª edição.",
+    "Os capitães são definidos pela organização, e os times são montados em um draft por pontos, no mesmo modelo da 3ª edição.",
   capitaesTitulo: "CAPITÃES",
-  capitaes1:
-    "Os capitães são os inscritos de maior elo na fila solo/duo, independentemente da rota. O elo da flex não conta.",
-  capitaes2: "Os organizadores desta edição jogam, mas não são capitães.",
+  capitaes1: "Os 8 capitães são definidos pela organização, um por time.",
+  capitaes2:
+    "O capitão não tem preço: ele não sai do orçamento do time, e cada time tem 30 pontos para as 4 escolhas.",
   capitaes3: "O número de capitães é igual ao número de times: 8 nesta edição.",
   capitaes4:
     "Um sorteio ao vivo define qual time cada capitão vai capitanear e a ordem de escolha do draft.",
   capitaes5:
-    "O capitão também é jogador: ocupa a rota do seu cadastro, que é fixa, independentemente da rota em que jogar na partida, e o valor dele em pontos sai do orçamento do time.",
+    "O capitão também é jogador: ocupa a rota do seu cadastro, que é fixa, independentemente da rota em que jogar na partida.",
   draftTitulo: "DRAFT POR PONTOS",
   draft1:
-    "Cada jogador tem um valor em pontos conforme o elo. A tabela de valores só será definida quando a lista completa de jogadores estiver fechada, com os elos atualizados.",
+    "Cada jogador a ser escolhido tem um valor em pontos conforme o elo e a divisão. A tabela de pontos é calculada pelo site a partir de quem vai ser escolhido (os jogadores que não são capitães), para a soma dar exatamente 8 × 30 = 240 pontos.",
   draft2:
-    "Cada capitão recebe um orçamento definido junto com a tabela: a média de pontos por time + 15%, arredondada para cima.",
+    "Cada time tem 30 pontos para as 4 escolhas — o mesmo para todos os times. O capitão não entra nessa conta.",
   draft3:
     "O capitão entra com a rota do seu cadastro, fixa, e o draft é feito em 4 rodadas para as outras 4 rotas.",
   draft4:
@@ -98,7 +99,7 @@ const pt = {
     "Jogador escolhido não pode ser escolhido por outro time. Se alguém desistir depois do sorteio, quem ainda não foi escolhido sai da lista na hora; se já tinha sido escolhido, ou é capitão, o draft segue normalmente, e a vaga é reposta depois por um reserva (regra 6).",
   tabelaValoresRotulo: "Tabela de valores.",
   tabelaValoresTexto:
-    "Será divulgada depois que a lista completa de jogadores estiver fechada, com os elos atualizados. Os valores serão recalculados para esta edição, em vez de reaproveitar os da 3ª.",
+    "Calculada pelo site, e não à mão, a partir dos elos de quem vai ser escolhido, e divulgada com a lista de jogadores fechada e os elos atualizados. Os valores são desta edição, em vez de reaproveitar os da 3ª.",
 
   // ---------- app/regras: 4. regras (numeradas; id="regra-N" na página) ----------
   regrasGeraisTitulo: "REGRAS GERAIS",
@@ -207,8 +208,7 @@ const pt = {
     "100% do valor arrecadado com as inscrições vira prêmio, dividido entre o time campeão e o vice. A organização não fica com nada.",
   premiacaoCampeaoK: "CAMPEÃO",
   premiacaoViceK: "VICE",
-  premiacaoOrganizadores:
-    "Os organizadores desta edição jogam, mas não pagam inscrição e não são capitães.",
+  premiacaoOrganizadores: "Os organizadores desta edição jogam e não pagam inscrição.",
 
   // ---------- app/regras: 7. calendário (o conteúdo vem de calendario4a) ----------
   calendarioTitulo: "CALENDÁRIO",
@@ -324,7 +324,7 @@ export const paginasRegras = definir<ChavesPaginasRegras>({
     regrasSobretitulo: "Official rulebook",
     regrasTitulo: "RULES",
     regrasSubtitulo:
-      "Rulebook of the 4th Campeonato dos Bronzes (League of Bronze, 4th Edition) — League of Legends 5v5. Updated on 22 October 2026.",
+      "Rulebook of the 4th Campeonato dos Bronzes (League of Bronze, 4th Edition) — League of Legends 5v5. Updated on 23 October 2026.",
     sumarioRotulo: "On this page",
 
     // ---------- app/regras: 1. visão geral ----------
@@ -373,21 +373,21 @@ export const paginasRegras = definir<ChavesPaginasRegras>({
     // ---------- app/regras: 3. formação dos times ----------
     formacaoTitulo: "TEAM FORMATION",
     formacaoIntro:
-      "The captains are the highest-ranked sign-ups in solo/duo queue, and teams are built through a points draft, using the same model as the 3rd edition.",
+      "The captains are chosen by the organisers, and teams are built through a points draft, using the same model as the 3rd edition.",
     capitaesTitulo: "CAPTAINS",
-    capitaes1:
-      "The captains are the sign-ups with the highest solo/duo queue rank, regardless of role. Flex rank does not count.",
-    capitaes2: "This edition's organisers play, but they are not captains.",
+    capitaes1: "The 8 captains are chosen by the organisers, one per team.",
+    capitaes2:
+      "The captain has no price: they do not come out of the team's budget, and each team has 30 points for its 4 picks.",
     capitaes3: "The number of captains equals the number of teams: 8 in this edition.",
     capitaes4:
       "A live draw decides which team each captain will lead and the pick order of the draft.",
     capitaes5:
-      "The captain is also a player: they take the role from their sign-up, which is fixed regardless of the role they actually play in the game, and their point value comes out of the team's budget.",
+      "The captain is also a player: they take the role from their sign-up, which is fixed regardless of the role they actually play in the game.",
     draftTitulo: "POINTS DRAFT",
     draft1:
-      "Every player has a point value based on their rank. The value table will only be set once the full player list is closed, with up-to-date ranks.",
+      "Every player up for picking has a point value based on their rank and division. The points table is calculated by the site from the players up for picking (everyone who is not a captain), so that the total is exactly 8 × 30 = 240 points.",
     draft2:
-      "Each captain receives a budget set together with the table: the average points per team + 15%, rounded up.",
+      "Each team has 30 points for its 4 picks — the same for every team. The captain is not part of that sum.",
     draft3:
       "The captain comes in with the fixed role from their sign-up, and the draft runs over 4 rounds for the other 4 roles.",
     draft4:
@@ -398,7 +398,7 @@ export const paginasRegras = definir<ChavesPaginasRegras>({
       "A player who has been picked cannot be picked by another team. If someone withdraws after the draw, a player who has not been picked yet is removed from the list straight away; if they had already been picked, or are a captain, the draft carries on as normal and the place is filled afterwards by a reserve (rule 6).",
     tabelaValoresRotulo: "Value table.",
     tabelaValoresTexto:
-      "It will be published once the full player list is closed, with up-to-date ranks. The values will be recalculated for this edition instead of reusing the 3rd edition's.",
+      "Calculated by the site, not by hand, from the ranks of the players up for picking, and published once the player list is closed, with up-to-date ranks. The values are this edition's own instead of reusing the 3rd edition's.",
 
     // ---------- app/regras: 4. regras (numeradas; id="regra-N" na página) ----------
     regrasGeraisTitulo: "GENERAL RULES",
@@ -503,8 +503,7 @@ export const paginasRegras = definir<ChavesPaginasRegras>({
       "100% of the money raised from entry fees becomes prize money, split between the champions and the runners-up. The organisers keep nothing.",
     premiacaoCampeaoK: "CHAMPIONS",
     premiacaoViceK: "RUNNERS-UP",
-    premiacaoOrganizadores:
-      "This edition's organisers play, but they do not pay the entry fee and are not captains.",
+    premiacaoOrganizadores: "This edition's organisers play and do not pay the entry fee.",
 
     // ---------- app/regras: 7. calendário (o conteúdo vem de calendario4a) ----------
     calendarioTitulo: "SCHEDULE",

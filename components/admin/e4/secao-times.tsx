@@ -39,8 +39,14 @@ import {
 } from "@/components/admin/ui";
 import { RoleIcon } from "@/components/lob/ui";
 import { ELO_ORDER, resolveElo, resolveRole, type EloMeta } from "@/lib/design";
-import { podeSubstituir, precosDoSorteio, previaDosPrecos, type PreviaDosPrecos } from "@/lib/draft/previa-de-precos";
-import { retratoDaTabela, type RetratoDaTabela } from "@/lib/draft/precos";
+import {
+  podeSubstituir,
+  precosDoSorteio,
+  previaDosPrecos,
+  retratoDaPrevia,
+  type PreviaDosPrecos,
+} from "@/lib/draft/previa-de-precos";
+import type { RetratoDaTabela } from "@/lib/draft/precos";
 import type { DraftPublico } from "@/lib/draft/store";
 import { lugarNaFila, reservaADevolverSeNaoJogar, type LugarNaFila } from "@/lib/inscricoes/fila";
 import { contaParaTimes, distribuirTimes } from "@/lib/inscricoes/schema";
@@ -92,8 +98,16 @@ import { contaParaTimes, distribuirTimes } from "@/lib/inscricoes/schema";
  * draft muda a prévia — e não pode mudar o preço com que o substituto é comparado.
  */
 
-/** O que a regra 6 precisa do draft sorteado: o retrato da tabela e o preço de cada um. */
-type TabelaDoSorteio = { retrato: RetratoDaTabela; pontos: ReadonlyMap<string, number> };
+/**
+ * O que a regra 6 precisa do draft sorteado: o retrato da tabela, o preço de cada um e os
+ * capitães (Riot ID) — que, sem preço, não substituem nem são substituídos pela tabela.
+ */
+type TabelaDoSorteio = {
+  retrato: RetratoDaTabela;
+  pontos: ReadonlyMap<string, number>;
+  capitaes: ReadonlySet<string>;
+  capitaoGratis: boolean;
+};
 
 /**
  * Lê o draft da rota pública uma vez (e a cada mudança da lista): só a tabela do sorteio e os
@@ -116,8 +130,10 @@ function useTabelaDoSorteio(chave: unknown): TabelaDoSorteio | null {
           return;
         }
         const pontos = new Map<string, number>();
-        for (const j of [...Object.values(draft.elencos ?? {}).flat(), ...(draft.disponiveis ?? [])]) pontos.set(j.riotId, j.pontos);
-        setLida({ retrato: draft.tabelaDePontos, pontos });
+        const elencos = Object.values(draft.elencos ?? {}).flat();
+        for (const j of [...elencos, ...(draft.disponiveis ?? [])]) pontos.set(j.riotId, j.pontos);
+        const capitaes = new Set(elencos.filter((j) => j.capitao).map((j) => j.riotId));
+        setLida({ retrato: draft.tabelaDePontos, pontos, capitaes, capitaoGratis: draft.capitaoGratis === true });
       } catch {
         // Sem rede ou sem draft legível: a regra 6 fica com a prévia.
       }
@@ -197,8 +213,12 @@ function rotuloElo(inscrito: Inscrito): string {
   return resolveElo(eloDePreco(inscrito))?.label ?? eloDePreco(inscrito);
 }
 
-/** O preço de prévia escrito: "—" quando ainda não há tabela (ou o elo não é reconhecido). */
-function textoDoPreco(preco: number | null, curto = false): string {
+/**
+ * O preço de prévia escrito: "—" quando ainda não há tabela (ou o elo não é reconhecido), e
+ * "capitão" para o capitão sem preço — ele não tem valor na tabela.
+ */
+function textoDoPreco(preco: number | null, curto = false, capitao = false): string {
+  if (capitao) return "capitão";
   if (preco === null) return "—";
   if (curto) return `${preco} pt`;
   return `${preco} ${preco === 1 ? "ponto" : "pontos"}`;
@@ -300,10 +320,19 @@ function BarraDeProporcao({ cor, fracao, style }: Readonly<{ cor: string; fracao
 function CartaoDoAprovado({
   inscrito,
   preco,
+  capitao = false,
   deOnde = "Prévia da tabela automática",
   fim,
   children,
-}: Readonly<{ inscrito: Inscrito; preco: number | null; deOnde?: string; fim?: ReactNode; children?: ReactNode }>) {
+}: Readonly<{
+  inscrito: Inscrito;
+  preco: number | null;
+  /** Capitão sem preço: a tag CAPITÃO no lugar dos pontos. */
+  capitao?: boolean;
+  deOnde?: string;
+  fim?: ReactNode;
+  children?: ReactNode;
+}>) {
   return (
     <li>
       <CartaoLinha
@@ -318,9 +347,13 @@ function CartaoDoAprovado({
           <span style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "2px 10px" }}>
             <RotaCurta rota={inscrito.rota_primaria} />
             <RotaCurta rota={inscrito.rota_secundaria} secundaria />
-            <span style={tabular} title={deOnde}>
-              {textoDoPreco(preco)}
-            </span>
+            {capitao ? (
+              <TagCapitao />
+            ) : (
+              <span style={tabular} title={deOnde}>
+                {textoDoPreco(preco)}
+              </span>
+            )}
           </span>
         }
         fim={fim}
@@ -328,6 +361,15 @@ function CartaoDoAprovado({
         {children}
       </CartaoLinha>
     </li>
+  );
+}
+
+/** A tag do capitão sem preço, no lugar dos pontos (decisão de 23/10/2026). */
+function TagCapitao() {
+  return (
+    <Chip tone="gold" title="Capitão definido pela organização: não tem preço, e cada time tem o orçamento inteiro para as escolhas.">
+      capitão
+    </Chip>
   );
 }
 
@@ -483,18 +525,30 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
         jogadoresPorTime,
         orcamentoPorTime: config.orcamento_por_time,
         maxTimes: config.max_times ?? null,
+        capitaoComPreco: config.capitao_com_preco ?? null,
       }),
-    [inscritos, jogadoresPorTime, config.orcamento_por_time, config.max_times],
+    [inscritos, jogadoresPorTime, config.orcamento_por_time, config.max_times, config.capitao_com_preco],
   );
   const precoDe = (i: Inscrito) => previa.preco(i);
 
   // A regra 6 depois do sorteio: a tabela do sorteio; antes, a prévia.
   const sorteio = useTabelaDoSorteio(inscritos);
   const precosDaRegra6 = useMemo(
-    () => (sorteio ? precosDoSorteio({ retrato: sorteio.retrato, pontosDoDraft: sorteio.pontos, inscritos }) : previa),
+    () =>
+      sorteio
+        ? precosDoSorteio({
+            retrato: sorteio.retrato,
+            pontosDoDraft: sorteio.pontos,
+            inscritos,
+            capitaesDoDraft: sorteio.capitaes,
+            capitaoGratis: sorteio.capitaoGratis,
+          })
+        : previa,
     [sorteio, inscritos, previa],
   );
   const precoNaRegra6 = (i: Inscrito) => precosDaRegra6.preco(i);
+  /** Capitão sem preço (na prévia ou no draft sorteado): tag no lugar dos pontos, fora da regra 6. */
+  const capitaoNaRegra6 = (i: Inscrito) => precosDaRegra6.semPreco(i);
   const ondeOPreco = sorteio ? "na tabela do sorteio" : "na prévia";
 
   const analise = useMemo(() => {
@@ -643,9 +697,11 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
   const voltaDe = (inscrito: Inscrito): string | null =>
     voltaPendente === inscrito.id && inscrito.situacao === "sobra" ? avisoDaVolta(inscrito) : null;
 
-  const tabela =
-    previa.tabela && previa.tabela.linhas.length > 0 ? { ...retratoDaTabela(previa.tabela), queda: previa.queda } : null;
+  const tabela = retratoDaPrevia(previa);
   const precoDoAlvo = alvo ? precoNaRegra6(alvo) : null;
+  const alvoECapitao = alvo !== null && capitaoNaRegra6(alvo);
+  /** Com o capitão sem preço, quantos entram na tabela: só quem vai ser escolhido. */
+  const naTabela = tabela?.capitaoGratis ? previa.vagas - previa.times : previa.vagas;
 
   return (
     <div>
@@ -775,21 +831,32 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
       ) : tabela === null ? (
         <Banner tone="warn" title="Ainda não dá para calcular">
           A tabela sai de quem joga — o elo mais baixo custa 1 ponto e o jogador médio custa{" "}
-          {config.orcamento_por_time} ÷ {jogadoresPorTime} —, então precisa de pelo menos um time
-          fechado. Ela aparece quando o primeiro time fechar.
+          {config.orcamento_por_time} ÷ {previa.capitaoGratis ? `${jogadoresPorTime - 1} (o capitão não tem preço)` : jogadoresPorTime} —,
+          então precisa de pelo menos um time fechado. Ela aparece quando o primeiro time fechar.
         </Banner>
       ) : (
         <>
           {tabela.folga === 0 ? (
             <Banner tone="ok" title="A conta fecha">
-              Os {previa.vagas} que entram somam exatamente {tabela.alvo} pontos ({tabela.times} ×{" "}
-              {tabela.orcamentoPorTime}): todo time termina o draft gastando os {tabela.orcamentoPorTime}.
+              {tabela.capitaoGratis ? (
+                <>
+                  Os {naTabela} que vão ser escolhidos somam exatamente {tabela.alvo} pontos ({tabela.times} ×{" "}
+                  {tabela.orcamentoPorTime}):{" "}
+                  {previa.times === 1 ? "o capitão entra sem preço" : `os ${previa.times} capitães entram sem preço`}, e todo time termina o draft
+                  gastando os {tabela.orcamentoPorTime} nas {tabela.jogadoresPorTime} escolhas.
+                </>
+              ) : (
+                <>
+                  Os {previa.vagas} que entram somam exatamente {tabela.alvo} pontos ({tabela.times} ×{" "}
+                  {tabela.orcamentoPorTime}): todo time termina o draft gastando os {tabela.orcamentoPorTime}.
+                </>
+              )}
             </Banner>
           ) : tabela.folga > 0 ? (
             <Banner tone="warn" title={`Sobram ${tabela.folga} ${tabela.folga === 1 ? "ponto" : "pontos"}`}>
               {tabela.queda
-                ? `A soma exata não fechava os elencos com os capitães da regra, então a conta baixou a soma: os ${previa.vagas} que entram somam ${tabela.soma} de ${tabela.alvo}, e um time pode terminar gastando menos que outro.`
-                : `Não existe tabela inteira com a soma exata para este pool: os ${previa.vagas} que entram somam ${tabela.soma} de ${tabela.alvo}, e um time pode terminar gastando menos que outro.`}
+                ? `A soma exata não fechava os elencos com os capitães, então a conta baixou a soma: os ${naTabela} da tabela somam ${tabela.soma} de ${tabela.alvo}, e um time pode terminar gastando menos que outro.`
+                : `Não existe tabela inteira com a soma exata para este pool: os ${naTabela} da tabela somam ${tabela.soma} de ${tabela.alvo}, e um time pode terminar gastando menos que outro.`}
             </Banner>
           ) : (
             <Banner tone="danger" title="O orçamento não paga 1 ponto por jogador">
@@ -807,6 +874,15 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
                 : `Calculada com os ${previa.vagas} de elo mais baixo entre os ${previa.elegiveis} elegíveis — o cenário mais barato possível, enquanto não está decidido quem fica na sobra.`}{" "}
               Quem fica de fora recebe o preço da reta, preso entre as linhas vizinhas.
             </p>
+            {previa.capitaoGratis ? (
+              <p style={nota}>
+                {previa.capitaesDaTabela === "definidos"
+                  ? `Capitães: os ${previa.times} definidos pela organização. Eles não têm preço e não entram na tabela — cada time tem ${config.orcamento_por_time} pontos para as ${jogadoresPorTime - 1} escolhas.`
+                  : previa.capitaesDaTabela === "regra"
+                    ? `Capitães: ainda não foram definidos pela organização, então a prévia usa os ${previa.times} de maior elo (sem organizador). Eles não têm preço e não entram na tabela — cada time tem ${config.orcamento_por_time} pontos para as ${jogadoresPorTime - 1} escolhas. Defina os capitães na aba Draft ao vivo.`
+                    : `O capitão não tem preço nesta edição, mas a prévia ainda não sabe quem são os capitães: a tabela acima inclui todo mundo e muda quando eles forem definidos (aba Draft ao vivo).`}
+              </p>
+            ) : null}
             <p style={{ ...nota, color: C.warnSoft }}>
               Prévia: muda conforme a conferência anda, o robô da Riot lê os elos e a organização marca a
               sobra. A tabela oficial sai na conferência do draft (aba Draft), com a lista de aptos
@@ -949,6 +1025,7 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
               key={i.id}
               inscrito={i}
               preco={precoDe(i)}
+              capitao={previa.semPreco(i)}
               fim={<ChipDoLugar lugar={lugar} />}
             >
               {pagou ? (
@@ -1024,7 +1101,7 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
                     <td style={td}>
                       <Elo elo={eloDePreco(i)} tamanho={24} />
                     </td>
-                    <td style={tdNum}>{precoDe(i) ?? "—"}</td>
+                    <td style={tdNum}>{previa.semPreco(i) ? <TagCapitao /> : (precoDe(i) ?? "—")}</td>
                     <td style={td}>
                       <CelulaRota rota={i.rota_primaria} />
                     </td>
@@ -1121,7 +1198,7 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
                 .sort((a, b) => a.nick.localeCompare(b.nick, "pt-BR"))
                 .map((i) => (
                   <option key={i.id} value={i.id}>
-                    {i.nick}#{i.tag} — {rotuloElo(i)} · {textoDoPreco(precoNaRegra6(i), true)}
+                    {i.nick}#{i.tag} — {rotuloElo(i)} · {textoDoPreco(precoNaRegra6(i), true, capitaoNaRegra6(i))}
                   </option>
                 ))}
             </Select>
@@ -1132,6 +1209,11 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
           <p style={nota}>
             Escolha alguém para ver quem, dentre os aprovados, pode entrar no lugar dele.
           </p>
+        ) : alvoECapitao ? (
+          <Empty title="Capitão não é substituído pela tabela">
+            {alvo.nick} é capitão e não tem preço: não há valor para comparar. Se um capitão sair, a organização
+            escolhe outro capitão entre os jogadores do time, e a vaga dele vai para um reserva (regra 6).
+          </Empty>
         ) : substitutos.length === 0 ? (
           <Empty title="Nenhum aprovado serve">
             {alvo.nick} é o aprovado mais barato

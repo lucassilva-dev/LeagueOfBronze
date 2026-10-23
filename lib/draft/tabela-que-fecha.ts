@@ -31,6 +31,14 @@ import { elencosFecham, ORCAMENTO_DA_MONTAGEM } from "@/lib/draft/viabilidade";
  * O retrato da tabela leva a curvatura usada, a folga e o motivo em português, e a tela
  * mostra. Só se nada fechar a resposta é "não fecha" (e a tabela é a pedida).
  *
+ * CAPITÃO SEM PREÇO (`capitaoGratis`, decisão da organização de 23/10/2026): o capitão não
+ * custa nada e todo time tem o orçamento INTEIRO para as escolhas — sem compensar a força do
+ * capitão, de propósito. A tabela é calculada SÓ sobre quem vai ser escolhido (o pool menos os
+ * capitães), com `jogadoresPorTime − 1` pagos por time e a mesma soma `times × orçamento`
+ * (na 4ª: 32 pessoas, 4 por time, 240 pontos, preço médio 7,5). O capitão entra no draft com
+ * 0 ponto, e a viabilidade dá a cada time a folga do orçamento inteiro. Sem a chave, o capitão
+ * é pago pelo orçamento, como até a 3ª — os dois caminhos continuam valendo.
+ *
  * Funções PURAS, sem `server-only`: o painel chama a mesma conta no navegador.
  */
 
@@ -70,28 +78,37 @@ export function tabelaQueFecha(params: {
   orcamentoPorTime: number;
   granularidade?: Granularidade;
   curvatura?: number;
+  /** Capitão sem preço: a tabela é só de quem vai ser escolhido, e o capitão custa 0. */
+  capitaoGratis?: boolean;
 }): TabelaQueFecha {
   const { pool, capitaes, times, jogadoresPorTime, orcamentoPorTime, granularidade } = params;
+  const capitaoGratis = params.capitaoGratis === true;
   const curvaturaPedida = Math.max(0, params.curvatura ?? CURVATURA_PADRAO);
   const alvo = Math.max(0, times) * orcamentoPorTime;
+  const doCapitao = new Set(capitaes);
+  // Quem paga: com o capitão sem preço, só quem vai ser escolhido — 4 por time na 4ª.
+  const pagantes = capitaoGratis ? pool.filter((j) => !doCapitao.has(j.id)) : pool;
+  const pagosPorTime = capitaoGratis ? jogadoresPorTime - 1 : jogadoresPorTime;
 
   const calcular = (curvatura: number, menos: number) => {
     const tabela = calcularTabela({
-      pool: pool.map((j) => j.elo),
+      pool: pagantes.map((j) => j.elo),
       times,
-      jogadoresPorTime,
+      jogadoresPorTime: pagosPorTime,
       orcamentoPorTime,
       granularidade,
       curvatura,
       somaMaxima: menos > 0 ? alvo - menos : undefined,
     });
-    const precoDe = new Map(pool.map((j) => [j.id, precoNaTabela(tabela, j.elo)]));
+    const precoDe = new Map(
+      pool.map((j) => [j.id, capitaoGratis && doCapitao.has(j.id) ? 0 : precoNaTabela(tabela, j.elo)]),
+    );
     return { tabela, precoDe };
   };
 
   const pedida = calcular(curvaturaPedida, 0);
   const fechaCom = (precoDe: ReadonlyMap<string, number>) =>
-    capitaesFecham({ capitaes, precoDe, jogadoresPorTime, orcamentoPorTime });
+    capitaesFecham({ capitaes, precoDe, jogadoresPorTime, orcamentoPorTime, capitaoGratis });
 
   if (fechaCom(pedida.precoDe)) return { ...pedida, fecha: true, queda: null };
 
@@ -104,7 +121,15 @@ export function tabelaQueFecha(params: {
       fecha: true,
       queda: {
         curvaturaPedida,
-        motivo: motivoDaQueda({ pedida, usada: tentada.tabela, pool, capitaes, jogadoresPorTime, orcamentoPorTime }),
+        motivo: motivoDaQueda({
+          pedida,
+          usada: tentada.tabela,
+          pool,
+          capitaes,
+          jogadoresPorTime,
+          orcamentoPorTime,
+          capitaoGratis,
+        }),
       },
     };
   }
@@ -131,8 +156,9 @@ function motivoDaQueda(params: {
   capitaes: readonly string[];
   jogadoresPorTime: number;
   orcamentoPorTime: number;
+  capitaoGratis: boolean;
 }): string {
-  const { pedida, usada, pool, capitaes, jogadoresPorTime, orcamentoPorTime } = params;
+  const { pedida, usada, pool, capitaes, jogadoresPorTime, orcamentoPorTime, capitaoGratis } = params;
   const de = curvaturaEscrita(pedida.tabela.curvatura);
   const rotuloDe = (j: JogadorDaConta) => {
     const forca = classeDoElo(j.elo, pedida.tabela.granularidade).forca;
@@ -155,7 +181,14 @@ function motivoDaQueda(params: {
       : Infinity;
   if (caroDemais && vagas > 0 && preco(caroDemais) > maximoNumaEscolha) {
     razao = `o ${rotuloDe(caroDemais)} custaria ${preco(caroDemais)} e nenhum time conseguiria pagá-lo (cabem no máximo ${maximoNumaEscolha} numa escolha)`;
-  } else if (capitaoCaro && vagas > 0 && Number.isFinite(maisBarato) && orcamentoPorTime - preco(capitaoCaro) < vagas * maisBarato) {
+  } else if (
+    // Capitão sem preço não pesa no orçamento de ninguém: o recado do capitão caro não existe.
+    !capitaoGratis &&
+    capitaoCaro &&
+    vagas > 0 &&
+    Number.isFinite(maisBarato) &&
+    orcamentoPorTime - preco(capitaoCaro) < vagas * maisBarato
+  ) {
     razao = `o capitão ${rotuloDe(capitaoCaro)} custaria ${preco(capitaoCaro)} e o time dele não conseguiria completar as outras ${vagas} vagas`;
   }
 
@@ -170,8 +203,9 @@ function motivoDaQueda(params: {
  * Os capitães conseguem fechar os elencos com estes preços?
  *
  * É a mesma conta que a montagem faz (`estadoFecha`): cada time com as vagas que faltam e o
- * orçamento menos o preço do capitão, e os outros jogadores para repartir. "indeterminado"
- * conta como "fecha", como no motor.
+ * orçamento menos o preço do capitão, e os outros jogadores para repartir. Com o capitão sem
+ * preço (`capitaoGratis`), a folga de cada time é o orçamento inteiro — o capitão entra no
+ * draft com 0 ponto. "indeterminado" conta como "fecha", como no motor.
  *
  * Guardado por entrada: a prévia do servidor roda a cada sondagem do painel, a do painel a
  * cada mudança da lista, e cada uma tenta várias tabelas — a resposta só muda quando mudam
@@ -184,10 +218,12 @@ export function capitaesFecham(params: {
   precoDe: ReadonlyMap<string, number>;
   jogadoresPorTime: number;
   orcamentoPorTime: number;
+  capitaoGratis?: boolean;
 }): boolean {
   const { capitaes, precoDe, jogadoresPorTime, orcamentoPorTime } = params;
   const doCapitao = new Set(capitaes);
-  const times = capitaes.map((id) => ({ vagas: jogadoresPorTime - 1, folga: orcamentoPorTime - (precoDe.get(id) ?? 0) }));
+  const precoDoCapitao = (id: string) => (params.capitaoGratis === true ? 0 : (precoDe.get(id) ?? 0));
+  const times = capitaes.map((id) => ({ vagas: jogadoresPorTime - 1, folga: orcamentoPorTime - precoDoCapitao(id) }));
   const custos = [...precoDe].filter(([id]) => !doCapitao.has(id)).map(([, p]) => p);
   // Menos jogadores do que vagas (titular ainda não apto na hora de sortear, decisão C4): a
   // ordem perde as escolhas que faltam (lib/draft/motor.ts, `ajustarOrdemAoPool`). Cada uma

@@ -64,7 +64,7 @@ export const preTemporada = definir({
       "A taxa é paga por Pix depois do envio da inscrição. Tudo o que é arrecadado vira prêmio.",
     passo4Titulo: "DRAFT AO VIVO",
     passo4Texto:
-      "Os inscritos de maior elo são os capitães e montam os times escolhendo jogadores por pontos — o preço de cada um vem do elo.",
+      "Os capitães, definidos pela organização, montam os times escolhendo jogadores por pontos — o preço de cada um vem do elo.",
     passo5Titulo: "CAMPEONATO",
     // `{times}` = número de times do calendário; `{periodo}` = "de 20 a 29 de novembro".
     passo5Texto:
@@ -134,7 +134,7 @@ export const preTemporada = definir({
       "The fee is paid via Pix after you submit your sign-up. Everything collected goes to prizes.",
     passo4Titulo: "LIVE DRAFT",
     passo4Texto:
-      "The highest-ranked players are the captains, and they build their teams by picking players with points — each player's price comes from their rank.",
+      "The captains, chosen by the organisers, build their teams by picking players with points — each player's price comes from their rank.",
     passo5Titulo: "TOURNAMENT",
     passo5Texto:
       "{times} teams of 5 players. Round robin in best-of-3 series, semi-finals 1st v 4th and 2nd v 3rd, and a best-of-5 final — {periodo}. The details are in the Rules.",

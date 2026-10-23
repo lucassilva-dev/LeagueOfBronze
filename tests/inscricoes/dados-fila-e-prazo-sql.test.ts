@@ -18,7 +18,9 @@ import { fichaPatchSchema } from "@/lib/inscricoes/schema";
  */
 
 const ARQUIVO = path.resolve(__dirname, "../../supabase/dados-4a-fila-e-prazo.sql");
-const sql = existsSync(ARQUIVO) ? readFileSync(ARQUIVO, "utf8") : "";
+// Sem o `\r`: num checkout do Windows (core.autocrlf) o arquivo chega com CRLF, e o `\s+` do
+// update pegava o `\r` junto com o texto do SET.
+const sql = existsSync(ARQUIVO) ? readFileSync(ARQUIVO, "utf8").replace(/\r\n/g, "\n") : "";
 /** Só o que executa: os comentários (inclusive a prévia comentada) ficam de fora. */
 const codigo = sql
   .split("\n")

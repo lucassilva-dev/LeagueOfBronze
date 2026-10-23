@@ -402,11 +402,12 @@ export default async function RegrasPage() {
     { texto: t.inscricaoCampo6, icone: FileCheck },
   ];
 
-  // O 1º item é "maior elo": vai o emblema de um elo alto, e não a coroa — a coroa já está
-  // no título do cartão, e repetida no item de cima não diria nada de novo.
+  // Desde 23/10/2026 os capitães são definidos pela organização (o selo de "conferido") e não
+  // têm preço (as moedas do orçamento). A coroa fica só no título do cartão — repetida no item
+  // de cima não diria nada de novo.
   const CAPITAES: ItemMarcado[] = [
-    { texto: t.capitaes1, marca: <EmblemaDoElo elo="MESTRE" tamanho={SELO_DO_ITEM} /> },
-    { texto: t.capitaes2, icone: UserX },
+    { texto: t.capitaes1, icone: BadgeCheck },
+    { texto: t.capitaes2, icone: Coins },
     { texto: t.capitaes3, icone: UsersRound },
     { texto: t.capitaes4, icone: Dices },
     { texto: t.capitaes5, icone: Gamepad2 },

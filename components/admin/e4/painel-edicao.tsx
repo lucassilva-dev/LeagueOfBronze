@@ -34,6 +34,12 @@ export type EdicaoConfig = {
   /** Teto de times (8 na 4ª, desde 2026-10-22). Nulo/ausente = sem teto. */
   max_times?: number | null;
   orcamento_por_time: number;
+  /**
+   * O capitão é pago pelo orçamento (`true`, o modelo até a 3ª) ou entra sem preço (falso, a
+   * decisão de 23/10/2026: cada time tem o orçamento inteiro para as escolhas). Ausente = banco
+   * sem a migração, e vale a decisão da 4ª (sem preço).
+   */
+  capitao_com_preco?: boolean | null;
   min_ranqueadas: number;
   dias_no_grupo: number;
   prazo_pagamento_dias: number;
@@ -99,6 +105,11 @@ export type Inscrito = {
   entrou_no_grupo: string | null;
   situacao: "pendente" | "apto" | "recusado" | "desistiu" | "sobra" | "excluido";
   organizador: boolean;
+  /**
+   * Capitão DEFINIDO pela organização (decisão de 23/10/2026), marcado na mesa do draft. Sem
+   * preço: as abas mostram a tag CAPITÃO no lugar dos pontos. Ausente = banco sem a coluna.
+   */
+  capitao?: boolean | null;
   /** NOTA INTERNA da organização: o jogador nunca lê (decisão G, 2026-10-22). */
   observacao: string | null;
   /**
