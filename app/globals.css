@@ -945,6 +945,14 @@ a:hover {
   `auto-fit` sozinho em toda largura deixava 5 + 1 entre 976 e 1163px; mudar o corte daqui
   é mudar onde a TV pode perder um time — tests/draft/grade-da-transmissao.test.tsx faz a
   conta.
+
+  COM 8 TIMES (a 4ª, desde 2026-10-22) as N colunas continuam numa linha só, mas ficam
+  estreitas: ~115px no projetor de 1024px, ~147px no notebook de 1280px (na TV de 1920px,
+  ~227px). Numa coluna assim a etiqueta de rota (30px) e os vãos comiam o nick inteiro. Por
+  isso cada coluna é um contêiner (`.lobd-coluna-time`) e, abaixo de 150px de largura, a
+  etiqueta some e a rota vai em texto para a linha do elo ("MID · Prata II"), com o
+  respiro lateral do slot menor: o nick volta a ter ~60px a 1024px. Acima de 150px (6 times
+  a 1024px, 8 times a 1366px ou mais) o slot é o do handoff, sem mudança.
 */
 .lobd-grade-times {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -952,6 +960,33 @@ a:hover {
 @media (min-width: 900px) {
   .lobd-grade-times {
     grid-template-columns: repeat(var(--times, 6), minmax(0, 1fr));
+  }
+}
+.lobd-coluna-time {
+  container-type: inline-size;
+}
+.lobd-slot-rota-curta {
+  display: none;
+}
+@container (max-width: 150px) {
+  .lobd-slot {
+    gap: 5px !important;
+    padding-left: 6px !important;
+    padding-right: 6px !important;
+  }
+  .lobd-slot-rota {
+    display: none !important;
+  }
+  .lobd-slot-rota-curta {
+    display: inline;
+  }
+  /* O nome do time é a identidade dele na TV: na coluna estreita o "#N" sai e o
+     espaçamento das letras aperta, senão VERDANTE e CARMESIM viravam "VERDA…" a 1024px. */
+  .lobd-coluna-nome {
+    letter-spacing: .05em !important;
+  }
+  .lobd-coluna-ordinal {
+    display: none;
   }
 }
 

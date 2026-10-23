@@ -321,8 +321,8 @@ export type EstadoDraftComTabela = EstadoDraft & { tabelaDePontos?: RetratoDaTab
  * Monta o draft a partir de quem foi aprovado — e SORTEIA a ordem.
  *
  * O número de times é DERIVADO (`distribuirTimes`), com o teto `max_times` da
- * Configuração (6 na 4ª Edição). Quem sobra da divisão fica fora do sorteio. É por isso
- * que a organização precisa fechar a lista de aprovados antes de montar.
+ * Configuração (8 na 4ª Edição, desde 2026-10-22). Quem sobra da divisão fica fora do
+ * sorteio. É por isso que a organização precisa fechar a lista de aprovados antes de montar.
  *
  * "Um sorteio ao vivo define qual time cada capitão vai capitanear e a ordem de escolha
  * do draft" (regulamento). Antes a ordem saía da própria lista de capitães — por pontos,

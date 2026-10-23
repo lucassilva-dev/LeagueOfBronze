@@ -40,6 +40,12 @@ type Rotulos = Messages["draft"];
  *
  * · **Os keyframes ganharam o prefixo `lobd`** — `lobGlow` já existia no site com outra
  *   definição, e nome repetido em CSS quebra em silêncio o lugar errado.
+ *
+ * · **N times, não 6.** O handoff foi desenhado com 6; a 4ª tem 8 (2026-10-22). A grade
+ *   é de N colunas (`--times`), as cores 7 e 8 vêm de lib/draft/times.ts (MARÉ e SEIVA), e
+ *   numa coluna estreita (8 times num projetor de 1024px dão ~115px) a etiqueta de rota
+ *   desce para a linha do elo em vez de comer a largura do nick — ver `.lobd-coluna-time`
+ *   em app/globals.css. A tela final põe no máximo metade dos times por linha (4 + 4).
  */
 
 type TimePublico = {
@@ -175,9 +181,24 @@ function fraseDaSerpentina(times: number, t: Rotulos): string {
   return `${t.ordemSerpentina} ${ida.join("-")} · ${[...ida].reverse().join("-")} · ${t.eRepete}`;
 }
 
-/** A cor do time por posição, do handoff — com a do banco como reserva. */
+/**
+ * A cor do time por posição, do handoff — com a do banco como reserva. O handoff tem 6
+ * cores; o 7º e o 8º time da 4ª (MARÉ e SEIVA) usam a do banco, que vem de
+ * lib/draft/times.ts na mesma ordem.
+ */
 function corDoTime(time: TimePublico, indice: number): string {
   return CORES_DOS_TIMES[indice] ?? time.cor;
+}
+
+/**
+ * Colunas da tela final ("times formados"): até 6 times, todos na mesma linha (o handoff);
+ * passando de 6, no máximo metade por linha — 8 times viram 4 + 4, e não 6 + 2. O mínimo
+ * de 196px continua mandando abaixo disso (tablet, celular).
+ */
+export function colunasDaTelaFinal(times: number): string {
+  const porLinha = times <= 6 ? Math.max(1, times) : Math.ceil(times / 2);
+  const vaos = (porLinha - 1) * 10;
+  return `repeat(auto-fit,minmax(max(196px,calc((100% - ${vaos}px) / ${porLinha})),1fr))`;
 }
 
 function abrevDaRota(rota: string): string {
@@ -202,8 +223,13 @@ function Slot({
   t: Rotulos;
 }>) {
   const capitao = jogador?.capitao === true;
+  const rota = jogador ? abrevDaRota(jogador.rota1) : "—";
+  // As classes `lobd-slot*` só fazem diferença dentro de uma coluna estreita da grade
+  // (@container em app/globals.css): ali a etiqueta de rota some e a rota vai, em texto,
+  // para a linha do elo. Fora dela (tela final, coluna larga) nada muda.
   return (
     <div
+      className="lobd-slot"
       style={{
         display: "flex",
         alignItems: "center",
@@ -215,6 +241,7 @@ function Slot({
       }}
     >
       <span
+        className="lobd-slot-rota"
         style={{
           flex: "none",
           display: "grid",
@@ -230,7 +257,7 @@ function Slot({
           color: jogador ? cor : D.rotuloVazio,
         }}
       >
-        {jogador ? abrevDaRota(jogador.rota1) : "—"}
+        {rota}
       </span>
       <span style={{ flex: 1, minWidth: 0 }}>
         <span
@@ -247,6 +274,11 @@ function Slot({
           {jogador ? jogador.riotId : "—"}
         </span>
         <span style={{ display: "block", fontSize: 10.5, color: D.mudo2 }}>
+          {jogador ? (
+            <span className="lobd-slot-rota-curta" style={{ color: cor, fontFamily: DISPLAY, fontWeight: 700 }}>
+              {rota} ·{" "}
+            </span>
+          ) : null}
           {jogador
             ? capitao
               ? `${t.capitao.toUpperCase()} · ${rotuloDoElo(jogador)}`
@@ -727,6 +759,7 @@ function AoVivo({
           return (
             <div
               key={time.id}
+              className="lobd-coluna-time"
               style={{
                 display: "flex",
                 flexDirection: "column",
@@ -748,6 +781,7 @@ function AoVivo({
               >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
                   <span
+                    className="lobd-coluna-nome"
                     style={{
                       fontFamily: DISPLAY,
                       fontSize: 13,
@@ -761,7 +795,9 @@ function AoVivo({
                   >
                     {time.nome}
                   </span>
-                  <span style={{ fontFamily: DISPLAY, fontSize: 11, color: D.mudo }}>#{i + 1}</span>
+                  <span className="lobd-coluna-ordinal" style={{ fontFamily: DISPLAY, fontSize: 11, color: D.mudo }}>
+                    #{i + 1}
+                  </span>
                 </div>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 5, marginTop: 5 }}>
                   <span
@@ -953,10 +989,15 @@ function Fim({ draft, t }: Readonly<{ draft: DraftPublico; t: Rotulos }>) {
         </h1>
         <p style={{ margin: "12px 0 0", fontSize: 15, color: D.secundario2 }}>{t.fimTexto}</p>
 
+        {/*
+          No máximo metade dos times por linha quando eles passam de 6: com 8, 4 + 4 em vez
+          do 6 + 2 que o auto-fit dava na largura de 1240px. Até 6, o mínimo de 196px manda,
+          como no handoff. Abaixo do mínimo, o auto-fit continua quebrando a linha.
+        */}
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit,minmax(196px,1fr))",
+            gridTemplateColumns: colunasDaTelaFinal(draft.times.length),
             gap: 10,
             marginTop: 34,
             textAlign: "left",

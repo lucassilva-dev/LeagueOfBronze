@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-import { TIMES_DO_CALENDARIO_4A, seriesDaFaseDePontos } from "@/lib/calendario-4a";
+import {
+  TIMES_DO_CALENDARIO_4A,
+  calendarioDivulgado,
+  motivoSemCalendario,
+  seriesDaFaseDePontos,
+} from "@/lib/calendario-4a";
 import { ConflitoDeVersaoError, readDatasetComVersao, saveDataset } from "@/lib/data-store";
 import {
   alcancarORelogio,
@@ -412,13 +417,18 @@ export async function POST(request: NextRequest) {
 
       case "calendario": {
         /*
-         * Sorteia a posição de cada time no calendário da 4ª (Time 1 … Time 6) e cria as
-         * 15 séries da fase de pontos, com data e hora (lib/calendario-4a.ts).
+         * Sorteia a posição de cada time no calendário da 4ª (Time 1 … Time 8) e cria as
+         * séries da fase de pontos (28 com 8 times), com data e hora (lib/calendario-4a.ts).
          *
-         * Só depois da virada, numa temporada aberta e ainda sem nenhuma série — e só com
-         * os times DESTE draft. Sem essa última trava, um clique antes da virada criava o
-         * calendário da 4ª com os times da 3ª.
+         * Só com a grade divulgada — desde 2026-10-22 as datas de 8 times estão "a
+         * divulgar", e sem data não há série para criar. Depois, só depois da virada, numa
+         * temporada aberta e ainda sem nenhuma série — e só com os times DESTE draft. Sem
+         * essa última trava, um clique antes da virada criava o calendário da 4ª com os
+         * times da 3ª.
          */
+        if (!calendarioDivulgado()) {
+          return NextResponse.json({ error: motivoSemCalendario(), semCalendario: true }, { status: 409 });
+        }
         if (!estado) return NextResponse.json({ error: "Monte e aplique o draft primeiro." }, { status: 409 });
 
         const { dataset, versao } = await readDatasetComVersao();

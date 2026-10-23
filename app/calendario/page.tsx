@@ -6,8 +6,8 @@ import { Eyebrow, GoldTitle, Pill, TeamMark } from "@/components/lob/ui";
 import { PreTemporadaAviso } from "@/components/pre-temporada-aviso";
 import {
   CALENDARIO_4A,
-  calendarioAindaPorVir,
   calendarioEDestaTemporada,
+  calendarioPorVirOuADivulgar,
   diaDoSlot,
   horaDoSlot,
 } from "@/lib/calendario-4a";
@@ -46,14 +46,16 @@ type Textos = Messages["paginasCompeticao"];
  *  - na pré-temporada com a 3ª ainda no ar e já encerrada (o dataset ao vivo é o dela até
  *    alguém iniciar a 4ª no painel — mostrar o calendário de julho seria mostrar o passado);
  *  - entre iniciar a 4ª e criar as séries (sem times, ou com os times do draft e zero séries).
- * Assim que o painel cria as 15 séries, esta página passa a mostrar as séries de verdade,
- * com os nomes dos times.
+ * Assim que as séries existem (o painel cria as da fase de pontos a partir da grade), esta
+ * página passa a mostrar as séries de verdade, com os nomes dos times.
  *
- * Só enquanto o calendário oficial ainda está por vir: passado 29/11/2026, a grade da 4ª
- * com "Time 1…6" não pode reaparecer na pré-temporada da edição seguinte.
+ * Com as datas a divulgar (8 times, desde 2026-10-22), o "planejado" é o formato com o aviso
+ * de "a divulgar" — `CalendarioDa4a` decide. Depois de divulgada, só enquanto a grade
+ * ainda está por vir: passada a final, a grade da 4ª com "Time 1…8" não pode reaparecer na
+ * pré-temporada da edição seguinte.
  */
 function mostrarPlanejado(dataset: Parameters<typeof semTemporadaAoVivo>[0] & { tournament: { status: string } }) {
-  if (!calendarioAindaPorVir()) return false;
+  if (!calendarioPorVirOuADivulgar()) return false;
   if (dataset.seriesMatches.length === 0) return true;
   if (semTemporadaAoVivo(dataset)) return true;
   return emPreTemporada() && dataset.tournament.status === "finished";
@@ -155,7 +157,7 @@ export default async function CalendarioPage() {
   try {
     ({ dataset } = await getServerDataset());
   } catch (erro) {
-    if (emPreTemporada() && calendarioAindaPorVir()) return planejado;
+    if (emPreTemporada() && calendarioPorVirOuADivulgar()) return planejado;
     throw erro;
   }
 
@@ -168,9 +170,9 @@ export default async function CalendarioPage() {
   const finalGame = buildFinalGame(dataset);
 
   // O calendário oficial completa o que ainda não virou série — as semifinais e a final só
-  // são criadas quando a tabela fecha —, mas só se ele for DESTA temporada. Sem isto, com as
-  // 15 séries criadas, a página dizia "15 séries" (a home diz 18) e os horários de 29/11
-  // sumiam até alguém cadastrar as semifinais.
+  // são criadas quando a tabela fecha —, mas só se ele for DESTA temporada (e divulgado). Sem
+  // isto, com as séries de pontos criadas, a página contava só elas (a home conta também as
+  // semifinais e a final) e os horários do último dia sumiam até alguém cadastrar as semis.
   const diasDasSeries = [...days.map((d) => d.dateKey), ...semifinais.map((g) => g.dateKey), ...(finalGame ? [finalGame.dateKey] : [])];
   const oficial = calendarioEDestaTemporada(diasDasSeries);
   const semisPrevistas = oficial && semifinais.length === 0 ? CALENDARIO_4A.filter((s) => s.tipo === "semifinal") : [];

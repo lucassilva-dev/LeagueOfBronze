@@ -22,6 +22,7 @@ import {
   display,
   tabular,
 } from "@/components/admin/ui";
+import { JOGADORES_POR_TIME_DO_CALENDARIO, TIMES_DO_CALENDARIO_4A, calendarioDivulgado } from "@/lib/calendario-4a";
 import { distribuirTimes, estadoDaJanela } from "@/lib/inscricoes/schema";
 import { normalizarChavePix } from "@/lib/pix";
 
@@ -710,7 +711,11 @@ export function SecaoConfiguracao({ dados, executar, ocupado, podeConfigurar, ul
         ))}
         <Field
           label="Máximo de times"
-          hint="Teto de times da edição (6 na 4ª = 30 vagas; o calendário é de 6). Quem passar das vagas vira sobra/reserva. Em branco = sem teto."
+          hint={`Teto de times da edição (${TIMES_DO_CALENDARIO_4A} na 4ª = ${TIMES_DO_CALENDARIO_4A * JOGADORES_POR_TIME_DO_CALENDARIO} vagas; ${
+            calendarioDivulgado()
+              ? `o calendário publicado é de ${TIMES_DO_CALENDARIO_4A}`
+              : `o calendário de ${TIMES_DO_CALENDARIO_4A} times ainda não tem datas`
+          }). Quem passar das vagas vira sobra/reserva. Em branco = sem teto.`}
         >
           <Input
             numeric

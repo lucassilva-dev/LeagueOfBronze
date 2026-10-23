@@ -544,9 +544,9 @@ export function contaParaTimes(situacao: string): boolean {
  * (`contaParaTimes`), os aprovados no draft (`montarDraftDosAprovados`).
  *
  * O número de times é derivado (piso de quantos ÷ jogadores por time), com um TETO
- * opcional, `max_times` na Configuração. A 4ª Edição fechou em 30 jogadores = 6 times
- * (decisão do Lucas, 2026-10-20), e o calendário de 18 séries só fecha com 6: sem o
- * teto, 35 aprovados viravam 7 times. Teto nulo = sem teto, como era antes.
+ * opcional, `max_times` na Configuração. A 4ª Edição fechou em 40 jogadores = 8 times
+ * (decisão do Lucas, 2026-10-22; antes eram 30 = 6), e o calendário (lib/calendario-4a.ts)
+ * só fecha com 8: sem o teto, 45 aprovados viravam 9 times. Teto nulo = sem teto.
  *
  * A sobra é o resto: quem fica de fora quando os times fecham — inclusive quem passa do
  * teto. Não é fila com ordem: a organização resolve na conversa do grupo, e quem sobra

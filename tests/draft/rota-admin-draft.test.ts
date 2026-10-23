@@ -4,11 +4,25 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { alcancarORelogio, iniciarDraft, montarDraft, type EstadoDraft, type JogadorDoDraft } from "@/lib/draft/motor";
 import { identidadeDoTime } from "@/lib/draft/times";
 import type { TournamentDataset } from "@/lib/schema";
+import { calendarioDe8TimesDeTeste } from "@/tests/_calendarios";
 
 /**
  * A rota da mesa do draft: as travas da virada e do calendário, e a escolha feita pela
  * organização. Banco, guarda e auditoria são simulados; o motor e a virada são os reais.
  */
+
+/*
+ * A grade do calendário, trocável por caso: a de 8 times de teste (o formato que o
+ * calendário de verdade vai ter) ou "a divulgar" (o estado do arquivo oficial desde
+ * 2026-10-22). O getter faz lib/calendario-4a.ts ler a grade da vez a cada chamada.
+ */
+// Começa "a divulgar" (é o que a carga do módulo lê); cada caso põe a grade que quer.
+const grade = vi.hoisted(() => ({ atual: { divulgado: false, times: 8 } as unknown }));
+vi.mock("@/lib/calendario-4a-grade", () => ({
+  get CALENDARIO_OFICIAL_4A() {
+    return grade.atual;
+  },
+}));
 
 const banco = vi.hoisted(() => ({
   dataset: null as unknown,
@@ -81,9 +95,9 @@ function req(corpo: unknown): NextRequest {
   } as unknown as NextRequest;
 }
 
-/** Draft de 6 times de 2 (capitão + 1), já encerrado — o bastante para virar e criar o calendário. */
-function draftEncerrado(): EstadoDraft {
-  const jogadores: JogadorDoDraft[] = Array.from({ length: 12 }, (_, i) => ({
+/** Draft de N times de 2 (capitão + 1), já encerrado — o bastante para virar e criar o calendário. */
+function draftEncerrado(n = 8): EstadoDraft {
+  const jogadores: JogadorDoDraft[] = Array.from({ length: 2 * n }, (_, i) => ({
     id: `i${i}`,
     riotId: `Jog${i}#BR1`,
     pontos: 3,
@@ -93,15 +107,15 @@ function draftEncerrado(): EstadoDraft {
     timeId: null,
   }));
   let e = montarDraft({
-    times: Array.from({ length: 6 }, (_, i) => ({ id: `time-${i + 1}`, ...identidadeDoTime(i), capitaoId: `i${i}` })),
+    times: Array.from({ length: n }, (_, i) => ({ id: `time-${i + 1}`, ...identidadeDoTime(i), capitaoId: `i${i}` })),
     jogadores,
     jogadoresPorTime: 2,
     orcamentoPorTime: 10,
     segundosPorEscolha: 60,
   });
   e = iniciarDraft(e, Date.parse("2026-11-15T20:00:00Z"));
-  // 6 escolhas (uma por time), todas pelo relógio: o auto-pick leva o mais barato válido.
-  e = alcancarORelogio(e, Date.parse("2026-11-15T20:00:00Z") + 6 * 60_000 + 1);
+  // N escolhas (uma por time), todas pelo relógio: o auto-pick leva o mais barato válido.
+  e = alcancarORelogio(e, Date.parse("2026-11-15T20:00:00Z") + n * 60_000 + 1);
   expect(e.fase).toBe("encerrado");
   return e;
 }
@@ -117,6 +131,7 @@ function datasetAberto(teams: TournamentDataset["teams"], series: TournamentData
 }
 
 beforeEach(() => {
+  grade.atual = calendarioDe8TimesDeTeste();
   banco.salvos = [];
   banco.auditoria = [];
   banco.versao = 4;
@@ -135,6 +150,33 @@ describe("virada", () => {
 });
 
 describe("calendário da 4ª", () => {
+  it("com as datas a divulgar, recusa antes de tudo e diz por quê — nada é gravado", async () => {
+    grade.atual = { divulgado: false, times: 8 };
+    banco.draft = { estado: draftEncerrado(), revisao: 1 };
+    banco.dataset = datasetAberto([]);
+    const virada = await POST(req({ acao: "virar" }));
+    expect(virada.status).toBe(200);
+    const salvosAntes = banco.salvos.length;
+
+    const r = await POST(req({ acao: "calendario" }));
+    expect(r.status).toBe(409);
+    const corpo = (await r.json()) as { error: string; semCalendario?: boolean };
+    expect(corpo.semCalendario).toBe(true);
+    expect(corpo.error).toContain("O calendário de 8 times ainda não foi definido");
+    expect(corpo.error).toContain("28 séries da fase de pontos");
+    expect(banco.salvos).toHaveLength(salvosAntes);
+    expect((banco.dataset as TournamentDataset).seriesMatches).toHaveLength(0);
+  });
+
+  it("com um draft de 6 times e o calendário de 8, recusa e manda criar as séries à mão", async () => {
+    banco.draft = { estado: draftEncerrado(6), revisao: 1 };
+    banco.dataset = datasetAberto([]);
+    expect((await POST(req({ acao: "virar" }))).status).toBe(200);
+    const r = await POST(req({ acao: "calendario" }));
+    expect(r.status).toBe(409);
+    expect(((await r.json()) as { error: string }).error).toContain("O calendário da 4ª é de 8 times, e há 6 no ar.");
+  });
+
   it("sem draft, recusa", async () => {
     banco.dataset = datasetAberto([]);
     const r = await POST(req({ acao: "calendario" }));
@@ -152,28 +194,31 @@ describe("calendário da 4ª", () => {
     expect(banco.salvos).toHaveLength(0);
   });
 
-  it("depois da virada: sorteia as posições e cria as 15 séries com data, uma vez só", async () => {
+  it("depois da virada, com a grade de 8 times: sorteia as posições e cria as 28 séries com data, uma vez só", async () => {
     banco.draft = { estado: draftEncerrado(), revisao: 1 };
     banco.dataset = datasetAberto([]);
     const virada = await POST(req({ acao: "virar" }));
     expect(virada.status).toBe(200);
     const times = (banco.dataset as TournamentDataset).teams.map((t) => t.id);
-    expect(times).toHaveLength(6);
+    expect(times).toHaveLength(8);
 
     const r = await POST(req({ acao: "calendario" }));
     expect(r.status).toBe(200);
-    const corpo = (await r.json()) as { posicoes: { posicao: number; teamId: string }[]; semente: string };
-    expect(corpo.posicoes.map((p) => p.posicao)).toEqual([1, 2, 3, 4, 5, 6]);
+    const corpo = (await r.json()) as { posicoes: { posicao: number; teamId: string }[]; semente: string; series: number };
+    expect(corpo.posicoes.map((p) => p.posicao)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     expect([...corpo.posicoes.map((p) => p.teamId)].sort()).toEqual([...times].sort());
+    expect(corpo.series).toBe(28);
 
     const series = (banco.dataset as TournamentDataset).seriesMatches;
-    expect(series).toHaveLength(15);
-    expect(series[0]!.date).toBe("2026-11-20T20:00:00-03:00");
-    // A 1ª série é Time 3 x Time 6 do calendário publicado.
-    expect([series[0]!.teamAId, series[0]!.teamBId]).toEqual([corpo.posicoes[2]!.teamId, corpo.posicoes[5]!.teamId]);
+    expect(series).toHaveLength(28);
+    const primeiro = calendarioDe8TimesDeTeste().slots.find((s) => s.tipo === "pontos")!;
+    expect(series[0]!.date).toBe(primeiro.quando);
+    // A 1ª série é o 1º confronto da grade (Time 1 x Time 8), com os times sorteados.
+    const [a, b] = primeiro.confronto!;
+    expect([series[0]!.teamAId, series[0]!.teamBId]).toEqual([corpo.posicoes[a - 1]!.teamId, corpo.posicoes[b - 1]!.teamId]);
     const jogos = new Map<string, number>();
     for (const s of series) for (const t of [s.teamAId, s.teamBId]) jogos.set(t, (jogos.get(t) ?? 0) + 1);
-    expect([...jogos.values()]).toEqual([5, 5, 5, 5, 5, 5]);
+    expect([...jogos.values()]).toEqual(Array(8).fill(7));
     // Gravou com a trava de versão, e a semente foi para a auditoria.
     expect(banco.salvos.at(-1)!.opcoes).toMatchObject({ versaoEsperada: 4 });
     expect(banco.auditoria.find((a) => a.acao === "calendario_sorteado")?.detalhe).toMatchObject({ semente: corpo.semente });
@@ -181,7 +226,7 @@ describe("calendário da 4ª", () => {
     // Segunda vez: já há séries, recusa em vez de duplicar.
     const deNovo = await POST(req({ acao: "calendario" }));
     expect(deNovo.status).toBe(409);
-    expect((banco.dataset as TournamentDataset).seriesMatches).toHaveLength(15);
+    expect((banco.dataset as TournamentDataset).seriesMatches).toHaveLength(28);
   });
 });
 

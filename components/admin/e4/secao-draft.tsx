@@ -42,6 +42,13 @@ import {
   tabular,
 } from "@/components/admin/ui";
 import { RoleIcon } from "@/components/lob/ui";
+import {
+  TIMES_DO_CALENDARIO_4A,
+  calendarioDivulgado,
+  diaDoSlot,
+  seriesDePontosCom,
+  slotsDoCalendario,
+} from "@/lib/calendario-4a";
 import { resolveElo, resolveRole } from "@/lib/design";
 import type { DraftPublico, PreviaDoDraft } from "@/lib/draft/store";
 import { listaForaDoDraft } from "@/lib/draft/virada";
@@ -62,7 +69,7 @@ import { listaForaDoDraft } from "@/lib/draft/virada";
  *
  * No celular a mesa muda de arranjo, não de regra. Com o draft sorteado, o placar da vez,
  * os botões de iniciar/pausar/retomar e o pool do time da vez sobem para o topo: quem
- * conduz pelo telefone não pode rolar a conferência e seis elencos para achar o jogador
+ * conduz pelo telefone não pode rolar a conferência e oito elencos para achar o jogador
  * que o capitão pediu no Discord. O pool vira cartões (emblema do elo, rotas, preço) com
  * busca e filtro de rota, e o `window.confirm` vira uma folha que mostra o orçamento do
  * time depois da escolha. A vez continua lida no toque e indo no pedido.
@@ -99,6 +106,26 @@ type JogadorDaPrevia = PreviaDoDraft["jogadores"][number];
  * a folha aberta, o servidor recusa em vez de dar o jogador ao time seguinte.
  */
 type Confirmacao = { id: string; escolha: number; timeId: string; nome: string; sorteioId: string | null };
+
+/**
+ * O que o cartão "4 · Calendário" diz, tirado da grade (lib/calendario-4a.ts): quantos
+ * times, quantas séries de pontos e o período delas. Sem a grade divulgada, os números são
+ * os do formato (8 times → 28 séries) e o botão fica travado.
+ */
+const CALENDARIO_DO_PAINEL = (() => {
+  const divulgado = calendarioDivulgado();
+  const dias = slotsDoCalendario()
+    .filter((s) => s.tipo === "pontos")
+    .map(diaDoSlot)
+    .sort();
+  const ddmm = (dia: string) => `${dia.slice(8, 10)}/${dia.slice(5, 7)}`;
+  return {
+    divulgado,
+    times: TIMES_DO_CALENDARIO_4A,
+    pontos: divulgado ? dias.length : seriesDePontosCom(TIMES_DO_CALENDARIO_4A),
+    periodoDosPontos: dias.length > 0 ? `${ddmm(dias[0]!)} a ${ddmm(dias[dias.length - 1]!)}` : "",
+  };
+})();
 
 const MOTIVO_DA_PAUSA: Record<NonNullable<DraftPublico["motivoDaPausa"]>, string> = {
   organizacao: "pausado pela organização",
@@ -488,6 +515,7 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
    */
   const [foraConfirmado, setForaConfirmado] = useState<string | null>(null);
   const [confirmoCalendario, setConfirmoCalendario] = useState(false);
+  const calendario = CALENDARIO_DO_PAINEL;
   const [posicoes, setPosicoes] = useState<{ posicao: number; nome: string }[] | null>(null);
   const [agora, setAgora] = useState(() => Date.now());
   /** Hora do servidor menos a do aparelho (ms), medida a cada sondagem — mesma correção da TV. */
@@ -1460,23 +1488,32 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
         </div>
       </ActionCard>
 
-      {/* ------------------------------------------------ calendário */}
+      {/* ------------------------------------------------ calendário
+          Os números (times, séries, período) saem da grade de lib/calendario-4a.ts. Sem a
+          grade divulgada, o cartão diz por que o botão está travado — a rota recusa do
+          mesmo jeito. */}
       <BlockTitle>4 · Calendário</BlockTitle>
       <ActionCard
-        tone="gold"
-        title="Sortear as posições e criar as 15 séries"
-        description="Sorteia qual time é o Time 1 … Time 6 do calendário publicado e cria as 15 séries da fase de pontos com data e hora (20/11 a 28/11). Semifinais e final são criadas depois, no painel de Séries, quando a tabela fechar. Só funciona com os times do draft já aplicados e a temporada ainda sem séries."
+        tone={calendario.divulgado ? "gold" : "neutro"}
+        title={`Sortear as posições e criar as ${calendario.pontos} séries`}
+        description={
+          calendario.divulgado
+            ? `Sorteia qual time é o Time 1 … Time ${calendario.times} do calendário publicado e cria as ${calendario.pontos} séries da fase de pontos com data e hora (${calendario.periodoDosPontos}). Semifinais e final são criadas depois, no painel de Séries, quando a tabela fechar. Só funciona com os times do draft já aplicados e a temporada ainda sem séries.`
+            : `O calendário de ${calendario.times} times ainda não foi definido. Quando estiver, este botão sorteia qual time é o Time 1 … Time ${calendario.times} e cria as ${calendario.pontos} séries da fase de pontos com data e hora.`
+        }
+        badge={calendario.divulgado ? undefined : <Chip tone="off">datas a divulgar</Chip>}
       >
-        <Check checked={confirmoCalendario} onChange={setConfirmoCalendario}>
+        <Check checked={confirmoCalendario} onChange={setConfirmoCalendario} disabled={!calendario.divulgado}>
           Os times do draft já estão no site. Pode sortear as posições.
         </Check>
         <div>
           <Button
             tone="gold"
             fullWidth={compacto}
-            disabled={!podeConduzir || ocupado || !confirmoCalendario}
+            disabled={!calendario.divulgado || !podeConduzir || ocupado || !confirmoCalendario}
+            title={calendario.divulgado ? undefined : `O calendário de ${calendario.times} times ainda não foi definido.`}
             onClick={() =>
-              void agir({ acao: "calendario" }, "Posições sorteadas e 15 séries criadas.").then((r) => {
+              void agir({ acao: "calendario" }, `Posições sorteadas e ${calendario.pontos} séries criadas.`).then((r) => {
                 if (!r) return;
                 setConfirmoCalendario(false);
                 setPosicoes((r.posicoes as { posicao: number; nome: string }[]) ?? null);

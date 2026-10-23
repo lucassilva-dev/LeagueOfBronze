@@ -59,7 +59,7 @@ export type EdicaoConfig = {
   inicio_campeonato: string | null;
   inscricoes_abertas: boolean;
   jogadores_por_time: number;
-  /** Teto de times (30 jogadores = 6 na 4ª). Nulo = sem teto. Opcional: banco sem a migração. */
+  /** Teto de times (40 jogadores = 8 na 4ª). Nulo = sem teto. Opcional: banco sem a migração. */
   max_times?: number | null;
   orcamento_por_time: number;
   min_ranqueadas: number;

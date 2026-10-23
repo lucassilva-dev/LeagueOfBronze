@@ -152,7 +152,7 @@ export const inscricao = definir({
     rotasIguais: "A rota secundária precisa ser diferente da primária.",
     disponibilidadeLabel: "DISPONIBILIDADE PARA JOGAR",
     disponibilidadeAjuda:
-      "Marque todos os turnos em que você pode jogar. Vale como compromisso (regra 9): os horários são os do calendário oficial (20 a 29/11, manhã, tarde e noite), e cada time joga nos horários da posição sorteada para ele.",
+      "Marque todos os turnos em que você pode jogar. Vale como compromisso (regra 9): os horários são os do calendário oficial (manhã, tarde e noite), que sai assim que a organização fechar as datas, e cada time joga nos horários da posição sorteada para ele.",
     disponibilidadeFaltando: "Marque pelo menos um turno.",
     turnos: {
       manha: "MANHÃ",
@@ -426,7 +426,7 @@ export const inscricao = definir({
     rotasIguais: "The secondary role must differ from the primary one.",
     disponibilidadeLabel: "AVAILABILITY TO PLAY",
     disponibilidadeAjuda:
-      "Tick every period you can play. It counts as a commitment (rule 9): times follow the official schedule (20 to 29 Nov, morning, afternoon and evening), and each team plays at the times of the slot drawn for it.",
+      "Tick every period you can play. It counts as a commitment (rule 9): times follow the official schedule (morning, afternoon and evening), published as soon as the organisers set the dates, and each team plays at the times of the slot drawn for it.",
     disponibilidadeFaltando: "Tick at least one period.",
     turnos: {
       manha: "MORNING",

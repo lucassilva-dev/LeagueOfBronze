@@ -19,13 +19,15 @@
  *     cravar número de edição nem data: o nome vem de `dataset.tournament.name` e as datas
  *     das séries ou de lib/calendario-4a.ts; a /tabela destaca os 4 que vão às semifinais;
  *   - as semifinais aparecem no calendário (`buildSemifinalGames` em lib/calendar.ts);
- *   - as 15 séries da fase de pontos são criadas pelo painel do draft, a partir do
- *     calendário oficial (lib/calendario-4a.ts).
+ *   - as séries da fase de pontos (28 com os 8 times da 4ª) são criadas pelo painel do
+ *     draft, a partir do calendário oficial (lib/calendario-4a.ts) — que precisa estar
+ *     divulgado: desde 2026-10-22 as datas estão "a divulgar" e o botão fica travado.
  *
  * O que a ORGANIZAÇÃO ainda precisa fazer, nesta ordem, antes de trocar:
  *   1. fechar as inscrições na Configuração da edição;
  *   2. aplicar o draft (a virada põe os times e jogadores no dataset ao vivo);
- *   3. criar as séries pelo painel do draft (sorteio das posições Time 1…6);
+ *   3. criar as séries pelo painel do draft (sorteio das posições Time 1…8), com a grade
+ *      de 8 times já preenchida em lib/calendario-4a-grade.ts;
  *   4. conferir /times e /tabela com o elenco certo — e só então trocar esta constante.
  * Ainda em aberto: o card de desempate da /tabela (`tabelaInfoDesempateTexto`) depende de
  * uma decisão pendente da organização.

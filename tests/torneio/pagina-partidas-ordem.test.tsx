@@ -3,13 +3,16 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { seriesDaFaseDePontos } from "@/lib/calendario-4a";
+import { CALENDARIO_6_TIMES_DE_20_10 } from "@/tests/_calendarios";
 import { tournamentDatasetSchema, type SeriesMatch, type TournamentDataset } from "@/lib/schema";
 
 /**
  * /partidas abre com o resultado mais recente, não com a série mais distante no futuro.
  *
- * As 15 séries da 4ª são criadas de uma vez; só por data decrescente, em 21/11 a página
- * começava pela de 28/11 (sem resultado) e a recém-terminada ficava lá pela 13ª posição.
+ * As séries da fase de pontos da 4ª são criadas de uma vez; só por data decrescente, em
+ * 21/11 a página começava pela de 28/11 (sem resultado) e a recém-terminada ficava lá pela
+ * 13ª posição. O cenário usa a grade de 6 times publicada em 20/10 (tests/_calendarios.ts):
+ * a de 8 times ainda está a divulgar, e a ordem não depende do número de times.
  */
 const TIMES = ["chama", "aurea", "verdante", "gelida", "arcana", "carmesim"];
 
@@ -48,7 +51,7 @@ async function resolver(no: ReactNode): Promise<ReactNode> {
 }
 
 function quarta(): TournamentDataset {
-  const series: SeriesMatch[] = seriesDaFaseDePontos(TIMES);
+  const series: SeriesMatch[] = seriesDaFaseDePontos(TIMES, CALENDARIO_6_TIMES_DE_20_10);
   const j3 = series.find((s) => s.id === "4a-jogo-03")!;
   const jogo = {
     winnerTeamId: j3.teamAId,

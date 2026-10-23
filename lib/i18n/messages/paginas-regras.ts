@@ -21,7 +21,7 @@ const pt = {
   regrasSobretitulo: "Regulamento oficial",
   regrasTitulo: "REGRAS",
   regrasSubtitulo:
-    "Regulamento do 4º Campeonato dos Bronzes (League of Bronze, 4ª Edição) — League of Legends 5v5. Atualizado em 20/10/2026.",
+    "Regulamento do 4º Campeonato dos Bronzes (League of Bronze, 4ª Edição) — League of Legends 5v5. Atualizado em 22/10/2026.",
   sumarioRotulo: "Nesta página",
 
   // ---------- app/regras: 1. visão geral ----------
@@ -32,7 +32,7 @@ const pt = {
   fichaModalidadeV: "5v5, Summoner’s Rift",
   fichaPeriodoK: "PERÍODO",
   fichaPeriodoV:
-    "De 20 a 29 de novembro, em dois fins de semana. O calendário completo está no fim desta página.",
+    "Datas a divulgar: o calendário dos jogos sai no fim desta página assim que a organização fechar as datas.",
   fichaFaseK: "FASE DE PONTOS CORRIDOS",
   fichaFaseV: "Todos contra todos, uma vez, em séries MD3 (melhor de 3). Vitória na série = 3 pontos.",
   fichaSemifinaisK: "SEMIFINAIS",
@@ -58,14 +58,14 @@ const pt = {
   inscricaoCampo3: "Elo atual na fila solo/duo.",
   inscricaoCampo4: "Rota primária e rota secundária.",
   inscricaoCampo5:
-    "Disponibilidade por turno (manhã, tarde e/ou noite). As datas e os horários estão no calendário, no fim desta página, e a disponibilidade informada vale como compromisso (regra 9).",
+    "Disponibilidade por turno (manhã, tarde e/ou noite). As datas e os horários saem no calendário, no fim desta página, e a disponibilidade informada vale como compromisso (regra 9).",
   inscricaoCampo6:
     "Aceite do regulamento e ciência do pagamento, autorização de uso de imagem e nick (regra 17) e confirmação dos requisitos das regras 1, 3, 4, 5 e 21.",
   inscricaoNota:
     "Nick ou Discord repetido bloqueia a inscrição. Os horários são os do calendário oficial, em manhã, tarde e noite, e cada time joga nos horários da posição sorteada para ele: a disponibilidade informada é o compromisso de jogar nesses horários.",
   inscricaoReservasRotulo: "Reservas:",
   inscricaoReservasTexto:
-    "esta edição tem 6 times de 5 jogadores (30 vagas). Quem passar disso vira reserva oficial e pode substituir titulares (regra 6).",
+    "esta edição tem 8 times de 5 jogadores (40 vagas). Quem passar disso vira reserva oficial e pode substituir titulares (regra 6).",
 
   // ---------- app/regras: 3. formação dos times ----------
   formacaoTitulo: "FORMAÇÃO DOS TIMES",
@@ -75,7 +75,7 @@ const pt = {
   capitaes1:
     "Os capitães são os inscritos de maior elo na fila solo/duo, independentemente da rota. O elo da flex não conta.",
   capitaes2: "Os organizadores desta edição jogam, mas não são capitães.",
-  capitaes3: "O número de capitães é igual ao número de times: 6 nesta edição.",
+  capitaes3: "O número de capitães é igual ao número de times: 8 nesta edição.",
   capitaes4:
     "Um sorteio ao vivo define qual time cada capitão vai capitanear e a ordem de escolha do draft.",
   capitaes5:
@@ -88,7 +88,7 @@ const pt = {
   draft3:
     "O capitão entra com a rota do seu cadastro, fixa, e o draft é feito em 4 rodadas para as outras 4 rotas.",
   draft4:
-    "A ordem de escolha é serpentina (ex.: com 6 times, 1-2-3-4-5-6-6-5-4-3-2-1) e não pode ser trocada nem alterada depois de sorteada.",
+    "A ordem de escolha é serpentina (ex.: com 8 times, 1-2-3-4-5-6-7-8-8-7-6-5-4-3-2-1) e não pode ser trocada nem alterada depois de sorteada.",
   draft5:
     "Nenhum capitão pode estourar o orçamento; deve sempre reservar pontos para fechar as rodadas restantes com o jogador mais barato ainda disponível em cada rota.",
   draft6: "Jogador escolhido não pode ser escolhido por outro time.",
@@ -319,7 +319,7 @@ export const paginasRegras = definir<ChavesPaginasRegras>({
     regrasSobretitulo: "Official rulebook",
     regrasTitulo: "RULES",
     regrasSubtitulo:
-      "Rulebook of the 4th Campeonato dos Bronzes (League of Bronze, 4th Edition) — League of Legends 5v5. Updated on 20 October 2026.",
+      "Rulebook of the 4th Campeonato dos Bronzes (League of Bronze, 4th Edition) — League of Legends 5v5. Updated on 22 October 2026.",
     sumarioRotulo: "On this page",
 
     // ---------- app/regras: 1. visão geral ----------
@@ -329,7 +329,8 @@ export const paginasRegras = definir<ChavesPaginasRegras>({
     fichaModalidadeK: "MODE",
     fichaModalidadeV: "5v5, Summoner’s Rift",
     fichaPeriodoK: "WHEN",
-    fichaPeriodoV: "20 to 29 November, over two weekends. The full schedule is at the bottom of this page.",
+    fichaPeriodoV:
+      "Dates to be announced: the match schedule will appear at the bottom of this page as soon as the organisers set the dates.",
     fichaFaseK: "ROUND-ROBIN STAGE",
     fichaFaseV: "Everyone plays everyone once, in Bo3 series (best of 3). Series win = 3 points.",
     fichaSemifinaisK: "SEMIFINALS",
@@ -355,14 +356,14 @@ export const paginasRegras = definir<ChavesPaginasRegras>({
     inscricaoCampo3: "Current solo/duo queue rank.",
     inscricaoCampo4: "Primary and secondary role.",
     inscricaoCampo5:
-      "Availability by session (morning, afternoon and/or evening). Dates and times are in the schedule at the bottom of this page, and the availability you give counts as a commitment (rule 9).",
+      "Availability by session (morning, afternoon and/or evening). Dates and times will be in the schedule at the bottom of this page, and the availability you give counts as a commitment (rule 9).",
     inscricaoCampo6:
       "Acceptance of the rulebook and acknowledgement of the payment, consent to the use of your image and nickname (rule 17) and confirmation of the requirements in rules 1, 3, 4, 5 and 21.",
     inscricaoNota:
       "A duplicate Riot ID or Discord blocks the sign-up. Times follow the official schedule, across morning, afternoon and evening, and each team plays at the times of the slot drawn for it: the availability you give is your commitment to play at those times.",
     inscricaoReservasRotulo: "Reserves:",
     inscricaoReservasTexto:
-      "this edition has 6 teams of 5 players (30 places). Anyone beyond that becomes an official reserve and may replace starters (rule 6).",
+      "this edition has 8 teams of 5 players (40 places). Anyone beyond that becomes an official reserve and may replace starters (rule 6).",
 
     // ---------- app/regras: 3. formação dos times ----------
     formacaoTitulo: "TEAM FORMATION",
@@ -372,7 +373,7 @@ export const paginasRegras = definir<ChavesPaginasRegras>({
     capitaes1:
       "The captains are the sign-ups with the highest solo/duo queue rank, regardless of role. Flex rank does not count.",
     capitaes2: "This edition's organisers play, but they are not captains.",
-    capitaes3: "The number of captains equals the number of teams: 6 in this edition.",
+    capitaes3: "The number of captains equals the number of teams: 8 in this edition.",
     capitaes4:
       "A live draw decides which team each captain will lead and the pick order of the draft.",
     capitaes5:
@@ -385,7 +386,7 @@ export const paginasRegras = definir<ChavesPaginasRegras>({
     draft3:
       "The captain comes in with the fixed role from their sign-up, and the draft runs over 4 rounds for the other 4 roles.",
     draft4:
-      "Pick order is snake (e.g. with 6 teams, 1-2-3-4-5-6-6-5-4-3-2-1) and cannot be swapped or changed once drawn.",
+      "Pick order is snake (e.g. with 8 teams, 1-2-3-4-5-6-7-8-8-7-6-5-4-3-2-1) and cannot be swapped or changed once drawn.",
     draft5:
       "No captain may go over budget; they must always keep enough points to fill the remaining rounds with the cheapest player still available in each role.",
     draft6: "A player who has been picked cannot be picked by another team.",

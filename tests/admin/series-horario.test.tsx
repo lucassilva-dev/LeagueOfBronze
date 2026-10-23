@@ -18,6 +18,7 @@ import {
   type MutateDraft,
 } from "@/components/admin/shared";
 import { CALENDARIO_4A } from "@/lib/calendario-4a";
+import { CALENDARIO_6_TIMES_DE_20_10, calendarioDe8TimesDeTeste } from "@/tests/_calendarios";
 import type { SeriesMatch, TournamentDataset } from "@/lib/schema";
 
 /**
@@ -163,7 +164,10 @@ describe("camposBrasiliaParaIso", () => {
   });
 
   it("ida e volta não anda: todos os horários do calendário oficial voltam idênticos", () => {
-    for (const slot of CALENDARIO_4A) {
+    // O oficial (vazio enquanto as datas não saem) e as grades de teste, de 6 e de 8 times.
+    const slots = [...CALENDARIO_4A, ...CALENDARIO_6_TIMES_DE_20_10.slots, ...calendarioDe8TimesDeTeste().slots];
+    expect(slots.length).toBeGreaterThan(40);
+    for (const slot of slots) {
       const { data, hora } = isoParaCamposBrasilia(slot.quando);
       expect(camposBrasiliaParaIso(data, hora)).toBe(slot.quando);
     }

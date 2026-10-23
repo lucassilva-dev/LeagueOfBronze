@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import { buildRegularGames } from "@/lib/calendar";
 import { seriesDaFaseDePontos } from "@/lib/calendario-4a";
+import { CALENDARIO_6_TIMES_DE_20_10 } from "@/tests/_calendarios";
 import { tournamentDatasetSchema, type SeriesMatch, type TournamentDataset } from "@/lib/schema";
 import { getSeriesSummaries, ordenarSeriesParaPartidas } from "@/lib/tournament";
 
 /**
- * A ORDEM DO /partidas E O "JOGO N" DO /calendario, com as 15 séries da 4ª criadas de uma
- * vez pelo gerador do calendário (como acontece de verdade).
+ * A ORDEM DO /partidas E O "JOGO N" DO /calendario, com as séries da fase de pontos criadas
+ * de uma vez pelo gerador do calendário (como acontece de verdade). A grade é a de 6 times
+ * publicada em 20/10 (tests/_calendarios.ts): a de 8 ainda está a divulgar.
  */
 
 const TIMES = ["chama", "aurea", "verdante", "gelida", "arcana", "carmesim"];
@@ -53,7 +55,7 @@ function decidir(serie: SeriesMatch) {
 
 describe("/partidas: resultados primeiro, depois as séries por jogar", () => {
   it("em 21/11, abre com a recém-terminada, e as por jogar vêm da mais próxima para a mais distante", () => {
-    const series = seriesDaFaseDePontos(TIMES);
+    const series = seriesDaFaseDePontos(TIMES, CALENDARIO_6_TIMES_DE_20_10);
     for (const id of ["4a-jogo-01", "4a-jogo-02", "4a-jogo-03"]) decidir(series.find((s) => s.id === id)!);
     const d = quarta(series);
 
@@ -68,7 +70,7 @@ describe("/partidas: resultados primeiro, depois as séries por jogar", () => {
   });
 
   it("não mexe na lista que recebe (campeão e histórico do time usam a ordem decrescente)", () => {
-    const d = quarta(seriesDaFaseDePontos(TIMES));
+    const d = quarta(seriesDaFaseDePontos(TIMES, CALENDARIO_6_TIMES_DE_20_10));
     const resumos = getSeriesSummaries(d);
     const antes = resumos.map((s) => s.series.id);
     ordenarSeriesParaPartidas(resumos);
@@ -78,7 +80,7 @@ describe("/partidas: resultados primeiro, depois as séries por jogar", () => {
 
 describe("/calendario: o JOGO N fica preso à série", () => {
   it("remarcar a 4a-jogo-03 para a reserva de 28/11 não renumera ninguém", () => {
-    const series = seriesDaFaseDePontos(TIMES);
+    const series = seriesDaFaseDePontos(TIMES, CALENDARIO_6_TIMES_DE_20_10);
     series.find((s) => s.id === "4a-jogo-03")!.date = "2026-11-28T19:00:00-03:00";
     const jogos = buildRegularGames(quarta(series));
     const n = (id: string) => jogos.find((j) => j.id === id)!.n;
@@ -92,14 +94,14 @@ describe("/calendario: o JOGO N fica preso à série", () => {
   });
 
   it("temporada sem o id numerado (a 3ª: serie-14) segue numerando pela ordem cronológica", () => {
-    const series = seriesDaFaseDePontos(TIMES).map((s, i) => ({ ...s, id: `serie-${i + 1}` }));
+    const series = seriesDaFaseDePontos(TIMES, CALENDARIO_6_TIMES_DE_20_10).map((s, i) => ({ ...s, id: `serie-${i + 1}` }));
     series[0]!.date = "2026-11-28T19:00:00-03:00";
     const jogos = buildRegularGames(quarta(series));
     expect(jogos.map((j) => j.n)).toEqual(Array.from({ length: 15 }, (_, i) => i + 1));
   });
 
   it("uma série avulsa sem o padrão no meio das numeradas não gera número repetido", () => {
-    const series = seriesDaFaseDePontos(TIMES);
+    const series = seriesDaFaseDePontos(TIMES, CALENDARIO_6_TIMES_DE_20_10);
     series.push({ ...series[0]!, id: "desempate-extra", date: "2026-11-28T21:00:00-03:00" });
     const jogos = buildRegularGames(quarta(series));
     expect(new Set(jogos.map((j) => j.n)).size).toBe(jogos.length);

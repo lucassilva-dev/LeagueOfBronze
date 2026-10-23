@@ -3,20 +3,31 @@ import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { CALENDARIO_4A, seriesDaFaseDePontos } from "@/lib/calendario-4a";
+import { CALENDARIO_4A, problemasDaGrade, seriesDaFaseDePontos } from "@/lib/calendario-4a";
 import { MESSAGES } from "@/lib/i18n/messages";
 import { diaEMes, horaNoIdioma, periodoPorExtenso } from "@/lib/i18n/messages/paginas-home";
 import { tournamentDatasetSchema, type SeriesMatch, type TournamentDataset } from "@/lib/schema";
 
 /**
- * As páginas públicas da temporada na 4ª Edição (20 a 29/11/2026; 6 times, 30 jogadores;
- * pontos corridos MD3, semifinais 1º x 4º e 2º x 3º em MD3, final MD5 em 29/11 às 14:30).
+ * As páginas públicas da temporada na 4ª Edição COM O CALENDÁRIO DIVULGADO.
+ *
+ * O calendário oficial de 8 times ainda está "a divulgar" (2026-10-22) — esse estado tem o
+ * seu próprio arquivo, tests/publico/calendario-a-divulgar.test.tsx. Aqui a grade oficial é
+ * trocada pela de 6 times publicada em 20/10 (tests/_calendarios.ts: 20 a 29/11/2026;
+ * pontos corridos MD3, semifinais 1º x 4º e 2º x 3º em MD3, final MD5 em 29/11 às 14:30),
+ * que casa com os 6 times da 3ª usados de figurante. O que se testa — a home, a /tabela e o
+ * /calendario completando com a grade o que ainda não virou série — não depende do número
+ * de times; quando a grade de 8 sair, estes caminhos são os mesmos.
  *
  * Os textos da home, de /times, /jogadores e /tabela tinham a 3ª cravada — "3ª EDIÇÃO",
  * "25 de julho a 02 de agosto", "os 2 primeiros vão à final" — e o bloco "Próxima edição —
  * 4ª" aparecia DURANTE a 4ª. Aqui as páginas são renderizadas de verdade, com o banco, o
  * idioma e a fase do site trocados por dublês.
  */
+
+vi.mock("@/lib/calendario-4a-grade", async () => ({
+  CALENDARIO_OFICIAL_4A: (await import("@/tests/_calendarios")).CALENDARIO_6_TIMES_DE_20_10,
+}));
 
 const cenario = vi.hoisted(() => ({
   locale: "pt" as "pt" | "en",
@@ -268,11 +279,23 @@ describe("home da pré-temporada: botão do draft ao vivo", () => {
     expect(markup).not.toMatch(/<a[^>]*class="lob-btn-gold"[^>]*href="\/draft"/);
   });
 
+  it("com a grade divulgada e por vir: o período na pílula e no passo 5, e as fichas dos dias", async () => {
+    const t = texto(await html(HomePreTemporada()));
+    expect(t).toContain("DE 20 A 29 DE NOVEMBRO");
+    expect(t).toContain("6 TIMES · 30 JOGADORES");
+    expect(t).not.toContain("DATAS A DIVULGAR");
+    expect(t).toContain("6 times de 5 jogadores. Pontos corridos em séries MD3, semifinais 1º x 4º e 2º x 3º, e final em MD5 — de 20 a 29 de novembro.");
+    expect(t).toContain("semis + final");
+    expect(t).toContain("VER O CALENDÁRIO");
+  });
+
   it("passado o calendário oficial, o resumo de datas some da home", async () => {
     vi.setSystemTime(new Date("2026-12-10T12:00:00-03:00"));
     const t = texto(await html(HomePreTemporada()));
     expect(t).not.toContain("20 A 29 DE NOVEMBRO");
     expect(t).not.toContain("VER O CALENDÁRIO");
+    // Nem o formato daquele calendário: a pílula "N TIMES · M JOGADORES" é dele.
+    expect(t).not.toContain("6 TIMES · 30 JOGADORES");
   });
 
   it("não aparece sem draft montado", async () => {
@@ -406,8 +429,10 @@ describe("textos que não podem voltar a cravar a 3ª", () => {
     expect(MESSAGES.pt.paginasRegras.regra9).toMatch(/^Não será aceito trocar os confrontos/);
   });
 
-  it("a reserva que a regra 9 cita existe no calendário oficial", () => {
+  it("a reserva que a regra 9 cita: a conferência da grade não aceita calendário sem ela", () => {
     expect(CALENDARIO_4A.filter((s) => s.tipo === "reserva").map((s) => s.quando)).toEqual(["2026-11-28T19:00:00-03:00"]);
+    const semReserva = { divulgado: true, times: 6, slots: CALENDARIO_4A.filter((s) => s.tipo !== "reserva") } as const;
+    expect(problemasDaGrade(semReserva).join(" ")).toMatch(/regra 9/);
   });
 });
 

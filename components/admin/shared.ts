@@ -198,7 +198,7 @@ export function isoParaCamposBrasilia(valor: string | null | undefined): CamposD
  * Campos do painel -> texto de `series.date`.
  *
  * - Com horário: "YYYY-MM-DDTHH:mm:00-03:00" — semifinais e final da 4ª são criadas aqui
- *   e precisam da hora (08:30, 10:30, 14:30); remarcar para a reserva (28/11 19:00) também.
+ *   e precisam da hora do calendário; remarcar para o horário de reserva também.
  * - Horário em branco: só a data, exatamente o que o campo antigo gravava.
  * - Data em branco/ilegível, ou horário ilegível: `undefined`, e quem chama NÃO grava. O
  *   schema exige a data (`min(1)`); gravar "" só adiaria o problema para um erro técnico

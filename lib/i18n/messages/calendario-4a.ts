@@ -4,19 +4,22 @@ import { definir } from "@/lib/i18n/definir";
  * Textos do calendário da 4ª Edição (lib/calendario-4a.ts), usado em /regras, em
  * /calendario e na home da pré-temporada.
  *
- * `{n}` é o número da posição (Time 1 … Time 6). A GRADE (dia, hora, confronto) vem do
- * arquivo do calendário. As frases abaixo repetem algumas datas e horas porque precisam
- * soar naturais nos dois idiomas ("Sexta 22:00 e sábado 23:00…") — e o teste
- * tests/calendario-4a.test.tsx compara cada uma com a grade: mudou um horário lá, o teste
- * aponta qual frase daqui (e de /regras, da home e do formulário) ficou velha.
+ * 8 times, datas a divulgar (decisão de 2026-10-22): enquanto a grade não sai, as páginas
+ * mostram o bloco `aDivulgar*` — o formato, sem dia nem hora. Quando a grade é divulgada,
+ * as frases que dependem dela são MOLDES preenchidos pela grade (`{times}`, `{dia}`,
+ * `{hora}`…): nenhuma data fica escrita aqui, então nenhuma fica velha.
+ *
+ * `intro` é a exceção, porque /regras e /calendario a mostram direto: ela diz só o formato
+ * (8 times, 31 séries), que vale com e sem as datas. tests/calendario-4a.test.tsx confere
+ * esses números com `TIMES_DO_CALENDARIO_4A` e com a grade, quando ela existir.
  */
 export const calendario4a = definir({
   pt: {
     titulo: "CALENDÁRIO DA 4ª EDIÇÃO",
     intro:
-      "6 times, um jogo de cada vez: 18 séries em dois fins de semana — 20, 21 e 22/11 e 27, 28 e 29/11. Semifinais e final no mesmo dia, domingo 29/11. Horários de Brasília.",
-    fimDeSemana1: "1º FIM DE SEMANA",
-    fimDeSemana2: "2º FIM DE SEMANA",
+      "8 times e 31 séries: 28 de pontos corridos (todos contra todos, em MD3), as 2 semifinais em MD3 e a final em MD5. Horários de Brasília.",
+    // `{n}` = 1, 2, 3… — os dias da mesma semana formam um fim de semana.
+    fimDeSemana: "{n}º FIM DE SEMANA",
     diasDaSemana: "DOMINGO,SEGUNDA,TERÇA,QUARTA,QUINTA,SEXTA,SÁBADO",
 
     legendaManha: "Manhã",
@@ -37,29 +40,46 @@ export const calendario4a = definir({
     formatoMd3: "MD3",
     formatoMd5: "MD5",
 
+    // `{times}` = número de times do calendário.
     notaPosicoes:
-      "Time 1 a Time 6 são posições: qual time ocupa cada uma sai de um sorteio ao vivo logo depois do draft.",
+      "Time 1 a Time {times} são posições: qual time ocupa cada uma sai de um sorteio ao vivo logo depois do draft.",
     notaAtraso:
-      "Os jogos de sexta às 22:00 e de sábado às 23:00 nunca começam antes do horário. Se o jogo anterior passar do tempo, eles começam assim que ele acabar.",
-    notaReserva: "A reserva de sábado 28/11 às 19:00 fica vaga para remarcar imprevistos.",
+      "Os jogos com o aviso de horário nunca começam antes da hora marcada. Se o jogo anterior passar do tempo, eles começam assim que ele acabar.",
+    // `{dia}` = "sábado, 28/11"; `{hora}` = "19:00". Uma nota por horário de reserva.
+    notaReserva: "A reserva de {dia}, às {hora}, fica vaga para remarcar imprevistos.",
     notaSemis: "Os confrontos das semifinais saem da classificação da fase de pontos: 1º x 4º e 2º x 3º.",
+
+    // ---------- datas a divulgar ----------
+    aDivulgarSelo: "A DIVULGAR",
+    aDivulgarTitulo: "Datas e horários dos jogos a divulgar",
+    // `{times}` = 8; `{vagas}` = 40.
+    aDivulgarTexto:
+      "O formato está fechado: {times} times de 5 jogadores ({vagas} vagas). As datas e os horários dos jogos saem aqui assim que a organização fechar o calendário — e o aviso vai também para o Discord e o grupo do WhatsApp.",
+    aDivulgarPontosK: "FASE DE PONTOS",
+    // `{pontos}` = 28 com 8 times.
+    aDivulgarPontosV: "Todos contra todos, uma vez: {pontos} séries em MD3.",
+    aDivulgarSemisK: "SEMIFINAIS",
+    aDivulgarSemisV: "1º x 4º e 2º x 3º colocados, em MD3.",
+    aDivulgarFinalK: "FINAL",
+    aDivulgarFinalV: "Os vencedores das semifinais, em MD5.",
+    aDivulgarPosicoes:
+      "Na grade, os times entram como posições (Time 1 a Time {times}), sorteadas ao vivo logo depois do draft.",
 
     // home
     resumoTitulo: "CALENDÁRIO",
-    resumoPeriodo: "20 A 29 DE NOVEMBRO",
-    resumoTexto:
-      "Dois fins de semana, 18 séries: pontos corridos de 20 a 28/11 e, no domingo 29/11, semifinais e a final em MD5.",
+    pilulaADivulgar: "DATAS A DIVULGAR",
+    pilulaFormato: "{times} TIMES · {vagas} JOGADORES",
     resumoJogos: "{n} jogos",
     resumoJogo: "1 jogo",
-    resumoFinais: "semis + final",
+    resumoSemis: "semis",
+    resumoFinal: "final",
     verCalendario: "VER O CALENDÁRIO →",
   },
   en: {
     titulo: "4TH EDITION SCHEDULE",
     intro:
-      "6 teams, one game at a time: 18 series over two weekends — 20, 21 and 22 Nov and 27, 28 and 29 Nov. Semifinals and the final on the same day, Sunday 29 Nov. Brasília time.",
-    fimDeSemana1: "1ST WEEKEND",
-    fimDeSemana2: "2ND WEEKEND",
+      "8 teams and 31 series: 28 in the round robin (everyone plays everyone, Bo3), the 2 Bo3 semifinals and the Bo5 final. Brasília time.",
+    fimDeSemana: "WEEKEND {n}",
     diasDaSemana: "SUNDAY,MONDAY,TUESDAY,WEDNESDAY,THURSDAY,FRIDAY,SATURDAY",
 
     legendaManha: "Morning",
@@ -80,19 +100,32 @@ export const calendario4a = definir({
     formatoMd5: "Bo5",
 
     notaPosicoes:
-      "Team 1 to Team 6 are slots: which team takes each one is decided by a live draw right after the draft.",
+      "Team 1 to Team {times} are slots: which team takes each one is decided by a live draw right after the draft.",
     notaAtraso:
-      "Friday 22:00 and Saturday 23:00 games never start early. If the game before them runs over, they start as soon as it ends.",
-    notaReserva: "The Saturday 28 Nov 19:00 reserve slot is kept free to reschedule anything that goes wrong.",
+      "Games marked with a start-time note never start early. If the game before them runs over, they start as soon as it ends.",
+    notaReserva: "The reserve slot on {dia}, at {hora}, is kept free to reschedule anything that goes wrong.",
     notaSemis: "The semifinal match-ups come from the round-robin standings: 1st v 4th and 2nd v 3rd.",
 
+    aDivulgarSelo: "TO BE ANNOUNCED",
+    aDivulgarTitulo: "Match dates and times to be announced",
+    aDivulgarTexto:
+      "The format is set: {times} teams of 5 players ({vagas} places). Match dates and times will be posted here as soon as the organisers finalise the schedule — and announced on Discord and in the WhatsApp group too.",
+    aDivulgarPontosK: "ROUND ROBIN",
+    aDivulgarPontosV: "Everyone plays everyone once: {pontos} Bo3 series.",
+    aDivulgarSemisK: "SEMIFINALS",
+    aDivulgarSemisV: "1st v 4th and 2nd v 3rd, Bo3.",
+    aDivulgarFinalK: "FINAL",
+    aDivulgarFinalV: "The semifinal winners, Bo5.",
+    aDivulgarPosicoes:
+      "On the schedule, teams appear as slots (Team 1 to Team {times}), drawn live right after the draft.",
+
     resumoTitulo: "SCHEDULE",
-    resumoPeriodo: "20 TO 29 NOVEMBER",
-    resumoTexto:
-      "Two weekends, 18 series: round robin from 20 to 28 Nov and, on Sunday 29 Nov, the semifinals and the Bo5 final.",
+    pilulaADivulgar: "DATES TO BE ANNOUNCED",
+    pilulaFormato: "{times} TEAMS · {vagas} PLAYERS",
     resumoJogos: "{n} games",
     resumoJogo: "1 game",
-    resumoFinais: "semis + final",
+    resumoSemis: "semis",
+    resumoFinal: "final",
     verCalendario: "SEE THE SCHEDULE →",
   },
 });

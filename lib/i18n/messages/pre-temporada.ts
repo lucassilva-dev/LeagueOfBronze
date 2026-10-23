@@ -4,11 +4,11 @@ import { definir } from "@/lib/i18n/definir";
  * Textos da PRÉ-TEMPORADA — o intervalo entre arquivar uma edição e aplicar o draft da
  * próxima (ver lib/fase-do-site.ts).
  *
- * As datas da 4ª foram decididas em 2026-10-20 (20 a 29/11, ver lib/calendario-4a.ts) e
- * o calendário da home vem daquele arquivo, não daqui. O formato segue o regulamento da 4ª
- * (pontos corridos em MD3, semifinais em MD3 e final em MD5). O que é número (taxa,
- * prazo) vem da Configuração da edição e é interpolado pela página: `{valor}`, `{dias}` e
- * `{temporada}`.
+ * Datas não moram aqui: o calendário da 4ª (8 times desde 2026-10-22, datas a divulgar)
+ * vem de lib/calendario-4a.ts, e a home escolhe entre o texto com `{periodo}` e o "sem
+ * data". O formato segue o regulamento da 4ª (pontos corridos em MD3, semifinais em MD3 e
+ * final em MD5). O que é número vem de fora e é interpolado pela página: `{valor}` e
+ * `{dias}` da Configuração da edição, `{temporada}` do dataset, `{times}` do calendário.
  */
 export const preTemporada = definir({
   pt: {
@@ -66,8 +66,11 @@ export const preTemporada = definir({
     passo4Texto:
       "Os inscritos de maior elo são os capitães e montam os times escolhendo jogadores por pontos — o preço de cada um vem do elo.",
     passo5Titulo: "CAMPEONATO",
+    // `{times}` = número de times do calendário; `{periodo}` = "de 20 a 29 de novembro".
     passo5Texto:
-      "6 times. Pontos corridos em séries MD3, semifinais 1º x 4º e 2º x 3º, e final em MD5 — de 20 a 29 de novembro. Os detalhes estão nas Regras.",
+      "{times} times de 5 jogadores. Pontos corridos em séries MD3, semifinais 1º x 4º e 2º x 3º, e final em MD5 — {periodo}. Os detalhes estão nas Regras.",
+    passo5TextoSemData:
+      "{times} times de 5 jogadores. Pontos corridos em séries MD3, semifinais 1º x 4º e 2º x 3º, e final em MD5. As datas saem assim que a organização fechar o calendário; os detalhes estão nas Regras.",
 
     // ---------- home · campeão da edição anterior ----------
     campeaoSobretitulo: "CAMPEÃO · {temporada}",
@@ -134,7 +137,9 @@ export const preTemporada = definir({
       "The highest-ranked players are the captains, and they build their teams by picking players with points — each player's price comes from their rank.",
     passo5Titulo: "TOURNAMENT",
     passo5Texto:
-      "6 teams. Round robin in best-of-3 series, semi-finals 1st v 4th and 2nd v 3rd, and a best-of-5 final — from 20 to 29 November. The details are in the Rules.",
+      "{times} teams of 5 players. Round robin in best-of-3 series, semi-finals 1st v 4th and 2nd v 3rd, and a best-of-5 final — {periodo}. The details are in the Rules.",
+    passo5TextoSemData:
+      "{times} teams of 5 players. Round robin in best-of-3 series, semi-finals 1st v 4th and 2nd v 3rd, and a best-of-5 final. Dates come out as soon as the organisers finalise the schedule; the details are in the Rules.",
 
     campeaoSobretitulo: "CHAMPION · {temporada}",
     campeaoVer: "SEE THE SEASON →",

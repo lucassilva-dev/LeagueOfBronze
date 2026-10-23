@@ -1,7 +1,13 @@
 import Link from "next/link";
 
 import { ResumoDoCalendario4a } from "@/components/calendario-4a";
-import { calendarioAindaPorVir } from "@/lib/calendario-4a";
+import {
+  JOGADORES_POR_TIME_DO_CALENDARIO,
+  TIMES_DO_CALENDARIO_4A,
+  calendarioDivulgado,
+  periodoDoCalendarioFuturo,
+} from "@/lib/calendario-4a";
+import { periodoPorExtenso } from "@/lib/i18n/messages/paginas-home";
 import type { FaseDraft } from "@/lib/draft/motor";
 import { Eyebrow, GoldTitleEmDuasLinhas, Pill, SectionTitle } from "@/components/lob/ui";
 import { Trailer4a } from "@/components/trailer-4a";
@@ -90,8 +96,9 @@ const SELO_ESTILO: Record<EstadoJanela, { cor: string; fundo: string; borda: str
 /**
  * Home da PRÉ-TEMPORADA (ver lib/fase-do-site.ts): a porta de entrada da inscrição.
  *
- * As datas vêm de lib/calendario-4a.ts (o calendário oficial, decidido em 2026-10-20); os
- * números de dinheiro e prazo (taxa, dias para pagar) vêm da Configuração da edição.
+ * O número de times e as datas vêm de lib/calendario-4a.ts (8 times desde 2026-10-22, datas
+ * a divulgar até a organização fechar a grade); os números de dinheiro e prazo (taxa, dias
+ * para pagar) vêm da Configuração da edição.
  */
 export async function HomePreTemporada() {
   const [mensagens, config, campeao, fase] = await Promise.all([
@@ -109,9 +116,20 @@ export async function HomePreTemporada() {
   const draftAoVivo = fase === "preparando" || fase === "rodando" || fase === "pausado";
   const draftEmDestaque = draftAoVivo && janela !== "aberta";
   const rotuloDoDraft = draftAoVivo ? t.botaoDraftAoVivo : t.botaoVerDraft;
-  // O resumo das datas é do calendário oficial da 4ª: passado ele, some da home.
-  const calendarioPorVir = calendarioAindaPorVir();
-  const valor = config ? formatarMoeda(config.taxa_centavos, mensagens.compartilhados.localeTag) : null;
+  const localeTag = mensagens.compartilhados.localeTag;
+  /*
+   * O calendário oficial da 4ª, em três estados:
+   *  - datas a divulgar (o de hoje: 8 times, sem grade) → pílula "DATAS A DIVULGAR" e o
+   *    bloco do formato no lugar das fichas de dia;
+   *  - divulgado e por vir → o período na pílula e no passo 5, e as fichas de dia;
+   *  - divulgado e já passado → nada de calendário na home.
+   */
+  const aDivulgar = !calendarioDivulgado();
+  const periodo = periodoDoCalendarioFuturo();
+  const periodoNaFrase = periodo ? periodoPorExtenso(mensagens.paginasHome, periodo.inicio, periodo.fim, localeTag) : null;
+  const mostrarCalendario = aDivulgar || periodo !== null;
+  const times = String(TIMES_DO_CALENDARIO_4A);
+  const valor = config ? formatarMoeda(config.taxa_centavos, localeTag) : null;
 
   const selo = {
     aberta: t.seloAberta,
@@ -138,7 +156,12 @@ export async function HomePreTemporada() {
           : t.passo3TextoSemValores,
     },
     { titulo: t.passo4Titulo, texto: t.passo4Texto },
-    { titulo: t.passo5Titulo, texto: t.passo5Texto },
+    {
+      titulo: t.passo5Titulo,
+      texto: periodoNaFrase
+        ? t.passo5Texto.replace("{times}", times).replace("{periodo}", periodoNaFrase)
+        : t.passo5TextoSemData.replace("{times}", times),
+    },
   ];
 
   return (
@@ -203,7 +226,16 @@ export async function HomePreTemporada() {
           </Link>
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 9 }}>
-          {calendarioPorVir ? <Pill>{tCal.resumoPeriodo}</Pill> : null}
+          {periodoNaFrase ? <Pill>{periodoNaFrase.toLocaleUpperCase(localeTag)}</Pill> : null}
+          {aDivulgar ? <Pill>{tCal.pilulaADivulgar}</Pill> : null}
+          {/* O formato é o DESTE calendário: passado ele, a pílula não fala da edição seguinte. */}
+          {mostrarCalendario ? (
+            <Pill>
+              {tCal.pilulaFormato
+                .replace("{times}", times)
+                .replace("{vagas}", String(TIMES_DO_CALENDARIO_4A * JOGADORES_POR_TIME_DO_CALENDARIO))}
+            </Pill>
+          ) : null}
           <Pill>{t.pilulaIndividual}</Pill>
           {valor ? <Pill>{t.pilulaTaxa.replace("{valor}", valor)}</Pill> : null}
           <Pill>{t.pilulaPremio}</Pill>
@@ -227,16 +259,22 @@ export async function HomePreTemporada() {
         </div>
       </section>
 
-      {/* CALENDÁRIO — as datas da 4ª, logo antes do "como funciona" */}
-      {calendarioPorVir ? (
+      {/*
+        CALENDÁRIO — as datas da 4ª, logo antes do "como funciona". Com as datas a divulgar,
+        o resumo desenha o formato e o aviso (o texto do bloco já diz tudo, sem parágrafo
+        de introdução repetindo).
+      */}
+      {mostrarCalendario ? (
         <section className="lob-fade" style={{ margin: "18px 0 44px" }}>
-          <div style={{ marginBottom: 10 }}>
+          <div style={{ marginBottom: aDivulgar ? 16 : 10 }}>
             <SectionTitle>{tCal.resumoTitulo}</SectionTitle>
           </div>
-          <p style={{ maxWidth: 620, fontSize: 14, lineHeight: 1.55, color: "#a99e8b", margin: "0 0 16px" }}>
-            {tCal.resumoTexto}
-          </p>
-          <ResumoDoCalendario4a t={tCal} localeTag={mensagens.compartilhados.localeTag} />
+          {aDivulgar ? null : (
+            <p style={{ maxWidth: 620, fontSize: 14, lineHeight: 1.55, color: "#a99e8b", margin: "0 0 16px" }}>
+              {tCal.intro}
+            </p>
+          )}
+          <ResumoDoCalendario4a t={tCal} localeTag={localeTag} />
         </section>
       ) : null}
 

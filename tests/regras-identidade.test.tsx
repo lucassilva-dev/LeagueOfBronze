@@ -7,6 +7,8 @@ import { CalendarioDa4a } from "@/components/calendario-4a";
 import { SectionTitle } from "@/components/lob/ui";
 import { MESSAGES } from "@/lib/i18n/messages";
 
+import { CALENDARIO_6_TIMES_DE_20_10 } from "./_calendarios";
+
 /**
  * /regras com a identidade "Bronze Hextech": nenhum losango genérico, cada título, item e
  * regra com o desenho do que trata — sem perder o que a página já garantia: as âncoras que
@@ -122,8 +124,13 @@ describe("/regras: ícones no lugar dos losangos", () => {
 describe("calendário: as notas com ícone", () => {
   it("cada nota tem o seu desenho, e o losango sumiu", () => {
     const raiz = document.createElement("div");
-    raiz.innerHTML = renderToStaticMarkup(<CalendarioDa4a t={MESSAGES.pt.calendario4a} localeTag="pt-BR" />);
-    const notas = [...raiz.querySelectorAll("li")].filter((li) => li.textContent?.includes(MESSAGES.pt.calendario4a.notaReserva));
+    // Com uma grade divulgada (a de teste): é nela que as notas aparecem.
+    raiz.innerHTML = renderToStaticMarkup(
+      <CalendarioDa4a t={MESSAGES.pt.calendario4a} localeTag="pt-BR" calendario={CALENDARIO_6_TIMES_DE_20_10} />,
+    );
+    const notas = [...raiz.querySelectorAll("li")].filter((li) =>
+      li.textContent?.includes("A reserva de sábado, 28/11, às 19:00, fica vaga para remarcar imprevistos."),
+    );
     expect(notas).toHaveLength(1);
     expect(notas[0]!.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
     expect(raiz.textContent).not.toContain("◆");

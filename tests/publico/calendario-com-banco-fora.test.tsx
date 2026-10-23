@@ -8,7 +8,14 @@ import { html, texto } from "./_ajuda";
  * /calendario mostra é o calendário PLANEJADO da 4ª — que não depende do banco —, e mesmo
  * assim a página caía inteira. Com a temporada no ar o erro segue para a app/error.tsx:
  * trocar as séries de verdade pela grade planejada esconderia resultado.
+ *
+ * Aqui com uma grade DIVULGADA (a de 6 times de 20/10, tests/_calendarios.ts). O caso das
+ * datas a divulgar — o de hoje, com 8 times — está em calendario-a-divulgar.test.tsx.
  */
+
+vi.mock("@/lib/calendario-4a-grade", async () => ({
+  CALENDARIO_OFICIAL_4A: (await import("@/tests/_calendarios")).CALENDARIO_6_TIMES_DE_20_10,
+}));
 
 const cenario = vi.hoisted(() => ({ pre: true }));
 
@@ -41,7 +48,7 @@ describe("INF-01 — /calendario com o banco fora", () => {
   it("pré-temporada: mostra o calendário planejado em vez de cair", async () => {
     const t = texto(await html(CalendarioPage()));
     expect(t).toContain("CALENDÁRIO");
-    // A grade planejada da 4ª (lib/calendario-4a.ts): da fase de pontos à final.
+    // A grade planejada (lib/calendario-4a.ts, aqui a de teste): da fase de pontos à final.
     expect(t).toMatch(/20 de novembro|20\/11/);
   });
 
