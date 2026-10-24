@@ -53,7 +53,59 @@ import type { CalendarioDaEdicao } from "@/lib/calendario-4a";
  *    1…8) estão em lib/i18n/messages/paginas-regras.ts e calendario-4a.ts — o mesmo teste
  *    avisa qual ficou velho.
  */
+/**
+ * DIVULGADO em 24/10/2026 (dia do draft): 3 fins de semana — 13 a 15/11, 27 a 29/11 e 04 a
+ * 06/12 —, um jogo de cada vez, começo às 08:30 no sábado e no domingo, almoço de 12:30 às
+ * 14:30, e a final em MD5 no domingo 06/12. O Time 1 é o time definido pela organização (fica
+ * fixo na posição 1 no sorteio das posições; os outros 7 são sorteados do 2 ao 8).
+ *
+ * `podeAtrasar` em todo jogo que vem logo depois de outro no mesmo dia: cada série reserva 2h
+ * e começa assim que a anterior termina — o horário é de referência. Depois do almoço não,
+ * porque as 2h de almoço absorvem o atraso.
+ */
+const BRT = "-03:00";
+const em = (dia: string, hora: string) => `2026-${dia}T${hora}:00${BRT}`;
+
 export const CALENDARIO_OFICIAL_4A: CalendarioDaEdicao = {
-  divulgado: false,
+  divulgado: true,
   times: 8,
+  slots: [
+    // ---- 1º fim de semana
+    { quando: em("11-13", "20:00"), tipo: "pontos", confronto: [7, 8], formato: "BO3" },
+    { quando: em("11-13", "22:00"), tipo: "pontos", confronto: [1, 6], formato: "BO3", podeAtrasar: true },
+    { quando: em("11-14", "08:30"), tipo: "pontos", confronto: [2, 5], formato: "BO3" },
+    { quando: em("11-14", "10:30"), tipo: "pontos", confronto: [4, 7], formato: "BO3", podeAtrasar: true },
+    { quando: em("11-14", "14:30"), tipo: "pontos", confronto: [2, 3], formato: "BO3" },
+    { quando: em("11-14", "16:30"), tipo: "pontos", confronto: [6, 8], formato: "BO3", podeAtrasar: true },
+    { quando: em("11-14", "18:30"), tipo: "pontos", confronto: [3, 5], formato: "BO3", podeAtrasar: true },
+    { quando: em("11-14", "20:30"), tipo: "pontos", confronto: [6, 7], formato: "BO3", podeAtrasar: true },
+    { quando: em("11-15", "08:30"), tipo: "pontos", confronto: [4, 5], formato: "BO3" },
+    { quando: em("11-15", "10:30"), tipo: "pontos", confronto: [1, 2], formato: "BO3", podeAtrasar: true },
+    { quando: em("11-15", "14:30"), tipo: "reserva" },
+    // ---- 2º fim de semana
+    { quando: em("11-27", "20:00"), tipo: "pontos", confronto: [1, 5], formato: "BO3" },
+    { quando: em("11-27", "22:00"), tipo: "pontos", confronto: [2, 4], formato: "BO3", podeAtrasar: true },
+    { quando: em("11-28", "08:30"), tipo: "pontos", confronto: [3, 7], formato: "BO3" },
+    { quando: em("11-28", "10:30"), tipo: "pontos", confronto: [4, 6], formato: "BO3", podeAtrasar: true },
+    { quando: em("11-28", "14:30"), tipo: "pontos", confronto: [5, 6], formato: "BO3" },
+    { quando: em("11-28", "16:30"), tipo: "pontos", confronto: [4, 8], formato: "BO3", podeAtrasar: true },
+    { quando: em("11-28", "18:30"), tipo: "pontos", confronto: [1, 7], formato: "BO3", podeAtrasar: true },
+    { quando: em("11-28", "20:30"), tipo: "pontos", confronto: [3, 8], formato: "BO3", podeAtrasar: true },
+    { quando: em("11-29", "08:30"), tipo: "pontos", confronto: [1, 8], formato: "BO3" },
+    { quando: em("11-29", "10:30"), tipo: "pontos", confronto: [2, 7], formato: "BO3", podeAtrasar: true },
+    { quando: em("11-29", "14:30"), tipo: "reserva" },
+    // ---- 3º fim de semana
+    { quando: em("12-04", "20:00"), tipo: "pontos", confronto: [3, 4], formato: "BO3" },
+    { quando: em("12-04", "22:00"), tipo: "pontos", confronto: [2, 8], formato: "BO3", podeAtrasar: true },
+    { quando: em("12-05", "08:30"), tipo: "pontos", confronto: [3, 6], formato: "BO3" },
+    { quando: em("12-05", "10:30"), tipo: "pontos", confronto: [5, 8], formato: "BO3", podeAtrasar: true },
+    { quando: em("12-05", "14:30"), tipo: "pontos", confronto: [1, 4], formato: "BO3" },
+    { quando: em("12-05", "16:30"), tipo: "pontos", confronto: [5, 7], formato: "BO3", podeAtrasar: true },
+    { quando: em("12-05", "18:30"), tipo: "pontos", confronto: [1, 3], formato: "BO3", podeAtrasar: true },
+    { quando: em("12-05", "20:30"), tipo: "pontos", confronto: [2, 6], formato: "BO3", podeAtrasar: true },
+    { quando: em("12-05", "22:30"), tipo: "reserva" },
+    { quando: em("12-06", "08:30"), tipo: "semifinal", semifinal: 1, formato: "BO3" },
+    { quando: em("12-06", "10:30"), tipo: "semifinal", semifinal: 2, formato: "BO3", podeAtrasar: true },
+    { quando: em("12-06", "14:30"), tipo: "final", formato: "BO5" },
+  ],
 };

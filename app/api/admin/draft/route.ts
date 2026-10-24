@@ -11,6 +11,7 @@ import { ConflitoDeVersaoError, readDatasetComVersao, saveDataset } from "@/lib/
 import {
   alcancarORelogio,
   aplicarEscolha,
+  ehTimeDefinido,
   iniciarDraft,
   jogadoresQueSairamDoPool,
   pausarDraft,
@@ -520,7 +521,8 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        const timesDoDraft = datasetDoDraft(estado).teams.map((t) => t.id).sort();
+        const timesDaVirada = datasetDoDraft(estado).teams;
+        const timesDoDraft = timesDaVirada.map((t) => t.id).sort();
         const timesNoAr = dataset.teams.map((t) => t.id);
         const mesmos =
           timesNoAr.length === timesDoDraft.length && [...timesNoAr].sort().every((id, i) => id === timesDoDraft[i]);
@@ -539,8 +541,18 @@ export async function POST(request: NextRequest) {
           );
         }
 
+        /*
+         * O time definido pela organização é o TIME 1 (decisão de 24/10/2026): fica fixo na
+         * posição 1, e o sorteio é só dos outros, do 2 ao 8. A virada mantém a ordem de
+         * `estado.times`, então o id dele no dataset é o da mesma posição. Para conferir:
+         * `embaralhar(semente, "calendario", entrada)` dá as posições 2 em diante.
+         */
+        const indiceDoDefinido = estado.times.findIndex(ehTimeDefinido);
+        const idDoDefinido = indiceDoDefinido >= 0 ? (timesDaVirada[indiceDoDefinido]?.id ?? null) : null;
+        const fixo = idDoDefinido !== null && timesNoAr.includes(idDoDefinido) ? [idDoDefinido] : [];
+        const sorteaveis = timesNoAr.filter((id) => !fixo.includes(id));
         const sementeDoSorteio = novaSemente();
-        const posicoes = embaralhar(sementeDoSorteio, "calendario", timesNoAr);
+        const posicoes = [...fixo, ...embaralhar(sementeDoSorteio, "calendario", sorteaveis)];
         const series = seriesDaFaseDePontos(posicoes);
 
         try {
@@ -561,7 +573,7 @@ export async function POST(request: NextRequest) {
         await registrarAuditoria({
           autor,
           acao: "calendario_sorteado",
-          detalhe: { semente: sementeDoSorteio, entrada: timesNoAr, posicoes: resultado, series: series.length },
+          detalhe: { semente: sementeDoSorteio, fixoNoTime1: fixo[0] ?? null, entrada: sorteaveis, posicoes: resultado, series: series.length },
         });
 
         return NextResponse.json({ ok: true, posicoes: resultado, series: series.length, semente: sementeDoSorteio });

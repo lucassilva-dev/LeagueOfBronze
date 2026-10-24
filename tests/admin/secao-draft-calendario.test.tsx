@@ -57,7 +57,7 @@ describe("cartão do calendário com a grade de 8 times", () => {
     await screen.findByText("Sortear as posições e criar as 28 séries");
     expect(
       screen.getByText(
-        /Sorteia qual time é o Time 1 … Time 8 do calendário publicado e cria as 28 séries da fase de pontos com data e hora \(20\/11 a 06\/12\)\./,
+        /O time definido pela organização fica no Time 1; sorteia qual time é o Time 2 … Time 8 do calendário publicado e cria as 28 séries da fase de pontos com data e hora \(20\/11 a 06\/12\)\./,
       ),
     ).toBeTruthy();
     expect(screen.queryByText("datas a divulgar")).toBeNull();

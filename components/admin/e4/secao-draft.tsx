@@ -2043,7 +2043,7 @@ export function SecaoDraft({ onAlert, podeConduzir, onDatasetMudou }: Props) {
         title={`Sortear as posições e criar as ${calendario.pontos} séries`}
         description={
           calendario.divulgado
-            ? `Sorteia qual time é o Time 1 … Time ${calendario.times} do calendário publicado e cria as ${calendario.pontos} séries da fase de pontos com data e hora (${calendario.periodoDosPontos}). Semifinais e final são criadas depois, no painel de Séries, quando a tabela fechar. Só funciona com os times do draft já aplicados e a temporada ainda sem séries.`
+            ? `O time definido pela organização fica no Time 1; sorteia qual time é o Time 2 … Time ${calendario.times} do calendário publicado e cria as ${calendario.pontos} séries da fase de pontos com data e hora (${calendario.periodoDosPontos}). Semifinais e final são criadas depois, no painel de Séries, quando a tabela fechar. Só funciona com os times do draft já aplicados e a temporada ainda sem séries.`
             : `O calendário de ${calendario.times} times ainda não foi definido. Quando estiver, este botão sorteia qual time é o Time 1 … Time ${calendario.times} e cria as ${calendario.pontos} séries da fase de pontos com data e hora.`
         }
         badge={calendario.divulgado ? undefined : <Chip tone="off">datas a divulgar</Chip>}

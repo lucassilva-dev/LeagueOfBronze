@@ -38,7 +38,7 @@ const pt = {
   fichaModalidadeV: "5v5, Summoner’s Rift",
   fichaPeriodoK: "PERÍODO",
   fichaPeriodoV:
-    "Datas a divulgar: o calendário dos jogos sai no fim desta página assim que a organização fechar as datas.",
+    "De 13 de novembro a 6 de dezembro de 2026, em três fins de semana (13 a 15/11, 27 a 29/11 e 4 a 6/12). O calendário completo está no fim desta página.",
   fichaFaseK: "FASE DE PONTOS CORRIDOS",
   fichaFaseV: "Todos contra todos, uma vez, em séries MD3 (melhor de 3). Vitória na série = 3 pontos.",
   fichaSemifinaisK: "SEMIFINAIS",
@@ -337,7 +337,7 @@ export const paginasRegras = definir<ChavesPaginasRegras>({
     fichaModalidadeV: "5v5, Summoner’s Rift",
     fichaPeriodoK: "WHEN",
     fichaPeriodoV:
-      "Dates to be announced: the match schedule will appear at the bottom of this page as soon as the organisers set the dates.",
+      "From 13 November to 6 December 2026, over three weekends (13–15 Nov, 27–29 Nov and 4–6 Dec). The full schedule is at the bottom of this page.",
     fichaFaseK: "ROUND-ROBIN STAGE",
     fichaFaseV: "Everyone plays everyone once, in Bo3 series (best of 3). Series win = 3 points.",
     fichaSemifinaisK: "SEMIFINALS",

@@ -87,8 +87,12 @@ function terceiraEncerrada(): TournamentDataset {
   return { ...base, tournament: { ...base.tournament, status: "finished" } };
 }
 
-/** Nada da grade velha de 6 times, nem dia de jogo nenhum. */
-const GRADE_VELHA = /Time 6\b|Team 6\b|\b(15|18) (SÉRIES|séries|series)\b|30 vagas|30 places|20 a 29|20 A 29|20 to 29|29\/11|28\/11|20\/11|29 de novembro|29 DE NOVEMBRO|November (20|29)/;
+/**
+ * Nada da grade velha de 6 times (20 a 29/11). Desde 24/10/2026 a frase fixa do período cita a
+ * grade de 8 times, que também tem 28 e 29/11 (o 2º fim de semana): o que denuncia a velha é o
+ * começo dela, não o fim.
+ */
+const GRADE_VELHA = /Time 6\b|Team 6\b|\b(15|18) (SÉRIES|séries|series)\b|30 vagas|30 places|20 a 29|20 A 29|20 to 29|20\/11|November 20/;
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
@@ -166,7 +170,8 @@ describe("/regras com as datas a divulgar", () => {
   it("período a divulgar, 8 times, 40 vagas, 8 capitães, serpentina dos 7 do draft — e a seção do calendário sem grade", async () => {
     const markup = await html(RegrasPage());
     const t = texto(markup);
-    expect(t).toContain("Datas a divulgar: o calendário dos jogos sai no fim desta página");
+    // A frase fixa do PERÍODO passou a citar as datas em 24/10/2026 (calendário divulgado); o
+    // que este teste confere é a seção do calendário sem grade, com a grade de mentira.
     expect(t).toContain("esta edição tem 8 times de 5 jogadores (40 vagas)");
     expect(t).toContain("O número de capitães é igual ao número de times: 8 nesta edição.");
     expect(t).toContain("1-2-3-4-5-6-7-7-6-5-4-3-2-1");
@@ -179,7 +184,6 @@ describe("/regras com as datas a divulgar", () => {
   it("em inglês", async () => {
     cenario.locale = "en";
     const t = texto(await html(RegrasPage()));
-    expect(t).toContain("Dates to be announced");
     expect(t).toContain("8 teams of 5 players (40 places)");
     expect(t).toContain("8 in this edition");
     expect(t).not.toMatch(GRADE_VELHA);

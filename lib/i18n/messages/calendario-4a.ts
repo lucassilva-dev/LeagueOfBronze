@@ -42,7 +42,7 @@ export const calendario4a = definir({
 
     // `{times}` = número de times do calendário.
     notaPosicoes:
-      "Time 1 a Time {times} são posições: qual time ocupa cada uma sai de um sorteio ao vivo logo depois do draft.",
+      "Time 1 a Time {times} são posições. O Time 1 é o time da organização; qual time ocupa cada uma das outras sai de um sorteio ao vivo logo depois do draft.",
     notaAtraso:
       "Os jogos com o aviso de horário nunca começam antes da hora marcada. Se o jogo anterior passar do tempo, eles começam assim que ele acabar.",
     // `{dia}` = "sábado, 28/11"; `{hora}` = "19:00". Uma nota por horário de reserva.
@@ -63,7 +63,7 @@ export const calendario4a = definir({
     aDivulgarFinalK: "FINAL",
     aDivulgarFinalV: "Os vencedores das semifinais, em MD5.",
     aDivulgarPosicoes:
-      "Na grade, os times entram como posições (Time 1 a Time {times}), sorteadas ao vivo logo depois do draft.",
+      "Na grade, os times entram como posições (Time 1 a Time {times}). O Time 1 é o time da organização; as outras são sorteadas ao vivo logo depois do draft.",
 
     // home
     resumoTitulo: "CALENDÁRIO",
@@ -100,7 +100,7 @@ export const calendario4a = definir({
     formatoMd5: "Bo5",
 
     notaPosicoes:
-      "Team 1 to Team {times} are slots: which team takes each one is decided by a live draw right after the draft.",
+      "Team 1 to Team {times} are slots. Team 1 is the organisers' team; which team takes each of the others is decided by a live draw right after the draft.",
     notaAtraso:
       "Games marked with a start-time note never start early. If the game before them runs over, they start as soon as it ends.",
     notaReserva: "The reserve slot on {dia}, at {hora}, is kept free to reschedule anything that goes wrong.",
@@ -117,7 +117,7 @@ export const calendario4a = definir({
     aDivulgarFinalK: "FINAL",
     aDivulgarFinalV: "The semifinal winners, Bo5.",
     aDivulgarPosicoes:
-      "On the schedule, teams appear as slots (Team 1 to Team {times}), drawn live right after the draft.",
+      "On the schedule, teams appear as slots (Team 1 to Team {times}). Team 1 is the organisers' team; the others are drawn live right after the draft.",
 
     resumoTitulo: "SCHEDULE",
     pilulaADivulgar: "DATES TO BE ANNOUNCED",

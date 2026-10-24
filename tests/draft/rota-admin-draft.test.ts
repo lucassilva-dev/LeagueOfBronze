@@ -229,6 +229,49 @@ describe("calendário da 4ª", () => {
     expect(deNovo.status).toBe(409);
     expect((banco.dataset as TournamentDataset).seriesMatches).toHaveLength(28);
   });
+
+  /*
+   * 24/10/2026: o time definido pela organização é o Time 1 do calendário. O sorteio das posições
+   * é só dos outros 7 (do 2 ao 8), em qualquer posição em que o time definido tenha saído no
+   * sorteio do draft.
+   */
+  it("o time definido pela organização fica fixo no Time 1; os outros 7 são sorteados do 2 ao 8", async () => {
+    const n = 8;
+    for (const posicaoDoDefinido of [0, 3, 7]) {
+      const jogadores: JogadorDoDraft[] = Array.from({ length: 2 * n }, (_, i) => ({
+        id: `i${i}`,
+        riotId: `Jog${i}#BR1`,
+        pontos: i === n + posicaoDoDefinido ? 0 : 3,
+        rota1: "MID",
+        rota2: "TOP",
+        elo: "Prata",
+        timeId: null,
+      }));
+      const times = Array.from({ length: n }, (_, i) => ({
+        id: `time-${i + 1}`,
+        ...identidadeDoTime(i),
+        capitaoId: `i${i}`,
+        ...(i === posicaoDoDefinido ? { elencoDefinido: [`i${i}`, `i${n + i}`] } : {}),
+      }));
+      let e = montarDraft({ times, jogadores, jogadoresPorTime: 2, orcamentoPorTime: 10, segundosPorEscolha: 60 });
+      expect(e.ordem).toHaveLength(n - 1);
+      e = iniciarDraft(e, Date.parse("2026-11-15T20:00:00Z"));
+      for (let k = 1; k < n; k++) e = alcancarORelogio(e, Date.parse("2026-11-15T20:00:00Z") + k * 60_000 + 1);
+      expect(e.fase).toBe("encerrado");
+
+      banco.draft = { estado: e, revisao: 1 };
+      banco.dataset = datasetAberto([]);
+      expect((await POST(req({ acao: "virar" }))).status).toBe(200);
+      const idDoDefinido = (banco.dataset as TournamentDataset).teams[posicaoDoDefinido]!.id;
+
+      const r = await POST(req({ acao: "calendario" }));
+      expect(r.status).toBe(200);
+      const corpo = (await r.json()) as { posicoes: { posicao: number; teamId: string }[] };
+      expect(corpo.posicoes[0]).toMatchObject({ posicao: 1, teamId: idDoDefinido });
+      expect(new Set(corpo.posicoes.map((p) => p.teamId)).size).toBe(8);
+      expect(banco.auditoria.at(-1)?.detalhe).toMatchObject({ fixoNoTime1: idDoDefinido });
+    }
+  });
 });
 
 describe("escolher pelo time da vez", () => {
