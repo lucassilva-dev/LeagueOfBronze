@@ -46,6 +46,11 @@ type Rotulos = Messages["draft"];
  *   numa coluna estreita (8 times num projetor de 1024px dão ~115px) a etiqueta de rota
  *   desce para a linha do elo em vez de comer a largura do nick — ver `.lobd-coluna-time`
  *   em app/globals.css. A tela final põe no máximo metade dos times por linha (4 + 4).
+ *
+ * · **O time definido pela organização** (24/10/2026, lib/draft/time-definido.ts) é uma das N
+ *   colunas, mas não disputa o draft: já entra com os 5, não escolhe e ninguém o escolhe. Ele
+ *   tira nome e cor no sorteio como os outros; fora isso, a tela o deixa fora de tudo o que é
+ *   ORDEM — serpentina, número da vez, rodadas — e põe a etiqueta dele no lugar do orçamento.
  */
 
 type TimePublico = {
@@ -55,6 +60,11 @@ type TimePublico = {
   capitaoRiotId: string;
   gasto: number;
   vagas: number;
+  /**
+   * O time definido pela organização: completo desde o sorteio, fora da ordem de escolha e sem
+   * preço (gasto 0, vagas 0). Só vem nele, e só `true`; servidor antigo não manda.
+   */
+  definido?: true;
 };
 
 type JogadorDoElenco = {
@@ -206,6 +216,41 @@ function corDoTime(time: TimePublico, indice: number): string {
   return CORES_DOS_TIMES[indice] ?? time.cor;
 }
 
+/** Os times que disputam o draft — todos menos o definido pela organização —, na ordem do sorteio. */
+function timesQueEscolhem(times: readonly TimePublico[]): TimePublico[] {
+  return times.filter((x) => !x.definido);
+}
+
+/**
+ * A posição de cada time na ordem de escolha (1, 2, 3…), contando só os que escolhem. Pela
+ * lista inteira, com o time definido sorteado no meio, quem escolhe em 4º aparecia como "#5".
+ */
+function posicoesNaOrdem(times: readonly TimePublico[]): ReadonlyMap<string, number> {
+  return new Map(timesQueEscolhem(times).map((x, i) => [x.id, i + 1]));
+}
+
+/**
+ * O time de cada escolha do trilho, como índice em `times` (é dele que sai a cor). Vem da
+ * ordem do servidor, que pode ter perdido escolhas quando alguém saiu do pool; sem ela
+ * (servidor antigo), a serpentina é refeita — ímpares 1→N, pares N→1 — SÓ com os times que
+ * escolhem. Refeita com a lista inteira, o time definido ganhava escolhas que não são dele e
+ * empurrava a vez de todo mundo.
+ */
+export function timesDoTrilho(
+  draft: Readonly<{ times: readonly TimePublico[]; ordem?: readonly string[]; totalEscolhas: number }>,
+): number[] {
+  const queEscolhem = timesQueEscolhem(draft.times);
+  const n = Math.max(1, queEscolhem.length);
+  return Array.from({ length: draft.totalEscolhas }, (_, i) => {
+    const pelaOrdem = draft.ordem?.[i] ? draft.times.findIndex((x) => x.id === draft.ordem![i]) : -1;
+    if (pelaOrdem >= 0) return pelaOrdem;
+    const rodada = Math.floor(i / n);
+    const dentro = i % n;
+    const time = queEscolhem[rodada % 2 === 0 ? dentro : n - 1 - dentro];
+    return time ? Math.max(0, draft.times.indexOf(time)) : 0;
+  });
+}
+
 /**
  * Colunas da tela final ("times formados"): até 6 times, todos na mesma linha (o handoff);
  * passando de 6, no máximo metade por linha — 8 times viram 4 + 4, e não 6 + 2. O mínimo
@@ -232,6 +277,7 @@ function Slot({
   cor,
   compacto,
   capitaoGratis = false,
+  definido = false,
   t,
 }: Readonly<{
   jogador: JogadorDoElenco | null;
@@ -239,10 +285,23 @@ function Slot({
   compacto: boolean;
   /** O capitão não tem preço: a tag CAPITÃO vai no lugar dos pontos. */
   capitaoGratis?: boolean;
+  /**
+   * A linha é do time definido pela organização: ninguém ali passou pelo draft nem tem preço.
+   * O capitão leva a tag CAPITÃO e os outros a do time definido — nunca um «0», que pareceria
+   * jogador de graça.
+   */
+  definido?: boolean;
   t: Rotulos;
 }>) {
   const capitao = jogador?.capitao === true;
-  const tagNoPreco = capitao && capitaoGratis;
+  // O que vai no lugar dos pontos; nulo = os pontos.
+  const tagNoPreco = !jogador
+    ? null
+    : capitao && (definido || capitaoGratis)
+      ? t.capitao
+      : definido
+        ? t.timeDefinidoTag
+        : null;
   const rota = jogador ? abrevDaRota(jogador.rota1) : "—";
   // As classes `lobd-slot*` só fazem diferença dentro de uma coluna estreita da grade
   // (@container em app/globals.css): ali a etiqueta de rota some e a rota vai, em texto,
@@ -300,15 +359,15 @@ function Slot({
             </span>
           ) : null}
           {jogador
-            ? capitao && !tagNoPreco
+            ? capitao && tagNoPreco === null
               ? `${t.capitao.toUpperCase()} · ${rotuloDoElo(jogador)}`
               : rotuloDoElo(jogador)
             : t.vagaAberta}
         </span>
       </span>
-      {tagNoPreco ? (
-        // Capitão sem preço: a tag no lugar dos pontos. Curta e em caixa alta, para caber na
-        // coluna estreita de 8 times (~115px num projetor de 1024px).
+      {tagNoPreco !== null ? (
+        // Sem preço (capitão, ou membro do time definido): a tag no lugar dos pontos. Curta e
+        // em caixa alta, para caber na coluna estreita de 8 times (~115px num projetor de 1024px).
         <span
           style={{
             flex: "none",
@@ -324,7 +383,7 @@ function Slot({
             color: cor,
           }}
         >
-          {t.capitao}
+          {tagNoPreco}
         </span>
       ) : (
         <span
@@ -446,6 +505,10 @@ function Sorteio({
     return () => window.clearTimeout(relogio);
   }, []);
 
+  // O time definido gira e trava como os outros (ele também tirou nome e cor), mas não tem
+  // lugar na ordem de escolha: a etiqueta dele no lugar do ordinal.
+  const posicoes = posicoesNaOrdem(draft.times);
+
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: "40px 24px 60px", textAlign: "center" }}>
       <div style={{ ...kicker(D.kickerOuro, ".3em"), fontSize: 11 }}>{t.sorteioKicker}</div>
@@ -494,10 +557,10 @@ function Sorteio({
                   padding: "3px 8px",
                   borderRadius: 4,
                   background: D.borda4,
-                  ...kicker(D.kicker, ".14em"),
+                  ...kicker(time.definido ? cor : D.kicker, ".14em"),
                 }}
               >
-                {ordinal(i + 1, t)}
+                {time.definido ? t.timeDefinido : ordinal(posicoes.get(time.id) ?? i + 1, t)}
               </div>
               <div
                 style={{
@@ -540,7 +603,7 @@ function Sorteio({
 
               <div style={{ fontSize: 12, color: D.mudo, marginTop: 6 }}>
                 {pronto && capitao
-                  ? draft.capitaoGratis
+                  ? draft.capitaoGratis || time.definido
                     ? `${rotuloDoElo(capitao)} · ${t.capitao.toUpperCase()} · ${abrevDaRota(capitao.rota1)}`
                     : `${rotuloDoElo(capitao)} · ${capitao.pontos} ${t.pontos} · ${abrevDaRota(capitao.rota1)}`
                   : t.sorteando}
@@ -553,7 +616,7 @@ function Sorteio({
       {pronto ? (
         <div style={{ marginTop: 34, animation: "lobdRise .5s ease both" }}>
           <p style={{ margin: "0 0 16px", fontSize: 14, color: D.secundario2 }}>
-            {fraseDaSerpentina(draft.times.length, t)}
+            {fraseDaSerpentina(timesQueEscolhem(draft.times).length, t)}
           </p>
         </div>
       ) : null}
@@ -573,16 +636,23 @@ function AoVivo({
   emTv: boolean;
   onAlternarTv: () => void;
 }>) {
+  // Sem time da vez (pausa), o primeiro que escolhe — nunca o time definido, que não tem vez
+  // (e mostraria um orçamento cheio de um time que não gasta).
   const indiceDaVez = draft.times.findIndex((x) => x.id === draft.timeDaVezId);
-  const daVez = indiceDaVez >= 0 ? draft.times[indiceDaVez]! : draft.times[0]!;
-  const corDaVez = corDoTime(daVez, Math.max(0, indiceDaVez));
+  const indiceMostrado = indiceDaVez >= 0 ? indiceDaVez : Math.max(0, draft.times.findIndex((x) => !x.definido));
+  const daVez = draft.times[indiceMostrado]!;
+  const corDaVez = corDoTime(daVez, indiceMostrado);
 
   const rodando = draft.fase === "rodando";
   const restante = useSegundosRestantes(draft.prazoISO, rodando);
   const urgente = rodando && restante !== null && restante <= URGENTE_S;
 
-  const rodada = Math.floor(draft.escolhaAtual / Math.max(1, draft.times.length)) + 1;
-  const rodadas = Math.max(1, Math.ceil(draft.totalEscolhas / Math.max(1, draft.times.length)));
+  // Rodadas e posições contam só quem escolhe: com o time definido, 7 escolhas por rodada.
+  const queEscolhem = Math.max(1, timesQueEscolhem(draft.times).length);
+  const posicoes = posicoesNaOrdem(draft.times);
+  const trilho = timesDoTrilho(draft);
+  const rodada = Math.floor(draft.escolhaAtual / queEscolhem) + 1;
+  const rodadas = Math.max(1, Math.ceil(draft.totalEscolhas / queEscolhem));
 
   return (
     <div
@@ -735,14 +805,9 @@ function AoVivo({
           overflowX: "auto",
         }}
       >
-        {Array.from({ length: draft.totalEscolhas }, (_, i) => {
-          // O time da escolha vem da ordem do servidor (que pode ter perdido escolhas quando
-          // alguém saiu do pool); sem ela, a serpentina: ímpares 1→N, pares N→1.
-          const n = draft.times.length;
-          const rodadaDoChip = Math.floor(i / n);
-          const dentro = i % n;
-          const pelaOrdem = draft.ordem?.[i] ? draft.times.findIndex((x) => x.id === draft.ordem![i]) : -1;
-          const indice = pelaOrdem >= 0 ? pelaOrdem : rodadaDoChip % 2 === 0 ? dentro : n - 1 - dentro;
+        {trilho.map((indice, i) => {
+          // O time da escolha vem da ordem do servidor; sem ela, a serpentina dos que
+          // escolhem (`timesDoTrilho`).
           const time = draft.times[indice]!;
           const cor = corDoTime(time, indice);
           const feito = i < draft.escolhaAtual;
@@ -750,6 +815,7 @@ function AoVivo({
           return (
             <span
               key={i}
+              data-time={time.id}
               style={{
                 flex: "none",
                 display: "grid",
@@ -799,9 +865,10 @@ function AoVivo({
       >
         {draft.times.map((time, i) => {
           const cor = corDoTime(time, i);
-          const naVez = time.id === draft.timeDaVezId;
+          const naVez = time.id === draft.timeDaVezId && !time.definido;
           const elenco = draft.elencos[time.id] ?? [];
           const pct = Math.min(100, Math.round((time.gasto / Math.max(1, draft.orcamentoPorTime)) * 100));
+          const posicao = posicoes.get(time.id);
           return (
             <div
               key={time.id}
@@ -841,44 +908,71 @@ function AoVivo({
                   >
                     {time.nome}
                   </span>
-                  <span className="lobd-coluna-ordinal" style={{ fontFamily: DISPLAY, fontSize: 11, color: D.mudo }}>
-                    #{i + 1}
-                  </span>
+                  {/* O número na ordem de escolha; o time definido não tem. */}
+                  {posicao !== undefined ? (
+                    <span className="lobd-coluna-ordinal" style={{ fontFamily: DISPLAY, fontSize: 11, color: D.mudo }}>
+                      #{posicao}
+                    </span>
+                  ) : null}
                 </div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 5, marginTop: 5 }}>
-                  <span
-                    style={{
-                      fontFamily: DISPLAY,
-                      fontSize: 24,
-                      fontWeight: 700,
-                      lineHeight: 1,
-                      color: D.tituloSuave,
-                    }}
-                  >
-                    {draft.orcamentoPorTime - time.gasto}
-                  </span>
-                  <span style={{ fontSize: 11, color: D.mudo }}>
-                    {t.pontosLivres} {draft.orcamentoPorTime}
-                  </span>
-                </div>
-                <div
-                  style={{
-                    marginTop: 7,
-                    height: 5,
-                    background: D.borda4,
-                    borderRadius: 99,
-                    overflow: "hidden",
-                  }}
-                >
-                  <div
-                    style={{
-                      height: "100%",
-                      width: `${pct}%`,
-                      background: `linear-gradient(90deg, ${cor}, #f7bd5c)`,
-                      transition: "width .8s cubic-bezier(.22,1,.36,1)",
-                    }}
-                  />
-                </div>
+                {time.definido ? (
+                  // No lugar do orçamento ("30 livres de 30"), que não existe para ele: a etiqueta.
+                  // A altura mínima é a do bloco do orçamento, para os elencos começarem na mesma
+                  // linha em todas as colunas; na coluna estreita a etiqueta quebra e cresce.
+                  <div data-time-definido="" style={{ display: "grid", alignContent: "center", gap: 3, minHeight: 41 }}>
+                    <span
+                      style={{
+                        fontFamily: DISPLAY,
+                        fontSize: 13,
+                        fontWeight: 700,
+                        letterSpacing: ".1em",
+                        lineHeight: 1.15,
+                        textTransform: "uppercase",
+                        color: cor,
+                      }}
+                    >
+                      {t.timeDefinido}
+                    </span>
+                    <span style={{ fontSize: 10.5, lineHeight: 1.3, color: D.mudo }}>{t.timeDefinidoNota}</span>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 5, marginTop: 5 }}>
+                      <span
+                        style={{
+                          fontFamily: DISPLAY,
+                          fontSize: 24,
+                          fontWeight: 700,
+                          lineHeight: 1,
+                          color: D.tituloSuave,
+                        }}
+                      >
+                        {draft.orcamentoPorTime - time.gasto}
+                      </span>
+                      <span style={{ fontSize: 11, color: D.mudo }}>
+                        {t.pontosLivres} {draft.orcamentoPorTime}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        marginTop: 7,
+                        height: 5,
+                        background: D.borda4,
+                        borderRadius: 99,
+                        overflow: "hidden",
+                      }}
+                    >
+                      <div
+                        style={{
+                          height: "100%",
+                          width: `${pct}%`,
+                          background: `linear-gradient(90deg, ${cor}, #f7bd5c)`,
+                          transition: "width .8s cubic-bezier(.22,1,.36,1)",
+                        }}
+                      />
+                    </div>
+                  </>
+                )}
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 5, padding: 8 }}>
@@ -889,6 +983,7 @@ function AoVivo({
                     cor={cor}
                     compacto
                     capitaoGratis={draft.capitaoGratis === true}
+                    definido={time.definido === true}
                     t={t}
                   />
                 ))}
@@ -1138,9 +1233,20 @@ function Fim({ draft, t }: Readonly<{ draft: DraftPublico; t: Rotulos }>) {
                   >
                     {time.nome}
                   </div>
-                  <div style={{ fontSize: 12, color: D.secundario2 }}>
-                    {time.gasto} {t.de} {draft.orcamentoPorTime} {t.pontosUsados}
-                  </div>
+                  {time.definido ? (
+                    // O time definido não gastou nada porque não passou pelo draft: "0 de 30
+                    // pontos usados" diria outra coisa.
+                    <div data-time-definido="" style={{ fontSize: 12, color: D.secundario2 }}>
+                      <span style={{ fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: cor }}>
+                        {t.timeDefinido}
+                      </span>{" "}
+                      · {t.timeDefinidoNota}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 12, color: D.secundario2 }}>
+                      {time.gasto} {t.de} {draft.orcamentoPorTime} {t.pontosUsados}
+                    </div>
+                  )}
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 5, padding: 9 }}>
                   {linhasDoTime(elenco, draft.jogadoresPorTime).map((jogador, k) => (
@@ -1150,6 +1256,7 @@ function Fim({ draft, t }: Readonly<{ draft: DraftPublico; t: Rotulos }>) {
                       cor={cor}
                       compacto={false}
                       capitaoGratis={draft.capitaoGratis === true}
+                      definido={time.definido === true}
                       t={t}
                     />
                   ))}

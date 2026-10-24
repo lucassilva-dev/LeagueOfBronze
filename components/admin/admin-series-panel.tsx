@@ -550,7 +550,8 @@ function textoDoAvisoDeSubstituto(draft: TournamentDataset, aviso: AvisoDeSubsti
   if (aviso.motivo === "sem_preco") {
     return (
       `${aviso.nick} cobriu ${time}, mas não há preço para comparar com os titulares que ficaram de fora ` +
-      `(inscrição com outro Riot ID ou elo que o site não reconhece). Confira a regra 6 à mão.`
+      `(o capitão e o time definido pela organização não têm preço no draft; ou a inscrição tem outro ` +
+      `Riot ID ou um elo que o site não reconhece). Confira a regra 6 à mão.`
     );
   }
   const valores =

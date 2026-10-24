@@ -340,10 +340,13 @@ describe("as frases FIXAS que dependem do calendário", () => {
     expect(en.paginasRegras.capitaes3).toContain(`${n} in this edition`);
     expect(pt.paginasRegras.inscricaoReservasTexto).toContain(`${n} times de 5 jogadores (${n * 5} vagas)`);
     expect(en.paginasRegras.inscricaoReservasTexto).toContain(`${n} teams of 5 players (${n * 5} places)`);
-    const ida = Array.from({ length: n }, (_, i) => i + 1);
+    // Desde 24/10/2026 o time dos organizadores já entra formado e fica fora da ordem de escolha:
+    // a serpentina do exemplo é a dos outros n − 1.
+    const noDraft = n - 1;
+    const ida = Array.from({ length: noDraft }, (_, i) => i + 1);
     const serpentina = [...ida, ...[...ida].reverse()].join("-");
-    expect(pt.paginasRegras.draft4).toContain(`com ${n} times, ${serpentina}`);
-    expect(en.paginasRegras.draft4).toContain(`with ${n} teams, ${serpentina}`);
+    expect(pt.paginasRegras.draft4).toContain(`com os ${noDraft} times do draft, ${serpentina}`);
+    expect(en.paginasRegras.draft4).toContain(`with the ${noDraft} drafting teams, ${serpentina}`);
   });
 
   it.runIf(!calendarioDivulgado())("sem a grade, nenhuma delas crava data — e dizem que as datas vão sair", () => {

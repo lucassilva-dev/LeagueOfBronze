@@ -53,6 +53,7 @@ import { ELO_ORDER, resolveElo, resolveRole } from "@/lib/design";
 import { compararForca, forcaDoElo, type ForcaDoElo } from "@/lib/draft/capitaes";
 import { eloDoJogadorDaInscricao } from "@/lib/draft/elo-da-inscricao";
 import { previaDosPrecos } from "@/lib/draft/previa-de-precos";
+import { rotaNoTimeDefinido } from "@/lib/draft/time-definido";
 import { formatDateTimeLabel } from "@/lib/format";
 import {
   alertasDoInscrito,
@@ -484,6 +485,18 @@ function useAgora(): number {
   }, []);
   return agora;
 }
+
+/**
+ * "time definido · MID": quem joga no time definido pela organização (24/10/2026), que não vai
+ * ao draft e não tem preço. A coluna `time_definido` vem no `select *` das inscrições, mas o
+ * tipo do painel (`Inscrito`) ainda não a declara.
+ */
+function rotuloDoTimeDefinido(inscrito: Inscrito): string {
+  const rota = rotaNoTimeDefinido(inscrito as Inscrito & { time_definido?: string | null });
+  return rota ? `time definido · ${resolveRole(rota).short}` : "time definido";
+}
+
+const TITULO_DO_TIME_DEFINIDO = "Time definido pela organização: já entra pronto, não vai ao draft e não tem preço.";
 
 function rotasDoInscrito(inscrito: Inscrito) {
   const primaria = resolveRole(inscrito.rota_primaria);
@@ -968,6 +981,12 @@ type PropsGaveta = Readonly<{
    * pontos. Opcional: falso quando não é capitão, ou com o capitão pago pelo orçamento.
    */
   capitaoNoDraft?: boolean;
+  /**
+   * No time definido pela organização (24/10/2026): não vai ao draft e não tem preço — a gaveta
+   * mostra a tag TIME DEFINIDO, que vale mais que a de capitão (o capitão dele também não tem
+   * preço, mas não é capitão de time do draft).
+   */
+  timeDefinidoNoDraft?: boolean;
   /** O lugar na fila de reserva (D1); nulo quando a edição não tem teto de vagas (não há fila). */
   lugar: LugarNaFila | null;
   /**
@@ -1006,6 +1025,7 @@ function GavetaInscrito({
   posicao,
   precoNoDraft,
   capitaoNoDraft = false,
+  timeDefinidoNoDraft = false,
   lugar,
   primeiroDaFila,
   simularFila,
@@ -1776,7 +1796,7 @@ function GavetaInscrito({
       ) : null}
 
       <Check checked={organizador} disabled={bloqueado} onChange={(v) => editarFicha("organizador", v)}>
-        É da organização desta edição — <b>não paga inscrição e não é capitão</b>, mas joga.
+        É da organização desta edição — <b>não paga inscrição</b>, mas joga; só é capitão se a organização definir.
         Marcar aqui não mexe no pagamento: a aba Pagamentos avisa e oferece o botão
         <b> Isentar</b> para quem cuida do caixa.
       </Check>
@@ -1896,13 +1916,15 @@ function GavetaInscrito({
           <Metric
             small
             label="Pontos no draft"
-            value={capitaoNoDraft ? "Capitão" : (precoNoDraft ?? "—")}
+            value={timeDefinidoNoDraft ? "Time definido" : capitaoNoDraft ? "Capitão" : (precoNoDraft ?? "—")}
             detail={
-              capitaoNoDraft
-                ? "capitão não tem preço: cada time tem o orçamento inteiro para as escolhas"
-                : precoNoDraft === null
-                  ? "sai da tabela automática quando fechar um time"
-                  : "prévia da tabela automática — a oficial sai na conferência do draft"
+              timeDefinidoNoDraft
+                ? `${rotuloDoTimeDefinido(inscrito)}: o time da organização já entra pronto, não vai ao draft e não tem preço`
+                : capitaoNoDraft
+                  ? "capitão não tem preço: cada time tem o orçamento inteiro para as escolhas"
+                  : precoNoDraft === null
+                    ? "sai da tabela automática quando fechar um time"
+                    : "prévia da tabela automática — a oficial sai na conferência do draft"
             }
           />
           <Metric
@@ -2185,7 +2207,7 @@ function GavetaInscrito({
             </Chip>
             {lugar ? <ChipDoLugar lugar={lugar} /> : null}
             {inscrito.organizador ? (
-              <Chip tone="gold" title="Organizador desta edição — não paga inscrição e não é capitão">
+              <Chip tone="gold" title="Organizador desta edição — joga e não paga inscrição">
                 organização
               </Chip>
             ) : null}
@@ -2215,7 +2237,11 @@ function GavetaInscrito({
             }}
           >
             <EloDoInscrito inscrito={inscrito} tamanho={30} />
-            {capitaoNoDraft ? (
+            {timeDefinidoNoDraft ? (
+              <Chip tone="ok" title={TITULO_DO_TIME_DEFINIDO}>
+                {rotuloDoTimeDefinido(inscrito)}
+              </Chip>
+            ) : capitaoNoDraft ? (
               <Chip tone="gold" title="Capitão definido pela organização: não tem preço.">
                 capitão
               </Chip>
@@ -2746,8 +2772,14 @@ export function SecaoInscritos({
     [inscritos, config.jogadores_por_time, config.orcamento_por_time, config.max_times, config.capitao_com_preco],
   );
   const precoDaPrevia = (inscrito: Inscrito) => previaDePrecos.preco(inscrito);
+  /**
+   * No time definido pela organização (24/10/2026): a tag TIME DEFINIDO no lugar dos pontos. Vem
+   * antes da de capitão — `semPreco` também é verdadeiro para os cinco, capitão dele incluído.
+   * A marca (`time_definido`) chega à prévia junto com o resto da inscrição (`select *`).
+   */
+  const noTimeDefinido = (inscrito: Inscrito) => previaDePrecos.doTimeDefinido(inscrito);
   /** Capitão sem preço (decisão de 23/10/2026): a tag CAPITÃO no lugar dos pontos. */
-  const capitaoSemPreco = (inscrito: Inscrito) => previaDePrecos.semPreco(inscrito);
+  const capitaoSemPreco = (inscrito: Inscrito) => !noTimeDefinido(inscrito) && previaDePrecos.semPreco(inscrito);
 
   /** Conferências indexadas por inscrito e item — a tabela lê isto 6 vezes por linha. */
   const porInscrito = useMemo(() => {
@@ -3136,11 +3168,13 @@ export function SecaoInscritos({
                         <LeituraDaRiotDiferente inscrito={inscrito} />
                         <span style={{ display: "block", ...tabular }} title={rotas.longo}>
                           {rotas.curto}
-                          {capitaoSemPreco(inscrito)
-                            ? " · capitão"
-                            : precoDaPrevia(inscrito) !== null
-                              ? ` · ${precoDaPrevia(inscrito)} pts`
-                              : ""}
+                          {noTimeDefinido(inscrito)
+                            ? ` · ${rotuloDoTimeDefinido(inscrito)}`
+                            : capitaoSemPreco(inscrito)
+                              ? " · capitão"
+                              : precoDaPrevia(inscrito) !== null
+                                ? ` · ${precoDaPrevia(inscrito)} pts`
+                                : ""}
                         </span>
                       </>
                     }
@@ -3163,7 +3197,7 @@ export function SecaoInscritos({
                       })}
                       {comFila ? <ChipDoLugar lugar={lugarDoInscrito(inscrito.id)} /> : null}
                       {inscrito.organizador ? (
-                        <Chip tone="gold" title="Organizador desta edição — não paga inscrição e não é capitão">
+                        <Chip tone="gold" title="Organizador desta edição — joga e não paga inscrição">
                           org
                         </Chip>
                       ) : null}
@@ -3291,7 +3325,7 @@ export function SecaoInscritos({
                         >
                           <span style={{ fontSize: 11, color: C.ink4 }}>{inscrito.riot_id}</span>
                           {inscrito.organizador ? (
-                            <Chip tone="gold" title="Organizador desta edição — não paga inscrição e não é capitão">
+                            <Chip tone="gold" title="Organizador desta edição — joga e não paga inscrição">
                               org
                             </Chip>
                           ) : null}
@@ -3319,7 +3353,11 @@ export function SecaoInscritos({
                       </td>
 
                       <td style={{ ...td, textAlign: "right", ...tabular }}>
-                        {capitaoSemPreco(inscrito) ? (
+                        {noTimeDefinido(inscrito) ? (
+                          <Chip tone="ok" title={TITULO_DO_TIME_DEFINIDO}>
+                            {rotuloDoTimeDefinido(inscrito)}
+                          </Chip>
+                        ) : capitaoSemPreco(inscrito) ? (
                           <Chip tone="gold" title="Capitão definido pela organização: não tem preço.">
                             capitão
                           </Chip>
@@ -3393,6 +3431,7 @@ export function SecaoInscritos({
           posicao={vizinhos.posicao}
           precoNoDraft={precoDaPrevia(selecionado)}
           capitaoNoDraft={capitaoSemPreco(selecionado)}
+          timeDefinidoNoDraft={noTimeDefinido(selecionado)}
           lugar={comFila ? lugarDoInscrito(selecionado.id) : null}
           primeiroDaFila={primeiro && primeiro.id !== selecionado.id ? primeiro : null}
           simularFila={(mudanca) => simularFila(selecionado.id, mudanca)}

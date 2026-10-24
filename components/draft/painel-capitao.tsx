@@ -24,6 +24,10 @@ import type { Messages } from "@/lib/i18n/messages";
  * 3. O teto da escolha é o número grande. Não é o orçamento restante: é o restante
  *    MENOS o mínimo reservado para as vagas que ainda faltam. É a conta que impede o
  *    capitão de gastar tudo num jogador caro e não conseguir fechar o elenco.
+ *
+ * O capitão do TIME DEFINIDO pela organização (24/10/2026, lib/draft/time-definido.ts) também
+ * chega aqui — ele é capitão de um time do draft —, mas o time dele já entrou completo e não
+ * escolhe: em vez da lista, o recado e o elenco, sem orçamento, sem relógio e sem botão.
  */
 
 type Rotulos = Messages["draft"];
@@ -35,6 +39,8 @@ type TimeDoDraft = Readonly<{
   capitaoRiotId: string;
   gasto: number;
   vagas: number;
+  /** O time definido pela organização: completo, fora da ordem de escolha. Servidor antigo não manda. */
+  definido?: true;
 }>;
 
 type JogadorDoElenco = Readonly<{
@@ -184,6 +190,95 @@ function EloTexto({ elo, classe }: Readonly<{ elo: string; classe?: string }>) {
   );
 }
 
+/**
+ * O MEU ELENCO, com as vagas que faltam. `tagNoPreco` diz o que vai no lugar dos pontos de cada
+ * um (nulo = os pontos): a tag de capitão quando ele entrou sem preço, e a do time definido
+ * pela organização, em que ninguém passou pelo draft. Capitão COM preço leva a tag ao lado do nome.
+ */
+function MeuElenco({
+  elenco,
+  quantas,
+  tagNoPreco,
+  automaticas,
+  t,
+}: Readonly<{
+  elenco: readonly JogadorDoElenco[];
+  /** As linhas do elenco: os jogadores por time. */
+  quantas: number;
+  tagNoPreco: (jogador: JogadorDoElenco) => string | null;
+  /** Quem entrou pelo estouro do cronômetro. */
+  automaticas: ReadonlySet<string>;
+  t: Rotulos;
+}>) {
+  return (
+    <div className="lob-card" style={{ ...CAIXA, display: "grid", gap: 12 }}>
+      <Etiqueta>{t.meuElenco}</Etiqueta>
+      <div style={{ display: "grid", gap: 7 }}>
+        {Array.from({ length: quantas }, (_, indice) => {
+          const jogador = elenco[indice];
+          if (!jogador) {
+            return (
+              <div
+                key={`vaga-${indice}`}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "10px 12px",
+                  border: "1px dashed var(--lob-line)",
+                  borderRadius: 3,
+                  color: "var(--lob-muted)",
+                  fontSize: 13,
+                }}
+              >
+                {t.vagaAberta}
+              </div>
+            );
+          }
+          const tag = tagNoPreco(jogador);
+          return (
+            <div
+              key={jogador.riotId}
+              className="lob-card-2"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "9px 12px",
+                flexWrap: "wrap",
+              }}
+            >
+              <RoleTag role={jogador.rota1} />
+              <strong style={{ color: "var(--lob-text)", fontSize: 13.5, minWidth: 0, wordBreak: "break-word" }}>
+                {jogador.riotId}
+              </strong>
+              {jogador.capitao && tag === null ? <span className="lob-pill">{t.capitao}</span> : null}
+              {automaticas.has(jogador.riotId) ? (
+                <span style={{ fontSize: 11.5, color: "#a98a5f" }}>{t.automatica}</span>
+              ) : null}
+              <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
+                <EloTexto elo={jogador.elo} classe={jogador.classe} />
+                {tag !== null ? (
+                  // Sem preço: a tag no lugar dos pontos.
+                  <span className="lob-pill">{tag}</span>
+                ) : (
+                  <span
+                    className="lob-display"
+                    style={{ color: "var(--lob-gold-1)", fontSize: 16, fontVariantNumeric: "tabular-nums" }}
+                  >
+                    {jogador.pontos}
+                    <span style={{ fontSize: 11, color: "var(--lob-muted)" }}> {t.pontos}</span>
+                  </span>
+                )}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
   const [estado, setEstado] = useState<RespostaEstado | null>(null);
   const [carregando, setCarregando] = useState(true);
@@ -315,7 +410,9 @@ export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
     draft?.prazoISO && agoraMs !== null ? Math.max(0, Date.parse(draft.prazoISO) - agoraMs) : null;
   const alerta = msRestantes !== null && msRestantes <= 10_000;
 
-  const numeroDeTimes = draft?.times.length ?? 0;
+  // Só os times que escolhem: o definido pela organização não tem vez, e contá-lo adiantava a
+  // rodada (com 8 times e 7 escolhendo, a 8ª escolha já aparecia como rodada 2).
+  const numeroDeTimes = draft?.times.filter((time) => !time.definido).length ?? 0;
   const totalRodadas = Math.max(1, (draft?.jogadoresPorTime ?? 1) - 1);
   const rodadaAtual =
     numeroDeTimes > 0 ? Math.min(totalRodadas, Math.floor((draft?.escolhaAtual ?? 0) / numeroDeTimes) + 1) : 1;
@@ -484,6 +581,57 @@ export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
             {semInscricao ? t.semInscricaoTexto : t.naoEhCapitaoTexto}
           </p>
         </div>
+      </div>
+    );
+  }
+
+  if (meuTime.definido) {
+    // O time definido pela organização não escolhe: nada de orçamento, relógio ou lista — o
+    // recado, o caminho para a transmissão e o elenco que já entrou pronto.
+    return (
+      <div className="lob-fade" style={{ display: "grid", gap: 16 }}>
+        {semResposta ? (
+          <div
+            className="lob-pill"
+            style={{ color: "#f3d69a", borderColor: "rgba(224,163,58,.40)", letterSpacing: 0, fontSize: 12 }}
+          >
+            {t.erroGenerico}
+          </div>
+        ) : null}
+
+        <div
+          className="lob-card"
+          style={{ ...CAIXA, borderLeft: `4px solid ${meuTime.cor}`, display: "grid", gap: 14 }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <span
+              style={{ width: 11, height: 11, transform: "rotate(45deg)", background: meuTime.cor, flexShrink: 0 }}
+            />
+            <h2 className="lob-display" style={{ margin: 0, fontSize: 22, color: "var(--lob-text)" }}>
+              {meuTime.nome}
+            </h2>
+            <span style={{ color: "var(--lob-muted)", fontSize: 12.5 }}>
+              {meuTime.capitaoRiotId} · {t.capitao}
+            </span>
+          </div>
+          <div data-time-definido="" style={{ display: "grid", gap: 6 }}>
+            <Etiqueta>{t.timeDefinido}</Etiqueta>
+            <p style={{ margin: 0, color: "var(--lob-text)", maxWidth: "60ch" }}>{t.timeDefinidoTexto}</p>
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+            <Link href="/draft" className="lob-btn-ghost" style={{ padding: "13px 20px", fontSize: 12 }}>
+              {t.verTransmissao}
+            </Link>
+          </div>
+        </div>
+
+        <MeuElenco
+          elenco={meuElenco}
+          quantas={draft.jogadoresPorTime}
+          tagNoPreco={(jogador) => (jogador.capitao ? t.capitao : t.timeDefinido)}
+          automaticas={entraramSozinhos}
+          t={t}
+        />
       </div>
     );
   }
@@ -680,71 +828,14 @@ export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
         </div>
       </div>
 
-      {/* 2. meu elenco */}
-      <div className="lob-card" style={{ ...CAIXA, display: "grid", gap: 12 }}>
-        <Etiqueta>{t.meuElenco}</Etiqueta>
-        <div style={{ display: "grid", gap: 7 }}>
-          {Array.from({ length: draft.jogadoresPorTime }, (_, indice) => {
-            const jogador = meuElenco[indice];
-            if (!jogador) {
-              return (
-                <div
-                  key={`vaga-${indice}`}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: "10px 12px",
-                    border: "1px dashed var(--lob-line)",
-                    borderRadius: 3,
-                    color: "var(--lob-muted)",
-                    fontSize: 13,
-                  }}
-                >
-                  {t.vagaAberta}
-                </div>
-              );
-            }
-            return (
-              <div
-                key={jogador.riotId}
-                className="lob-card-2"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  padding: "9px 12px",
-                  flexWrap: "wrap",
-                }}
-              >
-                <RoleTag role={jogador.rota1} />
-                <strong style={{ color: "var(--lob-text)", fontSize: 13.5, minWidth: 0, wordBreak: "break-word" }}>
-                  {jogador.riotId}
-                </strong>
-                {jogador.capitao && !capitaoGratis ? <span className="lob-pill">{t.capitao}</span> : null}
-                {entraramSozinhos.has(jogador.riotId) ? (
-                  <span style={{ fontSize: 11.5, color: "#a98a5f" }}>{t.automatica}</span>
-                ) : null}
-                <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
-                  <EloTexto elo={jogador.elo} classe={jogador.classe} />
-                  {jogador.capitao && capitaoGratis ? (
-                    // Capitão sem preço: a tag no lugar dos pontos.
-                    <span className="lob-pill">{t.capitao}</span>
-                  ) : (
-                    <span
-                      className="lob-display"
-                      style={{ color: "var(--lob-gold-1)", fontSize: 16, fontVariantNumeric: "tabular-nums" }}
-                    >
-                      {jogador.pontos}
-                      <span style={{ fontSize: 11, color: "var(--lob-muted)" }}> {t.pontos}</span>
-                    </span>
-                  )}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      {/* 2. meu elenco — capitão sem preço: a tag no lugar dos pontos */}
+      <MeuElenco
+        elenco={meuElenco}
+        quantas={draft.jogadoresPorTime}
+        tagNoPreco={(jogador) => (jogador.capitao && capitaoGratis ? t.capitao : null)}
+        automaticas={entraramSozinhos}
+        t={t}
+      />
 
       {/* 3. a lista de escolha */}
       <div className="lob-card" style={{ ...CAIXA, display: "grid", gap: 12 }}>
@@ -899,8 +990,10 @@ export default function PainelCapitao({ t }: Readonly<{ t: Rotulos }>) {
             gridTemplateColumns: "repeat(auto-fill,minmax(190px,1fr))",
           }}
         >
+          {/* Sem o time definido pela organização: ele não disputa jogador nenhum, e "30 livres
+              de 30 · 0 vagas" no meio dos rivais só confundiria. */}
           {draft.times
-            .filter((time) => time.id !== meuTime.id)
+            .filter((time) => time.id !== meuTime.id && !time.definido)
             .map((time) => {
               const naVez = time.id === draft.timeDaVezId;
               return (

@@ -137,6 +137,14 @@ export const draft = definir({
     fimTexto: "Agora é com vocês. Calendário e confrontos saem no Discord.",
     pontosUsados: "pontos usados",
     jogadores: "jogadores",
+
+    // ---- o time definido pela organização (24/10/2026): já entra pronto e não escolhe ----
+    timeDefinido: "time definido",
+    timeDefinidoNota: "pela organização · fora do draft",
+    // Curta de propósito: vai no lugar dos pontos, na coluna estreita de 8 times da TV.
+    timeDefinidoTag: "definido",
+    timeDefinidoTexto:
+      "Seu time já está definido pela organização e não escolhe no draft. Acompanhe pela transmissão.",
   },
 
   en: {
@@ -255,5 +263,11 @@ export const draft = definir({
     fimTexto: "It's on you now. Schedule and fixtures go out on Discord.",
     pontosUsados: "points used",
     jogadores: "players",
+
+    timeDefinido: "pre-set team",
+    timeDefinidoNota: "set by the organizers · not in the draft",
+    timeDefinidoTag: "pre-set",
+    timeDefinidoTexto:
+      "Your team has already been set by the organizers and doesn't pick in the draft. Follow along on the broadcast.",
   },
 });

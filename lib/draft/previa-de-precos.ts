@@ -12,6 +12,7 @@ import {
   type TabelaDePontos,
 } from "@/lib/draft/precos";
 import { tabelaQueFecha } from "@/lib/draft/tabela-que-fecha";
+import { rotaNoTimeDefinido, separarTimeDefinido } from "@/lib/draft/time-definido";
 
 /**
  * A PRÉVIA da tabela de pontos no painel (abas Times e vagas e Inscritos).
@@ -43,6 +44,11 @@ import { tabelaQueFecha } from "@/lib/draft/tabela-que-fecha";
  * da 4ª), a tabela é só de quem vai ser escolhido, o capitão custa 0 e a tela mostra a tag
  * CAPITÃO no lugar dos pontos (`semPreco`); ele também não entra na regra do substituto.
  *
+ * TIME DEFINIDO (24/10/2026): os membros do time que a organização já formou
+ * (`inscricoes.time_definido`, lib/draft/time-definido.ts) saem da conta, e um time a menos
+ * disputa o draft — a mesma separação do servidor. Eles não têm preço (`doTimeDefinido`; a tela
+ * mostra a tag TIME DEFINIDO) e não entram na regra do substituto.
+ *
  * Depois do sorteio vale outra coisa: a TABELA DO SORTEIO (`precosDoSorteio`), com os
  * preços que o draft usou — uma desistência depois do draft não pode mudar o preço de
  * ninguém na regra do substituto.
@@ -64,6 +70,11 @@ export type InscricaoDaPrevia = CamposDeElo & {
    * coluna, e a prévia segue com os capitães da regra.
    */
   capitao?: boolean | null;
+  /**
+   * A rota no time definido pela organização (`inscricoes.time_definido`, 24/10/2026). Ausente
+   * ou nula: vai ao draft.
+   */
+  time_definido?: string | null;
 };
 
 export type OrigemDaPrevia = "titulares" | "mais_fracos" | "sorteio";
@@ -73,6 +84,8 @@ export type PreviaDosPrecos = {
   tabela: TabelaDePontos | null;
   origem: OrigemDaPrevia | null;
   times: number;
+  /** Quantos times disputam o draft: `times` menos o time definido pela organização, quando vale. */
+  timesNoDraft: number;
   vagas: number;
   elegiveis: number;
   /** Ids de quem entrou na conta da tabela. */
@@ -96,6 +109,11 @@ export type PreviaDosPrecos = {
    * é substituído pela tabela (regra 6). Falso com o capitão pago, ou para quem não é capitão.
    */
   semPreco: (inscricao: InscricaoDaPrevia) => boolean;
+  /**
+   * Está no time definido pela organização (não vai ao draft): a tela mostra a tag TIME DEFINIDO
+   * — e não a de CAPITÃO — no lugar dos pontos. `semPreco` também é verdadeiro para ele.
+   */
+  doTimeDefinido: (inscricao: InscricaoDaPrevia) => boolean;
 };
 
 function forcaDe(i: InscricaoDaPrevia): number | null {
@@ -120,6 +138,7 @@ export function previaDosPrecos(params: {
     tabela: null,
     origem: null,
     times,
+    timesNoDraft: times,
     vagas,
     elegiveis,
     noPool: new Set(),
@@ -131,6 +150,7 @@ export function previaDosPrecos(params: {
     capitaes: new Set(),
     capitaoGratis,
     semPreco: () => false,
+    doTimeDefinido: () => false,
   });
 
   if (!Number.isInteger(jogadoresPorTime) || jogadoresPorTime <= 0) return vazia();
@@ -145,7 +165,12 @@ export function previaDosPrecos(params: {
   // Os titulares da fila, com o mesmo teto do número de times (`max_times × jogadores`).
   const fila = montarFila(inscritos, { max_times: maxTimes, jogadores_por_time: jogadoresPorTime });
   const titular = new Set(fila.titulares);
-  const titulares = comPreco.filter((i) => titular.has(i.id));
+  // Membro do time definido conta como titular mesmo sem elo legível: ele não tem preço (sai da
+  // conta logo abaixo), e o servidor também não olha o elo dele — sem isto, um membro de elo
+  // ilegível derrubava a prévia para "mais_fracos" enquanto o servidor seguia com o time definido.
+  const titulares = elegiveis.filter(
+    (i) => titular.has(i.id) && (temEloReconhecido(i) || rotaNoTimeDefinido(i) !== null),
+  );
 
   let origem: OrigemDaPrevia;
   let pool: InscricaoDaPrevia[];
@@ -159,14 +184,29 @@ export function previaDosPrecos(params: {
       .slice(0, vagas);
   }
 
+  // O time definido pela organização sai da conta, como no servidor: o pool da tabela é quem vai
+  // ao draft, com um time a menos. Marcado e inválido, a separação não vale (o servidor mostra o
+  // impedimento) e a conta segue com todo mundo. Só com o pool dos titulares, que é o do sorteio.
+  const separacao = origem === "titulares" ? separarTimeDefinido({ pool, inscritos, times, jogadoresPorTime }) : null;
+  const definidoVale = separacao?.ativo === true;
+  // Marcado e inválido, o servidor tem um impedimento e mostra a tabela PEDIDA, sem capitães: a
+  // prévia daqui faz o mesmo, para as duas telas não mostrarem preços diferentes.
+  const definidoImpede = separacao?.marcado === true && !definidoVale;
+  const doTime: ReadonlySet<string> = new Set(definidoVale ? separacao!.membros.map((i) => i.id) : []);
+  const timesNoDraft = definidoVale ? separacao!.timesNoDraft : times;
+  if (definidoVale) pool = pool.filter((i) => !doTime.has(i.id));
+  // Quem fica sem elo legível (só pode ser membro de um time definido que não vale) não tem preço.
+  pool = pool.filter((i) => temEloReconhecido(i));
+  const inscritosDoDraft = definidoVale ? inscritos.filter((i) => !doTime.has(i.id)) : inscritos;
+
   // Os capitães, na mesma ordem de preferência do servidor: os DEFINIDOS pela organização
   // (23/10/2026) quando são um por time e todos estão no pool; senão os da regra (maior elo,
   // sem organizador). Com o pool dos titulares e os capitães conhecidos, a tabela é a que fecha
   // com eles (a mesma conta do servidor). Sem isso, a pedida.
   const noPool = new Set(pool.map((i) => i.id));
   const definidos = origem === "titulares" ? pool.filter((i) => i.capitao === true).map((i) => i.id) : [];
-  const marcadoForaDoPool = inscritos.some((i) => i.capitao === true && !noPool.has(i.id) && contaParaTimes(i.situacao));
-  const definidosValem = origem === "titulares" && definidos.length === times && !marcadoForaDoPool;
+  const marcadoForaDoPool = inscritosDoDraft.some((i) => i.capitao === true && !noPool.has(i.id) && contaParaTimes(i.situacao));
+  const definidosValem = origem === "titulares" && definidos.length === timesNoDraft && !marcadoForaDoPool;
   const ranking =
     origem === "titulares" && !definidosValem
       ? rankingDeCapitaes(
@@ -174,15 +214,21 @@ export function previaDosPrecos(params: {
             const elo = eloDoJogadorDaInscricao(i);
             return { id: i.id, riotId: i.riot_id ?? i.id, organizador: i.organizador ?? false, ...elo };
           }),
-          times,
+          timesNoDraft,
         )
       : null;
-  const capitaes = definidosValem ? definidos : ranking && ranking.escolhidos.length === times ? ranking.escolhidos : null;
+  const capitaes = definidoImpede
+    ? null
+    : definidosValem
+      ? definidos
+      : ranking && ranking.escolhidos.length === timesNoDraft
+        ? ranking.escolhidos
+        : null;
   const comCapitaes = capitaes
     ? tabelaQueFecha({
         pool: pool.map((i) => ({ id: i.id, elo: eloDoJogadorDaInscricao(i) })),
         capitaes,
-        times,
+        times: timesNoDraft,
         jogadoresPorTime,
         orcamentoPorTime,
         capitaoGratis,
@@ -192,17 +238,20 @@ export function previaDosPrecos(params: {
     comCapitaes?.tabela ??
     calcularTabela({
       pool: pool.map(eloDoJogadorDaInscricao),
-      times,
+      times: timesNoDraft,
       jogadoresPorTime,
       orcamentoPorTime,
     });
   const doCapitao: ReadonlySet<string> = new Set(capitaes ?? []);
-  const semPreco = (i: InscricaoDaPrevia) => capitaoGratis && comCapitaes !== null && doCapitao.has(i.id);
+  const doTimeDefinido = (i: InscricaoDaPrevia) => doTime.has(i.id);
+  const semPreco = (i: InscricaoDaPrevia) =>
+    doTimeDefinido(i) || (capitaoGratis && comCapitaes !== null && doCapitao.has(i.id));
 
   return {
     tabela,
     origem,
     times,
+    timesNoDraft,
     vagas,
     elegiveis: elegiveis.length,
     noPool,
@@ -215,6 +264,7 @@ export function previaDosPrecos(params: {
     capitaes: doCapitao,
     capitaoGratis,
     semPreco,
+    doTimeDefinido,
   };
 }
 
@@ -247,6 +297,11 @@ export function precosDoSorteio(params: {
    */
   capitaesDoDraft?: ReadonlySet<string>;
   capitaoGratis?: boolean;
+  /**
+   * Os Riot IDs do time definido pela organização no draft (o time com `definido` na visão
+   * pública): sem preço, não substituem nem são substituídos pela tabela. Ausente: sem time definido.
+   */
+  timeDefinidoDoDraft?: ReadonlySet<string>;
 }): PreviaDosPrecos {
   const { retrato, pontosDoDraft, inscritos } = params;
   const tabela = tabelaDoRetrato(retrato);
@@ -254,12 +309,17 @@ export function precosDoSorteio(params: {
   const capitaoGratis = params.capitaoGratis === true;
   const capitaesDoDraft = params.capitaesDoDraft ?? new Set<string>();
   const capitaes = new Set(inscritos.filter((i) => i.riot_id !== undefined && capitaesDoDraft.has(i.riot_id)).map((i) => i.id));
+  const doTimeDefinidoDoDraft = params.timeDefinidoDoDraft ?? new Set<string>();
+  const doTime = new Set(inscritos.filter((i) => i.riot_id !== undefined && doTimeDefinidoDoDraft.has(i.riot_id)).map((i) => i.id));
   return {
     tabela,
     origem: "sorteio",
-    times: retrato.times,
+    // O retrato é da tabela do sorteio: com o time definido, os times que DISPUTARAM o draft.
+    times: retrato.times + (doTime.size > 0 ? 1 : 0),
+    timesNoDraft: retrato.times,
     // Com o capitão sem preço o retrato conta só os pagos por time (4): as vagas são uma a mais.
-    vagas: retrato.times * (retrato.jogadoresPorTime + (retrato.capitaoGratis ? 1 : 0)),
+    // Com o time definido, as vagas dele também contam — o mesmo total da prévia antes do sorteio.
+    vagas: (retrato.times + (doTime.size > 0 ? 1 : 0)) * (retrato.jogadoresPorTime + (retrato.capitaoGratis ? 1 : 0)),
     elegiveis: inscritos.filter((i) => contaParaTimes(i.situacao)).length,
     noPool,
     preco: (i) => {
@@ -273,7 +333,8 @@ export function precosDoSorteio(params: {
     capitaesDaTabela: null,
     capitaes,
     capitaoGratis,
-    semPreco: (i) => capitaoGratis && capitaes.has(i.id),
+    semPreco: (i) => doTime.has(i.id) || (capitaoGratis && capitaes.has(i.id)),
+    doTimeDefinido: (i) => doTime.has(i.id),
   };
 }
 

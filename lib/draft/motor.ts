@@ -25,6 +25,12 @@ export type TimeDoDraft = {
   cor: string;
   /** Id do jogador que é o capitão. Ele já ocupa uma vaga e já custa os pontos dele. */
   capitaoId: string;
+  /**
+   * O TIME DEFINIDO pela organização (24/10/2026, lib/draft/time-definido.ts): os ids do elenco
+   * inteiro, capitão incluído. Ele já entra completo (`montarDraft`) e fica FORA da ordem de
+   * escolha — não escolhe e ninguém o escolhe. Ausente nos times que disputam o draft.
+   */
+  elencoDefinido?: string[];
 };
 
 export type JogadorDoDraft = {
@@ -144,6 +150,16 @@ export function ordemSerpentina(timeIds: readonly string[], rodadas: number): st
 /** Rodadas = vagas por time menos o capitão, que já está no elenco. */
 export function rodadasDoDraft(jogadoresPorTime: number): number {
   return Math.max(0, jogadoresPorTime - 1);
+}
+
+/** O time já entrou completo, definido pela organização: fora da ordem de escolha. */
+export function ehTimeDefinido(time: Pick<TimeDoDraft, "elencoDefinido">): boolean {
+  return Array.isArray(time.elencoDefinido) && time.elencoDefinido.length > 0;
+}
+
+/** Os ids dos times que disputam o draft (todos menos o definido), na ordem do sorteio. */
+function idsQueEscolhem(times: readonly TimeDoDraft[]): string[] {
+  return times.filter((t) => !ehTimeDefinido(t)).map((t) => t.id);
 }
 
 // ---------------------------------------------------------------- contas por time
@@ -695,7 +711,7 @@ function ordemMaxima(estado: EstadoDraft): string[] {
   for (const id of estado.ordem.slice(0, estado.escolhaAtual)) pular.set(id, (pular.get(id) ?? 0) + 1);
   if (atual !== undefined) pular.set(atual, (pular.get(atual) ?? 0) + 1);
   const resto: string[] = [];
-  for (const id of ordemSerpentina(estado.times.map((t) => t.id), rodadasDoDraft(estado.jogadoresPorTime))) {
+  for (const id of ordemSerpentina(idsQueEscolhem(estado.times), rodadasDoDraft(estado.jogadoresPorTime))) {
     const p = pular.get(id) ?? 0;
     if (p > 0) pular.set(id, p - 1);
     else resto.push(id);
@@ -831,9 +847,26 @@ export function montarDraft(params: {
 
   if (times.length === 0) throw new Error("Não há times para o draft.");
 
-  // O capitão já entra no elenco do time dele: ocupa vaga e custa pontos. Se isso não
+  // O time definido pela organização já entra com o elenco inteiro (`elencoDefinido`), e o
+  // capitão de cada time já entra no elenco dele: ocupa vaga e custa pontos. Se isso não
   // acontecesse aqui, o teto de gasto sairia errado desde a primeira escolha.
+  const doTimeDefinido = new Map<string, string>();
+  for (const time of times) {
+    if (!ehTimeDefinido(time)) continue;
+    if (!time.elencoDefinido!.includes(time.capitaoId)) {
+      throw new Error(`O capitão do time ${time.nome} não está no elenco definido dele.`);
+    }
+    if (time.elencoDefinido!.length !== jogadoresPorTime) {
+      throw new Error(`O time ${time.nome} foi definido com ${time.elencoDefinido!.length} jogadores para ${jogadoresPorTime} vagas.`);
+    }
+    for (const id of time.elencoDefinido!) {
+      if (doTimeDefinido.has(id)) throw new Error("O mesmo jogador foi colocado em mais de um time definido.");
+      doTimeDefinido.set(id, time.id);
+    }
+  }
   const comCapitaes = jogadores.map((j) => {
+    const definido = doTimeDefinido.get(j.id);
+    if (definido) return { ...j, timeId: definido };
     const time = times.find((t) => t.capitaoId === j.id);
     return time ? { ...j, timeId: time.id } : { ...j, timeId: null };
   });
@@ -848,6 +881,13 @@ export function montarDraft(params: {
     if (!comCapitaes.some((j) => j.id === time.capitaoId)) {
       throw new Error(`O capitão do time ${time.nome} não está no pool.`);
     }
+    // Capitão de um time do draft não pode estar no elenco do definido.
+    if (!ehTimeDefinido(time) && doTimeDefinido.has(time.capitaoId)) {
+      throw new Error(`O capitão do time ${time.nome} está no elenco do time definido.`);
+    }
+  }
+  for (const id of doTimeDefinido.keys()) {
+    if (!comCapitaes.some((j) => j.id === id)) throw new Error("Um jogador do time definido não está no pool.");
   }
 
   return {
@@ -855,10 +895,8 @@ export function montarDraft(params: {
     fase: "preparando",
     times: [...times],
     jogadores: comCapitaes,
-    ordem: ordemSerpentina(
-      times.map((t) => t.id),
-      rodadasDoDraft(jogadoresPorTime),
-    ),
+    // Só os times que disputam o draft: o definido já está completo.
+    ordem: ordemSerpentina(idsQueEscolhem(times), rodadasDoDraft(jogadoresPorTime)),
     escolhaAtual: 0,
     prazoISO: null,
     jogadoresPorTime,

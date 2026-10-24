@@ -161,13 +161,15 @@ describe("/calendario com as datas a divulgar", () => {
 });
 
 describe("/regras com as datas a divulgar", () => {
-  it("período a divulgar, 8 times, 40 vagas, 8 capitães, serpentina até 8 — e a seção do calendário sem grade", async () => {
+  // 24/10/2026: o time dos organizadores já entra formado e fica fora do draft — a serpentina
+  // do exemplo é a dos 7 times que escolhem.
+  it("período a divulgar, 8 times, 40 vagas, 8 capitães, serpentina dos 7 do draft — e a seção do calendário sem grade", async () => {
     const markup = await html(RegrasPage());
     const t = texto(markup);
     expect(t).toContain("Datas a divulgar: o calendário dos jogos sai no fim desta página");
     expect(t).toContain("esta edição tem 8 times de 5 jogadores (40 vagas)");
     expect(t).toContain("O número de capitães é igual ao número de times: 8 nesta edição.");
-    expect(t).toContain("1-2-3-4-5-6-7-8-8-7-6-5-4-3-2-1");
+    expect(t).toContain("1-2-3-4-5-6-7-7-6-5-4-3-2-1");
     expect(t).toContain(MESSAGES.pt.calendario4a.intro);
     expect(markup).toContain('data-calendario="a-divulgar"');
     expect(t).not.toMatch(GRADE_VELHA);

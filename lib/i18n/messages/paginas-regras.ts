@@ -9,7 +9,9 @@ import { definir } from "@/lib/i18n/definir";
  * conta na regra 4, substituto por jogo e saída de vez na regra 6, W.O. no meio da série na
  * regra 8, fila de reserva e prazo de pagamento na regra 22, desistência depois do sorteio no
  * draft) e as de 23/10/2026 (os capitães são definidos pela organização e não têm preço; cada
- * time tem 30 pontos para as 4 escolhas; a tabela é calculada pelo site). Nada de valor em R$ ou percentual
+ * time tem 30 pontos para as 4 escolhas; a tabela é calculada pelo site) e a de 24/10/2026 (os
+ * organizadores jogam num time já formado pela organização, fora do draft; os outros 7 fazem o
+ * draft, e a tabela é calculada só sobre quem vai ser escolhido). Nada de valor em R$ ou percentual
  * cravado aqui: a taxa e a fatia do campeão vêm da Configuração da edição (`edicao_config`),
  * e o texto tem a versão com e a versão sem esses números para quando a configuração não
  * puder ser lida.
@@ -74,7 +76,7 @@ const pt = {
   // ---------- app/regras: 3. formação dos times ----------
   formacaoTitulo: "FORMAÇÃO DOS TIMES",
   formacaoIntro:
-    "Os capitães são definidos pela organização, e os times são montados em um draft por pontos, no mesmo modelo da 3ª edição.",
+    "Os capitães são definidos pela organização, e os times são montados em um draft por pontos, no mesmo modelo da 3ª edição. Os organizadores jogam num time já formado pela organização, que não participa do draft; os outros 7 times fazem o draft normalmente, com 30 pontos cada para as 4 escolhas, e a tabela é calculada só sobre quem vai ser escolhido.",
   capitaesTitulo: "CAPITÃES",
   capitaes1: "Os 8 capitães são definidos pela organização, um por time.",
   capitaes2:
@@ -86,13 +88,13 @@ const pt = {
     "O capitão também é jogador: ocupa a rota do seu cadastro, que é fixa, independentemente da rota em que jogar na partida.",
   draftTitulo: "DRAFT POR PONTOS",
   draft1:
-    "Cada jogador a ser escolhido tem um valor em pontos conforme o elo e a divisão. A tabela de pontos é calculada pelo site a partir de quem vai ser escolhido (os jogadores que não são capitães), para a soma dar exatamente 8 × 30 = 240 pontos.",
+    "Cada jogador a ser escolhido tem um valor em pontos conforme o elo e a divisão. A tabela de pontos é calculada pelo site a partir de quem vai ser escolhido (os jogadores que não são capitães nem do time dos organizadores), para a soma dar exatamente 30 pontos por time do draft (7 × 30).",
   draft2:
-    "Cada time tem 30 pontos para as 4 escolhas — o mesmo para todos os times. O capitão não entra nessa conta.",
+    "Cada time tem 30 pontos para as 4 escolhas — o mesmo para todos os times do draft. O capitão não entra nessa conta.",
   draft3:
     "O capitão entra com a rota do seu cadastro, fixa, e o draft é feito em 4 rodadas para as outras 4 rotas.",
   draft4:
-    "A ordem de escolha é serpentina (ex.: com 8 times, 1-2-3-4-5-6-7-8-8-7-6-5-4-3-2-1) e não pode ser trocada nem alterada depois de sorteada.",
+    "A ordem de escolha é serpentina (ex.: com os 7 times do draft, 1-2-3-4-5-6-7-7-6-5-4-3-2-1) e não pode ser trocada nem alterada depois de sorteada.",
   draft5:
     "Nenhum capitão pode estourar o orçamento; deve sempre reservar pontos para fechar as rodadas restantes com o jogador mais barato ainda disponível em cada rota.",
   draft6:
@@ -373,7 +375,7 @@ export const paginasRegras = definir<ChavesPaginasRegras>({
     // ---------- app/regras: 3. formação dos times ----------
     formacaoTitulo: "TEAM FORMATION",
     formacaoIntro:
-      "The captains are chosen by the organisers, and teams are built through a points draft, using the same model as the 3rd edition.",
+      "The captains are chosen by the organisers, and teams are built through a points draft, using the same model as the 3rd edition. The organisers play in a team already put together by the organisation, which does not take part in the draft; the other 7 teams draft as normal, with 30 points each for their 4 picks, and the points table is calculated only from the players up for picking.",
     capitaesTitulo: "CAPTAINS",
     capitaes1: "The 8 captains are chosen by the organisers, one per team.",
     capitaes2:
@@ -385,13 +387,13 @@ export const paginasRegras = definir<ChavesPaginasRegras>({
       "The captain is also a player: they take the role from their sign-up, which is fixed regardless of the role they actually play in the game.",
     draftTitulo: "POINTS DRAFT",
     draft1:
-      "Every player up for picking has a point value based on their rank and division. The points table is calculated by the site from the players up for picking (everyone who is not a captain), so that the total is exactly 8 × 30 = 240 points.",
+      "Every player up for picking has a point value based on their rank and division. The points table is calculated by the site from the players up for picking (everyone who is neither a captain nor in the organisers' team), so that the total is exactly 30 points per drafting team (7 × 30).",
     draft2:
-      "Each team has 30 points for its 4 picks — the same for every team. The captain is not part of that sum.",
+      "Each team has 30 points for its 4 picks — the same for every drafting team. The captain is not part of that sum.",
     draft3:
       "The captain comes in with the fixed role from their sign-up, and the draft runs over 4 rounds for the other 4 roles.",
     draft4:
-      "Pick order is snake (e.g. with 8 teams, 1-2-3-4-5-6-7-8-8-7-6-5-4-3-2-1) and cannot be swapped or changed once drawn.",
+      "Pick order is snake (e.g. with the 7 drafting teams, 1-2-3-4-5-6-7-7-6-5-4-3-2-1) and cannot be swapped or changed once drawn.",
     draft5:
       "No captain may go over budget; they must always keep enough points to fill the remaining rounds with the cheapest player still available in each role.",
     draft6:

@@ -11,9 +11,12 @@ import { MESSAGES } from "@/lib/i18n/messages";
  *  - os 8 capitães são DEFINIDOS pela organização (não mais "os de maior elo");
  *  - o capitão não tem preço: cada time tem 30 pontos para as 4 escolhas;
  *  - a tabela de pontos é calculada pelo site a partir de quem vai ser escolhido, para a soma
- *    dar exatamente 8 × 30;
+ *    dar exatamente 30 por time do draft;
  *  - saem "média + 15%", "capitães são os maiores elos", "organizadores não são capitães" e
  *    "o valor do capitão sai do orçamento". A serpentina e o resto continuam.
+ *
+ * E a de 24/10/2026: os organizadores jogam num time já formado pela organização, fora do
+ * draft; os outros 7 fazem o draft (a soma é 7 × 30 e a serpentina do exemplo, a dos 7).
  */
 
 vi.mock("@/lib/i18n/server", async () => {
@@ -64,11 +67,24 @@ describe("regulamento de 23/10/2026: capitães definidos e sem preço", () => {
     expect(en.draft2).toContain("Each team has 30 points for its 4 picks");
   });
 
-  it("a tabela é calculada pelo site a partir de quem vai ser escolhido, com a soma exata 8 × 30", () => {
+  // 24/10/2026: com o time dos organizadores fora do draft, a soma é a dos 7 times que escolhem.
+  it("a tabela é calculada pelo site a partir de quem vai ser escolhido, com a soma exata por time do draft", () => {
     expect(pt.draft1).toContain("calculada pelo site a partir de quem vai ser escolhido");
-    expect(pt.draft1).toContain("exatamente 8 × 30 = 240 pontos");
+    expect(pt.draft1).toContain("exatamente 30 pontos por time do draft (7 × 30)");
     expect(en.draft1).toContain("calculated by the site from the players up for picking");
-    expect(en.draft1).toContain("exactly 8 × 30 = 240 points");
+    expect(en.draft1).toContain("exactly 30 points per drafting team (7 × 30)");
+    for (const texto of [pt.draft1, en.draft1]) expect(texto).not.toMatch(/8 × 30|240/);
+  });
+
+  it("os organizadores jogam num time já formado, fora do draft; os outros 7 fazem o draft (24/10/2026)", () => {
+    expect(pt.formacaoIntro).toContain(
+      "Os organizadores jogam num time já formado pela organização, que não participa do draft; os outros 7 times fazem o draft normalmente, com 30 pontos cada para as 4 escolhas, e a tabela é calculada só sobre quem vai ser escolhido.",
+    );
+    expect(en.formacaoIntro).toContain(
+      "The organisers play in a team already put together by the organisation, which does not take part in the draft; the other 7 teams draft as normal, with 30 points each for their 4 picks",
+    );
+    expect(pt.draft2).toContain("o mesmo para todos os times do draft");
+    expect(en.draft2).toContain("the same for every drafting team");
   });
 
   it("saem a regra antiga do orçamento, o maior elo, o organizador que não capitaneia e o capitão pago", () => {
@@ -82,8 +98,8 @@ describe("regulamento de 23/10/2026: capitães definidos e sem preço", () => {
   });
 
   it("a serpentina e o resto do draft continuam", () => {
-    expect(pt.draft4).toContain("serpentina (ex.: com 8 times, 1-2-3-4-5-6-7-8-8-7-6-5-4-3-2-1)");
-    expect(en.draft4).toContain("snake (e.g. with 8 teams, 1-2-3-4-5-6-7-8-8-7-6-5-4-3-2-1)");
+    expect(pt.draft4).toContain("serpentina (ex.: com os 7 times do draft, 1-2-3-4-5-6-7-7-6-5-4-3-2-1)");
+    expect(en.draft4).toContain("snake (e.g. with the 7 drafting teams, 1-2-3-4-5-6-7-7-6-5-4-3-2-1)");
     expect(pt.capitaes3).toBe("O número de capitães é igual ao número de times: 8 nesta edição.");
     expect(pt.capitaes4).toContain("Um sorteio ao vivo define qual time cada capitão vai capitanear");
     expect(pt.capitaes5).toContain("O capitão também é jogador");
@@ -96,6 +112,7 @@ describe("regulamento de 23/10/2026: capitães definidos e sem preço", () => {
     const texto = raiz.textContent ?? "";
     expect(texto).toContain("Os 8 capitães são definidos pela organização, um por time.");
     expect(texto).toContain("O capitão não tem preço");
+    expect(texto).toContain("Os organizadores jogam num time já formado pela organização, que não participa do draft");
     expect(texto).not.toContain("média de pontos por time + 15%");
     expect(texto).not.toContain("os inscritos de maior elo");
   });

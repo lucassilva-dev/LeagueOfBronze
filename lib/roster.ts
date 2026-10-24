@@ -179,11 +179,15 @@ export function buildDesignTeams(dataset: TournamentDataset): DesignTeam[] {
  * comparação vem montada de fora, por `regraDoSubstitutoPelosPrecos`.
  */
 export type RegraDoSubstituto = {
-  /** O preço do jogador na tabela; nulo sem inscrição casada ou sem elo legível. */
+  /**
+   * O preço do jogador na tabela; nulo sem inscrição casada, sem elo legível ou sem preço (o
+   * capitão sem preço e o time definido pela organização).
+   */
   preco: (jogador: Pick<Player, "nick">) => number | null;
   /**
    * `true`: o substituto vale igual ou menos que o substituído; `false`: vale mais;
-   * `null`: não há valor para comparar (um dos dois sem inscrição casada ou sem elo legível).
+   * `null`: não há valor para comparar (um dos dois sem inscrição casada, sem elo legível ou
+   * sem preço).
    */
   comparar: (substituto: Pick<Player, "nick">, substituido: Pick<Player, "nick">) => boolean | null;
 };
@@ -202,6 +206,13 @@ function chaveDoRiotId(riotId: string): string {
  * que a virada gravou), sem diferenciar maiúsculas. Sem inscrição casada, ou com elo que o
  * site não reconhece, não há preço: a comparação devolve `null` e o aviso diz isso — a
  * tabela fixa da 3ª (`pontos` do elo) não serve, porque não é o preço que o draft usou.
+ *
+ * Também não há preço para quem a tabela não precifica (`semPreco`): o capitão sem preço
+ * (23/10/2026) e os cinco do time definido pela organização (24/10/2026), que não passaram
+ * pelo draft. No draft eles constam com 0 pontos, e comparar esse 0 diria que qualquer
+ * substituto "vale mais" — ou que qualquer um deles cabe no lugar de qualquer titular. A troca
+ * de um deles é decisão da organização: a comparação devolve `null`, e o aviso pede a
+ * conferência à mão.
  */
 export function regraDoSubstitutoPelosPrecos(
   precos: PreviaDosPrecos,
@@ -222,12 +233,13 @@ export function regraDoSubstitutoPelosPrecos(
   // `podeSubstituir` compara pelo preço quando há tabela e pela força antes dela; "sem valor"
   // é o mesmo critério dela, olhado antes para separar "vale mais" de "não dá para saber".
   const temValor = (inscricao: InscricaoDaPrevia) =>
-    precos.tabela ? precos.preco(inscricao) !== null : precos.forca(inscricao) !== null;
+    !precos.semPreco(inscricao) &&
+    (precos.tabela ? precos.preco(inscricao) !== null : precos.forca(inscricao) !== null);
 
   return {
     preco: (jogador) => {
       const inscricao = inscricaoDe(jogador);
-      return inscricao ? precos.preco(inscricao) : null;
+      return inscricao && !precos.semPreco(inscricao) ? precos.preco(inscricao) : null;
     },
     comparar: (substituto, substituido) => {
       const a = inscricaoDe(substituto);
