@@ -122,6 +122,8 @@ export const draft = definir({
     sorteando: "sorteando…",
     // A sequência (1-2-…-N · N-…-1) é montada pela tela com o número real de times.
     ordemSerpentina: "Ordem serpentina:",
+    ordemLinear: "Ordem de escolha:",
+    emTodasAsRodadas: "em todas as rodadas.",
     eRepete: "e repete.",
     escolhaLivre: "ESCOLHA LIVRE",
     poolDisponivel: "POOL DISPONÍVEL",
@@ -248,6 +250,8 @@ export const draft = definir({
     sorteioTitulo: "THE CAPTAINS ARE SET",
     sorteando: "drawing…",
     ordemSerpentina: "Snake order:",
+    ordemLinear: "Pick order:",
+    emTodasAsRodadas: "in every round.",
     eRepete: "and repeat.",
     escolhaLivre: "FREE PICK",
     poolDisponivel: "AVAILABLE POOL",

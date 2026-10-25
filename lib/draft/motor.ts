@@ -62,6 +62,12 @@ export type EventoDraft = {
 export type FaseDraft = "preparando" | "rodando" | "pausado" | "encerrado";
 
 /**
+ * Como as rodadas se sucedem. "serpentina" (o padrão): 1→N, depois N→1. "linear": 1→N em TODAS
+ * as rodadas — a decisão da organização na hora do draft da 4ª (24/10/2026, 22h).
+ */
+export type TipoDeOrdem = "serpentina" | "linear";
+
+/**
  * Por que o draft parou. A transmissão dizia sempre "a organização interrompeu o relógio",
  * inclusive quando foi o motor que pausou sozinho — e na TV isso vira acusação.
  */
@@ -89,6 +95,8 @@ export type EstadoDraft = {
    * Opcional porque drafts montados antes do sorteio não têm.
    */
   sorteio?: { semente: string; capitaes: string[]; emISO: string };
+  /** Ausente = serpentina (todo estado gravado antes de 24/10/2026). */
+  tipoDeOrdem?: TipoDeOrdem;
   /** Só com `fase === "pausado"`. Ausente em estados gravados antes deste campo existir. */
   motivoDaPausa?: MotivoDaPausa;
   /**
@@ -144,6 +152,14 @@ export function ordemSerpentina(timeIds: readonly string[], rodadas: number): st
     const daVez = r % 2 === 0 ? timeIds : [...timeIds].reverse();
     ordem.push(...daVez);
   }
+  return ordem;
+}
+
+/** A ordem das rodadas do tipo pedido: a serpentina ou 1→N em todas (`TipoDeOrdem`). */
+export function ordemDasRodadas(timeIds: readonly string[], rodadas: number, tipo: TipoDeOrdem = "serpentina"): string[] {
+  if (tipo === "serpentina") return ordemSerpentina(timeIds, rodadas);
+  const ordem: string[] = [];
+  for (let r = 0; r < rodadas; r++) ordem.push(...timeIds);
   return ordem;
 }
 
@@ -711,7 +727,7 @@ function ordemMaxima(estado: EstadoDraft): string[] {
   for (const id of estado.ordem.slice(0, estado.escolhaAtual)) pular.set(id, (pular.get(id) ?? 0) + 1);
   if (atual !== undefined) pular.set(atual, (pular.get(atual) ?? 0) + 1);
   const resto: string[] = [];
-  for (const id of ordemSerpentina(idsQueEscolhem(estado.times), rodadasDoDraft(estado.jogadoresPorTime))) {
+  for (const id of ordemDasRodadas(idsQueEscolhem(estado.times), rodadasDoDraft(estado.jogadoresPorTime), estado.tipoDeOrdem)) {
     const p = pular.get(id) ?? 0;
     if (p > 0) pular.set(id, p - 1);
     else resto.push(id);
@@ -842,8 +858,11 @@ export function montarDraft(params: {
   jogadoresPorTime: number;
   orcamentoPorTime: number;
   segundosPorEscolha: number;
+  /** Padrão: serpentina. */
+  tipoDeOrdem?: TipoDeOrdem;
 }): EstadoDraft {
   const { times, jogadores, jogadoresPorTime, orcamentoPorTime, segundosPorEscolha } = params;
+  const tipoDeOrdem = params.tipoDeOrdem ?? "serpentina";
 
   if (times.length === 0) throw new Error("Não há times para o draft.");
 
@@ -896,7 +915,9 @@ export function montarDraft(params: {
     times: [...times],
     jogadores: comCapitaes,
     // Só os times que disputam o draft: o definido já está completo.
-    ordem: ordemSerpentina(idsQueEscolhem(times), rodadasDoDraft(jogadoresPorTime)),
+    ordem: ordemDasRodadas(idsQueEscolhem(times), rodadasDoDraft(jogadoresPorTime), tipoDeOrdem),
+    // Gravado só quando não é a serpentina: o estado de sempre continua igual.
+    ...(tipoDeOrdem !== "serpentina" ? { tipoDeOrdem } : {}),
     escolhaAtual: 0,
     prazoISO: null,
     jogadoresPorTime,

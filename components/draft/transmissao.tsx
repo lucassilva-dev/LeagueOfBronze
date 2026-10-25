@@ -135,6 +135,8 @@ type DraftPublico = {
    * gasto de cada time é só o das escolhas. Opcional: servidor antigo não manda.
    */
   capitaoGratis?: boolean;
+  /** "linear" desde 24/10/2026: 1→N em todas as rodadas. Ausente: serpentina. */
+  tipoDeOrdem?: string;
 };
 
 type RespostaEstado = { draft: DraftPublico | null; souCapitaoDe: string | null; agoraServidorISO?: string };
@@ -202,8 +204,10 @@ function ordinal(n: number, t: Rotulos): string {
  * A frase da ordem com o número REAL de times. Era cravada em "1-2-3-4-5-6 · 6-5-4-3-2-1",
  * e com 25 a 29 aprovados (5 times) a TV anunciava um 6º time que não existe.
  */
-function fraseDaSerpentina(times: number, t: Rotulos): string {
+function fraseDaSerpentina(times: number, t: Rotulos, tipo?: string): string {
   const ida = Array.from({ length: times }, (_, i) => i + 1);
+  // 24/10/2026: na 4ª a ordem é 1→N em todas as rodadas (`tipoDeOrdem` "linear").
+  if (tipo === "linear") return `${t.ordemLinear} ${ida.join("-")} · ${t.emTodasAsRodadas}`;
   return `${t.ordemSerpentina} ${ida.join("-")} · ${[...ida].reverse().join("-")} · ${t.eRepete}`;
 }
 
@@ -616,7 +620,7 @@ function Sorteio({
       {pronto ? (
         <div style={{ marginTop: 34, animation: "lobdRise .5s ease both" }}>
           <p style={{ margin: "0 0 16px", fontSize: 14, color: D.secundario2 }}>
-            {fraseDaSerpentina(timesQueEscolhem(draft.times).length, t)}
+            {fraseDaSerpentina(timesQueEscolhem(draft.times).length, t, draft.tipoDeOrdem)}
           </p>
         </div>
       ) : null}

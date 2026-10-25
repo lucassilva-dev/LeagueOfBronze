@@ -19,6 +19,7 @@ import {
   type JogadorDoDraft,
   type MotivoDaPausa,
   type TimeDoDraft,
+  type TipoDeOrdem,
 } from "@/lib/draft/motor";
 import { montarFila } from "@/lib/inscricoes/fila";
 import { estaFora } from "@/lib/inscricoes/pagamento";
@@ -165,6 +166,12 @@ export async function comAsSaidasDoPool(estado: EstadoDraft, opcoes: { fresco?: 
  * quem quer ser capitão, e o método nunca encontraria ninguém.)
  */
 export type MetodoDeCapitao = "definidos" | "maior_elo" | "mid" | "adc" | "pior" | "manual";
+
+/**
+ * A ordem das rodadas nesta edição: "linear" (1→N em todas as rodadas), decidida pela
+ * organização na hora do draft da 4ª (24/10/2026, 22h). Para voltar à serpentina, troque aqui.
+ */
+export const TIPO_DE_ORDEM_DA_EDICAO: TipoDeOrdem = "linear";
 
 /**
  * As colunas que o resto do código não declara: `listarInscricoes` e `lerConfig` leem `*`, e
@@ -821,6 +828,9 @@ export async function montarDraftDosAprovados(params: {
     montarDraft({
       times,
       jogadores: [...pool, ...membros],
+      // Decisão da organização na hora do draft da 4ª (24/10/2026, 22h): 1→7 em todas as
+      // rodadas, em vez da serpentina.
+      tipoDeOrdem: TIPO_DE_ORDEM_DA_EDICAO,
       jogadoresPorTime: config.jogadores_por_time,
       orcamentoPorTime: config.orcamento_por_time,
       segundosPorEscolha: config.segundos_por_escolha,
@@ -1025,6 +1035,8 @@ export type DraftPublico = {
    * tag CAPITÃO no lugar dos pontos, e `gasto` é só o das escolhas. Opcional: servidor anterior.
    */
   capitaoGratis?: boolean;
+  /** Como as rodadas se sucedem. Ausente: servidor anterior (serpentina). */
+  tipoDeOrdem?: TipoDeOrdem;
 };
 
 /**
@@ -1139,6 +1151,7 @@ export function paraPublico(estado: EstadoDraftComTabela, revisao: number): Draf
     })),
     tabelaDePontos: estado.tabelaDePontos ?? null,
     capitaoGratis: estado.capitaoGratis === true,
+    tipoDeOrdem: estado.tipoDeOrdem ?? "serpentina",
   };
 }
 
