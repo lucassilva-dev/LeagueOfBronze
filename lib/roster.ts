@@ -1,8 +1,9 @@
 import type { Player, SeriesGame, TournamentDataset } from "@/lib/schema";
-import { resolveElo, resolveRole, teamColor, type EloMeta, type RoleMeta } from "@/lib/design";
+import { resolveElo, resolveRole, type EloMeta, type RoleMeta } from "@/lib/design";
 import { podeSubstituir, type InscricaoDaPrevia, type PreviaDosPrecos } from "@/lib/draft/previa-de-precos";
 import { contaParaTimes } from "@/lib/inscricoes/schema";
 import { getDisplayNick } from "@/lib/opgg";
+import { corDoTime } from "@/lib/temas/registro";
 import { elencoAtivo, estaNoElenco, linhaDeSubstituto } from "@/lib/tournament";
 
 /** Cor neutra do reserva, que não tem time (o mesmo cinza-bronze dos textos de apoio). */
@@ -127,7 +128,7 @@ export function buildDesignPlayers(
       teamId,
       teamName: reserva ? rotulos.reserva : (team?.name ?? teamId),
       teamSlug: team?.slug ?? teamId,
-      teamColor: reserva ? COR_DO_RESERVA : teamColor(teamId),
+      teamColor: reserva ? COR_DO_RESERVA : corDoTime({ id: teamId, slug: team?.slug }),
       teamImageUrl: team?.imageUrl,
       reserva,
       saiu: Boolean(player.saiuEm),
@@ -163,7 +164,7 @@ export function buildDesignTeams(dataset: TournamentDataset): DesignTeam[] {
       id: team.id,
       name: team.name,
       slug: team.slug,
-      color: teamColor(team.id),
+      color: corDoTime(team),
       imageUrl: team.imageUrl,
       roster,
       captain,

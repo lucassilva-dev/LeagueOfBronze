@@ -1,4 +1,4 @@
-import { teamColor } from "@/lib/design";
+import { corDoTime } from "@/lib/temas/registro";
 import type { SeriesFormat, TournamentDataset } from "@/lib/schema";
 import { getSeriesFormat, getSeriesScore, getSeriesWinnerTeamId, isWalkoverSeries } from "@/lib/tournament";
 
@@ -164,8 +164,8 @@ export function buildRegularGames(dataset: TournamentDataset): CalGame[] {
         turno: parts.turno,
         format: getSeriesFormat(series, dataset),
         hora: parts.hora,
-        teamA: { id: series.teamAId, name: teamA?.name ?? series.teamAId, color: teamColor(series.teamAId), imageUrl: teamA?.imageUrl },
-        teamB: { id: series.teamBId, name: teamB?.name ?? series.teamBId, color: teamColor(series.teamBId), imageUrl: teamB?.imageUrl },
+        teamA: { id: series.teamAId, name: teamA?.name ?? series.teamAId, color: corDoTime({ id: series.teamAId, slug: teamA?.slug }), imageUrl: teamA?.imageUrl },
+        teamB: { id: series.teamBId, name: teamB?.name ?? series.teamBId, color: corDoTime({ id: series.teamBId, slug: teamB?.slug }), imageUrl: teamB?.imageUrl },
         stage: series.stage ?? "REGULAR_SEASON",
         done: winnerId != null,
         scoreA: score.teamAWins,
@@ -203,8 +203,8 @@ export function buildSemifinalGames(dataset: TournamentDataset): CalGame[] {
         turno: parts.turno,
         hora: parts.hora,
         format: getSeriesFormat(series, dataset),
-        teamA: { id: series.teamAId, name: teamA?.name ?? series.teamAId, color: teamColor(series.teamAId), imageUrl: teamA?.imageUrl },
-        teamB: { id: series.teamBId, name: teamB?.name ?? series.teamBId, color: teamColor(series.teamBId), imageUrl: teamB?.imageUrl },
+        teamA: { id: series.teamAId, name: teamA?.name ?? series.teamAId, color: corDoTime({ id: series.teamAId, slug: teamA?.slug }), imageUrl: teamA?.imageUrl },
+        teamB: { id: series.teamBId, name: teamB?.name ?? series.teamBId, color: corDoTime({ id: series.teamBId, slug: teamB?.slug }), imageUrl: teamB?.imageUrl },
         stage: "SEMIFINAL",
         done: winnerId != null,
         scoreA: score.teamAWins,
@@ -234,8 +234,8 @@ export function buildFinalGame(dataset: TournamentDataset): CalGame | null {
     turno: parts.turno,
     hora: parts.hora,
     format: getSeriesFormat(series, dataset),
-    teamA: { id: series.teamAId, name: teamA?.name ?? series.teamAId, color: teamColor(series.teamAId), imageUrl: teamA?.imageUrl },
-    teamB: { id: series.teamBId, name: teamB?.name ?? series.teamBId, color: teamColor(series.teamBId), imageUrl: teamB?.imageUrl },
+    teamA: { id: series.teamAId, name: teamA?.name ?? series.teamAId, color: corDoTime({ id: series.teamAId, slug: teamA?.slug }), imageUrl: teamA?.imageUrl },
+    teamB: { id: series.teamBId, name: teamB?.name ?? series.teamBId, color: corDoTime({ id: series.teamBId, slug: teamB?.slug }), imageUrl: teamB?.imageUrl },
     stage: "FINAL",
     done: winnerId != null,
     scoreA: score.teamAWins,

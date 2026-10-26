@@ -27,6 +27,8 @@ export const TEMA_EQUIPE_RX: TemaDoTime = {
     tinta: "#0A0F1A",
   },
   prefixo: "EQUIPE",
+  // O azul do neon do escudo (o id `carmesim` dava o vermelho #d9455f do nome do draft).
+  cor: "#4DA3FF",
   cenario: "tempestade",
   fotos: { focoPadrao: "50% 32%", foco: { ironclaw: "42% 28%" } },
 };

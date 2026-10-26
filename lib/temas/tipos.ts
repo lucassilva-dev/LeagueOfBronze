@@ -56,6 +56,11 @@ export type TemaDoTime = Readonly<{
    * do "RX" em cromo). Só vale se o nome do time começar com ele seguido de espaço.
    */
   prefixo?: string;
+  /**
+   * A cor do time no RESTO do site (tabela, calendário, listas de times e jogadores), no lugar
+   * da cor que o nome do draft dava ao id. Clara o bastante para texto sobre o fundo escuro.
+   */
+  cor: string;
   cenario: Cenario;
   /** Enquadramento das fotos (object-position) por slug do jogador; o resto usa `focoPadrao`. */
   fotos: Readonly<{ focoPadrao: string; foco?: Readonly<Record<string, string>> }>;

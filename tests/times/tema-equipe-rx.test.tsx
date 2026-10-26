@@ -8,7 +8,7 @@ import { MESSAGES } from "@/lib/i18n/messages";
 import type { DesignPlayer, DesignTeam } from "@/lib/roster";
 import { resolveElo, resolveRole } from "@/lib/design";
 import { TEMA_EQUIPE_RX } from "@/lib/temas/equipe-rx";
-import { partesDoNome, temaDoTime } from "@/lib/temas/registro";
+import { corDoTime, partesDoNome, temaDoTime } from "@/lib/temas/registro";
 
 /*
  * A página temática da Equipe RX (26/10/2026) e a ficha temática do jogador: o que o leitor de
@@ -95,6 +95,13 @@ describe("registro de temas", () => {
     expect(temaDoTime("equipe-rx")).toBe(TEMA_EQUIPE_RX);
     expect(temaDoTime("carmesim")).toBeNull();
     expect(temaDoTime("aurea")).toBeNull();
+  });
+
+  // 26/10/2026: a RX aparecia no vermelho do id "carmesim" na tabela, no calendário e nas listas.
+  it("a cor do time no site segue o tema (pelo slug); sem tema, a de sempre pelo id", () => {
+    expect(corDoTime({ id: "carmesim", slug: "equipe-rx" })).toBe("#4DA3FF");
+    expect(corDoTime({ id: "carmesim", slug: "carmesim" })).toBe("#d9455f");
+    expect(corDoTime({ id: "carmesim" })).toBe("#d9455f");
   });
 
   it("parte o nome como no escudo: EQUIPE em pincel, RX em metal", () => {
