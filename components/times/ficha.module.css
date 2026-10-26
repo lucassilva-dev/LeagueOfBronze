@@ -5,10 +5,6 @@
  * opacidade animada só em enfeite `enf…`.
  */
 
-.heroi {
-  padding-bottom: calc(var(--barra) + clamp(24px, 3vw, 44px));
-}
-
 .grade {
   display: grid;
   gap: clamp(22px, 3vw, 44px);
@@ -49,7 +45,7 @@
   z-index: -1;
   border-radius: 10px;
   pointer-events: none;
-  background: radial-gradient(closest-side, rgba(77, 163, 255, 0.45), rgba(31, 107, 255, 0.14) 60%, transparent);
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--tm-neon) 45%, transparent), color-mix(in srgb, var(--tm-primaria) 14%, transparent) 60%, transparent);
   animation: haloRetrato 3.6s ease-in-out infinite;
 }
 @keyframes haloRetrato {
@@ -70,7 +66,7 @@
   height: auto;
   translate: -50% 0;
   pointer-events: none;
-  filter: drop-shadow(0 0 12px rgba(77, 163, 255, 0.8));
+  filter: drop-shadow(0 0 12px color-mix(in srgb, var(--tm-neon) 80%, transparent));
 }
 .retrato {
   --corte: 22px;
@@ -78,18 +74,18 @@
   margin: 0;
   padding: 2px;
   clip-path: polygon(0 0, calc(100% - var(--corte)) 0, 100% var(--corte), 100% 100%, var(--corte) 100%, 0 calc(100% - var(--corte)));
-  background: linear-gradient(160deg, #fff, #8a96a6 22%, var(--tm-primaria) 50%, #29303a 74%, #dfe6ef);
+  background: linear-gradient(160deg, var(--tm-metal-luz), var(--tm-metal-base) 22%, var(--tm-primaria) 50%, var(--tm-metal-sombra) 74%, var(--tm-metal-volta));
 }
 .retratoMiolo {
   position: relative;
   overflow: hidden;
-  aspect-ratio: 4 / 5;
+  aspect-ratio: var(--proporcao, 4 / 5);
   clip-path: polygon(0 0, calc(100% - var(--corte)) 0, 100% var(--corte), 100% 100%, var(--corte) 100%, 0 calc(100% - var(--corte)));
-  background: radial-gradient(80% 70% at 50% 30%, rgba(31, 107, 255, 0.3), transparent 70%), #050a1a;
+  background: radial-gradient(80% 70% at 50% 30%, color-mix(in srgb, var(--tm-primaria) 30%, transparent), transparent 70%), var(--tm-foto-fundo, #050a1a);
 }
 @media (min-width: 600px) and (max-width: 899px) {
   .retratoMiolo {
-    aspect-ratio: 4 / 3;
+    aspect-ratio: var(--proporcao, 4 / 3);
   }
 }
 /* Só a foto (filho direto): a crista de elo também é <img> e fica no canto. */
@@ -113,8 +109,8 @@
   inset: 0;
   pointer-events: none;
   background:
-    linear-gradient(180deg, rgba(3, 5, 11, 0.45) 0%, transparent 22%, transparent 62%, rgba(3, 5, 11, 0.85) 100%),
-    linear-gradient(180deg, transparent 55%, rgba(31, 107, 255, 0.28) 100%);
+    linear-gradient(180deg, color-mix(in srgb, var(--tm-breu) 45%, transparent) 0%, transparent 22%, transparent 62%, color-mix(in srgb, var(--tm-breu) 85%, transparent) 100%),
+    linear-gradient(180deg, transparent 55%, color-mix(in srgb, var(--tm-primaria) 28%, transparent) 100%);
 }
 /* Um reflexo de metal atravessa o retrato de vez em quando (enfeite, só transform). */
 .enfVarreduraLenta {
@@ -152,7 +148,7 @@
   gap: 6px;
   padding: 5px 11px;
   border-radius: 2px;
-  background: linear-gradient(180deg, #f4f7fb, #aeb9c6);
+  background: linear-gradient(180deg, var(--tm-placa-topo, #f4f7fb), var(--tm-metal-placa));
   color: var(--tm-tinta);
   font-size: 10.5px;
   font-weight: 700;
@@ -166,11 +162,12 @@
   container-type: inline-size;
   min-width: 0;
 }
+/* Sem letter-spacing aqui: o de tema.module.css (.kicker) vale — empatar com ele deixava o
+   resultado na mão da ordem dos CSS no build. */
 .kicker {
   display: flex;
   align-items: center;
   gap: 10px;
-  letter-spacing: 0.24em;
 }
 .escudoMini {
   width: 28px;
@@ -203,8 +200,8 @@
   max-width: 100%;
   line-height: 0.9;
   font-family: var(--tm-fonte-titulo), "Arial Black", sans-serif;
-  font-style: italic;
-  font-weight: 900;
+  font-style: var(--tm-titulo-estilo, italic);
+  font-weight: var(--tm-titulo-peso, 900);
   font-synthesis: none;
   text-transform: uppercase;
   overflow-wrap: anywhere;
@@ -219,9 +216,6 @@
   font-weight: 600;
   letter-spacing: 0.08em;
   color: var(--tm-prata);
-}
-.chips {
-  justify-content: flex-start;
 }
 @media (max-width: 899px) {
   .texto {
@@ -243,7 +237,7 @@
   content: "";
   flex: 1;
   height: 1px;
-  background: linear-gradient(90deg, rgba(111, 180, 255, 0.5), transparent);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--tm-acento) 50%, transparent), transparent);
 }
 .estatisticas {
   list-style: none;
@@ -265,9 +259,9 @@
   align-items: center;
   gap: 6px;
   padding: 14px 4px 12px;
-  border: 1px solid rgba(111, 180, 255, 0.28);
+  border: 1px solid color-mix(in srgb, var(--tm-acento) 28%, transparent);
   border-radius: 2px;
-  background: linear-gradient(180deg, rgba(27, 63, 166, 0.22), rgba(3, 5, 11, 0.55));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tm-royal) 22%, transparent), color-mix(in srgb, var(--tm-breu) 55%, transparent));
   text-align: center;
 }
 .estatistica::before {
@@ -280,13 +274,13 @@
   background: linear-gradient(90deg, transparent, var(--tm-neon), transparent);
 }
 .valor {
-  font: italic 900 clamp(22px, 2.4vw, 30px) / 1 var(--tm-fonte-titulo), sans-serif;
+  font: var(--tm-titulo-estilo, italic) var(--tm-titulo-peso, 900) clamp(22px, 2.4vw, 30px) / 1 var(--tm-fonte-titulo), sans-serif;
   color: var(--tm-texto);
 }
 @supports ((-webkit-background-clip: text) or (background-clip: text)) {
   .valor {
     padding: 0.05em 0.12em 0.08em 0;
-    background: linear-gradient(180deg, #fff 0%, #e3e9f1 55%, #9fb0c4 100%);
+    background: linear-gradient(180deg, var(--tm-metal-luz) 0%, var(--tm-nick-meio, #e3e9f1) 55%, var(--tm-valor-base, #9fb0c4) 100%);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -343,9 +337,9 @@
   align-items: stretch;
   gap: 0;
   min-height: 76px;
-  border: 1px solid rgba(111, 180, 255, 0.3);
+  border: 1px solid color-mix(in srgb, var(--tm-acento) 30%, transparent);
   border-radius: 2px;
-  background: linear-gradient(90deg, rgba(27, 63, 166, 0.25), rgba(3, 5, 11, 0.6));
+  background: linear-gradient(90deg, color-mix(in srgb, var(--tm-royal) 25%, transparent), color-mix(in srgb, var(--tm-breu) 60%, transparent));
   color: var(--tm-texto);
   text-decoration: none;
   overflow: hidden;
@@ -364,7 +358,7 @@
   flex: 0 0 72px;
   display: grid;
   place-items: center;
-  background: #050a1a;
+  background: var(--tm-foto-fundo, #050a1a);
 }
 .companheiroFoto img {
   position: absolute;
@@ -389,10 +383,10 @@
   font-size: 9.5px;
   font-weight: 700;
   letter-spacing: 0.12em;
-  color: #9cc8ff;
+  color: var(--tm-icone);
 }
 .companheiroNick {
-  font: italic 800 15px/1.1 var(--tm-fonte-titulo), sans-serif;
+  font: var(--tm-titulo-estilo, italic) var(--tm-titulo-peso-medio, 800) 15px/1.1 var(--tm-fonte-titulo), sans-serif;
   text-transform: uppercase;
   overflow-wrap: anywhere;
 }

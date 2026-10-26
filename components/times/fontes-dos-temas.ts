@@ -1,4 +1,4 @@
-import { Exo_2, Permanent_Marker } from "next/font/google";
+import { Bungee, Exo_2, Permanent_Marker, Special_Elite } from "next/font/google";
 
 import type { ChaveDeFonte } from "@/lib/temas/tipos";
 
@@ -27,7 +27,26 @@ const permanentMarker = Permanent_Marker({
   preload: false,
 });
 
+// Queijo Minas: letreiro de bloco (o "QUEIJO" do escudo) e máquina de escrever (o bilhete).
+const bungee = Bungee({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--tm-fonte-titulo",
+  display: "swap",
+  preload: false,
+});
+
+const specialElite = Special_Elite({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--tm-fonte-assinatura",
+  display: "swap",
+  preload: false,
+});
+
 export const FONTES_DOS_TEMAS: Readonly<Record<ChaveDeFonte, { variable: string }>> = {
   "exo2-italico": exo2Italico,
   "permanent-marker": permanentMarker,
+  bungee,
+  "special-elite": specialElite,
 };

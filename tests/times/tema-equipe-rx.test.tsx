@@ -109,6 +109,13 @@ describe("registro de temas", () => {
     expect(partesDoNome("DESORGANIZAÇÃO", "EQUIPE")).toEqual({ assinatura: null, marca: "DESORGANIZAÇÃO" });
     expect(partesDoNome("EQUIPE", "EQUIPE")).toEqual({ assinatura: null, marca: "EQUIPE" });
   });
+
+  it("parte pelo sufixo também: QUEIJO grande, MINAS embaixo", () => {
+    expect(partesDoNome("QUEIJO MINAS", undefined, "MINAS")).toEqual({ assinatura: "MINAS", marca: "QUEIJO" });
+    expect(partesDoNome("Queijo Minas", undefined, "MINAS")).toEqual({ assinatura: "Minas", marca: "Queijo" });
+    expect(partesDoNome("MINAS", undefined, "MINAS")).toEqual({ assinatura: null, marca: "MINAS" });
+    expect(partesDoNome("MARÉ", undefined, "MINAS")).toEqual({ assinatura: null, marca: "MARÉ" });
+  });
 });
 
 describe("página temática do time", () => {

@@ -25,6 +25,17 @@ export const TEMA_EQUIPE_RX: TemaDoTime = {
     apoio: "#9AA7BA",
     acento: "#6FB4FF",
     tinta: "#0A0F1A",
+    icone: "#9CC8FF",
+  },
+  metal: {
+    luz: "#FFFFFF",
+    alto: "#E9EEF5",
+    meio: "#A9B4C2",
+    sombra: "#29303A",
+    fundo: "#5B6675",
+    volta: "#DFE6EF",
+    base: "#8A96A6",
+    placa: "#AEB9C6",
   },
   prefixo: "EQUIPE",
   // O azul do neon do escudo (o id `carmesim` dava o vermelho #d9455f do nome do draft).

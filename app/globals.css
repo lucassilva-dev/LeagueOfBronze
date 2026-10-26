@@ -1036,3 +1036,8 @@ body:has([data-tema]) #lob-cabecalho {
   background: linear-gradient(180deg, rgba(3, 5, 11, 0.94), rgba(3, 5, 11, 0.82)) !important;
   border-bottom-color: rgba(111, 180, 255, 0.22) !important;
 }
+/* Queijo Minas: carvão e um friso de ouro (a regra acima é o padrão, no tom da RX). */
+body:has([data-tema="queijo-minas"]) #lob-cabecalho {
+  background: linear-gradient(180deg, rgba(11, 9, 7, 0.95), rgba(11, 9, 7, 0.84)) !important;
+  border-bottom-color: rgba(232, 169, 42, 0.28) !important;
+}

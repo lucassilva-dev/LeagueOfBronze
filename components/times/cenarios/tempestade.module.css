@@ -1,6 +1,7 @@
 /*
- * Cenário "tempestade" (Equipe RX): céu, nuvens, feixes de luz, raios, a coroa gigante que acende
- * com o raio, o clarão e as lascas do escudo. Tudo aqui é ENFEITE (`enf…`, aria-hidden, sem texto).
+ * Cenário "tempestade" (Equipe RX, cenarios/tempestade.tsx): céu, nuvens, feixes de luz, raios,
+ * a coroa gigante que acende com o raio, o clarão e as lascas do escudo. Tudo aqui é ENFEITE
+ * (`enf…`, aria-hidden, sem texto).
  *
  * Flashes: só o raio A pisca — 2 picos em ~200 ms a cada 9 s (o clarão e a coroa acendem no MESMO
  * relógio, contam como o mesmo flash). O raio B, menor e mais fraco, fica 4,5 s defasado. Fica

@@ -111,7 +111,30 @@ describe.each(ARQUIVOS)("$nome", ({ css }) => {
 
 describe("os keyframes de entrada do conteúdo", () => {
   const todos = new Map(ARQUIVOS.flatMap(({ css }) => [...analisar(css).keyframes]));
-  it.each(["entraEscudo", "entraMarca", "entraAssinatura", "sobe", "entraCarta", "entraCartaRolagem", "tremor", "entraRetrato", "entraNick"])(
+  it.each([
+    // a base e a RX
+    "entraEscudo",
+    "entraMarca",
+    "entraAssinatura",
+    "sobe",
+    "entraCarta",
+    "entraCartaRolagem",
+    "tremor",
+    "entraRetrato",
+    "entraNick",
+    // a Queijo Minas (cenarios/estacao)
+    "chegaEscudo",
+    "freada",
+    "engata",
+    "carimbo",
+    "balancaPlaca",
+    "chegaVagao",
+    "chegaVagaoRolagem",
+    "carimbada",
+    "chegaRetrato",
+    "chegaNick",
+    "carimbaPlaca",
+  ])(
     "%s anima transform e nada que esconda",
     (nome) => {
       const corpo = todos.get(nome);

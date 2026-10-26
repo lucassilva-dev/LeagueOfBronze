@@ -7,11 +7,25 @@
  * time para outro mora num arquivo como lib/temas/equipe-rx.ts.
  */
 
-/** As fontes que um tema pode pedir (components/times/fontes-dos-temas.ts carrega cada uma). */
-export type ChaveDeFonte = "exo2-italico" | "permanent-marker";
+import type { PaginasHomeTextos } from "@/lib/i18n/messages/paginas-home";
 
-/** Os cenários prontos (um CSS module por cenário em components/times/cenarios). */
-export type Cenario = "tempestade";
+/** As fontes que um tema pode pedir (components/times/fontes-dos-temas.ts carrega cada uma). */
+export type ChaveDeFonte = "exo2-italico" | "permanent-marker" | "bungee" | "special-elite";
+
+/** Os cenários prontos (components/times/cenarios: um componente e um CSS module por cenário). */
+export type Cenario = "tempestade" | "estacao";
+
+/** Os textos que um tema troca ou acrescenta na página e na ficha (o lema, o "A BORDO"…). */
+export type PapelDoTexto =
+  | "lema"
+  | "estrelando"
+  | "aviso"
+  | "capitao"
+  | "emCartaz"
+  | "destino"
+  | "carimbo"
+  | "fecho"
+  | "companheiros";
 
 export type CoresDoTema = Readonly<{
   /** Fundo base, letreiro, véu das fotos. */
@@ -40,6 +54,24 @@ export type CoresDoTema = Readonly<{
   acento: string;
   /** Texto sobre as placas de metal. */
   tinta: string;
+  /** Ícone da rota nas etiquetas e chips. */
+  icone: string;
+}>;
+
+/**
+ * O metal do título, do nick e das molduras (cromo na RX), de cima para baixo: o gradiente do
+ * título passa por luz → alto → meio → sombra (a faixa escura do bisel) → fundo → volta → luz →
+ * base. `placa` é o fim do gradiente das placas claras (pontos, capitão).
+ */
+export type MetalDoTema = Readonly<{
+  luz: string;
+  alto: string;
+  meio: string;
+  sombra: string;
+  fundo: string;
+  volta: string;
+  base: string;
+  placa: string;
 }>;
 
 export type TemaDoTime = Readonly<{
@@ -51,17 +83,32 @@ export type TemaDoTime = Readonly<{
   slug: string;
   fontes: Readonly<{ titulo: ChaveDeFonte; assinatura?: ChaveDeFonte }>;
   cores: CoresDoTema;
+  metal: MetalDoTema;
   /**
    * O nome do time dividido em assinatura + marca, como no escudo ("EQUIPE" em pincel por baixo
    * do "RX" em cromo). Só vale se o nome do time começar com ele seguido de espaço.
    */
   prefixo?: string;
+  /** O mesmo pelo fim do nome: "MINAS" embaixo do "QUEIJO" grande. */
+  sufixo?: string;
   /**
    * A cor do time no RESTO do site (tabela, calendário, listas de times e jogadores), no lugar
    * da cor que o nome do draft dava ao id. Clara o bastante para texto sobre o fundo escuro.
    */
   cor: string;
   cenario: Cenario;
-  /** Enquadramento das fotos (object-position) por slug do jogador; o resto usa `focoPadrao`. */
-  fotos: Readonly<{ focoPadrao: string; foco?: Readonly<Record<string, string>> }>;
+  /** A marca letra por letra (cada letra vira uma peça, e o cenário pode animar uma a uma). */
+  letraPorLetra?: boolean;
+  /**
+   * Os textos do tema: o valor é a CHAVE em lib/i18n/messages/paginas-home.ts, para sair no
+   * idioma da página. O papel que o tema não troca fica com o texto padrão (ou não aparece).
+   */
+  textos?: Readonly<Partial<Record<PapelDoTexto, keyof PaginasHomeTextos>>>;
+  fotos: Readonly<{
+    /** Enquadramento (object-position) por slug do jogador; o resto usa `focoPadrao`. */
+    focoPadrao: string;
+    foco?: Readonly<Record<string, string>>;
+    /** Proporção do retrato da ficha por slug ("3 / 2" para foto deitada); o resto usa 4 / 5. */
+    proporcao?: Readonly<Record<string, string>>;
+  }>;
 }>;

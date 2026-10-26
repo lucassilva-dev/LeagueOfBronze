@@ -8,3 +8,5 @@ export const Anton = fonte;
 export const Chakra_Petch = fonte;
 export const Exo_2 = fonte;
 export const Permanent_Marker = fonte;
+export const Bungee = fonte;
+export const Special_Elite = fonte;

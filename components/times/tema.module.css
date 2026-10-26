@@ -153,12 +153,12 @@
 }
 .enfBarraTopo {
   top: 0;
-  box-shadow: inset 0 -1px rgba(111, 180, 255, 0.2);
+  box-shadow: inset 0 -1px color-mix(in srgb, var(--tm-acento) 20%, transparent);
   animation: barraDesce 900ms cubic-bezier(0.7, 0, 0.2, 1);
 }
 .enfBarraBase {
   bottom: 0;
-  box-shadow: inset 0 1px rgba(111, 180, 255, 0.2);
+  box-shadow: inset 0 1px color-mix(in srgb, var(--tm-acento) 20%, transparent);
   animation: barraSobe 900ms cubic-bezier(0.7, 0, 0.2, 1);
 }
 @keyframes barraDesce {
@@ -185,9 +185,9 @@
   align-items: center;
   min-height: 44px;
   padding: 0 16px;
-  border: 1px solid rgba(111, 180, 255, 0.45);
+  border: 1px solid color-mix(in srgb, var(--tm-acento) 45%, transparent);
   border-radius: 2px;
-  background: rgba(3, 5, 11, 0.55);
+  background: color-mix(in srgb, var(--tm-breu) 55%, transparent);
   color: var(--tm-texto);
   font-size: 11.5px;
   font-weight: 600;
@@ -196,7 +196,7 @@
   transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 .voltar:hover {
-  background: rgba(27, 63, 166, 0.45);
+  background: color-mix(in srgb, var(--tm-royal) 45%, transparent);
   border-color: var(--tm-neon);
 }
 .voltar:focus-visible,
@@ -309,7 +309,7 @@
   height: 100%;
   border-radius: 50%;
   border: 2px solid var(--tm-neon);
-  font: italic 900 calc(var(--escudo) * 0.38) / 1 var(--tm-fonte-titulo), sans-serif;
+  font: var(--tm-titulo-estilo, italic) var(--tm-titulo-peso, 900) calc(var(--escudo) * 0.38) / 1 var(--tm-fonte-titulo), sans-serif;
   color: var(--tm-texto);
 }
 
@@ -321,7 +321,7 @@
   border-radius: 50%;
   pointer-events: none;
   opacity: 0.8;
-  background: radial-gradient(closest-side, transparent 74%, rgba(77, 163, 255, 0.55) 80%, rgba(31, 107, 255, 0.18) 88%, transparent 100%);
+  background: radial-gradient(closest-side, transparent 74%, color-mix(in srgb, var(--tm-neon) 55%, transparent) 80%, color-mix(in srgb, var(--tm-primaria) 18%, transparent) 88%, transparent 100%);
   animation: aroAcende 1200ms ease-out, aroRespira 3.2s ease-in-out 1200ms infinite;
 }
 @keyframes aroAcende {
@@ -354,7 +354,7 @@
   z-index: 1;
   border-radius: 50%;
   pointer-events: none;
-  background: conic-gradient(from 0deg, transparent 0 68%, rgba(77, 163, 255, 0) 70%, #eaf6ff 75%, rgba(77, 163, 255, 0) 80%, transparent 82% 100%);
+  background: conic-gradient(from 0deg, transparent 0 68%, color-mix(in srgb, var(--tm-neon) 0%, transparent) 70%, var(--tm-nucleo) 75%, color-mix(in srgb, var(--tm-neon) 0%, transparent) 80%, transparent 82% 100%);
   -webkit-mask: radial-gradient(closest-side, transparent calc(100% - 4px), #000 calc(100% - 3px), #000 calc(100% - 1px), transparent 100%);
   mask: radial-gradient(closest-side, transparent calc(100% - 4px), #000 calc(100% - 3px), #000 calc(100% - 1px), transparent 100%);
   transform: rotate(40deg);
@@ -416,8 +416,8 @@
   right: 0;
   top: 0;
   height: 2px;
-  background: linear-gradient(90deg, transparent 18%, rgba(31, 107, 255, 0.6) 36%, var(--tm-nucleo) 48%, #fff 50%, var(--tm-nucleo) 52%, rgba(31, 107, 255, 0.6) 64%, transparent 82%);
-  box-shadow: 0 0 12px 1px rgba(31, 107, 255, 0.55), 0 0 34px 6px rgba(31, 107, 255, 0.2);
+  background: linear-gradient(90deg, transparent 18%, color-mix(in srgb, var(--tm-primaria) 60%, transparent) 36%, var(--tm-nucleo) 48%, #fff 50%, var(--tm-nucleo) 52%, color-mix(in srgb, var(--tm-primaria) 60%, transparent) 64%, transparent 82%);
+  box-shadow: 0 0 12px 1px color-mix(in srgb, var(--tm-primaria) 55%, transparent), 0 0 34px 6px color-mix(in srgb, var(--tm-primaria) 20%, transparent);
   animation: horizonteAbre 1100ms cubic-bezier(0.16, 1, 0.3, 1), horizonteRespira 6s ease-in-out 1100ms infinite;
 }
 @keyframes horizonteAbre {
@@ -467,7 +467,7 @@
   height: 300%;
   transform-origin: 50% 0;
   transform: rotateX(64deg);
-  background-image: linear-gradient(rgba(77, 163, 255, 0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(77, 163, 255, 0.2) 1px, transparent 1px);
+  background-image: linear-gradient(color-mix(in srgb, var(--tm-neon) 30%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--tm-neon) 20%, transparent) 1px, transparent 1px);
   background-size: 64px 64px;
   -webkit-mask-image: linear-gradient(to bottom, #000, rgba(0, 0, 0, 0.4) 35%, transparent 70%);
   mask-image: linear-gradient(to bottom, #000, rgba(0, 0, 0, 0.4) 35%, transparent 70%);
@@ -576,8 +576,8 @@
   display: inline-block;
   line-height: 0.82;
   font-family: var(--tm-fonte-titulo), "Arial Black", sans-serif;
-  font-style: italic;
-  font-weight: 900;
+  font-style: var(--tm-titulo-estilo, italic);
+  font-weight: var(--tm-titulo-peso, 900);
   font-synthesis: none;
   font-size: clamp(104px, 34vw, 148px);
   font-size: clamp(32px, calc(100cqi / (var(--letras) * 0.72)), var(--tm-titulo-max));
@@ -605,14 +605,14 @@
 }
 .cromo {
   position: relative;
-  color: #e9eef5;
+  color: var(--tm-metal-alto);
 }
 @supports ((-webkit-background-clip: text) or (background-clip: text)) {
   .cromo {
     background-image:
-      linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.95) 48%, rgba(185, 230, 255, 0.9) 50%, transparent 58%),
+      linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.95) 48%, color-mix(in srgb, var(--tm-arco) 90%, transparent) 50%, transparent 58%),
       repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.06) 0 1px, transparent 1px 3px),
-      linear-gradient(180deg, #fff 0%, #e9eef5 24%, #a9b4c2 44%, #29303a 50%, #5b6675 53%, #dfe6ef 70%, #fff 82%, #8a96a6 100%);
+      linear-gradient(180deg, var(--tm-metal-luz) 0%, var(--tm-metal-alto) 24%, var(--tm-metal-meio) 44%, var(--tm-metal-sombra) 50%, var(--tm-metal-fundo) 53%, var(--tm-metal-volta) 70%, var(--tm-metal-luz) 82%, var(--tm-metal-base) 100%);
     background-size: 250% 100%, 100% 100%, 100% 100%;
     background-repeat: no-repeat;
     background-position: 150% 0, 0 0, 0 0;
@@ -645,7 +645,7 @@
   z-index: -1;
   color: transparent;
   pointer-events: none;
-  text-shadow: 0 0 0.06em var(--tm-primaria), 0 0 0.22em rgba(31, 107, 255, 0.6), 0 0.03em 0 #0b1530;
+  text-shadow: 0 0 0.06em var(--tm-primaria), 0 0 0.22em color-mix(in srgb, var(--tm-primaria) 60%, transparent), 0 0.03em 0 var(--tm-eco-base, #0b1530);
 }
 
 @keyframes entraAssinatura {
@@ -678,7 +678,7 @@
   line-height: 1.1;
   letter-spacing: 0.04em;
   color: var(--tm-texto);
-  text-shadow: 0 2px 0 #03050b, 0 0 18px rgba(31, 107, 255, 0.45);
+  text-shadow: 0 2px 0 var(--tm-breu), 0 0 18px color-mix(in srgb, var(--tm-primaria) 45%, transparent);
 }
 @media (min-width: 900px) {
   .pincel {
@@ -704,6 +704,28 @@
   }
   100% {
     transform: none;
+  }
+}
+
+/* A marca letra por letra (lib/temas: `letraPorLetra`): cada letra é uma peça. */
+.letra {
+  position: relative;
+  display: inline-block;
+}
+
+/* O lema do time, embaixo do nome (lib/temas: `textos.lema`). */
+.lema {
+  margin: 12px auto 0;
+  max-width: 36ch;
+  font-family: var(--tm-fonte-assinatura), Georgia, serif;
+  font-size: clamp(14px, 1.3vw, 18px);
+  line-height: 1.4;
+  color: var(--tm-prata);
+  text-wrap: balance;
+}
+@media (min-width: 900px) {
+  .lema {
+    margin-inline: 0;
   }
 }
 
@@ -748,25 +770,25 @@
   color: var(--tm-tinta);
 }
 .chipPts::before {
-  background: linear-gradient(180deg, #f4f7fb, #aeb9c6);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6) inset, 0 6px 18px -6px rgba(31, 107, 255, 0.6);
+  background: linear-gradient(180deg, var(--tm-placa-topo, #f4f7fb), var(--tm-metal-placa));
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6) inset, 0 6px 18px -6px color-mix(in srgb, var(--tm-primaria) 60%, transparent);
 }
 .chipNumero {
-  font: italic 900 22px/1 var(--tm-fonte-titulo), sans-serif;
+  font: var(--tm-titulo-estilo, italic) var(--tm-titulo-peso, 900) 22px/1 var(--tm-fonte-titulo), sans-serif;
 }
 .chipCapitao {
-  color: #dcebff;
+  color: var(--tm-chip-capitao, #dcebff);
 }
 .chipCapitao::before {
-  background: rgba(27, 63, 166, 0.28);
-  border: 1px solid rgba(111, 180, 255, 0.4);
+  background: color-mix(in srgb, var(--tm-royal) 28%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tm-acento) 40%, transparent);
 }
 .chipOpgg {
   color: var(--tm-texto);
 }
 .chipOpgg::before {
   border: 1px solid var(--tm-neon);
-  background: rgba(3, 5, 11, 0.4);
+  background: color-mix(in srgb, var(--tm-breu) 40%, transparent);
 }
 .chipOpgg:hover::before {
   background: var(--tm-royal);
@@ -795,7 +817,7 @@
   align-items: center;
   gap: 14px;
   margin: 0 0 clamp(18px, 2.4vw, 28px);
-  font: italic 900 clamp(22px, 2.6vw, 34px) / 1 var(--tm-fonte-titulo), sans-serif;
+  font: var(--tm-titulo-estilo, italic) var(--tm-titulo-peso, 900) clamp(22px, 2.6vw, 34px) / 1 var(--tm-fonte-titulo), sans-serif;
   letter-spacing: 0.06em;
   color: var(--tm-texto);
 }
@@ -803,7 +825,15 @@
   content: "";
   flex: 1;
   height: 1px;
-  background: linear-gradient(90deg, rgba(111, 180, 255, 0.6), transparent);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--tm-acento) 60%, transparent), transparent);
+}
+
+/* O aviso embaixo do título do elenco (lib/temas: `textos.aviso`). */
+.aviso {
+  margin: -8px 0 clamp(16px, 2vw, 24px);
+  font-family: var(--tm-fonte-assinatura), Georgia, serif;
+  font-size: 13px;
+  color: var(--tm-apoio);
 }
 
 .elenco {
@@ -894,7 +924,7 @@
   height: 100%;
   padding: 1px;
   clip-path: polygon(0 0, calc(100% - var(--corte)) 0, 100% var(--corte), 100% 100%, var(--corte) 100%, 0 calc(100% - var(--corte)));
-  background: linear-gradient(160deg, #e9eef5, #5b6675 30%, var(--tm-primaria) 55%, #29303a 75%, #a9b4c2);
+  background: linear-gradient(160deg, var(--tm-metal-alto), var(--tm-metal-fundo) 30%, var(--tm-primaria) 55%, var(--tm-metal-sombra) 75%, var(--tm-metal-meio));
 }
 @media (min-width: 600px) {
   .carta {
@@ -902,15 +932,18 @@
   }
 }
 .cascaCapitao .carta {
-  background: linear-gradient(160deg, #fff, var(--tm-neon) 35%, var(--tm-primaria) 60%, var(--tm-nucleo));
+  background: linear-gradient(160deg, var(--tm-metal-luz), var(--tm-neon) 35%, var(--tm-primaria) 60%, var(--tm-nucleo));
 }
 .miolo {
   position: relative;
   height: 100%;
   display: grid;
+  /* minmax(0, 1fr): o nome real no rodapé (sem quebra, com reticências) não alarga a carta —
+     "AURA MAIS EGO 67" empurrava a 2ª coluna para fora da tela em 360 px. */
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto;
   clip-path: polygon(0 0, calc(100% - var(--corte)) 0, 100% var(--corte), 100% 100%, var(--corte) 100%, 0 calc(100% - var(--corte)));
-  background: linear-gradient(180deg, #0a1430, #04070f);
+  background: linear-gradient(180deg, var(--tm-miolo-topo, #0a1430), var(--tm-miolo-base, #04070f));
 }
 .foto {
   grid-area: 1 / 1;
@@ -918,7 +951,7 @@
   isolation: isolate;
   overflow: hidden;
   aspect-ratio: 4 / 5;
-  background: radial-gradient(80% 70% at 50% 30%, rgba(31, 107, 255, 0.25), transparent 70%), #050a1a;
+  background: radial-gradient(80% 70% at 50% 30%, color-mix(in srgb, var(--tm-primaria) 25%, transparent), transparent 70%), var(--tm-foto-fundo, #050a1a);
 }
 .foto img {
   position: absolute;
@@ -941,8 +974,8 @@
   z-index: 1;
   pointer-events: none;
   background:
-    linear-gradient(180deg, rgba(3, 5, 11, 0.55) 0%, transparent 24%, transparent 46%, rgba(3, 5, 11, 0.96) 100%),
-    linear-gradient(180deg, transparent 60%, rgba(31, 107, 255, 0.22) 100%);
+    linear-gradient(180deg, color-mix(in srgb, var(--tm-breu) 55%, transparent) 0%, transparent 24%, transparent 46%, color-mix(in srgb, var(--tm-breu) 96%, transparent) 100%),
+    linear-gradient(180deg, transparent 60%, color-mix(in srgb, var(--tm-primaria) 22%, transparent) 100%);
 }
 /* A sigla da rota gigante, vazada, atrás do nick. */
 .enfRotaGigante {
@@ -961,9 +994,9 @@
   overflow: visible;
 }
 .enfRotaGigante text {
-  font: italic 900 78px var(--tm-fonte-titulo), sans-serif;
+  font: var(--tm-titulo-estilo, italic) var(--tm-titulo-peso, 900) 78px var(--tm-fonte-titulo), sans-serif;
   fill: none;
-  stroke: rgba(77, 163, 255, 0.4);
+  stroke: color-mix(in srgb, var(--tm-neon) 40%, transparent);
   stroke-width: 1.2px;
 }
 @media (min-width: 600px) {
@@ -1007,10 +1040,10 @@
   align-items: center;
   gap: 5px;
   padding: 4px 8px;
-  border: 1px solid rgba(111, 180, 255, 0.55);
+  border: 1px solid color-mix(in srgb, var(--tm-acento) 55%, transparent);
   border-radius: 2px;
-  background: rgba(3, 5, 11, 0.7);
-  color: #eef3fb;
+  background: color-mix(in srgb, var(--tm-breu) 70%, transparent);
+  color: var(--tm-etiqueta, #eef3fb);
   font-size: 9.5px;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -1027,7 +1060,7 @@
   gap: 6px;
   padding: 3px 9px;
   border-radius: 2px;
-  background: linear-gradient(180deg, #f4f7fb, #aeb9c6);
+  background: linear-gradient(180deg, var(--tm-placa-topo, #f4f7fb), var(--tm-metal-placa));
   color: var(--tm-tinta);
   font-size: 9.5px;
   font-weight: 700;
@@ -1035,7 +1068,7 @@
 }
 .nick {
   margin: 0;
-  font: italic 800 var(--nick, 18px) / 1.05 var(--tm-fonte-titulo), sans-serif;
+  font: var(--tm-titulo-estilo, italic) var(--tm-titulo-peso-medio, 800) var(--nick, 18px) / 1.05 var(--tm-fonte-titulo), sans-serif;
   text-transform: uppercase;
   overflow-wrap: anywhere;
   padding: 0.06em 0.12em 0.1em 0;
@@ -1050,7 +1083,7 @@
 }
 @supports ((-webkit-background-clip: text) or (background-clip: text)) {
   .nick {
-    background: linear-gradient(180deg, #fff 0%, #e3e9f1 55%, #b8c3d0 100%);
+    background: linear-gradient(180deg, var(--tm-metal-luz) 0%, var(--tm-nick-meio, #e3e9f1) 55%, var(--tm-nick-base, #b8c3d0) 100%);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -1071,9 +1104,9 @@
 }
 .mono {
   padding: 2px 6px;
-  border: 1px solid rgba(95, 212, 255, 0.6);
+  border: 1px solid color-mix(in srgb, var(--tm-mono, #5fd4ff) 60%, transparent);
   border-radius: 2px;
-  color: #5fd4ff;
+  color: var(--tm-mono, #5fd4ff);
   font-size: 8.5px;
   font-weight: 600;
   letter-spacing: 0.1em;
@@ -1085,7 +1118,7 @@
   align-items: center;
   gap: 8px;
   padding: 10px 12px 12px;
-  border-top: 1px solid rgba(111, 180, 255, 0.18);
+  border-top: 1px solid color-mix(in srgb, var(--tm-acento) 18%, transparent);
 }
 .nome {
   min-width: 0;
@@ -1112,7 +1145,7 @@
   height: auto;
   translate: -50% 0;
   pointer-events: none;
-  filter: drop-shadow(0 0 10px rgba(77, 163, 255, 0.7));
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--tm-neon) 70%, transparent));
 }
 @media (max-width: 599px) {
   .coroaDoCapitao {
@@ -1128,7 +1161,7 @@
   z-index: -1;
   border-radius: 8px;
   pointer-events: none;
-  background: radial-gradient(closest-side, rgba(77, 163, 255, 0.5), rgba(31, 107, 255, 0.18) 60%, transparent);
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--tm-neon) 50%, transparent), color-mix(in srgb, var(--tm-primaria) 18%, transparent) 60%, transparent);
   transform: scale(0.92);
   transition: transform 0.3s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
@@ -1223,14 +1256,18 @@
   gap: 14px;
   max-width: 520px;
   margin: 0 auto 22px;
-  color: #c7d0db;
+  color: var(--tm-prata);
 }
 .enfLinhaCromo::before,
 .enfLinhaCromo::after {
   content: "";
   flex: 1;
   height: 1px;
-  background: linear-gradient(90deg, transparent, #c7d0db, transparent);
+  background: linear-gradient(90deg, transparent, var(--tm-prata), transparent);
+}
+/* O miolo da cartela (o bilhete, na Queijo Minas). */
+.cartelaCorpo {
+  position: relative;
 }
 .cartelaEscudo {
   display: block;
@@ -1240,7 +1277,7 @@
 }
 .cartelaNome {
   margin: 0;
-  font: italic 900 clamp(26px, 3vw, 34px) / 1 var(--tm-fonte-titulo), sans-serif;
+  font: var(--tm-titulo-estilo, italic) var(--tm-titulo-peso, 900) clamp(26px, 3vw, 34px) / 1 var(--tm-fonte-titulo), sans-serif;
   color: var(--tm-texto);
   letter-spacing: 0.02em;
 }
@@ -1250,6 +1287,20 @@
   font-weight: 600;
   letter-spacing: 0.26em;
   color: var(--tm-apoio);
+}
+/* Os textos que um tema acrescenta (lib/temas: `textos`); a RX não tem nenhum. */
+.cartelaDestino,
+.cartelaFecho {
+  margin: 8px 0 0;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  color: var(--tm-apoio);
+}
+.cartelaCarimbo {
+  display: inline-block;
+  margin: 8px 0 0;
+  font: var(--tm-titulo-estilo, italic) var(--tm-titulo-peso, 900) 15px/1 var(--tm-fonte-titulo), sans-serif;
+  color: var(--tm-acento);
 }
 .cartelaLinks {
   position: relative;

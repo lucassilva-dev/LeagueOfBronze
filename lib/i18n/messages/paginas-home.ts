@@ -120,6 +120,16 @@ export const paginasHome = definir({
     timeEmCartaz: "EM CARTAZ {periodo}",
     timeVerCalendario: "VER CALENDÁRIO →",
     timeTodosOsTimes: "← TODOS OS TIMES",
+    // Queijo Minas (lib/temas/queijo-minas.ts): a viagem de trem na serra mineira.
+    temaQueijoLema: "Mecânica duvidosa · entretenimento imaculado.",
+    temaQueijoBordo: "A BORDO",
+    temaQueijoAviso: "Embarque imediato · pão de queijo não incluso.",
+    temaQueijoCapitao: "MAQUINISTA",
+    temaQueijoViagem: "EM VIAGEM {periodo}",
+    temaQueijoDestino: "ORIGEM: MINAS GERAIS · DESTINO: SUMMONER'S RIFT",
+    temaQueijoCarimbo: "Ô TREM BÃO!",
+    temaQueijoFecho: "Nenhum queijo foi ferido durante as filmagens.",
+    temaQueijoCompanheiros: "OUTROS PASSAGEIROS",
 
     // ---------- jogadores ----------
     jogadoresTitulo: "JOGADORES",
@@ -271,6 +281,16 @@ export const paginasHome = definir({
     timeEmCartaz: "NOW SHOWING {periodo}",
     timeVerCalendario: "SEE SCHEDULE →",
     timeTodosOsTimes: "← ALL TEAMS",
+    temaQueijoLema: "Questionable mechanics · immaculate entertainment.",
+    temaQueijoBordo: "ALL ABOARD",
+    temaQueijoAviso: "Now boarding · cheese bread not included.",
+    temaQueijoCapitao: "ENGINEER",
+    temaQueijoViagem: "ON THE RAILS {periodo}",
+    temaQueijoDestino: "FROM: MINAS GERAIS · TO: SUMMONER'S RIFT",
+    // Bordão mineiro: fica em português (a página marca lang="pt-BR").
+    temaQueijoCarimbo: "Ô TREM BÃO!",
+    temaQueijoFecho: "No cheese was harmed in the making of this film.",
+    temaQueijoCompanheiros: "FELLOW PASSENGERS",
 
     // ---------- jogadores ----------
     jogadoresTitulo: "PLAYERS",

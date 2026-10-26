@@ -1,20 +1,23 @@
 import Link from "next/link";
-import type { CSSProperties } from "react";
+import { Fragment, type CSSProperties } from "react";
 
 import { EloCrest, RoleIcon } from "@/components/lob/ui";
+import { CENARIOS } from "@/components/times/cenarios";
+import type { CenarioDoTema } from "@/components/times/cenarios/tipos";
 import { FONTES_DOS_TEMAS } from "@/components/times/fontes-dos-temas";
-import { Coroa, CoroaMini, Lascas, Raio, TracoDePincel } from "@/components/times/ornamentos";
-import { BarrasDeCinema, cx, Palco } from "@/components/times/palco";
-import c from "@/components/times/cenario-tempestade.module.css";
+import { Palco } from "@/components/times/palco";
 import s from "@/components/times/tema.module.css";
+import { comCenario, cx, type ClassesDaPeca } from "@/components/times/util";
 import { rotaCurto, type PaginasHomeTextos } from "@/lib/i18n/messages/paginas-home";
 import type { getOpGgMultiSearchUrlFromNicks } from "@/lib/opgg";
 import type { DesignPlayer, DesignTeam } from "@/lib/roster";
-import { partesDoNome, varsDoTema } from "@/lib/temas/registro";
-import type { TemaDoTime } from "@/lib/temas/tipos";
+import { partesDoNome, textoDoTema, varsDoTema } from "@/lib/temas/registro";
+import type { PapelDoTexto, TemaDoTime } from "@/lib/temas/tipos";
 
 /**
- * A página do time com o TEMA dele (lib/temas) — hoje a Equipe RX, «A Coroa Elétrica».
+ * A página do time com o TEMA dele (lib/temas). A estrutura é a mesma para todos; o cenário do
+ * tema (components/times/cenarios) dá o fundo, a moldura, o que fica em volta do escudo, a
+ * insígnia do capitão — e restiliza as peças pelos ganchos (`c("peca")`, ver cenarios/tipos.ts).
  *
  * A REGRA que manda em tudo aqui: animação não decide se o conteúdo aparece (já apagou o site
  * quatro vezes — ver tests/draft/animacoes-sem-opacidade.test.ts). O quadro 0 já é o pôster
@@ -37,56 +40,90 @@ type Props = Readonly<{
   periodo: string | null;
 }>;
 
-function BlocoEscudo({ team }: Readonly<{ team: DesignTeam }>) {
+/**
+ * O rótulo do capitão: o do tema na tela ("MAQUINISTA"), e "CAPITÃO" para o leitor de tela —
+ * quem não vê o trem não precisa adivinhar que o maquinista é o capitão.
+ */
+export function RotuloDoCapitao({ visivel, lido }: Readonly<{ visivel: string; lido: string }>) {
+  if (visivel === lido) return <>{lido}</>;
   return (
-    <div className={s.blocoEscudo}>
-      {/* Atrás do escudo: a coroa gigante que acende com o raio, o clarão e as lascas. */}
-      <Coroa className={c.enfCoroa} id="tm-coroa-gigante" />
-      <Raio className={cx(c.enfRaio, c.enfRaioA)} />
-      <div className={c.enfClarao} aria-hidden="true" />
-      <Lascas className={cx(c.enfLascas, c.enfLascasEsq)} id="tm-lascas-esq" />
-      <Lascas className={cx(c.enfLascas, c.enfLascasDir)} id="tm-lascas-dir" />
-      <div className={s.enfAro} aria-hidden="true" />
-      <div className={s.enfArco} aria-hidden="true" />
-      <div className={cx(s.enfOnda, s.enfOnda1)} aria-hidden="true" />
-      <div className={cx(s.enfOnda, s.enfOnda2)} aria-hidden="true" />
-      <div className={s.escudo}>
+    <>
+      <span aria-hidden="true">{visivel}</span>
+      <span className={s.somenteLeitor}>{lido}</span>
+    </>
+  );
+}
+
+function BlocoEscudo({ team, cenario, c }: Readonly<{ team: DesignTeam; cenario: CenarioDoTema; c: ClassesDaPeca }>) {
+  const { AtrasDoEscudo, NoEscudo, Chao } = cenario;
+  return (
+    <div className={c("blocoEscudo")}>
+      <AtrasDoEscudo />
+      <div className={c("escudo")}>
         {team.imageUrl ? (
           // O h1 já nomeia o time: o escudo é imagem decorativa (alt vazio).
           // eslint-disable-next-line @next/next/no-img-element
           <img src={team.imageUrl} alt="" width={512} height={512} fetchPriority="high" />
         ) : (
-          <span className={s.escudoVazio}>{team.name.slice(0, 2)}</span>
+          <span className={c("escudoVazio")}>{team.name.slice(0, 2)}</span>
         )}
+        {NoEscudo ? <NoEscudo /> : null}
       </div>
-      {/* O chão espelhado: o horizonte (flare) na base do escudo, o reflexo e a grade. */}
-      <div className={s.enfChao} aria-hidden="true">
-        <div className={s.enfHorizonte} />
-        {team.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img className={s.enfReflexo} src={team.imageUrl} alt="" width={512} height={512} />
-        ) : null}
-        <div className={s.enfGrade} />
-      </div>
+      <Chao imagem={team.imageUrl ?? null} />
     </div>
   );
 }
 
-function Titulo({ team, tema, id }: Readonly<{ team: DesignTeam; tema: TemaDoTime; id: string }>) {
-  const { assinatura, marca } = partesDoNome(team.name, tema.prefixo);
+function Titulo({
+  team,
+  tema,
+  cenario,
+  c,
+  id,
+}: Readonly<{ team: DesignTeam; tema: TemaDoTime; cenario: CenarioDoTema; c: ClassesDaPeca; id: string }>) {
+  const { assinatura, marca } = partesDoNome(team.name, tema.prefixo, tema.sufixo);
+  const { TracoDoNome } = cenario;
+  // Letra por letra, palavra por palavra: o nome quebra ENTRE as palavras, e cada letra sabe o
+  // lugar dela no nome todo (`--i`) para a cascata da entrada. O tamanho segue a maior palavra.
+  const palavras = marca.split(/\s+/).filter(Boolean).map((p) => [...p]);
+  const totalDeLetras = palavras.reduce((soma, p) => soma + p.length, 0);
+  const largura = tema.letraPorLetra ? Math.max(1, ...palavras.map((p) => p.length)) : [...marca].length;
+  const inicio = palavras.map((_, k) => palavras.slice(0, k).reduce((soma, p) => soma + p.length, 0));
   return (
-    <h1 className={s.titulo} id={id}>
+    <h1 className={c("titulo")} id={id}>
       {/* Lido uma vez, inteiro; o desenho ao lado é só visual. */}
       <span className={s.somenteLeitor}>{team.name}</span>
-      <span className={s.tituloVisual} aria-hidden="true">
-        <span className={s.marca} style={{ "--letras": [...marca].length } as CSSProperties}>
-          <span className={s.eco}>{marca}</span>
-          <span className={s.cromo}>{marca}</span>
+      <span
+        className={c("tituloVisual")}
+        aria-hidden="true"
+        style={{ "--letras": largura, "--total": totalDeLetras } as CSSProperties}
+      >
+        <span className={c("marca")}>
+          {tema.letraPorLetra ? (
+            palavras.map((letras, k) => (
+              <Fragment key={k}>
+                {k > 0 ? " " : null}
+                <span className={c("palavra")}>
+                  {letras.map((letra, j) => (
+                    <span key={j} className={c("letra")} style={{ "--i": inicio[k]! + j } as CSSProperties}>
+                      <span className={c("eco")}>{letra}</span>
+                      <span className={c("cromo")}>{letra}</span>
+                    </span>
+                  ))}
+                </span>
+              </Fragment>
+            ))
+          ) : (
+            <>
+              <span className={c("eco")}>{marca}</span>
+              <span className={c("cromo")}>{marca}</span>
+            </>
+          )}
         </span>
         {assinatura ? (
-          <span className={s.assinatura}>
-            <span className={s.pincel}>{assinatura}</span>
-            <TracoDePincel className={s.enfTraco} />
+          <span className={c("assinatura")}>
+            <span className={c("pincel")}>{assinatura}</span>
+            {TracoDoNome ? <TracoDoNome className={c("enfTraco")} /> : null}
           </span>
         ) : null}
       </span>
@@ -99,6 +136,9 @@ function CartaDoElenco({
   indice,
   larga,
   tema,
+  cenario,
+  c,
+  capitao,
   t,
   elos,
 }: Readonly<{
@@ -106,64 +146,69 @@ function CartaDoElenco({
   indice: number;
   larga: boolean;
   tema: TemaDoTime;
+  cenario: CenarioDoTema;
+  c: ClassesDaPeca;
+  /** O rótulo do capitão na tela ("CAPITÃO", "MAQUINISTA"). */
+  capitao: string;
   t: PaginasHomeTextos;
   elos?: Record<string, string>;
 }>) {
   const rota = rotaCurto(t, player.roleMeta.short);
   const foco = tema.fotos.foco?.[player.slug] ?? tema.fotos.focoPadrao;
+  const { Insignia, InsigniaMini } = cenario;
   return (
     <li
-      className={cx(s.casca, player.captain && s.cascaCapitao, larga && s.cascaLarga)}
+      className={c("casca", player.captain && "cascaCapitao", larga && "cascaLarga")}
       style={{ "--i": indice, "--col": indice % 2 } as CSSProperties}
     >
-      <span className={s.enfHaloCarta} aria-hidden="true" />
-      {player.captain ? <Coroa className={s.coroaDoCapitao} id={`tm-coroa-${player.slug}`} /> : null}
-      <article className={s.carta}>
-        <div className={s.miolo}>
-          <div className={s.foto} style={{ "--foco": foco } as CSSProperties}>
+      <span className={c("enfHaloCarta")} aria-hidden="true" />
+      {player.captain ? <Insignia className={c("coroaDoCapitao")} id={`tm-insignia-${player.slug}`} /> : null}
+      <article className={c("carta")}>
+        <div className={c("miolo")}>
+          <div className={c("foto")} style={{ "--foco": foco } as CSSProperties}>
             {player.imageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={player.imageUrl} alt="" loading="lazy" decoding="async" />
             ) : (
-              <span className={s.fotoVazia}>
+              <span className={c("fotoVazia")}>
                 <RoleIcon role={player.role1} size={96} color="var(--tm-primaria)" opacity={0.35} />
               </span>
             )}
-            <span className={s.enfGradacao} aria-hidden="true" />
-            <span className={s.enfRotaGigante} aria-hidden="true">
+            <span className={c("enfGradacao")} aria-hidden="true" />
+            <span className={c("enfRotaGigante")} aria-hidden="true">
               {/* Contorno vazado da sigla: enfeite, o texto de verdade está na etiqueta. */}
               <svg viewBox="0 0 200 80" preserveAspectRatio="xMinYMax meet" aria-hidden="true" focusable="false">
                 <text x="0" y="74">{rota}</text>
               </svg>
             </span>
-            <span className={s.enfVarredura} aria-hidden="true" />
+            <span className={c("enfVarredura")} aria-hidden="true" />
           </div>
-          <div className={s.sobreFoto}>
-            <div className={s.topo}>
-              <span className={s.etiquetaRota}>
-                <RoleIcon role={player.role1} size={11} color="#9CC8FF" />
+          <div className={c("sobreFoto")}>
+            <div className={c("topo")}>
+              <span className={c("etiquetaRota")}>
+                <RoleIcon role={player.role1} size={11} color="var(--tm-icone)" />
                 {rota}
               </span>
               <EloCrest elo={player.elo} size={34} labels={elos} />
             </div>
-            <div className={s.identidade}>
+            <div className={c("identidade")}>
               {player.captain ? (
-                <span className={s.placaCapitao}>
-                  <CoroaMini className={s.coroaMini} />
-                  {t.timeCapitaoTema}
+                <span className={c("placaCapitao")}>
+                  <InsigniaMini className={c("coroaMini")} />
+                  <RotuloDoCapitao visivel={capitao} lido={t.timeCapitaoTema} />
                 </span>
               ) : null}
-              <h3 className={s.nick}>
-                <Link className={s.link} href={`/jogadores/${player.slug}`}>
+              <h3 className={c("nick")}>
+                <Link className={c("link")} href={`/jogadores/${player.slug}`}>
                   {player.displayNick}
                 </Link>
               </h3>
-              {player.mono ? <span className={s.mono}>MONO</span> : null}
+              {player.mono ? <span className={c("mono")}>MONO</span> : null}
             </div>
           </div>
-          <div className={s.rodape}>
-            <span className={s.nome}>{player.name}</span>
-            <span className={s.ficha} aria-hidden="true">
+          <div className={c("rodape")}>
+            <span className={c("nome")}>{player.name}</span>
+            <span className={c("ficha")} aria-hidden="true">
               {t.ficha}
             </span>
           </div>
@@ -174,9 +219,21 @@ function CartaDoElenco({
 }
 
 export function PaginaDoTimeComTema({ team, tema, t, elos, multiOpGg, temporada, periodo }: Props) {
+  const cenario = CENARIOS[tema.cenario];
+  const c = comCenario(s, cenario.classes);
+  const { Moldura, InsigniaMini } = cenario;
+  const texto = (papel: PapelDoTexto) => textoDoTema(tema, t, papel);
+  const capitao = texto("capitao") ?? t.timeCapitaoTema;
+  const lema = texto("lema");
+  const aviso = texto("aviso");
+  const destino = texto("destino");
+  const carimbo = texto("carimbo");
+  const fecho = texto("fecho");
+  const emCartaz = texto("emCartaz") ?? t.timeEmCartaz;
   const fonteTitulo = FONTES_DOS_TEMAS[tema.fontes.titulo].variable;
   const fonteAssinatura = tema.fontes.assinatura ? FONTES_DOS_TEMAS[tema.fontes.assinatura].variable : "";
-  // O capitão fecha o elenco, como o último nome dos créditos; o resto na ordem das rotas.
+  // O capitão fecha o elenco — o último nome dos créditos, a locomotiva na frente do trem —; o
+  // resto na ordem das rotas.
   const elenco = [...team.roster.filter((p) => !p.captain), ...team.roster.filter((p) => p.captain)];
   const nomes = elenco.map((p) => p.displayNick.toUpperCase()).join(" · ");
   // "{temporada} · LEAGUE OF BRONZE APRESENTA": a última palavra sai no tom de destaque.
@@ -184,40 +241,45 @@ export function PaginaDoTimeComTema({ team, tema, t, elos, multiOpGg, temporada,
   const corte = apresenta.lastIndexOf(" ");
 
   return (
-    <div className={cx(s.raiz, fonteTitulo, fonteAssinatura)} style={varsDoTema(tema)} data-tema={tema.slug}>
+    <div className={cx(c("raiz"), fonteTitulo, fonteAssinatura)} style={varsDoTema(tema)} data-tema={tema.slug}>
       <Palco tema={tema} />
 
-      <div className={s.conteudo}>
-        <section className={s.heroi} aria-labelledby="tm-titulo-do-time">
-          <BarrasDeCinema />
-          <div className={s.conteiner}>
-            <Link href="/times" className={s.voltar}>
+      <div className={c("conteudo")}>
+        <section className={c("heroi")} aria-labelledby="tm-titulo-do-time">
+          <Moldura />
+          <div className={c("conteiner")}>
+            <Link href="/times" className={c("voltar")}>
               {t.timeVoltar}
             </Link>
-            <div className={s.heroiGrade}>
-              <BlocoEscudo team={team} />
-              <div className={s.blocoTexto}>
-                <p className={cx(s.kicker, s.sobe)} style={{ "--i": 0 } as CSSProperties}>
+            <div className={c("heroiGrade")}>
+              <BlocoEscudo team={team} cenario={cenario} c={c} />
+              <div className={c("blocoTexto")}>
+                <p className={c("kicker", "sobe")} style={{ "--i": 0 } as CSSProperties}>
                   {apresenta.slice(0, corte + 1)}
-                  <span className={s.kickerApresenta}>{apresenta.slice(corte + 1)}</span>
+                  <span className={c("kickerApresenta")}>{apresenta.slice(corte + 1)}</span>
                 </p>
-                <p className={cx(s.nomesDoElenco, s.sobe)} style={{ "--i": 1 } as CSSProperties} aria-hidden="true">
+                <p className={c("nomesDoElenco", "sobe")} style={{ "--i": 1 } as CSSProperties} aria-hidden="true">
                   {nomes}
                 </p>
-                <Titulo team={team} tema={tema} id="tm-titulo-do-time" />
-                <div className={cx(s.chips, s.sobe)} style={{ "--i": 3 } as CSSProperties}>
-                  <span className={cx(s.chip, s.chipPts)}>
-                    <span className={s.chipNumero}>{team.total}</span>
+                <Titulo team={team} tema={tema} cenario={cenario} c={c} id="tm-titulo-do-time" />
+                {lema ? (
+                  <p className={c("lema", "sobe")} style={{ "--i": 2.5 } as CSSProperties}>
+                    {lema}
+                  </p>
+                ) : null}
+                <div className={c("chips", "sobe")} style={{ "--i": 3 } as CSSProperties}>
+                  <span className={c("chip", "chipPts")}>
+                    <span className={c("chipNumero")}>{team.total}</span>
                     {t.timePtsElenco}
                   </span>
                   {team.captain ? (
-                    <span className={cx(s.chip, s.chipCapitao)}>
-                      <CoroaMini className={s.coroaMini} />
-                      {t.timeCapitaoTema} · {team.captain.displayNick}
+                    <span className={c("chip", "chipCapitao")}>
+                      <InsigniaMini className={c("coroaMini")} />
+                      <RotuloDoCapitao visivel={capitao} lido={t.timeCapitaoTema} /> · {team.captain.displayNick}
                     </span>
                   ) : null}
                   {multiOpGg.ok ? (
-                    <Link href={multiOpGg.url} target="_blank" rel="noreferrer" className={cx(s.chip, s.chipOpgg)}>
+                    <Link href={multiOpGg.url} target="_blank" rel="noreferrer" className={c("chip", "chipOpgg")}>
                       MULTI OP.GG ({team.roster.length}) →
                     </Link>
                   ) : null}
@@ -227,12 +289,17 @@ export function PaginaDoTimeComTema({ team, tema, t, elos, multiOpGg, temporada,
           </div>
         </section>
 
-        <section className={s.elencoSecao} aria-labelledby="tm-elenco">
-          <div className={s.conteiner}>
-            <h2 id="tm-elenco" className={s.estrelando}>
-              {t.timeEstrelando}
+        <section className={c("elencoSecao")} aria-labelledby="tm-elenco">
+          <div className={c("conteiner")}>
+            <h2 id="tm-elenco" className={c("estrelando")}>
+              {texto("estrelando") ?? t.timeEstrelando}
             </h2>
-            <ul className={s.elenco} data-n={elenco.length} style={{ "--colunas": Math.min(elenco.length, 5) } as CSSProperties}>
+            {aviso ? <p className={c("aviso")}>{aviso}</p> : null}
+            <ul
+              className={c("elenco")}
+              data-n={elenco.length}
+              style={{ "--colunas": Math.min(elenco.length, 5), "--n": elenco.length } as CSSProperties}
+            >
               {elenco.map((player, i) => (
                 <CartaDoElenco
                   key={player.id}
@@ -240,6 +307,9 @@ export function PaginaDoTimeComTema({ team, tema, t, elos, multiOpGg, temporada,
                   indice={i}
                   larga={i === elenco.length - 1 && elenco.length % 2 === 1}
                   tema={tema}
+                  cenario={cenario}
+                  c={c}
+                  capitao={capitao}
                   t={t}
                   elos={elos}
                 />
@@ -248,25 +318,34 @@ export function PaginaDoTimeComTema({ team, tema, t, elos, multiOpGg, temporada,
           </div>
         </section>
 
-        <footer className={s.cartela}>
-          <div className={s.conteiner}>
-            <span className={s.enfLinhaCromo} aria-hidden="true">
-              <CoroaMini className={s.coroaMini} />
+        <footer className={c("cartela")}>
+          <div className={c("conteiner")}>
+            <span className={c("enfLinhaCromo")} aria-hidden="true">
+              <InsigniaMini className={c("coroaMini")} />
             </span>
-            {team.imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img className={s.cartelaEscudo} src={team.imageUrl} alt="" width={64} height={64} loading="lazy" />
-            ) : null}
-            <p className={s.cartelaNome}>{team.name}</p>
-            <p className={s.cartelaData}>
-              {temporada.toUpperCase()}
-              {periodo ? ` · ${t.timeEmCartaz.replace("{periodo}", periodo.toUpperCase())}` : ""}
-            </p>
-            <div className={s.cartelaLinks}>
-              <Link href="/calendario" className={cx(s.chip, s.chipOpgg)}>
+            <div className={c("cartelaCorpo")}>
+              {team.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img className={c("cartelaEscudo")} src={team.imageUrl} alt="" width={64} height={64} loading="lazy" />
+              ) : null}
+              <p className={c("cartelaNome")}>{team.name}</p>
+              {destino ? <p className={c("cartelaDestino")}>{destino}</p> : null}
+              <p className={c("cartelaData")}>
+                {temporada.toUpperCase()}
+                {periodo ? ` · ${emCartaz.replace("{periodo}", periodo.toUpperCase())}` : ""}
+              </p>
+              {carimbo ? (
+                <p className={c("cartelaCarimbo")} lang="pt-BR">
+                  {carimbo}
+                </p>
+              ) : null}
+            </div>
+            {fecho ? <p className={c("cartelaFecho")}>{fecho}</p> : null}
+            <div className={c("cartelaLinks")}>
+              <Link href="/calendario" className={c("chip", "chipOpgg")}>
                 {t.timeVerCalendario}
               </Link>
-              <Link href="/times" className={s.voltar}>
+              <Link href="/times" className={c("voltar")}>
                 {t.timeTodosOsTimes}
               </Link>
             </div>

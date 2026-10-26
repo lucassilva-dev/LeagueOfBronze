@@ -1,11 +1,13 @@
 import type { CSSProperties } from "react";
 
 import { teamColor } from "@/lib/design";
+import type { PaginasHomeTextos } from "@/lib/i18n/messages/paginas-home";
 import { TEMA_EQUIPE_RX } from "@/lib/temas/equipe-rx";
-import type { CoresDoTema, TemaDoTime } from "@/lib/temas/tipos";
+import { TEMA_QUEIJO_MINAS } from "@/lib/temas/queijo-minas";
+import type { CoresDoTema, MetalDoTema, PapelDoTexto, TemaDoTime } from "@/lib/temas/tipos";
 
 /** Os times com página temática. Time novo: um arquivo em lib/temas e uma linha aqui. */
-const TEMAS: readonly TemaDoTime[] = [TEMA_EQUIPE_RX];
+const TEMAS: readonly TemaDoTime[] = [TEMA_EQUIPE_RX, TEMA_QUEIJO_MINAS];
 
 /** O tema do time pelo slug — ou null, e a página fica com o visual padrão do site. */
 export function temaDoTime(slug: string): TemaDoTime | null {
@@ -21,24 +23,47 @@ export function corDoTime(time: Readonly<{ id: string; slug?: string | null }>):
   return tema?.cor ?? teamColor(time.id);
 }
 
-/** As cores do tema como variáveis CSS (`--tm-breu`, `--tm-neon`…) na raiz da página. */
+/** O texto que o tema pede para um papel (no idioma de `t`), ou null: a página usa o padrão. */
+export function textoDoTema(tema: TemaDoTime, t: PaginasHomeTextos, papel: PapelDoTexto): string | null {
+  const chave = tema.textos?.[papel];
+  return chave ? t[chave] : null;
+}
+
+/**
+ * As cores do tema como variáveis CSS na raiz da página: `--tm-breu`, `--tm-neon`… e o metal
+ * como `--tm-metal-luz`, `--tm-metal-sombra`…
+ */
 export function varsDoTema(tema: TemaDoTime): CSSProperties {
   const vars: Record<string, string> = {};
   for (const [nome, cor] of Object.entries(tema.cores) as [keyof CoresDoTema, string][]) {
     vars[`--tm-${nome}`] = cor;
   }
+  for (const [nome, cor] of Object.entries(tema.metal) as [keyof MetalDoTema, string][]) {
+    vars[`--tm-metal-${nome}`] = cor;
+  }
   return vars as CSSProperties;
 }
 
 /**
- * O nome do time partido como no escudo: a assinatura em pincel ("EQUIPE") e a marca em metal
- * ("RX"). Sem o prefixo no começo do nome, a marca é o nome inteiro e não há assinatura.
+ * O nome do time partido como no escudo: a MARCA grande em metal e a ASSINATURA pequena por
+ * baixo. Pelo prefixo ("EQUIPE RX" → EQUIPE em pincel, RX em metal) ou pelo sufixo ("QUEIJO
+ * MINAS" → QUEIJO grande, MINAS embaixo). Se o nome não bater (o time mudou de nome), a marca é
+ * o nome inteiro e não há assinatura.
  */
-export function partesDoNome(nome: string, prefixo?: string): { assinatura: string | null; marca: string } {
+export function partesDoNome(
+  nome: string,
+  prefixo?: string,
+  sufixo?: string,
+): { assinatura: string | null; marca: string } {
   const limpo = nome.trim();
-  if (prefixo && limpo.toUpperCase().startsWith(`${prefixo.toUpperCase()} `)) {
+  const maiusculo = limpo.toUpperCase();
+  if (prefixo && maiusculo.startsWith(`${prefixo.toUpperCase()} `)) {
     const marca = limpo.slice(prefixo.length).trim();
     if (marca) return { assinatura: limpo.slice(0, prefixo.length), marca };
+  }
+  if (sufixo && maiusculo.endsWith(` ${sufixo.toUpperCase()}`)) {
+    const marca = limpo.slice(0, limpo.length - sufixo.length).trim();
+    if (marca) return { assinatura: limpo.slice(limpo.length - sufixo.length), marca };
   }
   return { assinatura: null, marca: limpo };
 }

@@ -1,0 +1,234 @@
+/*
+ * A ficha do jogador no cenário "estacao": o retrato é a janela do vagão com a lua de queijo
+ * atrás, o nick em ouro fundido, as estatísticas em placas esmaltadas e os companheiros em
+ * medalhões. Mesmas regras: `.raiz` + o seletor da base; conteúdo só transform.
+ */
+.raiz {
+  --tm-largura-letra-nick: 0.76;
+}
+
+@keyframes chegaRetrato {
+  0%,
+  30% {
+    transform: translate3d(-28px, 0, 0);
+    animation-timing-function: cubic-bezier(0.3, 0, 0.3, 1);
+  }
+  78% {
+    transform: translate3d(4px, 0, 0);
+  }
+  90% {
+    transform: translate3d(-1px, 0, 0);
+  }
+  100% {
+    transform: none;
+  }
+}
+.raiz .retratoCasca {
+  margin-top: 30px; /* a lua aparece acima do arco */
+  animation: chegaRetrato 1400ms linear;
+}
+.raiz .retrato {
+  clip-path: none;
+  padding: 9px;
+  border-radius: 50% 50% 16px 16px / 30% 30% 16px 16px; /* janela em arco */
+  background:
+    radial-gradient(circle, #fff6cf 0 1.6px, #6b4a14 2.2px 2.8px, transparent 3.2px) left 0 top 40% / 9px 26px repeat-y,
+    radial-gradient(circle, #fff6cf 0 1.6px, #6b4a14 2.2px 2.8px, transparent 3.2px) right 0 top 40% / 9px 26px repeat-y,
+    linear-gradient(160deg, var(--tm-metal-luz), var(--tm-metal-alto) 18%, var(--tm-metal-sombra) 46%, var(--tm-metal-volta) 64%, var(--tm-metal-base));
+  box-shadow: 0 0 0 1px var(--tm-abismo), 0 30px 60px -30px rgba(0, 0, 0, 0.9);
+}
+.raiz .retratoMiolo {
+  clip-path: none;
+  border-radius: 50% 50% 9px 9px / 29% 29% 9px 9px;
+  background: radial-gradient(80% 60% at 50% 20%, rgba(232, 169, 42, 0.2), transparent 70%), #0b1626;
+}
+.raiz .retratoMiolo > img {
+  filter: sepia(0.12) saturate(0.94) contrast(1.06); /* estático */
+}
+/* O véu + o reflexo do vidro no canto (estático). */
+.raiz .enfGradacao {
+  background:
+    linear-gradient(125deg, rgba(168, 246, 255, 0.12) 0 12%, transparent 24%),
+    linear-gradient(180deg, color-mix(in srgb, var(--tm-breu) 40%, transparent) 0%, transparent 22%, transparent 62%, color-mix(in srgb, var(--tm-abismo) 85%, transparent) 100%);
+}
+/* Rota e elo já estão nos chips ao lado: a janela fica limpa (o arco cortaria os cantos). */
+.raiz .topo {
+  display: none;
+}
+.raiz .placa {
+  border-radius: 3px;
+  font: 400 11px/1 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.1em;
+  padding: 6px 11px 5px;
+}
+.raiz .coroaDoRetrato {
+  width: 72px;
+  top: -42px;
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--tm-neon) 55%, transparent));
+}
+.enfLuaRetrato {
+  position: absolute;
+  left: 50%;
+  top: -10%;
+  z-index: -1;
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+  aspect-ratio: 1;
+  translate: -50% 0;
+  opacity: 0.5;
+  pointer-events: none;
+  animation: luaDoRetrato 2400ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes luaDoRetrato {
+  from {
+    transform: translate3d(0, 14%, 0);
+  }
+  to {
+    transform: none;
+  }
+}
+
+/* Texto */
+/* A placa esmaltada do cenário (estacao.module.css, .kicker) é inline-block; aqui ela volta a
+   ser flex para o escudinho ficar AO LADO do nome do time. p.kicker: um nível acima dela. */
+.raiz p.kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.raiz .escudoMini {
+  width: 24px;
+  height: 24px;
+}
+@keyframes chegaNick {
+  0%,
+  45% {
+    transform: translate(-0.12em, 0);
+    animation-timing-function: cubic-bezier(0.45, 0, 0.9, 0.55);
+  }
+  80% {
+    transform: translate(0.02em, 0);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1);
+  }
+  100% {
+    transform: none;
+  }
+}
+.raiz .nickVisual {
+  display: inline-grid; /* eco e cromo na mesma célula: quebram igual */
+  line-height: 0.95;
+  overflow-wrap: anywhere;
+  margin-bottom: 0.14em;
+  /* pelo TAMANHO DA MAIOR PALAVRA: "LUCRECIA / PONTIUS" fica grande, quebrando entre palavras */
+  font-size: clamp(28px, calc(100cqi / (var(--maior-palavra, 6) * var(--tm-largura-letra-nick))), 96px);
+  animation: chegaNick 1400ms linear;
+}
+/* Eco e cromo na MESMA célula (o gancho mora aqui: .nickVisual é peça de ficha.module.css). */
+.raiz .nickVisual > * {
+  grid-area: 1 / 1;
+}
+@media (min-width: 900px) {
+  .raiz .nickVisual {
+    font-size: clamp(40px, calc(100cqi / (var(--maior-palavra, 6) * var(--tm-largura-letra-nick))), 120px);
+  }
+}
+.raiz .chips {
+  justify-content: flex-start;
+}
+.raiz .nomeReal {
+  font: 400 15px/1.4 var(--tm-fonte-assinatura), monospace;
+  letter-spacing: 0.02em;
+}
+.raiz .performance {
+  position: relative;
+  z-index: 1;
+}
+.raiz .performance::after {
+  height: 9px;
+  background:
+    linear-gradient(var(--tm-primaria), var(--tm-primaria)) 0 1px / 100% 2px no-repeat,
+    linear-gradient(var(--tm-primaria), var(--tm-primaria)) 0 6px / 100% 2px no-repeat,
+    repeating-linear-gradient(90deg, #5a3a12 0 4px, transparent 4px 16px);
+  -webkit-mask-image: linear-gradient(90deg, #000 40%, transparent);
+  mask-image: linear-gradient(90deg, #000 40%, transparent);
+}
+
+/* Estatísticas: placas esmaltadas rebitadas, assentadas com uma batida de carimbo. */
+/* 1,08 e não mais: maior que isso a placa da 1ª linha encosta no título na batida. */
+@keyframes carimbaPlaca {
+  0%,
+  60% {
+    transform: scale(1.08);
+  }
+  74% {
+    transform: scale(0.96);
+  }
+  86% {
+    transform: scale(1.015);
+  }
+  100% {
+    transform: none;
+  }
+}
+.raiz .estatistica {
+  border: 1px solid var(--tm-primaria);
+  border-radius: 4px;
+  background:
+    radial-gradient(circle at 7px 7px, #ffe7a0 0 1.3px, #5a3a0e 1.8px 2.3px, transparent 2.7px),
+    radial-gradient(circle at calc(100% - 7px) 7px, #ffe7a0 0 1.3px, #5a3a0e 1.8px 2.3px, transparent 2.7px),
+    linear-gradient(180deg, #13304e, var(--tm-abismo) 65%, #06101d);
+  box-shadow: inset 0 0 0 2px var(--tm-abismo), inset 0 0 0 3px color-mix(in srgb, var(--tm-neon) 22%, transparent);
+  animation-name: carimbaPlaca; /* a duração em cascata vem do .sobe */
+}
+.raiz .estatistica:nth-child(4n + 1) {
+  rotate: -1.2deg;
+}
+.raiz .estatistica:nth-child(4n + 2) {
+  rotate: 0.8deg;
+}
+.raiz .estatistica:nth-child(4n + 3) {
+  rotate: -0.4deg;
+}
+.raiz .estatistica:nth-child(4n) {
+  rotate: 1.2deg;
+}
+.raiz .estatistica::before {
+  background: linear-gradient(90deg, transparent, var(--tm-primaria), transparent);
+}
+
+/* Companheiros: medalhões redondos (pequenas luas). */
+.raiz .companheiroLink {
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--tm-primaria) 55%, transparent);
+  border-radius: 6px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--tm-abismo) 85%, transparent), color-mix(in srgb, var(--tm-breu) 70%, transparent));
+}
+.raiz .companheiroLink:hover {
+  border-color: var(--tm-neon);
+}
+.raiz .companheiroFoto {
+  flex: 0 0 56px;
+  height: 56px;
+  margin: 10px 0 10px 10px;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow: 0 0 0 2px var(--tm-primaria), 0 0 0 4px var(--tm-abismo);
+}
+.raiz .companheiroNick {
+  font-size: 14px;
+  letter-spacing: 0.02em;
+}
+/* Duas colunas no celular: medalhão menor e nick menor, quebrando só ENTRE palavras
+   ("CACHAS/A" quebrava no meio). */
+@media (max-width: 599px) {
+  .raiz .companheiroFoto {
+    flex-basis: 44px;
+    height: 44px;
+    margin: 10px 0 10px 8px;
+  }
+  .raiz .companheiroNick {
+    font-size: 12px;
+    overflow-wrap: break-word;
+  }
+}
