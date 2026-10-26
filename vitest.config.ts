@@ -8,6 +8,9 @@ export default defineConfig({
       // A trava "server-only" é de build (impede a chave de serviço vazar para o
       // cliente). Em teste Node ela lançaria erro, então é substituída por um vazio.
       "server-only": path.resolve(__dirname, "tests/stubs/server-only.ts"),
+      // next/font só existe dentro do compilador do Next: no teste, as fontes viram objetos
+      // vazios (a página temática dos times importa fontes próprias — lib/temas).
+      "next/font/google": path.resolve(__dirname, "tests/stubs/next-font-google.ts"),
     },
   },
   test: {

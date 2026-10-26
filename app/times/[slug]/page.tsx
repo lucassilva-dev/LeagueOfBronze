@@ -3,15 +3,18 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { PlayerCard } from "@/components/lob/player-card";
+import { PaginaDoTimeComTema } from "@/components/times/pagina-do-time-com-tema";
 import { caminhoNoArquivo } from "@/lib/arquivo";
+import { periodoDoCalendario } from "@/lib/calendario-4a";
 import { semTemporadaAoVivo } from "@/lib/fase-do-site";
-import { rotaCurto } from "@/lib/i18n/messages/paginas-home";
+import { periodoPorExtenso, rotaCurto } from "@/lib/i18n/messages/paginas-home";
 import { metadadosDaPagina, montarMetadados } from "@/lib/i18n/metadados";
 import { nomeDaTemporada } from "@/lib/i18n/nome-da-temporada";
 import { getMessages } from "@/lib/i18n/server";
 import { getOpGgMultiSearchUrlFromNicks } from "@/lib/opgg";
 import { buildDesignTeams } from "@/lib/roster";
 import { getServerDataset } from "@/lib/server-data";
+import { temaDoTime } from "@/lib/temas/registro";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +43,7 @@ export async function generateMetadata({ params }: TeamPageParams): Promise<Meta
 
 export default async function TeamRosterPage({ params }: TeamPageParams) {
   const { slug } = await params;
-  const { paginasHome: t, paginasStats: ts } = await getMessages();
+  const { paginasHome: t, paginasStats: ts, compartilhados } = await getMessages();
   const { dataset } = await getServerDataset();
   const team = buildDesignTeams(dataset).find((time) => time.slug === slug);
 
@@ -54,6 +57,24 @@ export default async function TeamRosterPage({ params }: TeamPageParams) {
   if (!team) notFound();
 
   const multiOpGg = getOpGgMultiSearchUrlFromNicks(team.roster.map((player) => player.nick));
+
+  // O time com página temática (lib/temas — cores, fontes, cenário e efeitos só dele). Sem
+  // tema, o visual padrão de sempre, abaixo.
+  const tema = temaDoTime(team.slug);
+  if (tema) {
+    const periodo = periodoDoCalendario();
+    return (
+      <PaginaDoTimeComTema
+        team={team}
+        tema={tema}
+        t={t}
+        elos={ts.elos}
+        multiOpGg={multiOpGg}
+        temporada={nomeDaTemporada(dataset.tournament.name, compartilhados.localeTag)}
+        periodo={periodo ? periodoPorExtenso(t, periodo.inicio, periodo.fim, compartilhados.localeTag) : null}
+      />
+    );
+  }
 
   return (
     <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "0 clamp(16px,4vw,24px) 96px" }}>

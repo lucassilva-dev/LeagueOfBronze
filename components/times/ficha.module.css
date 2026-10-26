@@ -1,0 +1,409 @@
+/*
+ * A ficha temática do jogador (components/times/ficha-do-jogador-com-tema.tsx). Usa a estrutura
+ * de tema.module.css (raiz, palco, chips, cromo) e acrescenta o retrato, o nick e as
+ * estatísticas. As mesmas duas regras: conteúdo só anima transform, sem delay nem fill-mode;
+ * opacidade animada só em enfeite `enf…`.
+ */
+
+.heroi {
+  padding-bottom: calc(var(--barra) + clamp(24px, 3vw, 44px));
+}
+
+.grade {
+  display: grid;
+  gap: clamp(22px, 3vw, 44px);
+  margin-top: 22px;
+}
+@media (min-width: 900px) {
+  .grade {
+    grid-template-columns: minmax(300px, 0.9fr) minmax(0, 1.1fr);
+    align-items: center;
+  }
+}
+
+/* ------------------------------------------------------------------ retrato */
+@keyframes entraRetrato {
+  0%,
+  18% {
+    transform: perspective(1000px) translate3d(-18px, 10px, 0) rotateY(10deg) scale(0.96);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  100% {
+    transform: none;
+  }
+}
+.retratoCasca {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  max-width: 520px;
+  justify-self: center;
+  animation: entraRetrato 1300ms;
+}
+.retratoCapitao {
+  margin-top: 24px;
+}
+.enfHaloRetrato {
+  position: absolute;
+  inset: -16px;
+  z-index: -1;
+  border-radius: 10px;
+  pointer-events: none;
+  background: radial-gradient(closest-side, rgba(77, 163, 255, 0.45), rgba(31, 107, 255, 0.14) 60%, transparent);
+  animation: haloRetrato 3.6s ease-in-out infinite;
+}
+@keyframes haloRetrato {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.coroaDoRetrato {
+  position: absolute;
+  top: -30px;
+  left: 50%;
+  z-index: 3;
+  width: 64px;
+  height: auto;
+  translate: -50% 0;
+  pointer-events: none;
+  filter: drop-shadow(0 0 12px rgba(77, 163, 255, 0.8));
+}
+.retrato {
+  --corte: 22px;
+  position: relative;
+  margin: 0;
+  padding: 2px;
+  clip-path: polygon(0 0, calc(100% - var(--corte)) 0, 100% var(--corte), 100% 100%, var(--corte) 100%, 0 calc(100% - var(--corte)));
+  background: linear-gradient(160deg, #fff, #8a96a6 22%, var(--tm-primaria) 50%, #29303a 74%, #dfe6ef);
+}
+.retratoMiolo {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 4 / 5;
+  clip-path: polygon(0 0, calc(100% - var(--corte)) 0, 100% var(--corte), 100% 100%, var(--corte) 100%, 0 calc(100% - var(--corte)));
+  background: radial-gradient(80% 70% at 50% 30%, rgba(31, 107, 255, 0.3), transparent 70%), #050a1a;
+}
+@media (min-width: 600px) and (max-width: 899px) {
+  .retratoMiolo {
+    aspect-ratio: 4 / 3;
+  }
+}
+/* Só a foto (filho direto): a crista de elo também é <img> e fica no canto. */
+.retratoMiolo > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: var(--foco, 50% 30%);
+  filter: saturate(0.9) contrast(1.06); /* estático */
+}
+.retratoVazio {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+.enfGradacao {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(3, 5, 11, 0.45) 0%, transparent 22%, transparent 62%, rgba(3, 5, 11, 0.85) 100%),
+    linear-gradient(180deg, transparent 55%, rgba(31, 107, 255, 0.28) 100%);
+}
+/* Um reflexo de metal atravessa o retrato de vez em quando (enfeite, só transform). */
+.enfVarreduraLenta {
+  position: absolute;
+  inset: -10% -60%;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 42%, rgba(255, 255, 255, 0.18) 50%, transparent 58%);
+  transform: translateX(-100%);
+  animation: varreduraLenta 8s cubic-bezier(0.3, 0.1, 0.2, 1) 1800ms infinite;
+}
+@keyframes varreduraLenta {
+  0% {
+    transform: translateX(-100%);
+  }
+  14%,
+  100% {
+    transform: translateX(100%);
+  }
+}
+.topo {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  right: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.placa {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #f4f7fb, #aeb9c6);
+  color: var(--tm-tinta);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+/* ------------------------------------------------------------------ texto */
+.texto {
+  position: relative;
+  z-index: 2;
+  container-type: inline-size;
+  min-width: 0;
+}
+.kicker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  letter-spacing: 0.24em;
+}
+.escudoMini {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+@keyframes entraNick {
+  0%,
+  45% {
+    transform: translate3d(-0.04em, -0.02em, 0) scale(1.06) skewX(-8deg);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.4);
+  }
+  68% {
+    transform: translate3d(0.01em, 0, 0) scale(0.99) skewX(1deg);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  100% {
+    transform: none;
+  }
+}
+.nickTitulo {
+  margin: 4px 0 0;
+  font-weight: 400;
+}
+.nickVisual {
+  position: relative;
+  isolation: isolate;
+  display: inline-block;
+  max-width: 100%;
+  line-height: 0.9;
+  font-family: var(--tm-fonte-titulo), "Arial Black", sans-serif;
+  font-style: italic;
+  font-weight: 900;
+  font-synthesis: none;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+  font-size: clamp(38px, 11vw, 72px);
+  font-size: clamp(34px, calc(100cqi / (var(--letras) * 0.66)), 128px);
+  transform-origin: 20% 80%;
+  animation: entraNick 1300ms;
+}
+.nomeReal {
+  margin: 8px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--tm-prata);
+}
+.chips {
+  justify-content: flex-start;
+}
+@media (max-width: 899px) {
+  .texto {
+    text-align: left;
+  }
+}
+
+.performance {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: clamp(22px, 3vw, 32px) 0 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--tm-acento);
+}
+.performance::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(111, 180, 255, 0.5), transparent);
+}
+.estatisticas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+@media (max-width: 399px) {
+  .estatisticas {
+    gap: 6px;
+  }
+}
+.estatistica {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 4px 12px;
+  border: 1px solid rgba(111, 180, 255, 0.28);
+  border-radius: 2px;
+  background: linear-gradient(180deg, rgba(27, 63, 166, 0.22), rgba(3, 5, 11, 0.55));
+  text-align: center;
+}
+.estatistica::before {
+  content: "";
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  top: -1px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--tm-neon), transparent);
+}
+.valor {
+  font: italic 900 clamp(22px, 2.4vw, 30px) / 1 var(--tm-fonte-titulo), sans-serif;
+  color: var(--tm-texto);
+}
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .valor {
+    padding: 0.05em 0.12em 0.08em 0;
+    background: linear-gradient(180deg, #fff 0%, #e3e9f1 55%, #9fb0c4 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
+.rotulo {
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--tm-apoio);
+}
+.nota {
+  margin: 14px 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--tm-apoio);
+}
+
+/* ------------------------------------------------------------------ companheiros */
+.companheirosSecao {
+  position: relative;
+  padding-block: clamp(20px, 3vw, 40px) clamp(56px, 7vw, 96px);
+}
+/* Desce para o bronze do rodapé do site sem degrau. */
+.companheirosSecao::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 80px;
+  background: linear-gradient(180deg, transparent, #100d07);
+  pointer-events: none;
+}
+.companheiros {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+@media (min-width: 900px) {
+  .companheiros {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+  }
+}
+.companheiro {
+  position: relative;
+}
+.companheiroLink {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  min-height: 76px;
+  border: 1px solid rgba(111, 180, 255, 0.3);
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(27, 63, 166, 0.25), rgba(3, 5, 11, 0.6));
+  color: var(--tm-texto);
+  text-decoration: none;
+  overflow: hidden;
+  transition: border-color 0.2s ease, translate 0.25s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.companheiroLink:hover {
+  border-color: var(--tm-neon);
+  translate: 0 -3px;
+}
+.companheiroLink:focus-visible {
+  outline: 2px solid var(--tm-arco);
+  outline-offset: 3px;
+}
+.companheiroFoto {
+  position: relative;
+  flex: 0 0 72px;
+  display: grid;
+  place-items: center;
+  background: #050a1a;
+}
+.companheiroFoto img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: var(--foco, 50% 30%);
+}
+.companheiroTexto {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 12px;
+}
+.companheiroRota {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: #9cc8ff;
+}
+.companheiroNick {
+  font: italic 800 15px/1.1 var(--tm-fonte-titulo), sans-serif;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+.verTime {
+  display: flex;
+  justify-content: center;
+  margin-top: 22px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enfVarreduraLenta {
+    display: none;
+  }
+}

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { AvisoConsentimento } from "@/components/aviso-consentimento";
+import { FichaDoJogadorComTema } from "@/components/times/ficha-do-jogador-com-tema";
 import { caminhoNoArquivo } from "@/lib/arquivo";
 import { semTemporadaAoVivo } from "@/lib/fase-do-site";
 import { EloCrest, RoleIcon } from "@/components/lob/ui";
@@ -13,8 +14,9 @@ import { metadadosDaPagina, montarMetadados } from "@/lib/i18n/metadados";
 import { nomeDaTemporada } from "@/lib/i18n/nome-da-temporada";
 import { getLocale, getMessages } from "@/lib/i18n/server";
 import { getOpGgSummonerUrlFromNick } from "@/lib/opgg";
-import { buildDesignPlayers } from "@/lib/roster";
+import { buildDesignPlayers, buildDesignTeams } from "@/lib/roster";
 import { getServerDataset } from "@/lib/server-data";
+import { temaDoTime } from "@/lib/temas/registro";
 import { calculatePlayerAggregates } from "@/lib/tournament";
 
 export const dynamic = "force-dynamic";
@@ -71,6 +73,32 @@ export default async function PlayerFichaPage({ params }: PlayerPageParams) {
     { label: t.statWinrate, val: dash(`${Math.round(aggregate?.winRate ?? 0)}%`) },
   ];
   const opggUrl = getOpGgSummonerUrlFromNick(player.nick);
+
+  // Jogador de um time com página temática (lib/temas): a ficha ganha a cara do time. O
+  // reserva (sem time) fica com a ficha padrão.
+  const tema = player.reserva ? null : temaDoTime(player.teamSlug);
+  if (tema) {
+    const team = buildDesignTeams(dataset).find((time) => time.slug === player.teamSlug) ?? null;
+    return (
+      <>
+        <FichaDoJogadorComTema
+          player={player}
+          team={team}
+          tema={tema}
+          t={t}
+          elos={ts.elos}
+          tiles={tiles}
+          opggUrl={opggUrl}
+          temporada={nomeDaTemporada(dataset.tournament.name, compartilhados.localeTag)}
+          voltar={{ href: `/times/${player.teamSlug}`, texto: t.jogadorVoltar }}
+          saiu={player.saiu ? te.saiuDoTime : null}
+        />
+        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 clamp(16px,4vw,24px) 48px" }}>
+          <AvisoConsentimento />
+        </div>
+      </>
+    );
+  }
 
   return (
     <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "44px clamp(16px,4vw,24px) 96px" }}>

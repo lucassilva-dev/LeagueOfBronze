@@ -1029,3 +1029,10 @@ a:hover {
     display: block;
   }
 }
+
+/* Páginas temáticas dos times (lib/temas): o cabeçalho escurece no tom da página, em vez do
+   bronze. O !important vence o estilo inline do <header> (components/site-frame.tsx). */
+body:has([data-tema]) #lob-cabecalho {
+  background: linear-gradient(180deg, rgba(3, 5, 11, 0.94), rgba(3, 5, 11, 0.82)) !important;
+  border-bottom-color: rgba(111, 180, 255, 0.22) !important;
+}

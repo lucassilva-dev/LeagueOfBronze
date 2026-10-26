@@ -113,6 +113,13 @@ export const paginasHome = definir({
     timeVoltar: "← VOLTAR AOS TIMES",
     timeElencoOficial: "ELENCO OFICIAL",
     timePtsElenco: "PTS DE ELENCO",
+    // A página temática do time (lib/temas): a linguagem de abertura de filme.
+    timeApresenta: "{temporada} · LEAGUE OF BRONZE APRESENTA",
+    timeEstrelando: "ESTRELANDO",
+    timeCapitaoTema: "CAPITÃO",
+    timeEmCartaz: "EM CARTAZ {periodo}",
+    timeVerCalendario: "VER CALENDÁRIO →",
+    timeTodosOsTimes: "← TODOS OS TIMES",
 
     // ---------- jogadores ----------
     jogadoresTitulo: "JOGADORES",
@@ -123,6 +130,7 @@ export const paginasHome = definir({
     jogadoresContagem: "JOGADORES",
     jogadorVoltar: "← VOLTAR AO ELENCO",
     jogadorPerformance: "PERFORMANCE NO CAMPEONATO",
+    jogadorCompanheiros: "COMPANHEIROS DE ELENCO",
     jogadorNota:
       "As estatísticas de performance zeram no apito inicial e são atualizadas a cada rodada do campeonato.",
     jogadorFechar: "Fechar",
@@ -257,6 +265,12 @@ export const paginasHome = definir({
     timeVoltar: "← BACK TO TEAMS",
     timeElencoOficial: "OFFICIAL ROSTER",
     timePtsElenco: "ROSTER PTS",
+    timeApresenta: "{temporada} · LEAGUE OF BRONZE PRESENTS",
+    timeEstrelando: "STARRING",
+    timeCapitaoTema: "CAPTAIN",
+    timeEmCartaz: "NOW SHOWING {periodo}",
+    timeVerCalendario: "SEE SCHEDULE →",
+    timeTodosOsTimes: "← ALL TEAMS",
 
     // ---------- jogadores ----------
     jogadoresTitulo: "PLAYERS",
@@ -267,6 +281,7 @@ export const paginasHome = definir({
     jogadoresContagem: "PLAYERS",
     jogadorVoltar: "← BACK TO ROSTER",
     jogadorPerformance: "TOURNAMENT PERFORMANCE",
+    jogadorCompanheiros: "TEAMMATES",
     jogadorNota:
       "Performance stats start from zero at kickoff and are updated after every round of the tournament.",
     jogadorFechar: "Close",

@@ -1,0 +1,1300 @@
+/*
+ * A estrutura das páginas temáticas dos times (lib/temas): raiz, palco, herói, título em metal,
+ * chips, cartas do elenco e cartela final — mais os enfeites que qualquer cenário usa.
+ *
+ * DUAS REGRAS (tests/times/temas-sem-opacidade.test.ts confere):
+ *  1. CONTEÚDO só anima transform. Sem animation-delay e sem fill-mode: a espera mora dentro do
+ *     keyframe ("0%, 52% {…}"), e a cascata sai da DURAÇÃO. O quadro 0 é o pôster inteiro,
+ *     legível — no máximo deslocado.
+ *  2. Opacidade, filtro ou clip-path animados só em ENFEITE: classe que começa com `enf`,
+ *     aria-hidden, sem texto, nunca por cima do conteúdo no quadro 0.
+ */
+
+/* ------------------------------------------------------------------ raiz e palco */
+.raiz {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  overflow: clip; /* clip não vira contêiner de rolagem: o palco sticky continua funcionando */
+  min-height: 100vh;
+  background: var(--tm-breu);
+  color: var(--tm-prata);
+  --barra: clamp(10px, 3vw, 40px);
+}
+
+/* O fundo animado acompanha a rolagem (sticky) e ocupa a tela toda, por trás do conteúdo. */
+.palco {
+  position: sticky;
+  top: 0;
+  z-index: 0;
+  height: 100vh;
+  height: 100lvh;
+  margin-bottom: -100vh;
+  margin-bottom: -100lvh;
+  overflow: hidden;
+  pointer-events: none;
+  contain: strict;
+}
+
+.conteudo {
+  position: relative;
+  z-index: 1;
+}
+
+.conteiner {
+  max-width: 1280px;
+  margin-inline: auto;
+  padding-inline: clamp(16px, 4vw, 24px);
+}
+
+.somenteLeitor {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ------------------------------------------------------------------ enfeites do palco */
+.enfCamera {
+  position: absolute;
+  inset: 0;
+  animation: camera 2400ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes camera {
+  from {
+    transform: scale(1.08);
+  }
+  to {
+    transform: none;
+  }
+}
+
+.enfVinheta {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 90% at 50% 40%, transparent 55%, rgba(0, 0, 0, 0.72) 100%);
+}
+
+/* Grão de filme, parado (animar o grão atrás do cabeçalho com desfoque custa caro). */
+.enfGrao {
+  position: absolute;
+  inset: 0;
+  opacity: 0.07;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  background-size: 160px;
+}
+
+.enfFaiscas {
+  position: absolute;
+  inset: 80px 0 0; /* nunca atrás do cabeçalho */
+  overflow: hidden;
+}
+.enfFaisca {
+  position: absolute;
+  bottom: -16px;
+  left: var(--x);
+  width: 2px;
+  height: 12px;
+  border-radius: 2px;
+  opacity: 0;
+  background: linear-gradient(180deg, var(--tm-nucleo), var(--tm-neon));
+  animation-name: faisca;
+  animation-duration: var(--dur);
+  animation-timing-function: linear;
+  animation-delay: var(--atraso); /* negativo: já nascem espalhadas */
+  animation-iteration-count: infinite;
+}
+@keyframes faisca {
+  0% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.9;
+  }
+  75% {
+    opacity: 0.45;
+  }
+  100% {
+    transform: translate3d(var(--deriva), -75vh, 0);
+    opacity: 0;
+  }
+}
+@media (max-width: 899px) {
+  .enfFaisca:nth-child(n + 6) {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------------------------ herói */
+.heroi {
+  position: relative;
+  overflow: hidden;
+  overflow: clip;
+  padding-block: calc(var(--barra) + clamp(14px, 2.6vw, 36px));
+}
+
+/* Barras de cinema: moram no padding do herói (nunca sobre conteúdo) e entram de FORA. */
+.enfBarraTopo,
+.enfBarraBase {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  height: var(--barra);
+  background: #000;
+  pointer-events: none;
+}
+.enfBarraTopo {
+  top: 0;
+  box-shadow: inset 0 -1px rgba(111, 180, 255, 0.2);
+  animation: barraDesce 900ms cubic-bezier(0.7, 0, 0.2, 1);
+}
+.enfBarraBase {
+  bottom: 0;
+  box-shadow: inset 0 1px rgba(111, 180, 255, 0.2);
+  animation: barraSobe 900ms cubic-bezier(0.7, 0, 0.2, 1);
+}
+@keyframes barraDesce {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes barraSobe {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+.voltar {
+  position: relative;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid rgba(111, 180, 255, 0.45);
+  border-radius: 2px;
+  background: rgba(3, 5, 11, 0.55);
+  color: var(--tm-texto);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-decoration: none;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+.voltar:hover {
+  background: rgba(27, 63, 166, 0.45);
+  border-color: var(--tm-neon);
+}
+.voltar:focus-visible,
+.chip:focus-visible {
+  outline: 2px solid var(--tm-arco);
+  outline-offset: 3px;
+}
+
+.heroiGrade {
+  --escudo: clamp(180px, 56vw, 260px);
+  --tremor: 2px;
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 0;
+  margin-top: 18px;
+  animation-name: tremor;
+  animation-duration: 1100ms;
+  animation-timing-function: linear;
+}
+@keyframes tremor {
+  0%,
+  52% {
+    transform: none;
+  }
+  55% {
+    transform: translate3d(var(--tremor), calc(var(--tremor) * -0.6), 0);
+  }
+  59% {
+    transform: translate3d(calc(var(--tremor) * -1), calc(var(--tremor) * 0.6), 0);
+  }
+  63% {
+    transform: translate3d(calc(var(--tremor) * 0.6), 0, 0);
+  }
+  67%,
+  100% {
+    transform: none;
+  }
+}
+@media (min-width: 600px) {
+  .heroiGrade {
+    --tremor: 3px;
+  }
+}
+@media (min-width: 900px) {
+  .heroiGrade {
+    --escudo: clamp(280px, 27vw, 400px);
+    grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
+    align-items: center;
+    justify-items: start;
+    text-align: left;
+    gap: clamp(16px, 3vw, 48px);
+    min-height: clamp(560px, calc(100svh - 190px), 820px);
+  }
+}
+
+/* ------------------------------------------------------------------ escudo e ornamentos */
+.blocoEscudo {
+  position: relative;
+  z-index: 1;
+  width: var(--escudo);
+  aspect-ratio: 1;
+  margin-top: calc(var(--escudo) * 0.3);
+  margin-bottom: calc(var(--escudo) * 0.34);
+}
+@media (min-width: 900px) {
+  .blocoEscudo {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: center;
+    margin-top: calc(var(--escudo) * 0.22);
+    margin-bottom: calc(var(--escudo) * 0.26);
+  }
+}
+
+@keyframes entraEscudo {
+  0%,
+  20% {
+    transform: translate3d(0, -14px, 0) scale(0.9) rotate(-4deg);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5);
+  }
+  52% {
+    transform: translate3d(0, 2px, 0) scale(1.05) rotate(0.8deg);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  66% {
+    transform: scale(0.985);
+  }
+  100% {
+    transform: none;
+  }
+}
+.escudo {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  animation: entraEscudo 1100ms;
+}
+.escudo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.escudoVazio {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px solid var(--tm-neon);
+  font: italic 900 calc(var(--escudo) * 0.38) / 1 var(--tm-fonte-titulo), sans-serif;
+  color: var(--tm-texto);
+}
+
+/* Aro de neon: brilho por gradiente (nada de box-shadow animado). */
+.enfAro {
+  position: absolute;
+  inset: -10%;
+  z-index: 1;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0.8;
+  background: radial-gradient(closest-side, transparent 74%, rgba(77, 163, 255, 0.55) 80%, rgba(31, 107, 255, 0.18) 88%, transparent 100%);
+  animation: aroAcende 1200ms ease-out, aroRespira 3.2s ease-in-out 1200ms infinite;
+}
+@keyframes aroAcende {
+  0%,
+  14% {
+    opacity: 0.45;
+    transform: scale(0.97);
+  }
+  100% {
+    opacity: 0.8;
+    transform: none;
+  }
+}
+@keyframes aroRespira {
+  0%,
+  100% {
+    opacity: 0.8;
+    transform: none;
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.025);
+  }
+}
+
+/* Risco de energia orbitando logo fora do aro, por baixo do escudo. */
+.enfArco {
+  position: absolute;
+  inset: -4%;
+  z-index: 1;
+  border-radius: 50%;
+  pointer-events: none;
+  background: conic-gradient(from 0deg, transparent 0 68%, rgba(77, 163, 255, 0) 70%, #eaf6ff 75%, rgba(77, 163, 255, 0) 80%, transparent 82% 100%);
+  -webkit-mask: radial-gradient(closest-side, transparent calc(100% - 4px), #000 calc(100% - 3px), #000 calc(100% - 1px), transparent 100%);
+  mask: radial-gradient(closest-side, transparent calc(100% - 4px), #000 calc(100% - 3px), #000 calc(100% - 1px), transparent 100%);
+  transform: rotate(40deg);
+  animation: gira 4.8s linear infinite;
+}
+@keyframes gira {
+  from {
+    transform: rotate(40deg);
+  }
+  to {
+    transform: rotate(400deg);
+  }
+}
+
+/* Ondas de choque quando o escudo bate no chão. */
+.enfOnda {
+  position: absolute;
+  inset: 8%;
+  z-index: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  border: 2px solid var(--tm-arco);
+  box-shadow: 0 0 24px var(--tm-primaria), inset 0 0 24px var(--tm-primaria);
+}
+.enfOnda1 {
+  animation: onda 900ms cubic-bezier(0.15, 0.7, 0.2, 1) 572ms;
+}
+.enfOnda2 {
+  border-width: 1px;
+  animation: onda 900ms cubic-bezier(0.15, 0.7, 0.2, 1) 700ms;
+}
+@keyframes onda {
+  0% {
+    transform: scale(0.45);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+/* O chão espelhado: horizonte (flare anamórfico), reflexo do escudo e grade em perspectiva. */
+.enfChao {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  width: 200vw;
+  margin-left: -100vw;
+  height: calc(var(--escudo) * 0.5);
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.enfHorizonte {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 18%, rgba(31, 107, 255, 0.6) 36%, var(--tm-nucleo) 48%, #fff 50%, var(--tm-nucleo) 52%, rgba(31, 107, 255, 0.6) 64%, transparent 82%);
+  box-shadow: 0 0 12px 1px rgba(31, 107, 255, 0.55), 0 0 34px 6px rgba(31, 107, 255, 0.2);
+  animation: horizonteAbre 1100ms cubic-bezier(0.16, 1, 0.3, 1), horizonteRespira 6s ease-in-out 1100ms infinite;
+}
+@keyframes horizonteAbre {
+  0%,
+  52% {
+    transform: scaleX(0.03);
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes horizonteRespira {
+  0%,
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+  50% {
+    transform: scaleX(0.88);
+    opacity: 0.7;
+  }
+}
+.enfReflexo {
+  position: absolute;
+  left: 50%;
+  top: 2px;
+  width: var(--escudo);
+  height: auto;
+  translate: -50% 0;
+  transform: scaleY(-1);
+  opacity: 0.3;
+  -webkit-mask-image: linear-gradient(to top, rgba(0, 0, 0, 0.6), transparent 45%);
+  mask-image: linear-gradient(to top, rgba(0, 0, 0, 0.6), transparent 45%);
+}
+.enfGrade {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  perspective: 520px;
+}
+.enfGrade::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 300%;
+  transform-origin: 50% 0;
+  transform: rotateX(64deg);
+  background-image: linear-gradient(rgba(77, 163, 255, 0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(77, 163, 255, 0.2) 1px, transparent 1px);
+  background-size: 64px 64px;
+  -webkit-mask-image: linear-gradient(to bottom, #000, rgba(0, 0, 0, 0.4) 35%, transparent 70%);
+  mask-image: linear-gradient(to bottom, #000, rgba(0, 0, 0, 0.4) 35%, transparent 70%);
+  animation: gradeCorre 3.2s linear infinite;
+}
+@keyframes gradeCorre {
+  from {
+    transform: rotateX(64deg) translateY(0);
+  }
+  to {
+    transform: rotateX(64deg) translateY(64px);
+  }
+}
+@media (max-width: 899px) {
+  .enfGrade::before {
+    animation: none;
+  }
+}
+
+/* ------------------------------------------------------------------ texto do herói */
+.blocoTexto {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  container-type: inline-size;
+}
+@media (min-width: 900px) {
+  /* Centrado na faixa do escudo (e não no bloco com os respiros), com folga embaixo: os chips
+     ficam acima do horizonte, que corre na base do escudo. */
+  .blocoTexto {
+    grid-column: 1;
+    grid-row: 1;
+    margin-top: calc(var(--escudo) * 0.22);
+    margin-bottom: calc(var(--escudo) * 0.26 + 40px);
+  }
+}
+
+@keyframes sobe {
+  0%,
+  70% {
+    transform: translate3d(0, 14px, 0);
+  }
+  100% {
+    transform: none;
+  }
+}
+/* var() dentro do shorthand atrapalha o CSS Modules: longhands. */
+.sobe {
+  animation-name: sobe;
+  animation-duration: calc(1500ms + var(--i, 0) * 100ms);
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.kicker {
+  margin: 0 0 6px;
+  font-size: clamp(10.5px, 0.9vw, 12.5px);
+  font-weight: 600;
+  letter-spacing: 0.34em;
+  color: var(--tm-apoio);
+}
+.kickerApresenta {
+  color: var(--tm-acento);
+}
+.nomesDoElenco {
+  display: none;
+  margin: 0 0 4px;
+  font-size: clamp(10px, 0.8vw, 11.5px);
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  color: var(--tm-apoio);
+}
+@media (min-width: 600px) {
+  .nomesDoElenco {
+    display: block;
+  }
+}
+
+.titulo {
+  margin: 0;
+  font-weight: 400;
+}
+.tituloVisual {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+@keyframes entraMarca {
+  0%,
+  55% {
+    transform: translate3d(-0.05em, -0.03em, 0) scale(1.08) skewX(-10deg);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.4);
+  }
+  72% {
+    transform: translate3d(0.01em, 0, 0) scale(0.985) skewX(1.5deg);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  100% {
+    transform: none;
+  }
+}
+.marca {
+  --tm-titulo-max: 148px;
+  position: relative;
+  isolation: isolate;
+  display: inline-block;
+  line-height: 0.82;
+  font-family: var(--tm-fonte-titulo), "Arial Black", sans-serif;
+  font-style: italic;
+  font-weight: 900;
+  font-synthesis: none;
+  font-size: clamp(104px, 34vw, 148px);
+  font-size: clamp(32px, calc(100cqi / (var(--letras) * 0.72)), var(--tm-titulo-max));
+  transform-origin: 30% 80%;
+  animation: entraMarca 1400ms;
+}
+@media (min-width: 600px) {
+  .marca {
+    --tm-titulo-max: 200px;
+  }
+}
+@media (min-width: 900px) {
+  .marca {
+    --tm-titulo-max: 280px;
+  }
+}
+
+/* Cromo escovado. O texto SEMPRE tem tinta: só a camada do reflexo anda (background-position
+   não esconde nada). A folga de padding dá espaço à tinta do itálico (o canto do X). */
+.cromo,
+.eco {
+  display: inline-block;
+  padding: 0.12em 0.18em 0.2em 0.06em;
+  margin: -0.12em -0.18em -0.2em -0.06em;
+}
+.cromo {
+  position: relative;
+  color: #e9eef5;
+}
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .cromo {
+    background-image:
+      linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.95) 48%, rgba(185, 230, 255, 0.9) 50%, transparent 58%),
+      repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.06) 0 1px, transparent 1px 3px),
+      linear-gradient(180deg, #fff 0%, #e9eef5 24%, #a9b4c2 44%, #29303a 50%, #5b6675 53%, #dfe6ef 70%, #fff 82%, #8a96a6 100%);
+    background-size: 250% 100%, 100% 100%, 100% 100%;
+    background-repeat: no-repeat;
+    background-position: 150% 0, 0 0, 0 0;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    /* Sem text-stroke: a fonte variável tem contornos sobrepostos, e o traço desenhava a
+       costura por dentro do X. A silhueta sobre a faixa escura vem do eco azul, atrás. */
+    animation: brilhoCromo 7s cubic-bezier(0.3, 0.1, 0.2, 1) 1600ms infinite;
+  }
+}
+@keyframes brilhoCromo {
+  0% {
+    background-position: 150% 0, 0 0, 0 0;
+  }
+  16%,
+  100% {
+    background-position: -50% 0, 0 0, 0 0;
+  }
+}
+@media (max-width: 599px) {
+  .cromo {
+    animation-duration: 10s;
+  }
+}
+/* Eco de neon ATRÁS do cromo (estático, sem filtro). */
+.eco {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  color: transparent;
+  pointer-events: none;
+  text-shadow: 0 0 0.06em var(--tm-primaria), 0 0 0.22em rgba(31, 107, 255, 0.6), 0 0.03em 0 #0b1530;
+}
+
+@keyframes entraAssinatura {
+  0%,
+  62% {
+    transform: translate3d(-18px, 4px, 0) rotate(-5deg) scale(1.06);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  86% {
+    transform: translate3d(2px, 0, 0) rotate(0.6deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+.assinatura {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: -0.32em;
+  animation: entraAssinatura 1500ms;
+}
+.pincel {
+  display: inline-block;
+  transform: rotate(-5deg);
+  font-family: var(--tm-fonte-assinatura), cursive;
+  font-size: clamp(26px, 8vw, 34px);
+  line-height: 1.1;
+  letter-spacing: 0.04em;
+  color: var(--tm-texto);
+  text-shadow: 0 2px 0 #03050b, 0 0 18px rgba(31, 107, 255, 0.45);
+}
+@media (min-width: 900px) {
+  .pincel {
+    font-size: clamp(34px, 3.4vw, 54px);
+  }
+}
+.enfTraco {
+  display: block;
+  width: 110%;
+  height: 0.32em;
+  margin: -0.12em auto 0;
+  font-size: inherit;
+  transform-origin: 0 50%;
+  animation: tracoCresce 1500ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.assinatura .enfTraco {
+  height: clamp(9px, 2.6vw, 16px);
+}
+@keyframes tracoCresce {
+  0%,
+  66% {
+    transform: scaleX(0);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/* ------------------------------------------------------------------ chips */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: clamp(18px, 2.4vw, 28px);
+}
+@media (min-width: 900px) {
+  .chips {
+    justify-content: flex-start;
+  }
+}
+/* Paralelogramo por um ::before inclinado (nada de clip-path em elemento focável). */
+.chip {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.chip::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  transform: skewX(-14deg);
+  border-radius: 2px;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+.chipPts {
+  color: var(--tm-tinta);
+}
+.chipPts::before {
+  background: linear-gradient(180deg, #f4f7fb, #aeb9c6);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6) inset, 0 6px 18px -6px rgba(31, 107, 255, 0.6);
+}
+.chipNumero {
+  font: italic 900 22px/1 var(--tm-fonte-titulo), sans-serif;
+}
+.chipCapitao {
+  color: #dcebff;
+}
+.chipCapitao::before {
+  background: rgba(27, 63, 166, 0.28);
+  border: 1px solid rgba(111, 180, 255, 0.4);
+}
+.chipOpgg {
+  color: var(--tm-texto);
+}
+.chipOpgg::before {
+  border: 1px solid var(--tm-neon);
+  background: rgba(3, 5, 11, 0.4);
+}
+.chipOpgg:hover::before {
+  background: var(--tm-royal);
+}
+@media (max-width: 599px) {
+  .chips .chipOpgg {
+    flex: 1 1 100%;
+    justify-content: center;
+    min-height: 48px;
+  }
+}
+.coroaMini {
+  width: 15px;
+  height: auto;
+  flex-shrink: 0;
+  color: currentColor;
+}
+
+/* ------------------------------------------------------------------ elenco */
+.elencoSecao {
+  position: relative;
+  padding-block: clamp(28px, 4vw, 56px) clamp(36px, 5vw, 72px);
+}
+.estrelando {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 clamp(18px, 2.4vw, 28px);
+  font: italic 900 clamp(22px, 2.6vw, 34px) / 1 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.06em;
+  color: var(--tm-texto);
+}
+.estrelando::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(111, 180, 255, 0.6), transparent);
+}
+
+.elenco {
+  list-style: none;
+  margin: 0;
+  padding: 18px 0 0;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (max-width: 599px) {
+  .cascaLarga {
+    grid-column: 1 / -1;
+  }
+  .cascaLarga .foto {
+    aspect-ratio: 3 / 2;
+  }
+  .cascaLarga .nick {
+    --nick: 28px;
+  }
+}
+@media (min-width: 600px) {
+  .elenco {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 14px;
+  }
+  .casca {
+    grid-column: span 2;
+  }
+  .elenco[data-n="5"] .casca:nth-child(4) {
+    grid-column: 2 / span 2;
+  }
+}
+@media (min-width: 1024px) {
+  .elenco {
+    grid-template-columns: repeat(var(--colunas, 5), minmax(0, 1fr));
+    gap: 18px;
+    padding-top: 24px;
+  }
+  .casca,
+  .elenco[data-n="5"] .casca:nth-child(4) {
+    grid-column: auto;
+  }
+  .cascaCapitao {
+    translate: 0 -14px;
+  }
+}
+
+@keyframes entraCarta {
+  0%,
+  64% {
+    transform: perspective(900px) translate3d(0, 30px, 0) rotateX(8deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes entraCartaRolagem {
+  from {
+    transform: perspective(900px) translate3d(0, 32px, 0) rotateX(9deg);
+  }
+  to {
+    transform: none;
+  }
+}
+.casca {
+  position: relative;
+  isolation: isolate;
+  transform-origin: 50% 100%;
+  animation-name: entraCarta;
+  animation-duration: calc(2000ms + var(--i, 0) * 160ms);
+  animation-timing-function: cubic-bezier(0.16, 0.84, 0.24, 1);
+}
+/* No celular as cartas ficam abaixo da dobra: entram pela rolagem (não depende do relógio). */
+@supports (animation-timeline: view()) {
+  @media (max-width: 1023px) {
+    .casca {
+      animation: entraCartaRolagem linear;
+      animation-timeline: view();
+      animation-range: entry 0% entry calc(70% + var(--col, 0) * 15%);
+    }
+  }
+}
+
+.carta {
+  --corte: 12px;
+  position: relative;
+  height: 100%;
+  padding: 1px;
+  clip-path: polygon(0 0, calc(100% - var(--corte)) 0, 100% var(--corte), 100% 100%, var(--corte) 100%, 0 calc(100% - var(--corte)));
+  background: linear-gradient(160deg, #e9eef5, #5b6675 30%, var(--tm-primaria) 55%, #29303a 75%, #a9b4c2);
+}
+@media (min-width: 600px) {
+  .carta {
+    --corte: 16px;
+  }
+}
+.cascaCapitao .carta {
+  background: linear-gradient(160deg, #fff, var(--tm-neon) 35%, var(--tm-primaria) 60%, var(--tm-nucleo));
+}
+.miolo {
+  position: relative;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto auto;
+  clip-path: polygon(0 0, calc(100% - var(--corte)) 0, 100% var(--corte), 100% 100%, var(--corte) 100%, 0 calc(100% - var(--corte)));
+  background: linear-gradient(180deg, #0a1430, #04070f);
+}
+.foto {
+  grid-area: 1 / 1;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  aspect-ratio: 4 / 5;
+  background: radial-gradient(80% 70% at 50% 30%, rgba(31, 107, 255, 0.25), transparent 70%), #050a1a;
+}
+.foto img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: var(--foco, 50% 32%);
+  filter: saturate(0.88) contrast(1.06) brightness(0.95); /* estático */
+}
+.fotoVazia {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+.enfGradacao {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(3, 5, 11, 0.55) 0%, transparent 24%, transparent 46%, rgba(3, 5, 11, 0.96) 100%),
+    linear-gradient(180deg, transparent 60%, rgba(31, 107, 255, 0.22) 100%);
+}
+/* A sigla da rota gigante, vazada, atrás do nick. */
+.enfRotaGigante {
+  position: absolute;
+  left: 6px;
+  right: 0;
+  bottom: 46px;
+  z-index: 1;
+  height: 52px;
+  pointer-events: none;
+}
+.enfRotaGigante svg {
+  display: block;
+  height: 100%;
+  width: auto;
+  overflow: visible;
+}
+.enfRotaGigante text {
+  font: italic 900 78px var(--tm-fonte-titulo), sans-serif;
+  fill: none;
+  stroke: rgba(77, 163, 255, 0.4);
+  stroke-width: 1.2px;
+}
+@media (min-width: 600px) {
+  .enfRotaGigante {
+    height: 64px;
+  }
+}
+@media (min-width: 1024px) {
+  .enfRotaGigante {
+    height: 80px;
+    bottom: 50px;
+  }
+}
+/* Reflexo que atravessa a foto no hover. Em repouso fica FORA da foto. */
+.enfVarredura {
+  position: absolute;
+  inset: -10% -60%;
+  z-index: 3;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 40%, rgba(255, 255, 255, 0.22) 50%, transparent 60%);
+  transform: translateX(-100%);
+}
+
+/* O texto sobre a foto: item de grid SEM position (o link esticado se mede pelo .miolo). */
+.sobreFoto {
+  grid-area: 1 / 1;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 10px 10px 12px;
+}
+.topo {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
+}
+.etiquetaRota {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border: 1px solid rgba(111, 180, 255, 0.55);
+  border-radius: 2px;
+  background: rgba(3, 5, 11, 0.7);
+  color: #eef3fb;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+.identidade {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.placaCapitao {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #f4f7fb, #aeb9c6);
+  color: var(--tm-tinta);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+.nick {
+  margin: 0;
+  font: italic 800 var(--nick, 18px) / 1.05 var(--tm-fonte-titulo), sans-serif;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+  padding: 0.06em 0.12em 0.1em 0;
+  margin-right: -0.12em;
+  color: var(--tm-texto);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
+}
+@media (min-width: 1024px) {
+  .nick {
+    --nick: clamp(20px, 1.6vw, 24px);
+  }
+}
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .nick {
+    background: linear-gradient(180deg, #fff 0%, #e3e9f1 55%, #b8c3d0 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: none;
+  }
+}
+.link {
+  color: inherit;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+/* A carta inteira é clicável; o nome do link continua sendo o nick. */
+.link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+}
+.mono {
+  padding: 2px 6px;
+  border: 1px solid rgba(95, 212, 255, 0.6);
+  border-radius: 2px;
+  color: #5fd4ff;
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+}
+.rodape {
+  grid-area: 2 / 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px 12px;
+  border-top: 1px solid rgba(111, 180, 255, 0.18);
+}
+.nome {
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tm-prata);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ficha {
+  flex-shrink: 0;
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  color: var(--tm-acento);
+}
+
+.coroaDoCapitao {
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  z-index: 3;
+  width: 46px;
+  height: auto;
+  translate: -50% 0;
+  pointer-events: none;
+  filter: drop-shadow(0 0 10px rgba(77, 163, 255, 0.7));
+}
+@media (max-width: 599px) {
+  .coroaDoCapitao {
+    width: 38px;
+    top: -16px;
+  }
+}
+
+/* Halo atrás da carta: cresce por ESCALA no hover (nada de transição de opacidade). */
+.enfHaloCarta {
+  position: absolute;
+  inset: -10px;
+  z-index: -1;
+  border-radius: 8px;
+  pointer-events: none;
+  background: radial-gradient(closest-side, rgba(77, 163, 255, 0.5), rgba(31, 107, 255, 0.18) 60%, transparent);
+  transform: scale(0.92);
+  transition: transform 0.3s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.casca:hover .enfHaloCarta,
+.casca:has(.link:focus-visible) .enfHaloCarta {
+  transform: scale(1.04);
+}
+.cascaCapitao .enfHaloCarta {
+  transform: none;
+  animation: haloRespira 3.2s ease-in-out infinite;
+}
+@keyframes haloRespira {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+/* Foco: o anel fica na casca (sem clip-path), nunca na carta. */
+.casca:has(.link:focus-visible) {
+  outline: 2px solid var(--tm-arco);
+  outline-offset: 4px;
+}
+.link:focus-visible {
+  outline: none;
+}
+@supports not selector(:has(*)) {
+  .link:focus-visible::after {
+    outline: 2px solid var(--tm-arco);
+    outline-offset: -3px;
+  }
+}
+.casca:active {
+  scale: 0.985;
+  transition: scale 0.12s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .casca {
+    transition: translate 0.28s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .casca:hover,
+  .casca:has(.link:focus-visible) {
+    translate: 0 -8px;
+  }
+  .foto img {
+    transition: scale 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .casca:hover .foto img {
+    scale: 1.05;
+  }
+  .enfRotaGigante {
+    transition: translate 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .casca:hover .enfRotaGigante {
+    translate: 8px 0;
+  }
+  .casca:hover .enfVarredura {
+    transform: translateX(100%);
+    transition: transform 0.7s cubic-bezier(0.3, 0.1, 0.2, 1);
+  }
+}
+@media (hover: hover) and (pointer: fine) and (min-width: 1024px) {
+  .cascaCapitao:hover,
+  .cascaCapitao:has(.link:focus-visible) {
+    translate: 0 -22px;
+  }
+}
+
+/* ------------------------------------------------------------------ cartela final */
+.cartela {
+  position: relative;
+  padding: clamp(36px, 5vw, 64px) 0 clamp(64px, 8vw, 110px);
+  text-align: center;
+}
+.cartela::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 80px;
+  background: linear-gradient(180deg, transparent, #100d07);
+  pointer-events: none;
+}
+.enfLinhaCromo {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: 520px;
+  margin: 0 auto 22px;
+  color: #c7d0db;
+}
+.enfLinhaCromo::before,
+.enfLinhaCromo::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #c7d0db, transparent);
+}
+.cartelaEscudo {
+  display: block;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 10px;
+}
+.cartelaNome {
+  margin: 0;
+  font: italic 900 clamp(26px, 3vw, 34px) / 1 var(--tm-fonte-titulo), sans-serif;
+  color: var(--tm-texto);
+  letter-spacing: 0.02em;
+}
+.cartelaData {
+  margin: 10px 0 22px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.26em;
+  color: var(--tm-apoio);
+}
+.cartelaLinks {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+/* ------------------------------------------------------------------ acessibilidade */
+/* O global só encurta a duração e mantém o delay; aqui tudo para: vira um pôster parado. */
+@media (prefers-reduced-motion: reduce) {
+  .raiz *,
+  .raiz *::before,
+  .raiz *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .enfFaisca,
+  .enfOnda,
+  .enfVarredura {
+    display: none;
+  }
+}
+@media (forced-colors: active) {
+  .cromo,
+  .nick {
+    background: none;
+    -webkit-text-fill-color: CanvasText;
+    color: CanvasText;
+    -webkit-text-stroke: 0;
+  }
+  .eco {
+    display: none;
+  }
+}
+@media (prefers-contrast: more) {
+  .cromo,
+  .nick {
+    background: none;
+    -webkit-text-fill-color: #fff;
+    -webkit-text-stroke: 0;
+  }
+  .eco {
+    display: none;
+  }
+}
