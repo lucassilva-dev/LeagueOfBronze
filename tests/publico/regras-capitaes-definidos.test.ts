@@ -97,9 +97,12 @@ describe("regulamento de 23/10/2026: capitães definidos e sem preço", () => {
     }
   });
 
-  it("a serpentina e o resto do draft continuam", () => {
-    expect(pt.draft4).toContain("serpentina (ex.: com os 7 times do draft, 1-2-3-4-5-6-7-7-6-5-4-3-2-1)");
-    expect(en.draft4).toContain("snake (e.g. with the 7 drafting teams, 1-2-3-4-5-6-7-7-6-5-4-3-2-1)");
+  // Na hora do draft (24/10/2026, 22h) a organização trocou a serpentina pela ordem 1→7 em todas
+  // as rodadas; o resto do draft continua.
+  it("a ordem 1→7 em todas as rodadas e o resto do draft continuam", () => {
+    expect(pt.draft4).toContain("do 1º ao 7º time do draft (1-2-3-4-5-6-7, e repete)");
+    expect(en.draft4).toContain("from the 1st to the 7th drafting team (1-2-3-4-5-6-7, then again)");
+    expect(pt.draft4).not.toContain("serpentina");
     expect(pt.capitaes3).toBe("O número de capitães é igual ao número de times: 8 nesta edição.");
     expect(pt.capitaes4).toContain("Um sorteio ao vivo define qual time cada capitão vai capitanear");
     expect(pt.capitaes5).toContain("O capitão também é jogador");

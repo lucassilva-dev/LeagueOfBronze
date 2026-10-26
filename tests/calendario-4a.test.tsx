@@ -340,13 +340,12 @@ describe("as frases FIXAS que dependem do calendário", () => {
     expect(en.paginasRegras.capitaes3).toContain(`${n} in this edition`);
     expect(pt.paginasRegras.inscricaoReservasTexto).toContain(`${n} times de 5 jogadores (${n * 5} vagas)`);
     expect(en.paginasRegras.inscricaoReservasTexto).toContain(`${n} teams of 5 players (${n * 5} places)`);
-    // Desde 24/10/2026 o time dos organizadores já entra formado e fica fora da ordem de escolha:
-    // a serpentina do exemplo é a dos outros n − 1.
+    // Desde 24/10/2026 o time dos organizadores já entra formado e fica fora da ordem de escolha,
+    // e a ordem é 1→(n − 1) em todas as rodadas (decisão da hora do draft, no lugar da serpentina).
     const noDraft = n - 1;
-    const ida = Array.from({ length: noDraft }, (_, i) => i + 1);
-    const serpentina = [...ida, ...[...ida].reverse()].join("-");
-    expect(pt.paginasRegras.draft4).toContain(`com os ${noDraft} times do draft, ${serpentina}`);
-    expect(en.paginasRegras.draft4).toContain(`with the ${noDraft} drafting teams, ${serpentina}`);
+    const ida = Array.from({ length: noDraft }, (_, i) => i + 1).join("-");
+    expect(pt.paginasRegras.draft4).toContain(`do 1º ao ${noDraft}º time do draft (${ida}, e repete)`);
+    expect(en.paginasRegras.draft4).toContain(`from the 1st to the ${noDraft}th drafting team (${ida}, then again)`);
   });
 
   it.runIf(!calendarioDivulgado())("sem a grade, nenhuma delas crava data — e dizem que as datas vão sair", () => {

@@ -174,7 +174,8 @@ describe("/regras com as datas a divulgar", () => {
     // que este teste confere é a seção do calendário sem grade, com a grade de mentira.
     expect(t).toContain("esta edição tem 8 times de 5 jogadores (40 vagas)");
     expect(t).toContain("O número de capitães é igual ao número de times: 8 nesta edição.");
-    expect(t).toContain("1-2-3-4-5-6-7-7-6-5-4-3-2-1");
+    // Ordem 1→7 em todas as rodadas desde a hora do draft (24/10/2026), no lugar da serpentina.
+    expect(t).toContain("1-2-3-4-5-6-7, e repete");
     expect(t).toContain(MESSAGES.pt.calendario4a.intro);
     expect(markup).toContain('data-calendario="a-divulgar"');
     expect(t).not.toMatch(GRADE_VELHA);

@@ -36,7 +36,9 @@ import { elencosSaoDaUltimaArquivada } from "@/lib/arquivo";
 
 export type FaseDoSite = "pre_temporada" | "temporada";
 
-export const FASE_DO_SITE: FaseDoSite = "pre_temporada";
+// "temporada" desde 26/10/2026: o draft da 4ª foi aplicado (8 times, 40 jogadores) e as 28
+// séries da fase de pontos foram criadas pelo calendário, com o time da organização no Time 1.
+export const FASE_DO_SITE: FaseDoSite = "temporada";
 
 export function emPreTemporada(fase: FaseDoSite = FASE_DO_SITE): boolean {
   return fase === "pre_temporada";

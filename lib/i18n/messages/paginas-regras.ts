@@ -94,7 +94,7 @@ const pt = {
   draft3:
     "O capitão entra com a rota do seu cadastro, fixa, e o draft é feito em 4 rodadas para as outras 4 rotas.",
   draft4:
-    "A ordem de escolha é serpentina (ex.: com os 7 times do draft, 1-2-3-4-5-6-7-7-6-5-4-3-2-1) e não pode ser trocada nem alterada depois de sorteada.",
+    "A ordem de escolha é a mesma em todas as rodadas: do 1º ao 7º time do draft (1-2-3-4-5-6-7, e repete), como a organização decidiu na hora do draft. Ela não pode ser trocada nem alterada depois de sorteada.",
   draft5:
     "Nenhum capitão pode estourar o orçamento; deve sempre reservar pontos para fechar as rodadas restantes com o jogador mais barato ainda disponível em cada rota.",
   draft6:
@@ -393,7 +393,7 @@ export const paginasRegras = definir<ChavesPaginasRegras>({
     draft3:
       "The captain comes in with the fixed role from their sign-up, and the draft runs over 4 rounds for the other 4 roles.",
     draft4:
-      "Pick order is snake (e.g. with the 7 drafting teams, 1-2-3-4-5-6-7-7-6-5-4-3-2-1) and cannot be swapped or changed once drawn.",
+      "Pick order is the same in every round: from the 1st to the 7th drafting team (1-2-3-4-5-6-7, then again), as the organisers decided at the draft. It cannot be swapped or changed once drawn.",
     draft5:
       "No captain may go over budget; they must always keep enough points to fill the remaining rounds with the cheapest player still available in each role.",
     draft6:
