@@ -431,6 +431,12 @@ export const teamSchema = z.object({
   name: limitado(LIMITES.nome),
   slug: limitado(LIMITES.slug),
   imageUrl: imageUrlField.optional(),
+  /**
+   * Os "PTS DE ELENCO" que o site mostra, quando a organização os define (26/10/2026: o time
+   * da organização da 4ª fica com 30, como os times do draft). Ausente: a soma dos elos do
+   * elenco, como sempre (`buildDesignTeams`).
+   */
+  pontosDeElenco: z.number().int().min(0).max(999).optional(),
 });
 
 export const playerSchema = z.object({

@@ -157,7 +157,8 @@ export function buildDesignTeams(dataset: TournamentDataset): DesignTeam[] {
     // um (o TOP, que vem primeiro) poderia apontar alguém da organização.
     const marcado = roster.find((player) => player.captain);
     const captain = comMarca ? (marcado ?? null) : (marcado ?? roster[0] ?? null);
-    const total = roster.reduce((sum, player) => sum + player.pts, 0);
+    // Com o valor definido pela organização (`pontosDeElenco`), é ele que aparece; senão a soma.
+    const total = team.pontosDeElenco ?? roster.reduce((sum, player) => sum + player.pts, 0);
     return {
       id: team.id,
       name: team.name,
