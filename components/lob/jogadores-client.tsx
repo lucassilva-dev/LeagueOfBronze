@@ -1,216 +1,25 @@
-"use client";
-
-import { useEffect, useId, useRef, useState } from "react";
-
 import { PlayerCard } from "@/components/lob/player-card";
-import { EloCrest, RoleIcon } from "@/components/lob/ui";
-import { formatKda } from "@/lib/format";
-import {
-  eloLabel,
-  rotaCurto,
-  rotaLabel,
-  type PaginasHomeTextos,
-} from "@/lib/i18n/messages/paginas-home";
+import { RoleIcon } from "@/components/lob/ui";
+import { rotaCurto, rotaLabel, type PaginasHomeTextos } from "@/lib/i18n/messages/paginas-home";
 import type { DesignPlayer } from "@/lib/roster";
 
 const ROLE_ORDER = ["TOP", "SEL", "MID", "ADC", "SUP"];
 
-export type PlayerPerf = {
-  games: number;
-  wins: number;
-  kills: number;
-  deaths: number;
-  assists: number;
-  kda: number;
-  mvps: number;
-  winRate: number;
-};
-
-// Tiles de performance: mostram "—" enquanto o jogador não entrou em nenhum jogo.
-// O KDA sai no formato do idioma da página ("2.08" em inglês, "2,08" em português).
-function buildPerfTiles(perf: PlayerPerf | undefined, t: PaginasHomeTextos, localeTag?: string) {
-  const games = perf?.games ?? 0;
-  const dash = (value: string) => (games > 0 ? value : "—");
-  return [
-    { label: t.statPartidas, val: String(games) },
-    { label: t.statVitorias, val: dash(String(perf?.wins ?? 0)) },
-    { label: t.statAbates, val: dash(String(perf?.kills ?? 0)) },
-    { label: t.statMortes, val: dash(String(perf?.deaths ?? 0)) },
-    { label: t.statAssistencias, val: dash(String(perf?.assists ?? 0)) },
-    { label: t.statKda, val: dash(formatKda(perf?.kda ?? 0, localeTag)) },
-    { label: t.statMvps, val: String(perf?.mvps ?? 0) },
-    { label: t.statWinrate, val: dash(`${Math.round(perf?.winRate ?? 0)}%`) },
-  ];
-}
-
-function PlayerModal({
-  player,
-  perf,
-  onClose,
-  t,
-  elos,
-  localeTag,
-}: Readonly<{
-  player: DesignPlayer;
-  perf?: PlayerPerf;
-  onClose: () => void;
-  t: PaginasHomeTextos;
-  elos?: Record<string, string>;
-  localeTag?: string;
-}>) {
-  const caixa = useRef<HTMLDivElement | null>(null);
-  const botaoFechar = useRef<HTMLButtonElement | null>(null);
-  const idDoNick = useId();
-
-  /*
-   * É um DIÁLOGO de verdade, não só um véu por cima da página: o foco entra nele ao abrir
-   * (no "fechar"), o Tab fica preso dentro dele e, ao fechar, volta para o card que o abriu.
-   * Antes o foco ficava no botão por trás, o Tab percorria a página escondida e o leitor de
-   * tela nem anunciava que algo tinha aberto.
-   */
-  useEffect(() => {
-    const anterior = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    botaoFechar.current?.focus();
-    return () => anterior?.focus();
-  }, []);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-        return;
-      }
-      if (e.key !== "Tab" || !caixa.current) return;
-      const focaveis = [
-        ...caixa.current.querySelectorAll<HTMLElement>(
-          'a[href],button:not([disabled]),input:not([disabled]),select,textarea,[tabindex]:not([tabindex="-1"])',
-        ),
-      ];
-      if (focaveis.length === 0) return;
-      const primeiro = focaveis[0]!;
-      const ultimo = focaveis[focaveis.length - 1]!;
-      const ativo = document.activeElement;
-      const fora = !caixa.current.contains(ativo);
-      if (e.shiftKey && (ativo === primeiro || fora)) {
-        e.preventDefault();
-        ultimo.focus();
-      } else if (!e.shiftKey && (ativo === ultimo || fora)) {
-        e.preventDefault();
-        primeiro.focus();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  return (
-    <div
-      onClick={onClose}
-      style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, background: "rgba(6,4,2,.82)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", animation: "fadeUp .22s" }}
-    >
-      <div
-        ref={caixa}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={idDoNick}
-        onClick={(e) => e.stopPropagation()}
-        className="lob-scroll"
-        style={{ position: "relative", width: "min(860px,100%)", maxHeight: "92vh", overflow: "auto", background: "linear-gradient(180deg,#1d1710,#0d0a05)", border: "1px solid rgba(232,184,120,.4)", borderRadius: 8, boxShadow: "0 44px 100px -30px rgba(0,0,0,.95)" }}
-      >
-        <div style={{ height: 4, background: `linear-gradient(90deg,${player.teamColor},transparent)`, position: "sticky", top: 0, zIndex: 5 }} />
-        <button
-          ref={botaoFechar}
-          type="button"
-          onClick={onClose}
-          aria-label={t.jogadorFechar}
-          style={{ position: "absolute", top: 16, right: 16, zIndex: 6, width: 36, height: 36, borderRadius: "50%", background: "rgba(10,8,4,.75)", border: "1px solid rgba(201,138,75,.4)", color: "#e6c592", fontSize: 15, cursor: "pointer", lineHeight: 1 }}
-        >
-          ✕
-        </button>
-        <div style={{ display: "flex", flexWrap: "wrap" }}>
-          <div style={{ position: "relative", flex: "1 1 300px", minWidth: 260, minHeight: 360, background: "#0d0a05" }}>
-            <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "radial-gradient(120% 80% at 50% 0%,rgba(201,138,75,.16),transparent 62%)" }}>
-              <RoleIcon role={player.role1} size={188} color="#c98a4b" opacity={0.09} />
-            </div>
-            {player.imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={player.imageUrl} alt={player.displayNick} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 22%" }} />
-            ) : null}
-            <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "linear-gradient(180deg,rgba(8,6,3,.45) 0%,transparent 24%,transparent 44%,rgba(13,10,5,.96) 100%)" }} />
-            <div style={{ position: "absolute", top: 14, left: 14, display: "flex", flexDirection: "column", gap: 7 }}>
-              <span style={{ alignSelf: "flex-start", padding: "4px 10px", borderRadius: 2, background: player.roleMeta.color, color: "#120d06", fontWeight: 700, fontSize: 10.5, letterSpacing: ".08em" }}>{rotaLabel(t, player.roleMeta.short, player.roleMeta.label)}</span>
-              {player.captain ? (
-                <span style={{ alignSelf: "flex-start", padding: "4px 10px", borderRadius: 2, background: "linear-gradient(180deg,#f0c88a,#b97e40)", color: "#160f06", fontWeight: 700, fontSize: 9.5, letterSpacing: ".08em" }}>{t.capitao}</span>
-              ) : null}
-            </div>
-            <div style={{ position: "absolute", top: 12, right: 12 }}>
-              <EloCrest elo={player.elo} size={52} title={false} labels={elos} />
-            </div>
-            <div style={{ position: "absolute", left: 18, right: 18, bottom: 16 }}>
-              <div style={{ fontSize: 11, letterSpacing: ".12em", color: player.teamColor, marginBottom: 5 }}>{player.teamName}</div>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
-                <h2 id={idDoNick} className="lob-display" style={{ margin: 0, fontSize: "clamp(26px,4.4vw,40px)", lineHeight: 1.08, color: "#f7f1e6", wordBreak: "break-word", textShadow: "0 2px 12px rgba(0,0,0,.8)" }}>{player.displayNick}</h2>
-                {player.mono ? (
-                  <span style={{ padding: "2px 7px", border: "1px solid rgba(70,214,200,.6)", background: "rgba(10,20,19,.5)", color: "#7fe6db", borderRadius: 2, fontSize: 9, fontWeight: 600, letterSpacing: ".10em" }}>MONO</span>
-                ) : null}
-              </div>
-            </div>
-          </div>
-          <div style={{ flex: "1.25 1 320px", padding: "26px 26px 24px", minWidth: 290, display: "flex", flexDirection: "column" }}>
-            <div style={{ fontSize: 14, color: "#8f8472" }}>{player.name}</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 16 }}>
-              <span className="lob-pill" style={{ fontSize: 11.5 }}>
-                <RoleIcon role={player.role1} size={14} color={player.roleMeta.color} />
-                {rotaLabel(t, player.roleMeta.short, player.roleMeta.label)}
-              </span>
-              <span className="lob-pill" style={{ fontSize: 11.5 }}>
-                <EloCrest elo={player.elo} size={20} title={false} labels={elos} />
-                {eloLabel(t, player.eloMeta?.key, player.eloMeta?.label ?? player.elo)}
-              </span>
-              <span style={{ display: "inline-flex", alignItems: "baseline", gap: 5, padding: "8px 13px", background: "linear-gradient(180deg,#f0c88a,#b97e40)", color: "#160f06", borderRadius: 2, fontWeight: 700 }}>
-                <span className="lob-display" style={{ fontSize: 16 }}>{player.pts}</span>
-                <span style={{ fontSize: 9, letterSpacing: ".08em" }}>{t.ptsDraft}</span>
-              </span>
-            </div>
-            <div style={{ marginTop: 22, display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontSize: 11, letterSpacing: ".14em", color: "#c98a4b", whiteSpace: "nowrap" }}>{t.jogadorPerformance}</span>
-              <div style={{ height: 1, flex: 1, background: "linear-gradient(90deg,rgba(201,138,75,.3),transparent)" }} />
-            </div>
-            <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
-              {buildPerfTiles(perf, t, localeTag).map((tile) => (
-                <div key={tile.label} style={{ padding: "13px 6px", textAlign: "center", background: "linear-gradient(180deg,rgba(201,138,75,.08),rgba(201,138,75,.02))", border: "1px solid rgba(201,138,75,.16)", borderRadius: 3 }}>
-                  <div className="lob-display" style={{ fontSize: 23, color: "#e6c592", lineHeight: 1 }}>{tile.val}</div>
-                  <div style={{ fontSize: 8, letterSpacing: ".04em", color: "#8f8472", marginTop: 5 }}>{tile.label}</div>
-                </div>
-              ))}
-            </div>
-            <p style={{ margin: "16px 0 0", fontSize: 11.5, lineHeight: 1.5, color: "#6f6656" }}>
-              {t.jogadorNota}
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
+/**
+ * /jogadores, por rota. Cada card LEVA à ficha do jogador (/jogadores/<slug>): é lá que o
+ * time com página temática mostra a cara dele (components/times). Antes o card abria um
+ * diálogo com a ficha no visual antigo, e o tema do time nunca aparecia por este caminho.
+ */
 export function JogadoresClient({
   players,
-  perfByPlayer,
   textos: t,
   elos,
-  localeTag,
 }: Readonly<{
   players: DesignPlayer[];
-  perfByPlayer?: Record<string, PlayerPerf>;
   textos: PaginasHomeTextos;
   /** Rótulos de elo por chave, para o alt/title das cristas. */
   elos?: Record<string, string>;
-  /** Idioma da página (compartilhados.localeTag), para o KDA da ficha. */
-  localeTag?: string;
 }>) {
-  const [modal, setModal] = useState<DesignPlayer | null>(null);
-
   const byRole = new Map<string, DesignPlayer[]>();
   for (const player of players) {
     const list = byRole.get(player.roleMeta.short) ?? [];
@@ -259,7 +68,7 @@ export function JogadoresClient({
               <PlayerCard
                 key={player.id}
                 player={player}
-                onOpen={() => setModal(player)}
+                href={`/jogadores/${player.slug}`}
                 textos={{
                   capitao: t.capitao,
                   ficha: t.ficha,
@@ -271,16 +80,6 @@ export function JogadoresClient({
           </div>
         </section>
       ))}
-      {modal ? (
-        <PlayerModal
-          player={modal}
-          perf={perfByPlayer?.[modal.id]}
-          onClose={() => setModal(null)}
-          t={t}
-          elos={elos}
-          localeTag={localeTag}
-        />
-      ) : null}
     </>
   );
 }

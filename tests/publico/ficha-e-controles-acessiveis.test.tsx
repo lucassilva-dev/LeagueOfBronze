@@ -4,111 +4,46 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { DataTable } from "@/components/data-table";
-import { JogadoresClient, type PlayerPerf } from "@/components/lob/jogadores-client";
+import { JogadoresClient } from "@/components/lob/jogadores-client";
 import { StatsToggles } from "@/components/lob/stats-toggles";
 import { MESSAGES } from "@/lib/i18n/messages";
 import { buildDesignPlayers } from "@/lib/roster";
-import { calculatePlayerAggregates } from "@/lib/tournament";
 
 import { temporadaJogada } from "./_ajuda";
 
 /**
- * Os controles das páginas públicas para quem usa teclado ou leitor de tela: a ficha que
- * abre por cima de /jogadores, os botões de métrica de /stats e as colunas ordenáveis do
- * arquivo.
+ * Os controles das páginas públicas para quem usa teclado ou leitor de tela: o caminho de
+ * /jogadores até a ficha, os botões de métrica de /stats e as colunas ordenáveis do arquivo.
  */
 
 afterEach(cleanup);
 
-function paginaDeJogadores(locale: "pt" | "en") {
+function paginaDeJogadores() {
   const dataset = temporadaJogada();
-  const perf: Record<string, PlayerPerf> = {};
-  for (const agg of calculatePlayerAggregates(dataset)) {
-    perf[agg.playerId] = {
-      games: agg.gamesPlayed,
-      wins: agg.wins,
-      kills: agg.kills,
-      deaths: agg.deaths,
-      assists: agg.assists,
-      kda: agg.kda,
-      mvps: agg.gameMvps,
-      winRate: agg.winRate,
-    };
-  }
-  const t = MESSAGES[locale];
-  return render(
-    <>
-      <button type="button">fora do diálogo</button>
-      <JogadoresClient
-        players={buildDesignPlayers(dataset)}
-        perfByPlayer={perf}
-        textos={t.paginasHome}
-        elos={t.paginasStats.elos}
-        localeTag={t.compartilhados.localeTag}
-      />
-    </>,
-  );
+  const t = MESSAGES.pt;
+  const players = buildDesignPlayers(dataset);
+  render(<JogadoresClient players={players} textos={t.paginasHome} elos={t.paginasStats.elos} />);
+  return players;
 }
 
-/** Abre a ficha da Faisca (meio do time A) pelo botão do card dela. */
-function abrirFichaDaFaisca() {
-  const abrir = screen.getAllByRole("button").find((botao) => botao.textContent?.includes("Faisca"));
-  if (!abrir) throw new Error("card da Faisca sem botão de abrir a ficha");
-  abrir.focus();
-  fireEvent.click(abrir);
-  return abrir;
-}
-
-describe("PUB-10 — a ficha de /jogadores é um diálogo de verdade", () => {
-  it("abre como diálogo modal rotulado pelo nick, com o foco dentro dele", () => {
-    paginaDeJogadores("pt");
-    const abrir = abrirFichaDaFaisca();
-
-    const dialogo = screen.getByRole("dialog");
-    expect(dialogo.getAttribute("aria-modal")).toBe("true");
-    const rotulo = document.getElementById(dialogo.getAttribute("aria-labelledby") ?? "");
-    expect(rotulo?.textContent).toBe("Faisca");
-    // O foco entrou no diálogo (no "fechar") em vez de ficar no card por trás.
-    expect(dialogo.contains(document.activeElement)).toBe(true);
-    expect(document.activeElement).not.toBe(abrir);
-  });
-
-  it("o Tab fica preso no diálogo", () => {
-    paginaDeJogadores("pt");
-    abrirFichaDaFaisca();
-    const dialogo = screen.getByRole("dialog");
-
-    // Foco escapou para a página escondida sob o véu: o próximo Tab o traz de volta.
-    screen.getByText("fora do diálogo").focus();
-    fireEvent.keyDown(document.activeElement!, { key: "Tab" });
-    expect(dialogo.contains(document.activeElement)).toBe(true);
-
-    fireEvent.keyDown(document.activeElement!, { key: "Tab", shiftKey: true });
-    expect(dialogo.contains(document.activeElement)).toBe(true);
-  });
-
-  it("Esc fecha e o foco volta para o card que abriu a ficha", () => {
-    paginaDeJogadores("pt");
-    const abrir = abrirFichaDaFaisca();
-    // A pessoa está DENTRO do diálogo (no "fechar") quando aperta Esc.
-    screen.getByRole("button", { name: MESSAGES.pt.paginasHome.jogadorFechar }).focus();
-    fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+describe("PUB-10 — /jogadores leva à ficha de cada jogador", () => {
+  // A ficha mora em /jogadores/<slug>: é lá que o time com página temática mostra a cara dele.
+  // Antes o card abria um diálogo com a ficha no visual antigo, e o tema nunca aparecia.
+  it("cada card é um link para /jogadores/<slug>, sem diálogo por cima da página", () => {
+    const players = paginaDeJogadores();
+    const links = screen.getAllByRole("link");
+    expect(links.map((link) => link.getAttribute("href")).sort()).toEqual(
+      players.map((player) => `/jogadores/${player.slug}`).sort(),
+    );
+    expect(screen.queryAllByRole("button")).toEqual([]);
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(document.activeElement).toBe(abrir);
   });
-});
 
-describe("PUB-08 — KDA da ficha no formato do idioma", () => {
-  it("inglês: 3.33; português: 3,33", () => {
-    paginaDeJogadores("en");
-    abrirFichaDaFaisca();
-    expect(screen.getByRole("dialog").textContent).toContain("3.33");
-    expect(screen.getByRole("dialog").textContent).not.toMatch(/\d,\d{2}/);
-    cleanup();
-
-    paginaDeJogadores("pt");
-    abrirFichaDaFaisca();
-    expect(screen.getByRole("dialog").textContent).toContain("3,33");
+  it("o link do card se estica pelo card inteiro (tocar na foto também abre a ficha)", () => {
+    paginaDeJogadores();
+    const faisca = screen.getAllByRole("link").find((link) => link.textContent?.includes("Faisca"));
+    expect(faisca?.getAttribute("href")).toMatch(/^\/jogadores\//);
+    expect(faisca?.classList.contains("lob-linha-link")).toBe(true);
   });
 });
 

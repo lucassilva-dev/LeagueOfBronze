@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { AvisoConsentimento } from "@/components/aviso-consentimento";
-import { JogadoresClient, type PlayerPerf } from "@/components/lob/jogadores-client";
+import { JogadoresClient } from "@/components/lob/jogadores-client";
 import { PreTemporadaAviso } from "@/components/pre-temporada-aviso";
 import { semTemporadaAoVivo } from "@/lib/fase-do-site";
 import { Eyebrow, GoldTitle, Pill } from "@/components/lob/ui";
@@ -9,7 +9,6 @@ import { getMessages } from "@/lib/i18n/server";
 import { nomeDaTemporada } from "@/lib/i18n/nome-da-temporada";
 import { buildDesignPlayersDoElenco } from "@/lib/roster";
 import { getServerDataset } from "@/lib/server-data";
-import { calculatePlayerAggregates } from "@/lib/tournament";
 
 export const dynamic = "force-dynamic";
 
@@ -26,20 +25,6 @@ export default async function JogadoresPage() {
   // dois continuam com ficha, aberta pelas partidas em que jogaram.
   const players = buildDesignPlayersDoElenco(dataset);
 
-  const perfByPlayer: Record<string, PlayerPerf> = {};
-  for (const agg of calculatePlayerAggregates(dataset)) {
-    perfByPlayer[agg.playerId] = {
-      games: agg.gamesPlayed,
-      wins: agg.wins,
-      kills: agg.kills,
-      deaths: agg.deaths,
-      assists: agg.assists,
-      kda: agg.kda,
-      mvps: agg.gameMvps,
-      winRate: agg.winRate,
-    };
-  }
-
   return (
     <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "0 clamp(16px,4vw,24px) 96px" }}>
       <section className="lob-fade" style={{ padding: "clamp(40px,7vw,56px) 0 26px" }}>
@@ -55,7 +40,7 @@ export default async function JogadoresPage() {
           <Pill>{t.jogadoresRotas}</Pill>
         </div>
       </section>
-      <JogadoresClient players={players} perfByPlayer={perfByPlayer} textos={t} elos={ts.elos} localeTag={compartilhados.localeTag} />
+      <JogadoresClient players={players} textos={t} elos={ts.elos} />
       <AvisoConsentimento />
     </div>
   );

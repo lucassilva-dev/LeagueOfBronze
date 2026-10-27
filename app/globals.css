@@ -445,7 +445,8 @@ a:hover {
 
 /* Link que se estica por cima da linha inteira (a linha precisa de position: relative).
    Usado na /tabela: a semântica de tabela pede o link numa célula, mas clicar em qualquer
-   ponto da linha continua levando ao time. O anel do Tab vai em volta da linha toda. */
+   ponto da linha continua levando ao time. O anel do Tab vai em volta da linha toda.
+   Também no card de jogador (components/lob/player-card.tsx): o link do rodapé cobre o card. */
 .lob-linha-link::after {
   content: "";
   position: absolute;

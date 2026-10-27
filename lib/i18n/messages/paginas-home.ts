@@ -153,7 +153,6 @@ export const paginasHome = definir({
     jogadorCompanheiros: "COMPANHEIROS DE ELENCO",
     jogadorNota:
       "As estatísticas de performance zeram no apito inicial e são atualizadas a cada rodada do campeonato.",
-    jogadorFechar: "Fechar",
 
     // ---------- tiles de performance ----------
     statPartidas: "PARTIDAS",
@@ -324,7 +323,6 @@ export const paginasHome = definir({
     jogadorCompanheiros: "TEAMMATES",
     jogadorNota:
       "Performance stats start from zero at kickoff and are updated after every round of the tournament.",
-    jogadorFechar: "Close",
 
     // ---------- tiles de performance ----------
     statPartidas: "GAMES",

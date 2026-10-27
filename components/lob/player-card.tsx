@@ -93,7 +93,9 @@ export function PlayerCard({
     <div className="lob-lift" style={cardStyle}>
       <PhotoArea player={player} textos={textos} />
       {href ? (
-        <Link href={href} style={{ textDecoration: "none", display: "block" }}>
+        // O link é o rodapé, mas se estica por cima do card inteiro (`lob-linha-link`): tocar
+        // na foto também abre a ficha.
+        <Link href={href} className="lob-linha-link" style={{ textDecoration: "none", display: "block" }}>
           <Footer player={player} textos={textos} />
         </Link>
       ) : (
