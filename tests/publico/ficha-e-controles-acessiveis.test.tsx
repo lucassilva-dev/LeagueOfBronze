@@ -32,18 +32,33 @@ describe("PUB-10 — /jogadores leva à ficha de cada jogador", () => {
   it("cada card é um link para /jogadores/<slug>, sem diálogo por cima da página", () => {
     const players = paginaDeJogadores();
     const links = screen.getAllByRole("link");
+    // `?de=jogadores`: a ficha sabe que veio da lista e o «voltar» traz de volta para ela.
     expect(links.map((link) => link.getAttribute("href")).sort()).toEqual(
-      players.map((player) => `/jogadores/${player.slug}`).sort(),
+      players.map((player) => `/jogadores/${player.slug}?de=jogadores`).sort(),
     );
     expect(screen.queryAllByRole("button")).toEqual([]);
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
+  it("cada card tem a âncora para onde o «voltar» da ficha devolve", () => {
+    const players = paginaDeJogadores();
+    for (const player of players) {
+      const card = document.getElementById(`jogador-${player.slug}`);
+      expect(card?.querySelector("a")?.getAttribute("href"), player.slug).toBe(`/jogadores/${player.slug}?de=jogadores`);
+    }
+  });
+
   it("o link do card se estica pelo card inteiro (tocar na foto também abre a ficha)", () => {
     paginaDeJogadores();
-    const faisca = screen.getAllByRole("link").find((link) => link.textContent?.includes("Faisca"));
-    expect(faisca?.getAttribute("href")).toMatch(/^\/jogadores\//);
-    expect(faisca?.classList.contains("lob-linha-link")).toBe(true);
+    for (const link of screen.getAllByRole("link")) {
+      expect(link.classList.contains("lob-linha-link")).toBe(true);
+      // O `::after` do link para no CARD: sem o relative nele, um card cobriria a página inteira.
+      const card = link.closest(".lob-card-alvo") as HTMLElement | null;
+      expect(card?.style.position).toBe("relative");
+      for (let no = link as HTMLElement | null; no && no !== card; no = no.parentElement) {
+        expect([no.style.position, no.style.filter, no.style.transform].filter(Boolean)).toEqual([]);
+      }
+    }
   });
 });
 

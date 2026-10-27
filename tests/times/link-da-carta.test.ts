@@ -7,8 +7,8 @@ import { describe, expect, it } from "vitest";
  * A carta do elenco (components/times/pagina-do-time-com-tema.tsx) é clicável INTEIRA: o link
  * do nick estica um `::after` (`position: absolute; inset: 0`) até o `.miolo`, que é o bloco de
  * contenção. Qualquer coisa entre os dois que crie um bloco de contenção novo — filter,
- * transform e as propriedades individuais, perspective, contain, will-change — encolhe o
- * `::after` para o tamanho dela.
+ * transform e as propriedades individuais, perspective, contain, will-change, position — ou
+ * que recorte o que passa dela (clip-path, mask, content-visibility) encolhe o `::after`.
  *
  * Foi o que aconteceu nos Galácticos do Bar (26/10/2026): um `filter: drop-shadow` no `.nick`
  * deixou só o texto do nick clicável (6–23% da carta); o «FICHA →» e a foto não abriam nada.
@@ -24,7 +24,32 @@ const ARQUIVOS = readdirSync(PASTA, { recursive: true })
 
 /** Do `.miolo` até o link: o que fica no caminho do `::after`. */
 const NO_CAMINHO = /\.(identidade|sobreFoto|nick|link)(?![\w-])/;
-const CRIA_CONTENCAO = /(^|[\s;{])(filter|backdrop-filter|transform|translate|rotate|scale|perspective|contain|will-change)\s*:\s*([^;]+)/g;
+/*
+ * O que vira bloco de contenção do `::after` (ou recorta/esconde o que passa dele). Medido na
+ * página dos Galácticos (revisão de 26/10): cada uma destas, sozinha no nick ou na identidade,
+ * deixava 0 de 10 pontos clicáveis — inclusive `position: relative`, que é o jeito "natural"
+ * de ancorar um enfeite no nick. Com ou sem o prefixo -webkit-.
+ */
+const PROPRIEDADE =
+  /(^|[\s;{])(?:-webkit-)?(filter|backdrop-filter|transform|translate|rotate|scale|perspective|contain|will-change|position|clip-path|mask|mask-image|content-visibility|transform-style)\s*:\s*([^;]+)/g;
+
+function criaContencao(propriedade: string, valor: string): boolean {
+  const v = valor.replace(/!important/, "").trim();
+  switch (propriedade) {
+    case "position":
+      return v !== "static";
+    case "content-visibility":
+      return v !== "visible";
+    case "transform-style":
+      return v === "preserve-3d";
+    case "contain":
+      return /\b(layout|paint|strict|content)\b/.test(v);
+    case "will-change":
+      return /\b(transform|translate|rotate|scale|perspective|filter|backdrop-filter|contain|position)\b/.test(v);
+    default:
+      return !/^(none|auto|normal|initial|unset)$/.test(v);
+  }
+}
 
 type Bloco = { seletor: string; corpo: string };
 
@@ -70,8 +95,8 @@ describe.each(ARQUIVOS)("$nome", ({ css }) => {
   it("nada entre a carta e o link cria bloco de contenção (a carta inteira continua clicável)", () => {
     const problemas: string[] = [];
     for (const r of regras.filter((regra) => miraOCaminho(regra.seletor))) {
-      for (const m of r.corpo.matchAll(CRIA_CONTENCAO)) {
-        if (!/^(none|auto|normal)\s*(!important)?$/.test(m[3]!.trim())) problemas.push(`${r.seletor} → ${m[2]}: ${m[3]!.trim()}`);
+      for (const m of r.corpo.matchAll(PROPRIEDADE)) {
+        if (criaContencao(m[2]!, m[3]!)) problemas.push(`${r.seletor} → ${m[2]}: ${m[3]!.trim()}`);
       }
       // Animação que mexe em transform/filter também cria o bloco enquanto roda.
       for (const m of r.corpo.matchAll(/animation(?:-name)?\s*:\s*([^;]+)/g)) {

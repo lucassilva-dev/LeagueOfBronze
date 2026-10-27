@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { AvisoConsentimento } from "@/components/aviso-consentimento";
+import { LinkDeVolta } from "@/components/lob/link-de-volta";
 import { FichaDoJogadorComTema } from "@/components/times/ficha-do-jogador-com-tema";
 import { caminhoNoArquivo } from "@/lib/arquivo";
 import { semTemporadaAoVivo } from "@/lib/fase-do-site";
@@ -18,10 +19,15 @@ import { buildDesignPlayers, buildDesignTeams } from "@/lib/roster";
 import { getServerDataset } from "@/lib/server-data";
 import { temaDoTime } from "@/lib/temas/registro";
 import { calculatePlayerAggregates } from "@/lib/tournament";
+import { voltarDaFicha } from "@/lib/voltar-da-ficha";
 
 export const dynamic = "force-dynamic";
 
-type PlayerPageParams = Readonly<{ params: Promise<{ slug: string }> }>;
+type PlayerPageParams = Readonly<{
+  params: Promise<{ slug: string }>;
+  /** `?de=jogadores`: a ficha foi aberta pela lista de /jogadores (lib/voltar-da-ficha.ts). */
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}>;
 
 /** O nick na aba e na prévia do link; sem o jogador (ou com o banco fora), o da seção. */
 export async function generateMetadata({ params }: PlayerPageParams): Promise<Metadata> {
@@ -41,8 +47,9 @@ export async function generateMetadata({ params }: PlayerPageParams): Promise<Me
   return metadadosDaPagina("jogadores");
 }
 
-export default async function PlayerFichaPage({ params }: PlayerPageParams) {
+export default async function PlayerFichaPage({ params, searchParams }: PlayerPageParams) {
   const { slug } = await params;
+  const { de } = (await searchParams) ?? {};
   const { paginasHome: t, paginasStats: ts, compartilhados } = await getMessages();
   const te = textosElenco[await getLocale()];
   const { dataset } = await getServerDataset();
@@ -73,6 +80,8 @@ export default async function PlayerFichaPage({ params }: PlayerPageParams) {
     { label: t.statWinrate, val: dash(`${Math.round(aggregate?.winRate ?? 0)}%`) },
   ];
   const opggUrl = getOpGgSummonerUrlFromNick(player.nick);
+  // Veio da lista de /jogadores: volta para a lista; senão, para o time (o reserva, para a lista).
+  const voltar = voltarDaFicha(player, de, { voltarAoTime: t.jogadorVoltar, voltarAosJogadores: te.voltarJogadores });
 
   // Jogador de um time com página temática (lib/temas): a ficha ganha a cara do time. O
   // reserva (sem time) fica com a ficha padrão.
@@ -90,7 +99,7 @@ export default async function PlayerFichaPage({ params }: PlayerPageParams) {
           tiles={tiles}
           opggUrl={opggUrl}
           temporada={nomeDaTemporada(dataset.tournament.name, compartilhados.localeTag)}
-          voltar={{ href: `/times/${player.teamSlug}`, texto: t.jogadorVoltar }}
+          voltar={voltar}
           saiu={player.saiu ? te.saiuDoTime : null}
         />
         <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 clamp(16px,4vw,24px) 48px" }}>
@@ -102,10 +111,9 @@ export default async function PlayerFichaPage({ params }: PlayerPageParams) {
 
   return (
     <div style={{ position: "relative", maxWidth: 1280, margin: "0 auto", padding: "44px clamp(16px,4vw,24px) 96px" }}>
-      {/* O reserva não tem time para onde voltar: a volta é para a lista de jogadores. */}
-      <Link href={player.reserva ? "/jogadores" : `/times/${player.teamSlug}`} className="lob-btn-ghost" style={{ padding: "9px 16px", fontSize: 11.5, letterSpacing: ".12em", marginBottom: 26 }}>
-        {player.reserva ? te.voltarJogadores : t.jogadorVoltar}
-      </Link>
+      <LinkDeVolta href={voltar.href} className="lob-btn-ghost" style={{ padding: "9px 16px", fontSize: 11.5, letterSpacing: ".12em", marginBottom: 26 }}>
+        {voltar.texto}
+      </LinkDeVolta>
       <div className="lob-fade" style={{ marginTop: 20, position: "relative", background: "linear-gradient(180deg,#1d1710,#0d0a05)", border: "1px solid rgba(232,184,120,.4)", borderRadius: 8, overflow: "hidden", boxShadow: "0 44px 100px -30px rgba(0,0,0,.6)" }}>
         <div style={{ height: 4, background: `linear-gradient(90deg,${player.teamColor},transparent)` }} />
         <div style={{ display: "flex", flexWrap: "wrap" }}>

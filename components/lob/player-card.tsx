@@ -71,15 +71,19 @@ function Footer({
 export function PlayerCard({
   player,
   href,
-  onOpen,
+  ancora,
   textos = TEXTOS_PADRAO,
 }: Readonly<{
   player: DesignPlayer;
-  href?: string;
-  onOpen?: () => void;
+  /** A ficha do jogador. O card inteiro leva até ela. */
+  href: string;
+  /** O `id` do card, para um link voltar até ele (`/jogadores#<ancora>`). */
+  ancora?: string;
   textos?: PlayerCardTextos;
 }>) {
   const cardStyle: React.CSSProperties = {
+    // O link do rodapé se estica até aqui (`lob-linha-link`): sem o relative, o `::after` subiria
+    // até o próximo ancestral posicionado e um card cobriria a página inteira.
     position: "relative",
     display: "flex",
     flexDirection: "column",
@@ -90,23 +94,14 @@ export function PlayerCard({
   };
 
   return (
-    <div className="lob-lift" style={cardStyle}>
+    <div id={ancora} className="lob-lift lob-card-alvo" style={cardStyle}>
       <PhotoArea player={player} textos={textos} />
-      {href ? (
-        // O link é o rodapé, mas se estica por cima do card inteiro (`lob-linha-link`): tocar
-        // na foto também abre a ficha.
-        <Link href={href} className="lob-linha-link" style={{ textDecoration: "none", display: "block" }}>
-          <Footer player={player} textos={textos} />
-        </Link>
-      ) : (
-        <button
-          type="button"
-          onClick={onOpen}
-          style={{ display: "block", width: "100%", background: "none", border: "none", cursor: "pointer", textAlign: "left", padding: 0 }}
-        >
-          <Footer player={player} textos={textos} />
-        </button>
-      )}
+      {/* O link é o rodapé, mas se estica por cima do card inteiro (`lob-linha-link`): tocar na
+          foto também abre a ficha. (O `title` da crista de elo fica por baixo — como nas cartas
+          temáticas; o `alt` dela continua para o leitor de tela.) */}
+      <Link href={href} className="lob-linha-link" style={{ textDecoration: "none", display: "block" }}>
+        <Footer player={player} textos={textos} />
+      </Link>
     </div>
   );
 }

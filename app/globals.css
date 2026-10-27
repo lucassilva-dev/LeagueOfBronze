@@ -460,6 +460,18 @@ a:hover {
   outline-offset: -2px;
 }
 
+/* Card de jogador como alvo de volta (/jogadores#jogador-<slug>, lib/voltar-da-ficha.ts): pousa
+   abaixo do cabeçalho fixo e fica marcado — quem volta da ficha vê de onde saiu. */
+.lob-card-alvo {
+  /* 120 e não a altura do cabeçalho (~70): a entrada das seções (lob-fade) ainda desloca o card
+     enquanto o navegador rola, e ele termina ~20 px mais alto. */
+  scroll-margin-top: 120px;
+}
+.lob-card-alvo:target {
+  border-color: rgba(232, 184, 120, 0.85) !important;
+  box-shadow: 0 0 0 2px rgba(232, 184, 120, 0.55);
+}
+
 /* Menu do celular (components/main-nav.tsx). O cabeçalho é sticky e o menu desce de
    dentro dele: se a lista for mais alta que a tela (9 itens num celular deitado), o fim
    dela nunca apareceria, porque rolar a página leva o menu junto. Rola por dentro. */

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { CSSProperties } from "react";
 
+import { LinkDeVolta } from "@/components/lob/link-de-volta";
 import { EloCrest, RoleIcon } from "@/components/lob/ui";
 import { CENARIOS } from "@/components/times/cenarios";
 import f from "@/components/times/ficha.module.css";
@@ -66,9 +67,9 @@ export function FichaDoJogadorComTema({ player, team, tema, t, elos, tiles, opgg
         <section className={cx(c("heroi"), cf("heroi"))} aria-labelledby="tm-nick">
           <Moldura />
           <div className={c("conteiner")}>
-            <Link href={voltar.href} className={c("voltar")}>
+            <LinkDeVolta href={voltar.href} className={c("voltar")}>
               {voltar.texto}
-            </Link>
+            </LinkDeVolta>
 
             <div className={cf("grade")}>
               <div className={cf("retratoCasca", player.captain && "retratoCapitao")}>

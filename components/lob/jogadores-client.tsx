@@ -2,6 +2,7 @@ import { PlayerCard } from "@/components/lob/player-card";
 import { RoleIcon } from "@/components/lob/ui";
 import { rotaCurto, rotaLabel, type PaginasHomeTextos } from "@/lib/i18n/messages/paginas-home";
 import type { DesignPlayer } from "@/lib/roster";
+import { ancoraDoJogador, fichaPelaLista } from "@/lib/voltar-da-ficha";
 
 const ROLE_ORDER = ["TOP", "SEL", "MID", "ADC", "SUP"];
 
@@ -9,6 +10,8 @@ const ROLE_ORDER = ["TOP", "SEL", "MID", "ADC", "SUP"];
  * /jogadores, por rota. Cada card LEVA à ficha do jogador (/jogadores/<slug>): é lá que o
  * time com página temática mostra a cara dele (components/times). Antes o card abria um
  * diálogo com a ficha no visual antigo, e o tema do time nunca aparecia por este caminho.
+ * O link marca a origem (`?de=jogadores`) e o card tem âncora: o «voltar» da ficha traz de
+ * volta para este card (lib/voltar-da-ficha.ts).
  */
 export function JogadoresClient({
   players,
@@ -68,7 +71,8 @@ export function JogadoresClient({
               <PlayerCard
                 key={player.id}
                 player={player}
-                href={`/jogadores/${player.slug}`}
+                href={fichaPelaLista(player.slug)}
+                ancora={ancoraDoJogador(player.slug)}
                 textos={{
                   capitao: t.capitao,
                   ficha: t.ficha,
