@@ -1,4 +1,4 @@
-import { Bungee, Exo_2, Permanent_Marker, Special_Elite } from "next/font/google";
+import { Bungee, Exo_2, Kalam, Knewave, Permanent_Marker, Special_Elite } from "next/font/google";
 
 import type { ChaveDeFonte } from "@/lib/temas/tipos";
 
@@ -44,9 +44,32 @@ const specialElite = Special_Elite({
   preload: false,
 });
 
+// Galácticos do Bar: a pincelada do GALÁCTICOS do escudo e o giz da lousa do boteco.
+// A reserva é uma Arial ENCOLHIDA (@font-face em cenarios/boteco.module.css): a padrão do next/font
+// é mais larga que a Knewave e cortava o título enquanto ela carregava.
+const knewave = Knewave({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--tm-fonte-titulo",
+  display: "swap",
+  preload: false,
+  adjustFontFallback: false,
+  fallback: ["Knewave Caixa Alta"],
+});
+
+const kalam = Kalam({
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  variable: "--tm-fonte-assinatura",
+  display: "swap",
+  preload: false,
+});
+
 export const FONTES_DOS_TEMAS: Readonly<Record<ChaveDeFonte, { variable: string }>> = {
   "exo2-italico": exo2Italico,
   "permanent-marker": permanentMarker,
   bungee,
   "special-elite": specialElite,
+  knewave,
+  kalam,
 };

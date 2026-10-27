@@ -446,8 +446,9 @@
   top: 2px;
   width: var(--escudo);
   height: auto;
-  translate: -50% 0;
-  transform: scaleY(-1);
+  /* O recuo de -50% vai DENTRO do transform: o minificador do build (lightningcss) descarta um
+     `translate:` que divide a regra com um `transform:` literal (o reflexo saía torto em prod). */
+  transform: translateX(-50%) scaleY(-1);
   opacity: 0.3;
   -webkit-mask-image: linear-gradient(to top, rgba(0, 0, 0, 0.6), transparent 45%);
   mask-image: linear-gradient(to top, rgba(0, 0, 0, 0.6), transparent 45%);
@@ -961,6 +962,18 @@
   object-fit: cover;
   object-position: var(--foco, 50% 32%);
   filter: saturate(0.88) contrast(1.06) brightness(0.95); /* estático */
+}
+/* Avatares redondos de fundo transparente (lib/temas: fotos.formato = "medalhao"): o círculo
+   inteiro no alto da foto, nunca cortado. :where() deixa a especificidade igual à da base, e o
+   gancho do cenário (`.raiz .foto img`) continua mandando. RX e QM não têm o atributo. */
+:where([data-fotos="medalhao"]) .foto img {
+  inset: 5% 5% auto;
+  width: 90%;
+  height: auto;
+  aspect-ratio: 1;
+  object-fit: contain;
+  object-position: 50% 50%;
+  border-radius: 50%;
 }
 .fotoVazia {
   position: absolute;

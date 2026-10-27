@@ -10,3 +10,5 @@ export const Exo_2 = fonte;
 export const Permanent_Marker = fonte;
 export const Bungee = fonte;
 export const Special_Elite = fonte;
+export const Knewave = fonte;
+export const Kalam = fonte;

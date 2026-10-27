@@ -130,6 +130,16 @@ export const paginasHome = definir({
     temaQueijoCarimbo: "Ô TREM BÃO!",
     temaQueijoFecho: "Nenhum queijo foi ferido durante as filmagens.",
     temaQueijoCompanheiros: "OUTROS PASSAGEIROS",
+    // Galácticos do Bar (lib/temas/galacticos-do-bar.ts): noite de jogo no boteco do time.
+    temaGalacticosLema: "FUTEBOL + AMIGOS + CERVEJA = FELICIDADE",
+    temaGalacticosEscalacao: "ESCALAÇÃO DE HOJE",
+    temaGalacticosAviso: "Tática da casa: tudo pro ADC.",
+    temaGalacticosCapitao: "DONO DO CANECO",
+    temaGalacticosAoVivo: "AO VIVO {periodo}",
+    temaGalacticosPedido: "MESA 5 · PEDIDO: 1 TAÇA, BEM GELADA",
+    temaGalacticosFiado: "FIADO SÓ AMANHÃ",
+    temaGalacticosFecho: "Beba com moderação · jogue sem moderação nenhuma.",
+    temaGalacticosMesa: "A MESA TODA",
 
     // ---------- jogadores ----------
     jogadoresTitulo: "JOGADORES",
@@ -291,6 +301,16 @@ export const paginasHome = definir({
     temaQueijoCarimbo: "Ô TREM BÃO!",
     temaQueijoFecho: "No cheese was harmed in the making of this film.",
     temaQueijoCompanheiros: "FELLOW PASSENGERS",
+    temaGalacticosLema: "FOOTBALL + FRIENDS + BEER = HAPPINESS",
+    temaGalacticosEscalacao: "TONIGHT'S LINEUP",
+    temaGalacticosAviso: "House tactic: everything goes to the ADC.",
+    temaGalacticosCapitao: "KING OF THE CUP",
+    temaGalacticosAoVivo: "LIVE {periodo}",
+    temaGalacticosPedido: "TABLE 5 · ORDER: 1 CUP, ICE COLD",
+    // Plaquinha de boteco: fica em português (a página marca lang="pt-BR").
+    temaGalacticosFiado: "FIADO SÓ AMANHÃ",
+    temaGalacticosFecho: "Drink responsibly · play irresponsibly.",
+    temaGalacticosMesa: "THE WHOLE TABLE",
 
     // ---------- jogadores ----------
     jogadoresTitulo: "PLAYERS",

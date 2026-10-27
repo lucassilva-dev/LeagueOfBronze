@@ -10,10 +10,10 @@
 import type { PaginasHomeTextos } from "@/lib/i18n/messages/paginas-home";
 
 /** As fontes que um tema pode pedir (components/times/fontes-dos-temas.ts carrega cada uma). */
-export type ChaveDeFonte = "exo2-italico" | "permanent-marker" | "bungee" | "special-elite";
+export type ChaveDeFonte = "exo2-italico" | "permanent-marker" | "bungee" | "special-elite" | "knewave" | "kalam";
 
 /** Os cenários prontos (components/times/cenarios: um componente e um CSS module por cenário). */
-export type Cenario = "tempestade" | "estacao";
+export type Cenario = "tempestade" | "estacao" | "boteco";
 
 /** Os textos que um tema troca ou acrescenta na página e na ficha (o lema, o "A BORDO"…). */
 export type PapelDoTexto =
@@ -110,5 +110,12 @@ export type TemaDoTime = Readonly<{
     foco?: Readonly<Record<string, string>>;
     /** Proporção do retrato da ficha por slug ("3 / 2" para foto deitada); o resto usa 4 / 5. */
     proporcao?: Readonly<Record<string, string>>;
+    /**
+     * "medalhao": as fotos são AVATARES REDONDOS com fundo transparente (os da 4ª Edição, saídos
+     * de .sim/avatar-redondo.cjs). A página mostra o círculo inteiro, nunca cortado: carta,
+     * retrato 1:1 e companheiros (tema.module.css e ficha.module.css, `[data-fotos]`). Sem o
+     * campo, a foto é um retrato que preenche a moldura (object-fit: cover), como na RX e na QM.
+     */
+    formato?: "medalhao";
   }>;
 }>;

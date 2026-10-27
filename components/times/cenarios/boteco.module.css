@@ -1,0 +1,2055 @@
+/*
+ * Cenário "boteco" — GALÁCTICOS DO BAR, «O Bar da Resenha» (cenarios/boteco.tsx).
+ *
+ * Duas famílias de regra:
+ *  - ENFEITES próprios (`.enf…`, aria-hidden, sem texto): parede, prateleira, bokeh, luminárias,
+ *    varal, letreiro de neon, TV, balcão, espuma, giz, lousa.
+ *  - GANCHOS: classe com o MESMO nome de uma peça da base (casca, marca, chip…), que a página soma
+ *    à peça (comCenario). Sempre `.raiz` + o MESMO seletor da base: um nível acima, sem depender
+ *    da ordem em que os CSS chegam. Nada de @layer.
+ * Conteúdo só anima transform, sem delay nem fill-mode, com a espera dentro do keyframe. A única
+ * exceção é PINTURA que nunca esconde: o nível do chope dentro das letras (`tiraChope`, dois
+ * @property de porcentagem; o quadro 0 é o copo vazio, vidro claro a 18:1) e as bolhas
+ * (`borbulha`, background-position) — como o lampejo da base.
+ * Flashes (≤ 2 por segundo, todos pequenos): a faísca do neon (352 ms), o TIM do brinde (945 ms),
+ * a TV ligando (1,5 s), o brilho dos óculos (2,2 s e a cada 8 s), o "só" falhando (a cada 12 s).
+ * As luminárias e o neon só SOBEM de luz.
+ */
+
+/* A reserva da Knewave (fontes-dos-temas.ts: `fallback`), enquanto ela não chega ou se falhar: Arial
+   a 80% é MAIS ESTREITA que a Knewave em toda maiúscula (GALÁCTICOS: 6,445 em × 0,8 = 5,16 contra
+   5,44; W 0,755 contra 0,773), então a largura medida (lib/temas/metricas.ts) vale para as duas e o
+   título nunca sai cortado. A reserva padrão do next/font (Arial a 105%) era 25% mais larga. */
+@font-face {
+  font-family: "Knewave Caixa Alta";
+  src: local("Arial"), local("ArialMT"), local("Helvetica"), local("Helvetica Neue"), local("Roboto"), local("Arimo"), local("Liberation Sans");
+  size-adjust: 80%;
+}
+
+/* O nível do chope nas letras do título (tiraChope). Registrados: animam liso. Sem @property
+   (Safari < 16.4) o valor declarado na regra continua válido e a animação só "pula". */
+@property --chope-nivel {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 100%;
+}
+@property --chope-espuma {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 36%;
+}
+
+/* ======================================================================= raiz */
+.raiz {
+  --tm-titulo-estilo: normal;
+  --tm-titulo-peso: 400;
+  --tm-titulo-peso-medio: 400;
+  /* Os tons que na RX são fixos (tema.module.css guarda os dela como padrão). */
+  --tm-placa-topo: var(--tm-metal-luz);
+  --tm-nick-meio: var(--tm-metal-alto);
+  --tm-nick-base: var(--tm-metal-meio);
+  --tm-valor-base: var(--tm-metal-meio);
+  --tm-etiqueta: var(--tm-tinta);
+  --tm-foto-fundo: var(--tm-abismo);
+  --tm-chip-capitao: var(--tm-texto);
+  --tm-mono: var(--tm-icone);
+  --tm-eco-base: #1a0d02;
+  /* Do cenário: lousa, giz, madeira, papel da comanda, caneta. */
+  --giz: #f1eee4;
+  --lousa: #18221e;
+  --madeira: #5a3a1e;
+  --papel: #f3efe3;
+  --caneta: #1e4fd8;
+  font-synthesis: none;
+}
+
+/* ======================================================================= palco */
+/* A câmera entra pela porta: travelling da esquerda com um leve empurrão (a RX dá zoom; a QM desce de grua). */
+@keyframes entraNoBar {
+  from {
+    transform: translate3d(-2.5%, 0.8%, 0) scale(1.08);
+  }
+  to {
+    transform: none;
+  }
+}
+.raiz .enfCamera {
+  animation: entraNoBar 1800ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* A parede do bar: madeira escura em ripas, as poças âmbar das luminárias e o azul do neon. */
+.enfParede {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(36% 30% at 31% 30%, rgba(255, 190, 110, 0.15), transparent 70%),
+    radial-gradient(36% 30% at 69% 30%, rgba(255, 190, 110, 0.11), transparent 70%),
+    radial-gradient(30% 24% at 30% 40%, rgba(61, 139, 255, 0.13), transparent 72%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 58px),
+    linear-gradient(180deg, #05060c 0%, var(--tm-ceu) 24%, #0e1022 56%, #150f11 82%, var(--tm-breu) 100%);
+}
+@media (max-width: 1023px) {
+  .enfParede {
+    background:
+      radial-gradient(60% 26% at 86% 24%, rgba(255, 190, 110, 0.14), transparent 70%),
+      radial-gradient(50% 20% at 50% 22%, rgba(61, 139, 255, 0.14), transparent 72%),
+      repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 46px),
+      linear-gradient(180deg, #05060c 0%, var(--tm-ceu) 24%, #0e1022 56%, #150f11 82%, var(--tm-breu) 100%);
+  }
+}
+
+/* A prateleira de garrafas azuis do escudo (ladrilho SVG), com a fita de LED embaixo. */
+.enfPrateleira {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 17%;
+  height: clamp(64px, 8vw, 104px);
+  opacity: 0.75;
+  background: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 110' width='300' height='110'%3E%3Cpath d='M24 10h6v22q10 6 10 18v46h-26v-46q0-12 10-18z' fill='rgb(14 40 104)' fill-opacity='.85' stroke='%233D8BFF' stroke-opacity='.55' stroke-width='1.5'/%3E%3Cpath d='M61 34h8v10q11 2 11 10v42h-30v-42q0-8 11-10z' fill='rgb(90 46 6)' fill-opacity='.85' stroke='%23F5A524' stroke-opacity='.45' stroke-width='1.5'/%3E%3Cpath d='M101 6h6v28q9 8 9 20v42h-24v-42q0-12 9-20z' fill='rgb(14 40 104)' fill-opacity='.85' stroke='%233D8BFF' stroke-opacity='.55' stroke-width='1.5'/%3E%3Cpath d='M138 26h8v10h10v60h-28v-60h10z' fill='rgb(14 40 104)' fill-opacity='.85' stroke='%233D8BFF' stroke-opacity='.55' stroke-width='1.5'/%3E%3Cpath d='M178 30h7v12q12 2 12 12v42h-31v-42q0-10 12-12z' fill='rgb(90 46 6)' fill-opacity='.85' stroke='%23F5A524' stroke-opacity='.45' stroke-width='1.5'/%3E%3Cpath d='M218 12h6v22q9 6 9 18v44h-24v-44q0-12 9-18z' fill='rgb(14 40 104)' fill-opacity='.85' stroke='%233D8BFF' stroke-opacity='.55' stroke-width='1.5'/%3E%3Cpath d='M256 40h7v8q10 3 10 12v36h-27v-36q0-9 10-12z' fill='rgb(14 40 104)' fill-opacity='.85' stroke='%233D8BFF' stroke-opacity='.55' stroke-width='1.5'/%3E%3Cpath d='M0 96H300' stroke='%23FFCF8A' stroke-opacity='.5' stroke-width='1'/%3E%3Crect x='0' y='96.5' width='300' height='10' fill='%232A190C'/%3E%3Crect x='0' y='106.5' width='300' height='3.5' fill='%23120A05'/%3E%3C/svg%3E") 50% 100% / auto 100% repeat-x;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+@media (max-width: 1023px) {
+  .enfPrateleira {
+    top: 40%;
+  }
+}
+.enfLed {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #9ccbff 10%, #9ccbff 90%, transparent);
+  box-shadow: 0 0 10px 2px rgba(61, 139, 255, 0.6);
+  transform-origin: 0 50%;
+  animation: ledCorre 1100ms cubic-bezier(0.5, 0, 0.2, 1);
+}
+@keyframes ledCorre {
+  0%,
+  18% {
+    transform: scaleX(0);
+  }
+  100% {
+    transform: none;
+  }
+}
+/* Um brilho atravessa as garrafas a cada 9 s (a máscara é o mesmo ladrilho, só as garrafas). */
+.enfReflexoGarrafas {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  -webkit-mask: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 110' width='300' height='110'%3E%3Cpath d='M24 10h6v22q10 6 10 18v46h-26v-46q0-12 10-18z'/%3E%3Cpath d='M61 34h8v10q11 2 11 10v42h-30v-42q0-8 11-10z'/%3E%3Cpath d='M101 6h6v28q9 8 9 20v42h-24v-42q0-12 9-20z'/%3E%3Cpath d='M138 26h8v10h10v60h-28v-60h10z'/%3E%3Cpath d='M178 30h7v12q12 2 12 12v42h-31v-42q0-10 12-12z'/%3E%3Cpath d='M218 12h6v22q9 6 9 18v44h-24v-44q0-12 9-18z'/%3E%3Cpath d='M256 40h7v8q10 3 10 12v36h-27v-36q0-9 10-12z'/%3E%3C/svg%3E") 50% 100% / auto 100% repeat-x;
+  mask: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 110' width='300' height='110'%3E%3Cpath d='M24 10h6v22q10 6 10 18v46h-26v-46q0-12 10-18z'/%3E%3Cpath d='M61 34h8v10q11 2 11 10v42h-30v-42q0-8 11-10z'/%3E%3Cpath d='M101 6h6v28q9 8 9 20v42h-24v-42q0-12 9-20z'/%3E%3Cpath d='M138 26h8v10h10v60h-28v-60h10z'/%3E%3Cpath d='M178 30h7v12q12 2 12 12v42h-31v-42q0-10 12-12z'/%3E%3Cpath d='M218 12h6v22q9 6 9 18v44h-24v-44q0-12 9-18z'/%3E%3Cpath d='M256 40h7v8q10 3 10 12v36h-27v-36q0-9 10-12z'/%3E%3C/svg%3E") 50% 100% / auto 100% repeat-x;
+}
+.enfReflexoGarrafas::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 18%;
+  background: linear-gradient(100deg, transparent, rgba(190, 225, 255, 0.55), transparent);
+  transform: translateX(-100%);
+  animation: garrafasBrilham 9s cubic-bezier(0.4, 0, 0.3, 1) infinite;
+}
+@keyframes garrafasBrilham {
+  0%,
+  26% {
+    transform: translateX(-100%);
+  }
+  48%,
+  100% {
+    transform: translateX(560%);
+  }
+}
+
+/* Bokeh: as luzes do bar fora de foco (gradiente, nada de blur), à deriva nos cantos. */
+.enfBokehs {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.enfBokeh {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: var(--d);
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(var(--cor) / 0.13), rgb(var(--cor) / 0.1) 58%, rgb(var(--cor) / 0.13) 74%, rgb(var(--cor) / 0.04) 88%, transparent);
+  /* var() no shorthand atrapalha o CSS Modules: longhands */
+  animation-name: bokehDeriva;
+  animation-duration: var(--dur);
+  animation-timing-function: ease-in-out;
+  animation-delay: var(--atraso);
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+@keyframes bokehDeriva {
+  from {
+    transform: none;
+  }
+  to {
+    transform: translate3d(var(--dx), var(--dy), 0);
+  }
+}
+
+/* As luminárias pendentes: acendem em degrau (só sobe a luz: não é flash), a da esquerda aos
+   120 ms e a da direita aos 380 ms. O repouso é aceso (pôster e movimento reduzido). */
+.enfLuminaria {
+  position: absolute;
+  top: 0;
+  width: clamp(64px, 7vw, 108px);
+  translate: -50% 0;
+}
+.enfLuminaria svg {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: auto;
+}
+/* Penduradas sobre o letreiro e a TV, longe do «VOLTAR» (que fica no canto esquerdo e apagava
+   a lâmpada com o fundo dele). */
+.enfLuminariaEsq {
+  left: max(31%, calc(50% - 380px));
+  animation: lampadaA 1000ms linear;
+}
+.enfLuminariaDir {
+  left: min(69%, calc(50% + 380px));
+  animation: lampadaB 1000ms linear;
+}
+@keyframes lampadaA {
+  0%,
+  11.9% {
+    opacity: 0.25;
+  }
+  12%,
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes lampadaB {
+  0%,
+  37.9% {
+    opacity: 0.25;
+  }
+  38%,
+  100% {
+    opacity: 1;
+  }
+}
+/* O cone de luz: forma por clip-path ESTÁTICO. */
+.enfCone {
+  position: absolute;
+  left: 50%;
+  top: 64%;
+  width: 460%;
+  height: 72vh;
+  height: 72lvh;
+  translate: -50% 0;
+  clip-path: polygon(44% 0, 56% 0, 100% 100%, 0 100%);
+  background:
+    radial-gradient(60% 34% at 50% 0, rgba(255, 214, 150, 0.3), transparent 70%),
+    linear-gradient(180deg, rgba(255, 196, 110, 0.2), rgba(255, 196, 110, 0.05) 52%, transparent 86%);
+}
+@media (max-width: 1023px) {
+  /* Uma luminária só, no lado oposto ao «VOLTAR». */
+  .enfLuminariaEsq {
+    left: 86%;
+  }
+  .enfLuminariaDir {
+    display: none;
+  }
+}
+
+/* ======================================================================= moldura */
+/* A faixa do herói e da ficha ganha altura para o varal (aqui, e não em .raiz: a base declara
+   --barra em .raiz com a mesma especificidade). */
+.raiz .heroi {
+  --barra: clamp(22px, 3.2vw, 44px);
+}
+/* O varal de flâmulas do teto (preto, royal e ouro; GG e coroas como as bandeiras da arte
+   original). Desce do teto com um quique e fica parado: no bar não venta. */
+.enfVaral {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 3;
+  height: var(--barra);
+  pointer-events: none;
+  background: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 52' width='240' height='52'%3E%3Cpath d='M0 4Q120 22 240 4' fill='none' stroke='%23C9B68E' stroke-width='1.5'/%3E%3Cpath d='M7 6.8L33 6.8L20 40.8Z' fill='%2307080F' stroke='%2305060A' stroke-width='1'/%3E%3Cpath d='M18 14.2A3.5 3.5 0 1 0 18.6 18.2V17.2H16.5' fill='none' stroke='%23F5C94A' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M26.8 14.2A3.5 3.5 0 1 0 27.4 18.2V17.2H25.3' fill='none' stroke='%23F5C94A' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M47 10.8L73 10.8L60 44.8Z' fill='%231440C8' stroke='%2305060A' stroke-width='1'/%3E%3Cpath d='M55 11.8V28.8M65 11.8V28.8' stroke='%2307080F' stroke-width='3.6'/%3E%3Cpath d='M87 12.7L113 12.7L100 46.7Z' fill='%23F5A524' stroke='%2305060A' stroke-width='1'/%3E%3Cpath d='M94 28.7L93 20.7L97 23.7L100 18.2L103 23.7L107 20.7L106 28.7Z' fill='%2307080F'/%3E%3Cpath d='M127 12.8L153 12.8L140 46.8Z' fill='%2307080F' stroke='%2305060A' stroke-width='1'/%3E%3Cpath d='M138 20.2A3.5 3.5 0 1 0 138.6 24.2V23.2H136.5' fill='none' stroke='%23F5C94A' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M146.8 20.2A3.5 3.5 0 1 0 147.4 24.2V23.2H145.3' fill='none' stroke='%23F5C94A' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M167 10.8L193 10.8L180 44.8Z' fill='%231440C8' stroke='%2305060A' stroke-width='1'/%3E%3Cpath d='M175 11.8V28.8M185 11.8V28.8' stroke='%2307080F' stroke-width='3.6'/%3E%3Cpath d='M207 6.8L233 6.8L220 40.8Z' fill='%23F5A524' stroke='%2305060A' stroke-width='1'/%3E%3Cpath d='M214 22.8L213 14.8L217 17.8L220 12.3L223 17.8L227 14.8L226 22.8Z' fill='%2307080F'/%3E%3C/svg%3E") 50% 0 / auto 100% repeat-x;
+  animation: varalDesce 1000ms linear;
+}
+@keyframes varalDesce {
+  0%,
+  10% {
+    transform: translateY(-100%);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.8, 0.6);
+  }
+  58% {
+    transform: translateY(10%);
+    animation-timing-function: cubic-bezier(0.3, 0, 0.3, 1);
+  }
+  78% {
+    transform: translateY(-4%);
+  }
+  100% {
+    transform: none;
+  }
+}
+/* A barra da camisa (listras pretas e royal, fio de ouro) no pé do herói: abre do centro. */
+.enfFaixaCamisa {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  height: calc(var(--barra) * 0.42);
+  pointer-events: none;
+  background:
+    linear-gradient(var(--tm-primaria), var(--tm-primaria)) 0 0 / 100% 2px no-repeat,
+    repeating-linear-gradient(90deg, #06070d 0 16px, #1440c8 16px 30px);
+  box-shadow: 0 -8px 20px -8px rgba(61, 139, 255, 0.4);
+  animation: faixaAbre 1000ms cubic-bezier(0.7, 0, 0.2, 1);
+}
+@keyframes faixaAbre {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: none;
+  }
+}
+
+/* ======================================================================= herói: um eixo só */
+/* O balcão no meio da cena, em todas as larguras: escudo em cima, o nome na frente do balcão
+   (a RX põe o texto à esquerda; a QM, à direita). Sem tremor: quem bate é o caneco. */
+.raiz .heroiGrade {
+  --escudo: clamp(200px, 60vw, 250px);
+  animation-name: none;
+}
+.raiz .blocoEscudo {
+  margin-top: calc(var(--escudo) * 0.4);
+  margin-bottom: calc(var(--escudo) * 0.16);
+}
+@media (min-width: 600px) and (max-width: 1023px) {
+  .raiz .heroiGrade {
+    --escudo: clamp(240px, min(38vw, 34svh), 300px);
+  }
+}
+@media (min-width: 900px) {
+  .raiz .heroiGrade {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    justify-items: center;
+    text-align: center;
+    gap: 0;
+    min-height: 0;
+  }
+  .raiz .blocoEscudo {
+    grid-column: 1;
+    grid-row: 1;
+    margin-top: calc(var(--escudo) * 0.4);
+    margin-bottom: calc(var(--escudo) * 0.16);
+  }
+  .raiz .blocoTexto {
+    grid-column: 1;
+    grid-row: 2;
+    margin: 0;
+  }
+  /* .blocoTexto: só no herói (a ficha também tem .chips, em outro módulo). */
+  .raiz .blocoTexto .chips {
+    justify-content: center;
+  }
+  .raiz .lema {
+    margin-inline: auto;
+  }
+}
+/* ≥1024: o tríptico na parede (letreiro | escudo | TV) e a primeira dobra (1366×768 inclusive)
+   com escudo, GALÁCTICOS e DO BAR. */
+@media (min-width: 1024px) {
+  .raiz .heroiGrade {
+    --escudo: clamp(220px, min(20vw, 30svh), 320px);
+  }
+  .raiz .blocoEscudo {
+    margin-top: calc(var(--escudo) * 0.06);
+    margin-bottom: calc(var(--escudo) * 0.14);
+  }
+}
+
+/* ======================================================================= escudo: o BRINDE */
+/* Sobe inclinado como um caneco erguido, faz TIM no alto (945 ms), desce e assenta no balcão.
+   O quadro 0 é o escudo inteiro, 8% abaixo e girado 5°. */
+@keyframes brinde {
+  0%,
+  20% {
+    transform: translate3d(0, 8%, 0) rotate(5deg) scale(0.94);
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.3, 1);
+  }
+  60% {
+    transform: translate3d(0, -3%, 0) rotate(-2.5deg) scale(1.03);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5);
+  }
+  63% {
+    transform: translate3d(0, -1.2%, 0) rotate(1deg) scale(1.02);
+  }
+  75% {
+    transform: translate3d(0, 0.6%, 0) rotate(-0.4deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+.raiz .escudo {
+  /* Pontos medidos no webp de 640 px. */
+  --neon-x: 75.5%;
+  --neon-y: 27%;
+  --caneco-x: 33%;
+  --caneco-y: 33.5%;
+  --espuma-x: 37.5%;
+  --espuma-y: 30.5%;
+  --oculos-x: 51.5%;
+  --oculos-y: 22.5%;
+  transform-origin: 50% 90%;
+  animation: brinde 1500ms linear;
+}
+
+/* -------------------------------------------- atrás do escudo: contraluz, letreiro, TV */
+.enfHaloEscudo {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  z-index: 0;
+  width: 210%;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(closest-side, rgba(255, 196, 110, 0.3), rgba(245, 165, 36, 0.11) 45%, rgba(61, 139, 255, 0.06) 62%, transparent 74%);
+  animation: haloNasce 1500ms cubic-bezier(0.16, 1, 0.3, 1), haloDoBar 6s ease-in-out 1500ms infinite alternate;
+}
+@keyframes haloNasce {
+  from {
+    transform: scale(0.7);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes haloDoBar {
+  from {
+    scale: 1;
+  }
+  to {
+    scale: 1.05;
+  }
+}
+
+/* O letreiro de neon «Aqui é só RESENHA» na parede. Celular e tablet: em cima do escudo (a coroa
+   passa na frente dele); ≥1024: à esquerda. Três camadas do mesmo SVG: a placa com os tubos
+   APAGADOS (sempre visível), o aceso e o "só". O brilho é drop-shadow ESTÁTICO: só a opacidade
+   da camada anima (no compositor). */
+.enfLetreiro {
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  top: calc(var(--escudo) * -0.4);
+  width: calc(var(--escudo) * 0.8);
+  aspect-ratio: 400 / 160;
+  translate: -50% 0;
+  pointer-events: none;
+}
+@media (min-width: 1024px) {
+  .enfLetreiro {
+    left: auto;
+    right: calc(100% + var(--escudo) * 0.12);
+    top: 16%;
+    width: calc(var(--escudo) * 0.9);
+    translate: none;
+    rotate: -3deg;
+  }
+}
+/* A luz azul do neon na parede (acende junto com o letreiro). */
+.enfLetreiro::before {
+  content: "";
+  position: absolute;
+  inset: -50% -30%;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(61, 139, 255, 0.4), rgba(20, 64, 200, 0.13) 55%, transparent 76%);
+  animation: neonAcende 1600ms linear;
+}
+.enfLetreiro > svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.enfLetreiro text {
+  font-family: var(--tm-fonte-assinatura), "Comic Sans MS", cursive;
+  font-weight: 700;
+}
+.enfLetreiroPlaca {
+  fill: #1e2c52;
+  stroke: #34497a;
+  stroke-width: 1;
+}
+.enfLetreiroPlaca rect {
+  fill: #070b18;
+  stroke: #1c2a4e;
+  stroke-width: 3;
+}
+.enfLetreiroAceso,
+.enfLetreiroSo {
+  fill: var(--tm-nucleo);
+  will-change: opacity;
+  filter: drop-shadow(0 0 2px #7fc0ff) drop-shadow(0 0 7px var(--tm-neon)) drop-shadow(0 0 18px rgba(20, 64, 200, 0.8)); /* estático */
+}
+.enfLetreiroAceso {
+  animation: neonAcende 1600ms linear, neonZumbe 7s ease-in-out 1600ms infinite;
+}
+.enfLetreiroSo {
+  animation: neonAcende 1600ms linear, neonFalha 12s linear 1600ms infinite;
+}
+/* UMA faísca (352–410 ms) e acende de vez aos 851 ms. Com o TIM (945), são 2 flashes no 1º segundo. */
+@keyframes neonAcende {
+  0%,
+  21.9% {
+    opacity: 0;
+  }
+  22%,
+  25.5% {
+    opacity: 1;
+  }
+  25.6%,
+  53% {
+    opacity: 0.1;
+  }
+  53.2%,
+  100% {
+    opacity: 1;
+  }
+}
+/* Zumbido de 12%: não é flash. */
+@keyframes neonZumbe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.88;
+  }
+}
+/* O "só" engasga uma vez a cada 12 s (o 1º aos ~13 s). */
+@keyframes neonFalha {
+  0%,
+  95% {
+    opacity: 1;
+  }
+  96% {
+    opacity: 0.25;
+  }
+  97.5%,
+  100% {
+    opacity: 1;
+  }
+}
+
+/* A TV do canto (só ≥1024, à direita do escudo): liga aos 1,5 s, com o jogo passando. */
+.enfTv {
+  display: none;
+}
+@media (min-width: 1024px) {
+  .enfTv {
+    display: block;
+    position: absolute;
+    z-index: 1;
+    left: calc(100% + var(--escudo) * 0.12);
+    top: 13%;
+    width: calc(var(--escudo) * 0.84);
+    aspect-ratio: 16 / 10;
+    padding: calc(var(--escudo) * 0.022);
+    border-radius: 6px;
+    rotate: 2deg;
+    font-size: calc(var(--escudo) * 0.1);
+    background: linear-gradient(180deg, #1c2130, #07080c);
+    box-shadow: 0 0 0 1px #2a2f3a, 0 18px 40px -16px #000, 0 0 70px -4px rgba(37, 137, 63, 0.4);
+  }
+  /* o suporte na parede */
+  .enfTv::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: 100%;
+    width: 7%;
+    height: 22%;
+    translate: -50% 0;
+    background: linear-gradient(90deg, #10131b, #2a2f3a, #10131b);
+  }
+  .enfTv .enfTela {
+    animation: telaLiga 1900ms linear;
+  }
+}
+/* A tela de jogo (a TV do herói e a da cartela): gramado listrado, meio-campo, círculo central,
+   placar sem texto e os jogadores (pontinhos) correndo. */
+.enfTela {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 3px;
+  container-type: inline-size;
+  background:
+    linear-gradient(90deg, transparent calc(50% - 1px), rgba(255, 255, 255, 0.5) calc(50% - 1px) calc(50% + 1px), transparent calc(50% + 1px)),
+    radial-gradient(circle at 50% 50%, transparent 0 1.1em, rgba(255, 255, 255, 0.5) 1.1em 1.25em, transparent 1.25em),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.5) 0 1px, transparent 1px calc(100% - 1px), rgba(255, 255, 255, 0.5) calc(100% - 1px)),
+    repeating-linear-gradient(90deg, #1f7a3c 0 12.5%, #25893f 12.5% 25%);
+}
+.enfTela::after {
+  /* linhas de tela, paradas */
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.16) 0 1px, transparent 1px 3px);
+  pointer-events: none;
+}
+.enfTelaPlacar {
+  position: absolute;
+  left: 5%;
+  top: 6%;
+  width: 34%;
+  height: 11%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #0a1236 0 42%, #f5a524 42% 58%, #0a1236 58%);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+.enfJogador {
+  position: absolute;
+  left: 0;
+  top: var(--y);
+  width: 3.4%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--cor);
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.6);
+  transform: translateX(var(--parado, 50cqi)); /* o lugar dele com o movimento reduzido */
+  animation-name: corre;
+  animation-duration: var(--dur);
+  animation-timing-function: ease-in-out;
+  animation-delay: var(--atraso);
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+@keyframes corre {
+  from {
+    transform: translateX(12cqi);
+  }
+  to {
+    transform: translateX(84cqi);
+  }
+}
+.enfBola {
+  position: absolute;
+  left: 0;
+  top: 52%;
+  width: 2%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #fff;
+  transform: translate(50cqi, -2cqi);
+  animation: bolaRola 5s ease-in-out infinite alternate;
+}
+@keyframes bolaRola {
+  from {
+    transform: translate(20cqi, -6cqi);
+  }
+  to {
+    transform: translate(78cqi, 4cqi);
+  }
+}
+/* Ligar: a tela abre de uma linha (scaleY) e um clarão branco apaga em 400 ms (1 flash pequeno). */
+@keyframes telaLiga {
+  0%,
+  78.9% {
+    transform: scaleY(0);
+  }
+  79% {
+    transform: scale(1, 0.03);
+  }
+  88% {
+    transform: scale(1, 1.04);
+  }
+  100% {
+    transform: none;
+  }
+}
+.enfTelaLiga {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: var(--tm-nucleo);
+  opacity: 0;
+}
+@media (min-width: 1024px) {
+  .enfTv .enfTelaLiga {
+    animation: telaClarao 1900ms linear;
+  }
+}
+@keyframes telaClarao {
+  0%,
+  78.9% {
+    opacity: 0;
+  }
+  79%,
+  84% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* -------------------------------------------- no escudo: neon, caneco, espuma, TIM, óculos */
+/* O neon pequeno do escudo acende junto com o da parede (mesmo keyframe e mesma hora). */
+.enfNeonMini {
+  position: absolute;
+  left: var(--neon-x);
+  top: var(--neon-y);
+  z-index: 1;
+  width: 22%;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  border-radius: 50%;
+  pointer-events: none;
+  mix-blend-mode: screen; /* só clareia; camada pequena */
+  background: radial-gradient(closest-side, rgba(170, 220, 255, 0.55), rgba(61, 139, 255, 0.22) 55%, transparent);
+  animation: neonAcende 1600ms linear, neonZumbe 7s ease-in-out 1600ms infinite;
+}
+/* As bolhas do chope no caneco do pato (recorte do vidro: x 33–42%, y 33–45%). */
+.enfCaneco {
+  position: absolute;
+  left: var(--caneco-x);
+  top: var(--caneco-y);
+  z-index: 1;
+  width: 9%;
+  height: 11.5%;
+  overflow: hidden;
+  border-radius: 8% 8% 14% 14%;
+  pointer-events: none;
+}
+.enfBolha {
+  position: absolute;
+  left: var(--x);
+  bottom: -6%;
+  width: 7%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fffbe6 0 25%, rgba(255, 236, 170, 0.75) 55%, transparent 72%);
+  animation-name: bolhaSobe;
+  animation-duration: var(--dur);
+  animation-timing-function: cubic-bezier(0.4, 0.1, 0.7, 1);
+  animation-delay: var(--atraso);
+  animation-iteration-count: infinite;
+}
+@keyframes bolhaSobe {
+  from {
+    transform: translate3d(0, 0, 0) scale(0.6);
+  }
+  to {
+    transform: translate3d(30%, -1500%, 0) scale(1.1);
+  }
+}
+/* O colarinho do caneco incha no TIM e solta uma gota; depois, uma borbulhada a cada 6 s. */
+.enfEspuma {
+  position: absolute;
+  left: var(--espuma-x);
+  top: var(--espuma-y);
+  z-index: 1;
+  width: 10%;
+  aspect-ratio: 1.6;
+  translate: -50% -50%;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(closest-side, rgba(255, 250, 235, 0.95), rgba(255, 244, 214, 0.6) 60%, transparent);
+  /* `scale` e não `transform`: ao lado de um `transform:` literal, o lightningcss do build
+     descarta o `translate:` (a espuma sairia do colarinho). */
+  scale: 0.85;
+  animation: espumaIncha 1600ms linear, espumaBorbulha 6s ease-in-out 1600ms infinite;
+}
+@keyframes espumaIncha {
+  0%,
+  58% {
+    scale: 0.85;
+  }
+  64% {
+    scale: 1.3 1.18;
+  }
+  80% {
+    scale: 1.1;
+  }
+  100% {
+    scale: 0.85;
+  }
+}
+@keyframes espumaBorbulha {
+  0%,
+  80%,
+  100% {
+    scale: 0.85;
+  }
+  88% {
+    scale: 1.06 0.96;
+  }
+}
+.enfGota {
+  position: absolute;
+  left: calc(var(--espuma-x) + 3.6%);
+  top: calc(var(--espuma-y) + 1.6%);
+  z-index: 1;
+  width: 1.6%;
+  aspect-ratio: 0.7;
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  background: rgba(255, 248, 230, 0.95);
+  pointer-events: none;
+  opacity: 0;
+  animation: gotaEscorre 2600ms cubic-bezier(0.5, 0, 0.8, 0.6);
+}
+@keyframes gotaEscorre {
+  0%,
+  36% {
+    transform: none;
+    opacity: 0;
+  }
+  38% {
+    opacity: 1;
+  }
+  90% {
+    transform: translateY(380%);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(420%);
+    opacity: 0;
+  }
+}
+/* Os respingos de espuma em leque no TIM (uma vez). */
+.enfRespingos {
+  position: absolute;
+  left: var(--espuma-x);
+  top: var(--espuma-y);
+  z-index: 1;
+  width: 0;
+  height: 0;
+}
+.enfRespingo {
+  position: absolute;
+  left: -3px;
+  top: -3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff8e6;
+  rotate: var(--ang);
+  opacity: 0;
+  animation: respinga 1700ms cubic-bezier(0.1, 0.6, 0.3, 1);
+}
+@keyframes respinga {
+  0%,
+  55% {
+    transform: none;
+    opacity: 0;
+  }
+  57% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateX(calc(var(--escudo) * var(--dist))) scale(0.4);
+    opacity: 0;
+  }
+}
+/* TIM: a estrela de quatro pontas e o anel no caneco, no alto do brinde (945–1245 ms). */
+.enfTim,
+.enfAnelTim {
+  position: absolute;
+  left: var(--espuma-x);
+  top: calc(var(--espuma-y) - 1%);
+  z-index: 2;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  pointer-events: none;
+}
+.enfTim {
+  width: 26%;
+  background:
+    linear-gradient(#fffbe6, #fffbe6) 50% 50% / 100% 6% no-repeat,
+    linear-gradient(#fffbe6, #fffbe6) 50% 50% / 6% 100% no-repeat,
+    radial-gradient(closest-side, #fff, rgba(255, 214, 120, 0.5) 30%, transparent 60%);
+  -webkit-mask: radial-gradient(closest-side, #000 30%, transparent);
+  mask: radial-gradient(closest-side, #000 30%, transparent);
+  transform: scale(0);
+  animation: timBrilha 1500ms linear;
+}
+@keyframes timBrilha {
+  0%,
+  61.5% {
+    transform: scale(0) rotate(0);
+  }
+  64.5% {
+    transform: scale(1.25) rotate(30deg);
+  }
+  80%,
+  100% {
+    transform: scale(0) rotate(90deg);
+  }
+}
+.enfAnelTim {
+  width: 14%;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 244, 214, 0.9);
+  opacity: 0;
+  animation: anelTim 1700ms cubic-bezier(0.15, 0.7, 0.2, 1);
+}
+@keyframes anelTim {
+  0%,
+  55% {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+  57% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+/* O pato dá aquela olhada: um brilho na lente aos 2,2 s e a cada 8 s depois. */
+.enfBrilhoOculos {
+  position: absolute;
+  left: var(--oculos-x);
+  top: var(--oculos-y);
+  z-index: 2;
+  width: 10%;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  pointer-events: none;
+  background:
+    linear-gradient(#fff, #fff) 50% 50% / 100% 7% no-repeat,
+    linear-gradient(#fff, #fff) 50% 50% / 7% 100% no-repeat;
+  -webkit-mask: radial-gradient(closest-side, #000 22%, transparent);
+  mask: radial-gradient(closest-side, #000 22%, transparent);
+  /* `scale`/`rotate` e não `transform` (o `translate:` sumiria no build, como na espuma). */
+  scale: 0;
+  animation: oculosBrilham 8s ease-out infinite;
+}
+/* 1º brilho aos 2,24 s (28% de 8 s), sem delay. */
+@keyframes oculosBrilham {
+  0%,
+  26% {
+    scale: 0;
+    rotate: 0deg;
+  }
+  28% {
+    scale: 1.15;
+    rotate: 45deg;
+  }
+  31%,
+  100% {
+    scale: 0;
+    rotate: 90deg;
+  }
+}
+
+/* -------------------------------------------- o balcão (sem espelho: o espelho é da RX) */
+.enfBalcao {
+  position: absolute;
+  top: 93%;
+  left: 50%;
+  z-index: 0;
+  width: 200vw;
+  margin-left: -100vw;
+  height: calc(var(--escudo) * 1.5);
+  pointer-events: none;
+  background:
+    linear-gradient(#ffd9a0, #ffd9a0) 0 0 / 100% 1px no-repeat,
+    radial-gradient(calc(var(--escudo) * 0.5) calc(var(--escudo) * 0.05) at 50% calc(var(--escudo) * 0.05), rgba(255, 207, 138, 0.45), transparent) no-repeat,
+    radial-gradient(calc(var(--escudo) * 0.45) calc(var(--escudo) * 0.05) at 40% calc(var(--escudo) * 0.05), rgba(61, 139, 255, 0.28), transparent) no-repeat,
+    radial-gradient(14px 4px at 36% calc(var(--escudo) * 0.06), transparent 62%, rgba(255, 230, 190, 0.32) 66% 76%, transparent 80%) no-repeat,
+    radial-gradient(16px 4px at 61% calc(var(--escudo) * 0.045), transparent 62%, rgba(255, 230, 190, 0.28) 66% 76%, transparent 80%) no-repeat,
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.14) 0 2px, transparent 2px 37px) 0 1px / 100% calc(var(--escudo) * 0.1) no-repeat,
+    linear-gradient(180deg, #6b4423, #4a2c15 55%, #3a2212) 0 1px / 100% calc(var(--escudo) * 0.1) no-repeat,
+    linear-gradient(180deg, rgba(0, 0, 0, 0.7), transparent) 0 calc(var(--escudo) * 0.1) / 100% calc(var(--escudo) * 0.06) no-repeat,
+    repeating-linear-gradient(90deg, #22140b 0 calc(var(--escudo) * 0.22), #140b06 calc(var(--escudo) * 0.22) calc(var(--escudo) * 0.226)) 0 calc(var(--escudo) * 0.1) / 100% 100% no-repeat;
+  -webkit-mask-image: linear-gradient(180deg, #000 40%, transparent);
+  mask-image: linear-gradient(180deg, #000 40%, transparent);
+}
+/* A sombra do escudo no tampo: encolhe quando ele sobe no brinde. */
+.enfSombraEscudo {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: calc(var(--escudo) * 0.62);
+  height: calc(var(--escudo) * 0.07);
+  translate: -50% -45%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.7), transparent);
+  animation: sombraBrinde 1500ms linear;
+}
+@keyframes sombraBrinde {
+  0%,
+  20% {
+    transform: scale(0.9);
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.3, 1);
+  }
+  60% {
+    transform: scale(0.72, 0.6);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5);
+  }
+  100% {
+    transform: none;
+  }
+}
+/* Um reflexo corre pela quina do balcão a cada 10 s. */
+.enfBrilhoBalcao {
+  position: absolute;
+  left: 25%;
+  top: 0;
+  width: 12%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #fff4d6, transparent);
+  transform: translateX(-100%);
+  animation: brilhoCorre 10s cubic-bezier(0.4, 0, 0.3, 1) infinite;
+}
+@keyframes brilhoCorre {
+  0%,
+  70% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(420%);
+  }
+}
+
+/* ======================================================================= texto do herói */
+.raiz .kicker {
+  text-wrap: balance;
+}
+/* No herói, o kicker e os créditos NÃO sobem (o .sobe da base os desceria 14 px no quadro 0, para
+   baixo do acento do Á). A entrada fica com o título, o brinde e o giz. Os dois param juntos: se
+   só um subisse, encostaria no outro. */
+.raiz .blocoTexto .kicker {
+  animation-name: none;
+}
+.raiz .nomesDoElenco {
+  position: relative;
+  z-index: 1;
+  animation-name: none;
+}
+
+/* -------------------------------------------- título: GALÁCTICOS enche de chope */
+/* Pela largura MEDIDA da maior palavra (--largura-em, lib/temas/metricas.ts): GALÁCTICOS =
+   5,86 em com o espaçamento e a tinta do pincel. Sem a métrica, o pior caso (W). */
+.raiz .tituloVisual {
+  --tm-titulo-max: 120px;
+  --tam: clamp(40px, calc(100cqi / var(--largura-em, calc(var(--letras) * 0.78))), var(--tm-titulo-max));
+}
+@media (min-width: 600px) {
+  .raiz .tituloVisual {
+    --tm-titulo-max: min(150px, 18svh);
+  }
+}
+@media (min-width: 1024px) {
+  .raiz .tituloVisual {
+    --tm-titulo-max: min(190px, 17svh);
+  }
+}
+/* O chope balança no TIM do brinde (945 ms): o copo gira pela base. 2D de propósito: o
+   translate3d com background-clip:text some no WebKit (lição da QM). */
+@keyframes chacoalha {
+  0%,
+  55% {
+    transform: none;
+  }
+  58% {
+    transform: rotate(-1.2deg);
+  }
+  67% {
+    transform: rotate(0.8deg);
+  }
+  78% {
+    transform: rotate(-0.35deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+.raiz .marca {
+  font-size: var(--tam);
+  line-height: 0.92;
+  letter-spacing: 0.01em;
+  margin-top: 0.22em; /* o Á sobe a 1,07 em da linha de base; a caixa de 0,92 só cobre 0,85 */
+  white-space: normal;
+  text-transform: uppercase;
+  font-kerning: none;
+  font-variant-ligatures: none;
+  transform-origin: 50% 100%;
+  animation: chacoalha 1700ms linear;
+}
+.raiz .palavra {
+  display: inline-block;
+  white-space: nowrap;
+}
+.raiz .letra {
+  display: inline-grid;
+}
+.raiz .letra > * {
+  grid-area: 1 / 1;
+}
+/* Folga de tinta: o acento em cima (Á 1,07 em; Ô 1,14 em), a cauda do pincel à direita. */
+.raiz .eco,
+.raiz .cromo {
+  padding: 0.3em 0.2em 0.22em 0.08em;
+  margin: -0.3em -0.2em -0.22em -0.08em;
+}
+/* Contorno de tinta do pincel + halo royal. Estático, ATRÁS de toda face (.marca é isolate). O
+   traço fica no eco: as costuras dos contornos sobrepostos somem debaixo do chope. */
+.raiz .eco {
+  position: static;
+  inset: auto;
+  z-index: -1;
+  color: var(--tm-eco-base);
+  -webkit-text-stroke: 0.1em var(--tm-eco-base);
+  text-shadow:
+    0 0.07em 0 #050200,
+    0 0.12em 0.16em rgba(0, 0, 0, 0.6),
+    0 0 0.32em rgba(20, 64, 200, 0.55);
+  user-select: none;
+}
+/* A tinta garantida: ouro sólido. */
+.raiz .cromo {
+  color: var(--tm-metal-meio);
+}
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  /* O chope parado (o nick da ficha): colarinho em cima, âmbar no fundo do copo. */
+  .raiz .cromo {
+    background-image: linear-gradient(180deg, #fff8e6 0%, var(--tm-metal-luz) 12%, var(--tm-metal-alto) 28%, var(--tm-metal-volta) 46%, var(--tm-metal-meio) 66%, var(--tm-metal-fundo) 86%, var(--tm-metal-base) 100%);
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    -webkit-text-stroke: 0;
+    animation: none;
+  }
+  /* A letra é um copo: o chope sobe até --chope-nivel, com colarinho de --chope-espuma; acima
+     do nível, vidro claro. Na caixa da letra (1,44 em de altura) a linha de base fica a 20% e o
+     topo das maiúsculas a 75%: cheio (100%/36%), a espuma cobre o topo das letras e o acento.
+     Os valores finais estão DECLARADOS aqui: sem @property, o var() continua válido. */
+  .raiz .letra .cromo {
+    --chope-nivel: 100%;
+    --chope-espuma: 36%;
+    background-image:
+      radial-gradient(circle at 30% 40%, rgba(255, 244, 214, 0.55) 0 0.014em, transparent 0.022em),
+      radial-gradient(circle at 70% 20%, rgba(255, 244, 214, 0.45) 0 0.01em, transparent 0.017em),
+      radial-gradient(circle at 50% 70%, rgba(255, 244, 214, 0.5) 0 0.018em, transparent 0.026em),
+      linear-gradient(
+        0deg,
+        var(--tm-metal-base) 0%,
+        var(--tm-metal-fundo) 18%,
+        var(--tm-metal-meio) 34%,
+        var(--tm-metal-volta) calc(var(--chope-nivel) - var(--chope-espuma) - 4%),
+        #ffe7a8 calc(var(--chope-nivel) - var(--chope-espuma)),
+        #fff8e6 calc(var(--chope-nivel) - var(--chope-espuma) + 3%),
+        var(--tm-metal-luz) calc(var(--chope-nivel) - 3%),
+        #e8d6ae var(--chope-nivel),
+        rgba(206, 226, 250, 0.96) var(--chope-nivel),
+        #eaf3ff 100%
+      );
+    background-size: 0.37em 0.53em, 0.29em 0.41em, 0.23em 0.67em, 100% 100%;
+    background-repeat: repeat, repeat, repeat, no-repeat;
+    background-position: 0 0, 0 0, 0 0, 0 0;
+    animation-name: tiraChope, borbulha;
+    animation-duration: calc(1700ms + var(--i, 0) * 40ms), 12s;
+    animation-timing-function: linear, linear;
+    animation-iteration-count: 1, infinite;
+  }
+}
+/* Tirar o chope: parado até 25% (o copo vazio do quadro 0 ainda tem um dedo de chope), sobe
+   passando do ponto (104%) e assenta. Pintura, não composição: ~1,3 s, só nas 10 letras. */
+@keyframes tiraChope {
+  0%,
+  25% {
+    --chope-nivel: 38%;
+    --chope-espuma: 8%;
+    animation-timing-function: cubic-bezier(0.3, 0, 0.4, 1);
+  }
+  80% {
+    --chope-nivel: 104%;
+    --chope-espuma: 34%;
+    animation-timing-function: cubic-bezier(0.3, 0, 0.3, 1);
+  }
+  90% {
+    --chope-nivel: 99%;
+    --chope-espuma: 37%;
+  }
+  100% {
+    --chope-nivel: 100%;
+    --chope-espuma: 36%;
+  }
+}
+/* As bolhas sobem dois ladrilhos (o fim é igual ao começo); paradas 80% do ciclo. */
+@keyframes borbulha {
+  0%,
+  15% {
+    background-position: 0 0, 0 0, 0 0, 0 0;
+  }
+  35%,
+  100% {
+    background-position: 0 -1.06em, 0 -0.82em, 0 -1.34em, 0 0;
+  }
+}
+@media (max-width: 599px) {
+  .raiz .letra .cromo {
+    animation-name: tiraChope;
+    animation-iteration-count: 1;
+  }
+}
+
+/* -------------------------------------------- DO BAR: pincelada azul, circulado a giz */
+@keyframes pincelada {
+  0%,
+  55% {
+    transform: translate(calc(var(--tam) * -0.3), 0) rotate(-6deg) scale(1.08);
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.3, 1);
+  }
+  85% {
+    transform: translate(calc(var(--tam) * 0.02), 0) rotate(0.8deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+.raiz .assinatura {
+  position: relative;
+  isolation: isolate;
+  margin-top: 0.02em;
+  animation: pincelada 1800ms linear;
+}
+.raiz .pincel {
+  transform: rotate(-3deg);
+  padding: 0.1em 0.45em 0.16em;
+  font: 400 max(24px, calc(var(--tam) * 0.44)) / 1 var(--tm-fonte-titulo), "Arial Black", sans-serif;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #6fb0ff;
+  text-shadow: none;
+  /* contorno escuro e o brilho azul: estáticos */
+  filter: drop-shadow(0 0.05em 0 #05070d) drop-shadow(0 0 0.025em #05070d) drop-shadow(0 0 0.14em rgba(61, 139, 255, 0.5));
+}
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .raiz .pincel {
+    background: linear-gradient(180deg, #ddeeff 0%, #8cc2ff 30%, #3d8bff 64%, #2f7bff 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
+.raiz .assinatura .enfTraco {
+  position: absolute;
+  inset: -16% -12% -24% -12%;
+  z-index: -1;
+  width: auto;
+  height: auto;
+  margin: 0;
+  animation: none;
+}
+.enfGiz {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+/* O giz se desenha (stroke-dashoffset) de 1,2 s a 1,9 s; o repouso é desenhado. */
+.enfGizRisco {
+  fill: none;
+  stroke: var(--giz);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  opacity: 0.85;
+  animation: gizRisca 1900ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.enfGizRisco2 {
+  stroke-width: 1.4;
+  opacity: 0.5;
+  animation-duration: 2050ms;
+}
+@keyframes gizRisca {
+  0%,
+  63% {
+    stroke-dashoffset: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* -------------------------------------------- o lema na lousinha do escudo */
+.raiz .lema {
+  width: fit-content;
+  max-width: min(100%, 32em);
+  margin: clamp(22px, 2.6vw, 30px) auto 0;
+  padding: 0.62em 1.05em 0.58em;
+  border: 6px solid transparent;
+  border-radius: 7px;
+  rotate: -1.5deg; /* estático; a entrada (.sobe) é transform */
+  background:
+    radial-gradient(60% 80% at 20% 30%, rgba(241, 238, 228, 0.07), transparent 70%) padding-box,
+    radial-gradient(50% 70% at 80% 70%, rgba(241, 238, 228, 0.05), transparent 70%) padding-box,
+    linear-gradient(var(--lousa), var(--lousa)) padding-box,
+    linear-gradient(160deg, #7a5230, #4a2c15) border-box;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.55), inset 0 0 18px rgba(0, 0, 0, 0.45), 0 10px 22px -10px #000;
+  font: 700 clamp(13px, 1.1vw, 16px) / 1.35 var(--tm-fonte-assinatura), "Comic Sans MS", cursive;
+  letter-spacing: 0.04em;
+  color: var(--giz); /* 14,1:1 na lousa */
+  text-wrap: balance;
+}
+
+/* -------------------------------------------- chips viram fichas de bar (pílulas) */
+.raiz .chip::before {
+  transform: none;
+  border-radius: 999px;
+}
+.raiz .chipPts::before {
+  background: linear-gradient(180deg, var(--tm-metal-luz), var(--tm-metal-placa));
+  box-shadow: inset 0 0 0 1px rgba(255, 244, 214, 0.7), 0 6px 18px -6px rgba(245, 165, 36, 0.6);
+}
+/* O dono do caneco: marinho com as listras da camisa na ponta direita. */
+.raiz .chipCapitao {
+  padding-right: 38px;
+}
+.raiz .chipCapitao::before {
+  background:
+    linear-gradient(270deg, transparent 0 26px, var(--tm-abismo) 26px),
+    repeating-linear-gradient(90deg, #06070d 0 6px, #1440c8 6px 12px);
+  border: 1px solid rgba(245, 165, 36, 0.65);
+}
+/* OP.GG: um tubo de neon (brilho estático). */
+.raiz .chipOpgg::before {
+  border: 2px solid var(--tm-neon);
+  background: rgba(7, 8, 15, 0.55);
+  box-shadow: 0 0 10px rgba(61, 139, 255, 0.45), inset 0 0 8px rgba(61, 139, 255, 0.3);
+}
+.raiz .chipOpgg:hover::before {
+  background: var(--tm-royal);
+}
+/* «DONO DO CANECO · SOU ADC NÃO DEUS» mede ~311 px: no limite em 360. Vira texto corrido (em bloco,
+   não flex: com flex cada pedaço quebrava na própria coluna e a leitura saía em zigue-zague). */
+@media (max-width: 419px) {
+  .raiz .blocoTexto .chipCapitao {
+    flex: 1 1 100%;
+    display: block;
+    padding-block: 12px;
+    line-height: 1.6;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-wrap: balance;
+    text-align: center;
+  }
+  .raiz .blocoTexto .chipCapitao > svg {
+    display: inline-block;
+    vertical-align: -3px;
+    margin-right: 8px;
+  }
+}
+
+/* ======================================================================= elenco: a lousa tática */
+.raiz .elencoSecao {
+  padding-bottom: clamp(92px, 9vw, 128px); /* a calha de giz e os rabiscos embaixo */
+}
+/* A 1ª bolacha, girada, passava por cima da moldura de madeira até ~1300 px. */
+@media (min-width: 600px) and (max-width: 1365px) {
+  .raiz .elencoSecao .conteiner {
+    padding-inline: 34px;
+  }
+}
+/* A lousa: ardósia com pó de apagador, moldura de madeira, calha com dois gizes. Atrás do texto
+   e das bolachas (z −1 dentro do .conteudo), acima do palco. No celular, de ponta a ponta. */
+.enfLousa {
+  position: absolute;
+  z-index: -1;
+  left: 0;
+  right: 0;
+  top: clamp(8px, 1.6vw, 20px);
+  bottom: clamp(18px, 2.4vw, 32px);
+  pointer-events: none;
+  border-block: 8px solid var(--madeira);
+  background:
+    radial-gradient(40% 30% at 22% 28%, rgba(241, 238, 228, 0.06), transparent 70%),
+    radial-gradient(36% 26% at 74% 62%, rgba(241, 238, 228, 0.05), transparent 70%),
+    radial-gradient(60% 12% at 50% 96%, rgba(241, 238, 228, 0.07), transparent 70%),
+    var(--lousa);
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.55), 0 20px 40px -20px #000;
+}
+@media (min-width: 600px) {
+  .enfLousa {
+    left: 50%;
+    right: auto;
+    width: min(100% - 16px, 1296px);
+    translate: -50% 0;
+    border: 10px solid var(--madeira);
+    border-radius: 6px;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 0 50px rgba(0, 0, 0, 0.5), 0 0 0 1px #2a190c, 0 24px 48px -20px #000;
+  }
+}
+/* A calha com dois tocos de giz. */
+.enfLousa::after {
+  content: "";
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: -14px;
+  height: 10px;
+  border-radius: 2px;
+  background:
+    linear-gradient(var(--giz), var(--giz)) 22% 1px / 28px 5px no-repeat,
+    linear-gradient(#ffd45e, #ffd45e) 30% 2px / 18px 5px no-repeat,
+    linear-gradient(180deg, #7a5230, #3a2212);
+  box-shadow: 0 4px 8px -2px #000;
+}
+.enfGizTatica {
+  position: absolute;
+  inset: auto 4% 26px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+.enfGizConta {
+  width: clamp(110px, 14vw, 190px);
+  height: auto;
+}
+.enfGizJogada {
+  width: clamp(110px, 14vw, 190px);
+  height: auto;
+}
+.enfGizTatica .enfGizRisco {
+  stroke-width: 3;
+  opacity: 0.6;
+}
+@supports (animation-timeline: view()) {
+  .enfGizConta,
+  .enfGizJogada {
+    view-timeline: --gizDaLousa block;
+  }
+  .enfGizTatica .enfGizRisco {
+    animation: gizRiscaRolagem linear;
+    animation-timeline: --gizDaLousa;
+    animation-range: entry 30% cover 55%;
+  }
+}
+@keyframes gizRiscaRolagem {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* O título da lousa, a giz, sublinhado com um risco seco. */
+.raiz .estrelando {
+  position: relative;
+  margin-top: clamp(14px, 2vw, 26px);
+  font: 700 clamp(26px, 3vw, 42px) / 1.1 var(--tm-fonte-assinatura), "Comic Sans MS", cursive;
+  letter-spacing: 0.02em;
+  color: var(--giz);
+}
+.raiz .estrelando::after {
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(241, 238, 228, 0.8), rgba(241, 238, 228, 0.12));
+  -webkit-mask-image: repeating-linear-gradient(90deg, #000 0 14px, rgba(0, 0, 0, 0.5) 14px 18px);
+  mask-image: repeating-linear-gradient(90deg, #000 0 14px, rgba(0, 0, 0, 0.5) 14px 18px);
+}
+.raiz .aviso {
+  margin-top: -6px;
+  font: 400 clamp(14px, 1.2vw, 16px) / 1.4 var(--tm-fonte-assinatura), "Comic Sans MS", cursive;
+  color: #d9d4c6; /* 11:1 na lousa */
+}
+
+/* -------------------------------------------- as cartas viram bolachas de chope */
+/* Distribuídas na mesa: chegam girando de baixo e assentam, cada uma no seu giro (por rolagem
+   em todas as larguras; sem suporte, pelo relógio, com a espera dentro do keyframe). De BAIXO:
+   vindo de cima, a bolacha que entra pela rolagem cobria a comanda da linha anterior. */
+@keyframes bolachaPousa {
+  from {
+    transform: translate(-8px, 26px) rotate(-6deg) scale(1.02);
+  }
+  72% {
+    transform: translate(1px, 2px) rotate(1deg) scale(0.99);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes bolachaPousaRelogio {
+  0%,
+  60% {
+    transform: translate(-8px, 26px) rotate(-6deg) scale(1.02);
+    animation-timing-function: cubic-bezier(0.3, 0, 0.3, 1);
+  }
+  88% {
+    transform: translate(1px, 2px) rotate(1deg) scale(0.99);
+  }
+  100% {
+    transform: none;
+  }
+}
+.raiz .casca {
+  --giro: 0deg;
+  rotate: calc(var(--giro) * var(--giro-escala, 1)); /* estático; a entrada é transform */
+  border-radius: 18px; /* o anel de foco acompanha a bolacha */
+  animation-name: bolachaPousaRelogio;
+  animation-duration: calc(2000ms + var(--i, 0) * 140ms);
+  animation-timing-function: linear;
+}
+@supports (animation-timeline: view()) {
+  .raiz .casca {
+    animation: bolachaPousa linear; /* o shorthand primeiro: ele zera a timeline */
+    animation-timeline: view();
+    animation-range: entry 0% entry calc(60% + var(--col, 0) * 12%);
+  }
+}
+@media (min-width: 1024px) {
+  @supports (animation-timeline: view()) {
+    .raiz .casca {
+      animation-range: entry 0% entry calc(50% + var(--i, 0) * 8%);
+    }
+  }
+}
+/* Giros que não convergem entre vizinhas (pivô na base: duas cartas que se inclinam uma para a
+   outra encostavam no topo). */
+.raiz .casca:nth-child(4n + 1) {
+  --giro: -2deg;
+}
+.raiz .casca:nth-child(4n + 2) {
+  --giro: -0.4deg;
+}
+.raiz .casca:nth-child(4n + 3) {
+  --giro: 1.2deg;
+}
+.raiz .casca:nth-child(4n) {
+  --giro: 0.4deg;
+}
+.raiz .cascaCapitao:nth-child(n) {
+  --giro: 0deg;
+}
+@media (max-width: 599px) {
+  .raiz .casca {
+    --giro-escala: 0.5;
+  }
+}
+/* Fita crepe no topo de cada bolacha (o dono do caneco não precisa). */
+.raiz .casca::before {
+  content: "";
+  position: absolute;
+  z-index: 5;
+  top: -9px;
+  left: 50%;
+  width: 56px;
+  height: 18px;
+  translate: -50% 0;
+  rotate: -4deg;
+  pointer-events: none;
+  background: rgba(232, 220, 190, 0.8);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+.raiz .cascaCapitao::before {
+  display: none;
+}
+
+/* A bolacha: borda de papelão, face impressa com as listras da camisa e o medalhão. */
+.raiz .carta {
+  container-type: inline-size;
+  clip-path: none;
+  padding: 3px;
+  border-radius: 18px;
+  background: linear-gradient(160deg, #ede2c8, #c9b68e);
+  box-shadow: 0 14px 26px -12px rgba(0, 0, 0, 0.85);
+}
+.raiz .miolo {
+  clip-path: none;
+  overflow: hidden;
+  border-radius: 15px;
+  grid-template-rows: auto 1fr auto;
+  background: var(--tm-abismo);
+}
+/* O texto sai de cima da foto (o link esticado continua se medindo pelo .miolo, que é relative;
+   .identidade fica SEM position). */
+.raiz .sobreFoto {
+  display: contents;
+}
+.raiz .foto {
+  aspect-ratio: 1;
+  background:
+    radial-gradient(closest-side, transparent 0 84%, var(--tm-primaria) 84.5% 86.5%, transparent 87% 89.5%, rgba(255, 217, 98, 0.85) 90% 91%, transparent 91.5%),
+    radial-gradient(closest-side, var(--tm-abismo) 0 92%, transparent 92.5%),
+    repeating-linear-gradient(90deg, #070b1c 0 14px, #12308f 14px 26px);
+}
+.raiz .foto img {
+  inset: 8%;
+  width: 84%;
+  height: 84%;
+  aspect-ratio: auto;
+  object-fit: contain;
+  border-radius: 50%;
+  filter: none; /* figurinhas claras contra a noite: sem sépia (é da QM) */
+}
+.raiz .casca:hover .foto img {
+  scale: none; /* o medalhão não cresce para dentro do anel */
+}
+/* O verniz do medalhão. */
+.raiz .enfGradacao {
+  inset: 8%;
+  border-radius: 50%;
+  background: linear-gradient(140deg, rgba(255, 255, 255, 0.18), transparent 38%);
+}
+.raiz .enfRotaGigante {
+  display: none;
+}
+.raiz .topo {
+  grid-area: 1 / 1;
+  align-self: start;
+  z-index: 2;
+  padding: 8px;
+}
+.raiz .etiquetaRota {
+  border: 0;
+  border-radius: 999px;
+  padding: 4px 8px 4px 7px;
+  background: linear-gradient(180deg, var(--tm-metal-luz), var(--tm-metal-placa));
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  --tm-icone: var(--tm-tinta);
+}
+.raiz .identidade {
+  grid-area: 2 / 1;
+  z-index: 2;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 5px;
+  padding: 4px 8px 10px;
+}
+/* O nick pela palavra mais larga do ELENCO, medida (--maior-palavra-em: DINGOBEELL = 5,86 em):
+   todas as bolachas no mesmo tamanho, quebrando só entre palavras. */
+.raiz .nick {
+  --nick: clamp(14px, calc((100cqi - 22px) / var(--maior-palavra-em, 7.8)), 26px);
+  overflow-wrap: anywhere; /* como a base: um nick de palavra única gigante parte em vez de vazar */
+  text-wrap: balance;
+  line-height: 1.02;
+  letter-spacing: 0.01em;
+  padding: 0.12em 0.14em 0.1em;
+  margin-right: 0;
+  filter: drop-shadow(0 2px 0 #05070d);
+}
+.raiz .placaCapitao {
+  border-radius: 999px;
+  padding: 4px 10px 3px;
+  background: #06070d;
+  color: var(--tm-acento); /* 14:1 */
+  box-shadow: 0 0 0 1px rgba(245, 165, 36, 0.7);
+}
+/* O rodapé vira a COMANDA: papel pautado com picote, nome a caneta. */
+.raiz .rodape {
+  grid-area: 3 / 1;
+  align-items: flex-end;
+  flex-wrap: wrap; /* sem espaço, o «FICHA →» desce em vez de partir o nome no meio */
+  row-gap: 2px;
+  border-top: 0;
+  padding: 13px 12px 9px;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 15px, rgba(30, 79, 216, 0.16) 15px 16px),
+    var(--papel);
+  -webkit-mask: radial-gradient(circle 5px at 50% 0, #0000 96%, #000) 0 0 / 10px 100% repeat-x;
+  mask: radial-gradient(circle 5px at 50% 0, #0000 96%, #000) 0 0 / 10px 100% repeat-x;
+}
+.raiz .nome {
+  overflow: visible;
+  white-space: normal;
+  text-overflow: clip;
+  overflow-wrap: break-word;
+  color: var(--tm-tinta); /* 15,8:1 */
+  font: 700 13px / 1.2 var(--tm-fonte-assinatura), "Comic Sans MS", cursive;
+}
+.raiz .ficha {
+  margin-left: auto;
+  color: var(--caneta); /* 5,8:1 */
+  font: 700 12px / 1 var(--tm-fonte-assinatura), "Comic Sans MS", cursive;
+  letter-spacing: 0.02em;
+}
+
+/* O dono do caneco: a bolacha de ouro, com folha laminada. */
+.raiz .cascaCapitao .carta {
+  background: linear-gradient(160deg, var(--tm-metal-luz), var(--tm-metal-alto) 22%, var(--tm-metal-sombra) 48%, var(--tm-metal-volta) 66%, var(--tm-metal-base));
+  box-shadow: 0 0 0 1px #1a0d02, 0 18px 34px -14px rgba(0, 0, 0, 0.9);
+}
+.raiz .cascaCapitao .miolo {
+  background: #06070d;
+}
+.raiz .cascaCapitao .foto {
+  background:
+    radial-gradient(closest-side, transparent 0 84%, var(--tm-metal-alto) 84.5% 87%, transparent 87.5% 89.5%, var(--tm-metal-volta) 90% 91.5%, transparent 92%),
+    repeating-conic-gradient(from 0deg at 50% 50%, rgba(245, 165, 36, 0.14) 0 6deg, transparent 6deg 15deg),
+    #06070d;
+}
+.raiz .cascaCapitao .enfHaloCarta {
+  background: radial-gradient(closest-side, rgba(255, 196, 110, 0.5), rgba(245, 165, 36, 0.16) 60%, transparent);
+}
+/* A folha laminada da bolacha de ouro: um brilho a cada 6 s. */
+.raiz .cascaCapitao .enfVarredura {
+  inset: -10% -80%;
+  background: linear-gradient(100deg, transparent 42%, rgba(255, 244, 214, 0.28) 50%, transparent 58%);
+  animation: folhaBrilha 6s cubic-bezier(0.3, 0.1, 0.2, 1) infinite;
+}
+@keyframes folhaBrilha {
+  0%,
+  60% {
+    transform: translateX(-100%);
+  }
+  80%,
+  100% {
+    transform: translateX(100%);
+  }
+}
+.raiz .coroaDoCapitao {
+  width: 58px;
+  top: -34px;
+  rotate: -8deg;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 10px rgba(245, 165, 36, 0.45));
+}
+@media (max-width: 599px) {
+  .raiz .coroaDoCapitao {
+    width: 48px;
+    top: -28px;
+  }
+  /* O caneco pousa no vão, não no pé da comanda de cima (sozinho na linha: nada estica). */
+  .raiz .cascaCapitao {
+    margin-top: 20px;
+  }
+}
+/* No tablet o capitão divide a linha com outra carta: afasta as linhas em vez de descer só ele. */
+@media (min-width: 600px) and (max-width: 1023px) {
+  .raiz .elenco {
+    row-gap: 34px;
+  }
+}
+
+/* Celular: o dono do caneco DEITADO, na largura toda (medalhão à esquerda, texto à direita). */
+@media (max-width: 599px) {
+  .raiz .cascaLarga .miolo {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    grid-template-rows: 1fr auto;
+  }
+  .raiz .cascaLarga .foto {
+    grid-area: 1 / 1 / 3 / 2;
+    aspect-ratio: 1;
+    align-self: center;
+  }
+  .raiz .cascaLarga .topo {
+    grid-area: 1 / 1 / 3 / 2;
+  }
+  .raiz .cascaLarga .identidade {
+    grid-area: 1 / 2;
+    align-items: flex-start;
+    text-align: left;
+    padding: 12px 12px 8px 4px;
+  }
+  .raiz .cascaLarga .rodape {
+    grid-area: 2 / 2;
+  }
+  .raiz .cascaLarga .nick {
+    --nick: clamp(20px, calc((100cqi * 0.55 - 20px) / var(--maior-palavra-em, 7.8)), 30px);
+  }
+  .raiz .cascaLarga .coroaDoCapitao {
+    left: 24%;
+  }
+}
+
+/* ======================================================================= cartela: a TV do bar */
+.raiz .enfLinhaCromo {
+  color: var(--tm-primaria);
+}
+.raiz .enfLinhaCromo::before,
+.raiz .enfLinhaCromo::after {
+  height: 6px;
+  background:
+    linear-gradient(var(--tm-primaria), var(--tm-primaria)) 0 0 / 100% 1px no-repeat,
+    repeating-linear-gradient(90deg, #06070d 0 8px, #1440c8 8px 16px);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 30%, #000 70%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 30%, #000 70%, transparent);
+}
+.raiz .enfLinhaCromo svg {
+  width: 22px;
+}
+/* A tela: gramado embaixo (a peça NaCartela), faixas de transmissão por cima. A moldura preta é
+   box-shadow (não ocupa layout). Texto nunca sobre o gramado: cada faixa tem fundo próprio. */
+.raiz .cartelaCorpo {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(clamp(96px, 16vw, 180px), 1fr) auto auto;
+  max-width: 680px;
+  margin: 0 auto 74px;
+  border-radius: 12px;
+  text-align: left;
+  background: #0d2a17;
+  box-shadow: 0 0 0 10px #07080c, 0 0 0 11px #2a2f3a, 0 30px 60px -20px #000, 0 0 80px -6px rgba(37, 137, 63, 0.35);
+}
+.enfTelaCartela {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: 12px;
+  font-size: clamp(22px, 6vw, 40px); /* o círculo central (em) */
+}
+.enfTelaCartela .enfJogador {
+  width: 1.7%;
+}
+.enfTelaCartela .enfBola {
+  width: 1.1%;
+}
+@supports (animation-timeline: view()) {
+  .enfTelaCartela {
+    animation: telaLigaRolagem linear;
+    animation-timeline: view();
+    animation-range: entry 10% entry 80%;
+  }
+}
+@keyframes telaLigaRolagem {
+  from {
+    transform: scale(1, 0.03);
+  }
+  45% {
+    transform: scale(1, 1.03);
+  }
+  to {
+    transform: none;
+  }
+}
+.raiz .cartelaEscudo {
+  position: relative;
+  z-index: 1;
+  grid-row: 1;
+  grid-column: 1;
+  width: 72px;
+  height: 72px;
+  margin: 0;
+  padding: 8px 6px 8px 12px;
+  box-sizing: content-box;
+  border-top-left-radius: 12px;
+  background: var(--tm-abismo);
+}
+.raiz .cartelaNome {
+  position: relative;
+  z-index: 1;
+  grid-row: 1;
+  grid-column: 2;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  padding: 8px 16px 8px 8px;
+  background: linear-gradient(90deg, var(--tm-abismo), #0f2470);
+  border-bottom: 2px solid var(--tm-primaria);
+  border-top-right-radius: 12px;
+  color: var(--tm-metal-alto); /* 13,3:1 */
+  font-size: clamp(20px, 2.6vw, 30px);
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+}
+.raiz .cartelaDestino {
+  position: relative;
+  z-index: 1;
+  grid-row: 3;
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 8px 14px;
+  background: linear-gradient(90deg, #12308f, #0f3a86 60%, rgba(15, 58, 134, 0.85));
+  border-top: 2px solid var(--tm-primaria);
+  color: var(--tm-texto); /* 10:1 */
+  font: 700 13px / 1.3 var(--tm-fonte-assinatura), "Comic Sans MS", cursive;
+  letter-spacing: 0.02em;
+}
+.raiz .cartelaData {
+  position: relative;
+  z-index: 1;
+  grid-row: 4;
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 7px 14px 8px;
+  border-radius: 0 0 12px 12px;
+  background: #05060a;
+  color: #ffc928; /* LED âmbar, 13:1 */
+  letter-spacing: 0.16em;
+}
+/* O ponto "ao vivo" pulsa por ESCALA (0,6 por segundo). */
+.raiz .cartelaData::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff3b4e;
+  box-shadow: 0 0 6px #ff3b4e;
+  animation: aoVivo 1600ms ease-in-out infinite;
+}
+@keyframes aoVivo {
+  0%,
+  100% {
+    transform: scale(0.7);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+}
+/* A plaquinha de boteco pendurada embaixo da TV (fora da tela: nunca cobre texto). Balança
+   quando a TV entra na tela. */
+.raiz .cartelaCarimbo {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  top: calc(100% + 26px);
+  translate: -50% 0;
+  margin: 0;
+  padding: 7px 14px 6px;
+  border: 2px solid #c8102e;
+  border-radius: 4px;
+  background:
+    radial-gradient(circle at 8px 50%, #8a8f99 0 2px, transparent 2.5px),
+    radial-gradient(circle at calc(100% - 8px) 50%, #8a8f99 0 2px, transparent 2.5px),
+    #fafaf5;
+  box-shadow: 0 0 0 3px #fafaf5, 0 8px 16px -6px #000;
+  color: #c8102e; /* 5,6:1 */
+  font: 400 15px / 1 var(--tm-fonte-titulo), "Arial Black", sans-serif;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  transform-origin: 50% -26px;
+}
+@supports (animation-timeline: view()) {
+  .raiz .cartelaCarimbo {
+    animation: plaquinhaBalanca linear;
+    animation-timeline: view();
+    animation-range: entry 20% cover 50%;
+  }
+}
+@keyframes plaquinhaBalanca {
+  from {
+    transform: rotate(-9deg);
+  }
+  40% {
+    transform: rotate(6deg);
+  }
+  70% {
+    transform: rotate(-2.5deg);
+  }
+  to {
+    transform: none;
+  }
+}
+/* O arame da plaquinha até a TV. */
+.raiz .cartelaCarimbo::before {
+  content: "";
+  position: absolute;
+  left: 20%;
+  right: 20%;
+  bottom: calc(100% + 5px);
+  height: 21px;
+  border-inline: 2px solid #8a8f99;
+}
+/* Time sem escudo: o nome ocupa a faixa toda. */
+.raiz .cartelaCorpo:not(:has(.cartelaEscudo)) .cartelaNome {
+  grid-column: 1 / -1;
+  padding-left: 14px;
+  border-top-left-radius: 12px;
+}
+.raiz .cartelaFecho {
+  margin: 0 0 20px;
+  font: 400 15px / 1.5 var(--tm-fonte-assinatura), "Comic Sans MS", cursive;
+  letter-spacing: 0.01em;
+  color: var(--tm-apoio); /* 9,5:1 */
+}
+@media (max-width: 599px) {
+  .raiz .cartelaEscudo {
+    width: 52px;
+    height: 52px;
+  }
+  .raiz .cartelaNome {
+    font-size: 18px;
+  }
+}
+
+/* ======================================================================= celular e acessibilidade */
+@media (max-width: 899px) {
+  .enfBokeh:nth-child(n + 5) {
+    display: none;
+  }
+  .enfBolha:nth-child(n + 4) {
+    display: none;
+  }
+}
+/* O bloco da base (.raiz * { animation: none !important }) já para tudo: vira o pôster aceso,
+   chope cheio, giz desenhado. Aqui só some o que só faz sentido em movimento. */
+@media (prefers-reduced-motion: reduce) {
+  .enfRespingos,
+  .enfTim,
+  .enfAnelTim,
+  .enfGota,
+  .enfCaneco,
+  .enfBrilhoOculos,
+  .enfTelaLiga,
+  .enfReflexoGarrafas,
+  .enfBrilhoBalcao {
+    display: none;
+  }
+}
+@media (forced-colors: active) {
+  .raiz .cromo,
+  .raiz .letra .cromo,
+  .raiz .pincel {
+    background: none;
+    filter: none;
+    -webkit-text-fill-color: CanvasText;
+    color: CanvasText;
+  }
+  .raiz .eco,
+  .raiz .assinatura .enfTraco {
+    display: none;
+  }
+}
+@media (prefers-contrast: more) {
+  .raiz .cromo,
+  .raiz .letra .cromo {
+    background: none;
+    -webkit-text-fill-color: #ffe08a;
+  }
+  .raiz .eco {
+    /* o contorno escuro ajuda aqui: a base o esconde */
+    display: block;
+  }
+  .raiz .pincel {
+    background: none;
+    -webkit-text-fill-color: #9ccbff;
+  }
+}

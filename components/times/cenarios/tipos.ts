@@ -34,6 +34,10 @@ export type CenarioDoTema = Readonly<{
   TracoDoNome?: (props: Readonly<{ className?: string }>) => ReactNode;
   /** Atrás do retrato da ficha (a lua na QM). */
   AtrasDoRetrato?: () => ReactNode;
+  /** Atrás do elenco, primeiro filho da seção (a lousa tática na Galácticos). */
+  AtrasDoElenco?: () => ReactNode;
+  /** Dentro do miolo da cartela, antes do texto (a tela da TV na Galácticos). */
+  NaCartela?: () => ReactNode;
   /** O módulo CSS do cenário: ganchos com o nome das peças de tema.module.css. */
   classes?: Readonly<Record<string, string>>;
   /** O mesmo para as peças de ficha.module.css (outro módulo: há nomes repetidos, `topo`…). */

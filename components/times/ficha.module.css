@@ -98,6 +98,19 @@
   object-position: var(--foco, 50% 30%);
   filter: saturate(0.9) contrast(1.06); /* estático */
 }
+/* Avatar redondo (lib/temas: fotos.formato = "medalhao"): retrato 1:1 em toda largura (inclusive
+   600–899, que é 4:3) e o círculo inteiro. Depois das regras acima: mesma especificidade. */
+:where([data-fotos="medalhao"]) .retratoMiolo {
+  aspect-ratio: 1;
+}
+:where([data-fotos="medalhao"]) .retratoMiolo > img {
+  inset: 4%;
+  width: 92%;
+  height: 92%;
+  object-fit: contain;
+  object-position: 50% 50%;
+  border-radius: 50%;
+}
 .retratoVazio {
   position: absolute;
   inset: 0;
@@ -367,6 +380,14 @@
   height: 100%;
   object-fit: cover;
   object-position: var(--foco, 50% 30%);
+}
+:where([data-fotos="medalhao"]) .companheiroFoto img {
+  inset: 6%;
+  width: 88%;
+  height: 88%;
+  object-fit: contain;
+  object-position: 50% 50%;
+  border-radius: 50%;
 }
 .companheiroTexto {
   display: flex;

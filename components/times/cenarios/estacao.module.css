@@ -682,9 +682,10 @@
   left: 50%;
   width: calc(var(--bitola) * 2 + 180px);
   height: 320%;
-  translate: -50% 0;
   transform-origin: 50% 0;
-  transform: rotateX(74deg);
+  /* O recuo vai dentro do transform: com `translate:` separado, o lightningcss do build o
+     descartava e os trilhos saíam jogados para a direita em produção. */
+  transform: translateX(-50%) rotateX(74deg);
   background:
     linear-gradient(90deg,
       transparent calc(50% - var(--bitola) - 4px),

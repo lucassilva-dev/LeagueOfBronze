@@ -11,6 +11,7 @@ import { comCenario, cx, type ClassesDaPeca } from "@/components/times/util";
 import { rotaCurto, type PaginasHomeTextos } from "@/lib/i18n/messages/paginas-home";
 import type { getOpGgMultiSearchUrlFromNicks } from "@/lib/opgg";
 import type { DesignPlayer, DesignTeam } from "@/lib/roster";
+import { METRICAS, maiorPalavraEm } from "@/lib/temas/metricas";
 import { partesDoNome, textoDoTema, varsDoTema } from "@/lib/temas/registro";
 import type { PapelDoTexto, TemaDoTime } from "@/lib/temas/tipos";
 
@@ -81,8 +82,13 @@ function Titulo({
   c,
   id,
 }: Readonly<{ team: DesignTeam; tema: TemaDoTime; cenario: CenarioDoTema; c: ClassesDaPeca; id: string }>) {
-  const { assinatura, marca } = partesDoNome(team.name, tema.prefixo, tema.sufixo);
+  const partes = partesDoNome(team.name, tema.prefixo, tema.sufixo);
+  // NFC: um acento gravado decomposto ("A" + U+0301) viraria uma "letra" solta.
+  const marca = partes.marca.normalize("NFC");
+  const { assinatura } = partes;
   const { TracoDoNome } = cenario;
+  // A largura MEDIDA da maior palavra, quando a fonte do título tem métrica (lib/temas/metricas).
+  const metrica = METRICAS[tema.fontes.titulo];
   // Letra por letra, palavra por palavra: o nome quebra ENTRE as palavras, e cada letra sabe o
   // lugar dela no nome todo (`--i`) para a cascata da entrada. O tamanho segue a maior palavra.
   const palavras = marca.split(/\s+/).filter(Boolean).map((p) => [...p]);
@@ -96,7 +102,13 @@ function Titulo({
       <span
         className={c("tituloVisual")}
         aria-hidden="true"
-        style={{ "--letras": largura, "--total": totalDeLetras } as CSSProperties}
+        style={
+          {
+            "--letras": largura,
+            "--total": totalDeLetras,
+            ...(metrica && { "--largura-em": maiorPalavraEm(marca, metrica) }),
+          } as CSSProperties
+        }
       >
         <span className={c("marca")}>
           {tema.letraPorLetra ? (
@@ -221,8 +233,9 @@ function CartaDoElenco({
 export function PaginaDoTimeComTema({ team, tema, t, elos, multiOpGg, temporada, periodo }: Props) {
   const cenario = CENARIOS[tema.cenario];
   const c = comCenario(s, cenario.classes);
-  const { Moldura, InsigniaMini } = cenario;
+  const { Moldura, InsigniaMini, AtrasDoElenco, NaCartela } = cenario;
   const texto = (papel: PapelDoTexto) => textoDoTema(tema, t, papel);
+  const metrica = METRICAS[tema.fontes.titulo];
   const capitao = texto("capitao") ?? t.timeCapitaoTema;
   const lema = texto("lema");
   const aviso = texto("aviso");
@@ -241,7 +254,12 @@ export function PaginaDoTimeComTema({ team, tema, t, elos, multiOpGg, temporada,
   const corte = apresenta.lastIndexOf(" ");
 
   return (
-    <div className={cx(c("raiz"), fonteTitulo, fonteAssinatura)} style={varsDoTema(tema)} data-tema={tema.slug}>
+    <div
+      className={cx(c("raiz"), fonteTitulo, fonteAssinatura)}
+      style={varsDoTema(tema)}
+      data-tema={tema.slug}
+      data-fotos={tema.fotos.formato}
+    >
       <Palco tema={tema} />
 
       <div className={c("conteudo")}>
@@ -290,6 +308,7 @@ export function PaginaDoTimeComTema({ team, tema, t, elos, multiOpGg, temporada,
         </section>
 
         <section className={c("elencoSecao")} aria-labelledby="tm-elenco">
+          {AtrasDoElenco ? <AtrasDoElenco /> : null}
           <div className={c("conteiner")}>
             <h2 id="tm-elenco" className={c("estrelando")}>
               {texto("estrelando") ?? t.timeEstrelando}
@@ -298,7 +317,15 @@ export function PaginaDoTimeComTema({ team, tema, t, elos, multiOpGg, temporada,
             <ul
               className={c("elenco")}
               data-n={elenco.length}
-              style={{ "--colunas": Math.min(elenco.length, 5), "--n": elenco.length } as CSSProperties}
+              style={
+                {
+                  "--colunas": Math.min(elenco.length, 5),
+                  "--n": elenco.length,
+                  ...(metrica && {
+                    "--maior-palavra-em": Math.max(...elenco.map((p) => maiorPalavraEm(p.displayNick, metrica))),
+                  }),
+                } as CSSProperties
+              }
             >
               {elenco.map((player, i) => (
                 <CartaDoElenco
@@ -324,6 +351,7 @@ export function PaginaDoTimeComTema({ team, tema, t, elos, multiOpGg, temporada,
               <InsigniaMini className={c("coroaMini")} />
             </span>
             <div className={c("cartelaCorpo")}>
+              {NaCartela ? <NaCartela /> : null}
               {team.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img className={c("cartelaEscudo")} src={team.imageUrl} alt="" width={64} height={64} loading="lazy" />

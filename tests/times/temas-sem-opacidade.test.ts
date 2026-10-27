@@ -95,6 +95,26 @@ describe.each(ARQUIVOS)("$nome", ({ css }) => {
     expect(problemas).toEqual([]);
   });
 
+  // A espera mora DENTRO do keyframe: um delay fora dele deixa o quadro 0 parado no 1º quadro
+  // (com fill-mode) ou "pula" depois de aparecer. Pintura (brilhoCromo) pode esperar.
+  it("conteúdo sem animation-delay", () => {
+    const problemas: string[] = [];
+    for (const r of regras) {
+      if (ehEnfeite(r.seletor)) continue;
+      for (const m of r.corpo.matchAll(/animation-delay\s*:\s*([^;]+)/g)) {
+        if (!/^\s*0m?s\s*$/.test(m[1]!)) problemas.push(`${r.seletor} → animation-delay: ${m[1]!.trim()}`);
+      }
+      for (const m of r.corpo.matchAll(/(?:^|[\s;])animation\s*:\s*([^;]+)/g)) {
+        for (const parte of m[1]!.split(",")) {
+          const nome = parte.trim().split(/\s+/).find((p) => nomes.has(p));
+          const tempos = parte.match(/(^|\s)-?[\d.]+m?s\b/g) ?? [];
+          if (nome && /transform/.test(keyframes.get(nome)!) && tempos.length >= 2) problemas.push(`${r.seletor} → ${parte.trim()}`);
+        }
+      }
+    }
+    expect(problemas).toEqual([]);
+  });
+
   // "none" é permitido: é o que o bloco de movimento reduzido usa.
   it("transição sempre com a propriedade nomeada, nunca opacity, filter ou all", () => {
     for (const regra of regras) {
@@ -134,6 +154,18 @@ describe("os keyframes de entrada do conteúdo", () => {
     "chegaRetrato",
     "chegaNick",
     "carimbaPlaca",
+    // os Galácticos do Bar (cenarios/boteco)
+    "brinde",
+    "chacoalha",
+    "pincelada",
+    "bolachaPousa",
+    "bolachaPousaRelogio",
+    "plaquinhaBalanca",
+    "aoVivo",
+    "bolachaGira",
+    "nickPousa",
+    "tampinhaCai",
+    "tampinhaGira",
   ])(
     "%s anima transform e nada que esconda",
     (nome) => {

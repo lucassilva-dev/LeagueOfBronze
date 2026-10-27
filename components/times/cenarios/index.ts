@@ -1,3 +1,4 @@
+import { BOTECO } from "@/components/times/cenarios/boteco";
 import { ESTACAO } from "@/components/times/cenarios/estacao";
 import { TEMPESTADE } from "@/components/times/cenarios/tempestade";
 import type { CenarioDoTema } from "@/components/times/cenarios/tipos";
@@ -7,4 +8,5 @@ import type { Cenario } from "@/lib/temas/tipos";
 export const CENARIOS: Readonly<Record<Cenario, CenarioDoTema>> = {
   tempestade: TEMPESTADE,
   estacao: ESTACAO,
+  boteco: BOTECO,
 };

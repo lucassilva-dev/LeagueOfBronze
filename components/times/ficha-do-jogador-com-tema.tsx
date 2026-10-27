@@ -11,6 +11,7 @@ import s from "@/components/times/tema.module.css";
 import { comCenario, cx } from "@/components/times/util";
 import { eloLabel, rotaCurto, rotaLabel, type PaginasHomeTextos } from "@/lib/i18n/messages/paginas-home";
 import type { DesignPlayer, DesignTeam } from "@/lib/roster";
+import { METRICAS, larguraDoNickEm } from "@/lib/temas/metricas";
 import { textoDoTema, varsDoTema } from "@/lib/temas/registro";
 import type { TemaDoTime } from "@/lib/temas/tipos";
 
@@ -49,12 +50,15 @@ export function FichaDoJogadorComTema({ player, team, tema, t, elos, tiles, opgg
   const capitao = textoDoTema(tema, t, "capitao") ?? t.timeCapitaoTema;
   // O nick pelo tamanho da MAIOR PALAVRA (quem quebra entre palavras cabe maior).
   const maiorPalavra = Math.max(4, ...player.displayNick.split(/\s+/).map((p) => [...p].length));
+  // A largura MEDIDA para o nick caber em até duas linhas, quando a fonte tem métrica.
+  const metrica = METRICAS[tema.fontes.titulo];
 
   return (
     <div
       className={cx(c("raiz"), cenario.classesDaFicha?.raiz, fonteTitulo, fonteAssinatura)}
       style={varsDoTema(tema)}
       data-tema={tema.slug}
+      data-fotos={tema.fotos.formato}
     >
       <Palco tema={tema} />
 
@@ -124,6 +128,7 @@ export function FichaDoJogadorComTema({ player, team, tema, t, elos, tiles, opgg
                       {
                         "--letras": Math.max(4, [...player.displayNick].length),
                         "--maior-palavra": maiorPalavra,
+                        ...(metrica && { "--largura-nick-em": larguraDoNickEm(player.displayNick, metrica) }),
                       } as CSSProperties
                     }
                   >

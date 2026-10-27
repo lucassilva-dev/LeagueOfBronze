@@ -1,0 +1,344 @@
+/*
+ * A ficha do jogador no cenário "boteco": o retrato é uma bolacha redonda (anel de chope, a
+ * bolacha de papelão dentada atrás), o nick em pincelada cheia de chope, as estatísticas em
+ * tampinhas de garrafa e os companheiros em comandas. Mesmas regras: `.raiz` + o seletor da base;
+ * conteúdo só transform. Peças com classe dos DOIS módulos do cenário (kicker, chips, heroi):
+ * nada aqui repete propriedade que boteco.module.css declara nelas com a mesma especificidade.
+ */
+
+/* ------------------------------------------------------------------ retrato: a bolacha */
+/* Jogada na mesa: chega girando e assenta. O quadro 0 é o retrato inteiro, girado 24°. */
+@keyframes bolachaGira {
+  0%,
+  20% {
+    transform: translate3d(-24px, -10px, 0) rotate(-24deg) scale(0.94);
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.3, 1);
+  }
+  70% {
+    transform: rotate(3deg) scale(1.01);
+  }
+  85% {
+    transform: rotate(-1deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+.raiz .retratoCasca {
+  width: min(100% - 80px, 440px); /* a bolacha dentada (116%) não sai da tela nem encosta nos chips */
+  margin-top: 30px;
+  animation: bolachaGira 1500ms linear;
+}
+.raiz .retratoCapitao {
+  margin-top: 56px; /* o caneco coroado em cima */
+}
+@media (max-width: 899px) {
+  .raiz .retratoCasca {
+    width: min(100% - 40px, 340px);
+  }
+}
+.raiz .enfHaloRetrato {
+  inset: -12%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 196, 110, 0.32), rgba(61, 139, 255, 0.12) 60%, transparent);
+}
+/* 1:1 em TODA largura (a base faz 4:3 em 600–899): a bolacha de trás nunca sobra por baixo. */
+.raiz .retrato {
+  clip-path: none;
+  aspect-ratio: 1;
+  padding: 8px;
+  border-radius: 50%;
+  background: conic-gradient(from 200deg, var(--tm-metal-luz), var(--tm-metal-alto) 14%, var(--tm-metal-sombra) 30%, var(--tm-metal-volta) 48%, var(--tm-metal-fundo) 66%, var(--tm-metal-luz) 82%, var(--tm-metal-alto));
+  box-shadow: 0 0 0 2px #1a0d02, 0 0 0 6px var(--tm-abismo), 0 0 50px -6px rgba(61, 139, 255, 0.45), 0 30px 60px -30px #000;
+}
+.raiz .retratoMiolo {
+  clip-path: none;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--tm-abismo);
+}
+.raiz .retratoMiolo > img {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 50%;
+  filter: none;
+}
+/* O volume da bolacha: luz em cima à esquerda, sombra embaixo à direita (estático). */
+.raiz .enfGradacao {
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 26%, rgba(255, 255, 255, 0.16), transparent 40%);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.08), inset -14px -18px 40px rgba(7, 8, 15, 0.35);
+}
+/* Rota e elo já estão nos chips ao lado: o círculo cortaria os cantos. */
+.raiz .topo {
+  display: none;
+}
+.raiz .placa {
+  left: 50%;
+  bottom: 7%;
+  translate: -50% 0;
+  border-radius: 999px;
+  padding: 6px 12px 5px;
+  background: #06070d;
+  color: var(--tm-acento); /* 14:1 */
+  box-shadow: 0 0 0 1px rgba(245, 165, 36, 0.75), 0 6px 14px -6px #000;
+  font: 400 11px / 1 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+.raiz .coroaDoRetrato {
+  width: 84px;
+  top: -50px;
+  rotate: -8deg;
+  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 12px rgba(245, 165, 36, 0.45));
+}
+/* A bolacha de papelão dentada atrás do retrato: gira uma vez ao chegar (enfeite). */
+.enfBolacha {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: -1;
+  width: 116%;
+  height: auto;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  pointer-events: none;
+  filter: drop-shadow(0 18px 24px rgba(0, 0, 0, 0.6)); /* estático */
+  animation: bolachaAtras 1800ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes bolachaAtras {
+  from {
+    transform: rotate(-70deg) scale(0.9);
+  }
+  to {
+    transform: none;
+  }
+}
+
+/* ------------------------------------------------------------------ texto */
+.raiz .escudoMini {
+  width: 30px;
+  height: 30px;
+}
+/* O nick pousa como o copo no balcão. 2D (background-clip:text no WebKit). */
+@keyframes nickPousa {
+  0%,
+  40% {
+    transform: translate(-0.1em, -0.06em) rotate(-4deg);
+    animation-timing-function: cubic-bezier(0.45, 0, 0.9, 0.55);
+  }
+  78% {
+    transform: translate(0.01em, 0) rotate(0.6deg);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1);
+  }
+  100% {
+    transform: none;
+  }
+}
+/* Pela largura MEDIDA do nick em até duas linhas (--largura-nick-em, lib/temas/metricas.ts):
+   "SOU ADC / NÃO DEUS" = 4,9 em; DINGOBEELL = 5,86 em numa linha. */
+.raiz .nickVisual {
+  display: inline-grid; /* eco e cromo na mesma célula: quebram igual */
+  line-height: 0.95;
+  overflow-wrap: break-word;
+  text-wrap: balance;
+  margin-top: 0.26em; /* o til do NÃO e o Á sobem acima da caixa */
+  margin-bottom: 0.1em;
+  font-size: clamp(28px, calc(100cqi / var(--largura-nick-em, calc(var(--maior-palavra, 6) * 0.78))), 96px);
+  transform-origin: 20% 90%;
+  animation: nickPousa 1400ms linear;
+}
+@media (min-width: 900px) {
+  .raiz .nickVisual {
+    font-size: clamp(40px, calc(100cqi / var(--largura-nick-em, calc(var(--maior-palavra, 6) * 0.78))), 120px);
+  }
+}
+/* Eco e cromo na MESMA célula (o gancho mora aqui: .nickVisual é peça de ficha.module.css; eco
+   e cromo são de outro módulo, então `> *`). */
+.raiz .nickVisual > * {
+  grid-area: 1 / 1;
+}
+.raiz .nomeReal {
+  font: 700 16px / 1.35 var(--tm-fonte-assinatura), "Comic Sans MS", cursive;
+  letter-spacing: 0.01em;
+}
+/* .texto: só na ficha (a página centra os chips do herói em .blocoTexto). */
+.raiz .texto .chips {
+  justify-content: flex-start;
+}
+/* O título NÃO sobe (o .sobe da base o desceria 14 px no quadro 0, para baixo das tampinhas). */
+.raiz .performance {
+  font: 700 clamp(18px, 1.8vw, 22px) / 1 var(--tm-fonte-assinatura), "Comic Sans MS", cursive;
+  letter-spacing: 0.04em;
+  color: var(--giz);
+  animation-name: none;
+}
+.raiz .performance::after {
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(241, 238, 228, 0.7), rgba(241, 238, 228, 0.1));
+}
+
+/* Estatísticas: tampinhas de garrafa (a tampinha é o ::before, na mesma célula do valor). A
+   tampinha cai e quica (o item inteiro só se desloca 6 px: no quadro 0 a 1ª linha não encosta
+   no título) e GIRA sozinha (o ::before), com o número e o rótulo sempre de pé. */
+@keyframes tampinhaCai {
+  0%,
+  58% {
+    transform: translateY(-6px) scale(1.03);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5);
+  }
+  76% {
+    transform: translateY(2px) scale(0.98);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1);
+  }
+  88% {
+    transform: translateY(-1px);
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes tampinhaGira {
+  0%,
+  58% {
+    transform: rotate(-150deg);
+    animation-timing-function: cubic-bezier(0.3, 0, 0.3, 1);
+  }
+  80% {
+    transform: rotate(10deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+.raiz .estatisticas {
+  gap: 12px 6px;
+}
+/* O item também tem o .sobe da base (0,1,0): esta regra (0,2,0) troca o keyframe e fica com a
+   duração em cascata dele. */
+.raiz .estatistica {
+  display: grid;
+  grid-template-rows: auto auto;
+  justify-items: center;
+  align-items: center;
+  gap: 6px;
+  padding: 0 0 2px;
+  border: 0;
+  background: none;
+  animation-name: tampinhaCai; /* a duração em cascata vem do .sobe */
+  animation-timing-function: linear;
+}
+.raiz .estatistica::before {
+  position: static;
+  grid-area: 1 / 1;
+  width: min(76px, 100%);
+  height: auto;
+  aspect-ratio: 1;
+  background:
+    radial-gradient(closest-side, #ffe08a 0 58%, #e8961a 62% 68%, #b5650a 70% 75%, transparent 76%),
+    repeating-conic-gradient(var(--tm-primaria) 0 7.5deg, #9a5408 7.5deg 15deg);
+  -webkit-mask: radial-gradient(closest-side, #000 96%, transparent 98%);
+  mask: radial-gradient(closest-side, #000 96%, transparent 98%);
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.6)); /* estático */
+  animation-name: tampinhaGira;
+  animation-duration: calc(1500ms + var(--i, 0) * 100ms); /* a mesma do .sobe do item */
+  animation-timing-function: linear;
+}
+.raiz .valor {
+  grid-area: 1 / 1;
+  z-index: 1;
+  padding: 0;
+  background: none;
+  color: var(--tm-tinta); /* 14:1 no miolo da tampinha */
+  -webkit-text-fill-color: var(--tm-tinta);
+  font: 400 clamp(18px, 2vw, 24px) / 1 var(--tm-fonte-titulo), sans-serif;
+}
+.raiz .rotulo {
+  grid-area: 2 / 1;
+  font: 700 11px / 1.15 var(--tm-fonte-assinatura), "Comic Sans MS", cursive;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+
+/* ------------------------------------------------------------------ companheiros: comandas */
+.raiz .companheiros {
+  gap: 14px 10px;
+}
+/* O furinho da comanda (no li: o link fica limpo para o foco). */
+.raiz .companheiro::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  top: 5px;
+  left: 50%;
+  width: 7px;
+  height: 7px;
+  translate: -50% 0;
+  border-radius: 50%;
+  background: var(--tm-breu);
+  pointer-events: none;
+}
+.raiz .companheiro:nth-child(odd) .companheiroLink {
+  rotate: -1deg;
+}
+.raiz .companheiro:nth-child(even) .companheiroLink {
+  rotate: 0.8deg;
+}
+.raiz .companheiroLink {
+  align-items: center;
+  min-height: 74px;
+  border: 0;
+  border-radius: 4px;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 15px, rgba(30, 79, 216, 0.16) 15px 16px),
+    var(--papel);
+  color: var(--tm-tinta);
+  box-shadow: 0 8px 18px -8px #000;
+}
+.raiz .companheiroFoto {
+  flex: 0 0 54px;
+  height: 54px;
+  margin: 10px 0 10px 10px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--tm-abismo);
+  box-shadow: 0 0 0 2px var(--tm-primaria), 0 0 0 3px #1a0d02;
+}
+.raiz .companheiroFoto img {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.raiz .companheiroRota {
+  --tm-icone: var(--caneta);
+  color: var(--caneta); /* 5,8:1 no papel */
+  font: 700 12px / 1 var(--tm-fonte-assinatura), "Comic Sans MS", cursive;
+  letter-spacing: 0.04em;
+}
+.raiz .companheiroNick {
+  color: var(--tm-tinta); /* 15,8:1 */
+  font-size: 15px;
+  letter-spacing: 0.01em;
+  overflow-wrap: break-word;
+}
+@media (max-width: 599px) {
+  .raiz .companheiroFoto {
+    flex-basis: 44px;
+    height: 44px;
+    margin: 8px 0 8px 8px;
+  }
+  .raiz .companheiroTexto {
+    padding: 10px 8px;
+  }
+  .raiz .companheiroNick {
+    font-size: 12.5px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .enfBolacha {
+    rotate: 8deg;
+  }
+}
