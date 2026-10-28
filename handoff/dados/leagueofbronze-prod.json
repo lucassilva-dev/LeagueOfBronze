@@ -1,0 +1,730 @@
+{
+  "tournament": {
+    "name": "4ª Edição",
+    "format": "BO3",
+    "status": "active",
+    "seasonId": "season-2026-10-24T21-16-40-802Z",
+    "startedAtISO": "2026-10-24T21:16:40.802Z",
+    "lastUpdatedISO": "2026-10-28T01:51:36.388Z",
+    "seriesPointsRule": {
+      "win": 3,
+      "loss": 0
+    }
+  },
+  "teams": [
+    {
+      "id": "chama",
+      "name": "DESORGANIZAÇÃO",
+      "slug": "desorganizacao",
+      "imageUrl": "/teams/desorganizacao.webp",
+      "pontosDeElenco": 30
+    },
+    {
+      "id": "aurea",
+      "name": "OS 5 SEM PING",
+      "slug": "os-5-sem-ping",
+      "imageUrl": "/teams/os-5-sem-ping.webp"
+    },
+    {
+      "id": "verdante",
+      "name": "SO ADC BRONZE CLUBE",
+      "slug": "so-adc-bronze-clube",
+      "imageUrl": "/teams/so-adc-bronze-clube.webp"
+    },
+    {
+      "id": "gelida",
+      "name": "GALÁCTICOS DO BAR",
+      "slug": "galacticos-do-bar",
+      "imageUrl": "/teams/galacticos-do-bar.webp"
+    },
+    {
+      "id": "arcana",
+      "name": "OS 5 FURIOSOS",
+      "slug": "os-5-furiosos",
+      "imageUrl": "/teams/os-5-furiosos.webp"
+    },
+    {
+      "id": "carmesim",
+      "name": "EQUIPE RX",
+      "slug": "equipe-rx",
+      "imageUrl": "/teams/equipe-rx.webp"
+    },
+    {
+      "id": "mare",
+      "name": "QUEIJO MINAS",
+      "slug": "queijo-minas",
+      "imageUrl": "/teams/queijo-minas.webp"
+    },
+    {
+      "id": "seiva",
+      "name": "FÃS DE ROSCA ESPORTE CLUBE",
+      "slug": "fas-de-rosca-esporte-clube",
+      "imageUrl": "/teams/fas-de-rosca-esporte-clube.webp"
+    }
+  ],
+  "players": [
+    {
+      "id": "luiz6546",
+      "elo": "Mestre",
+      "nick": "Luiz6546#BR1",
+      "slug": "luiz6546",
+      "role1": "JUNG",
+      "role2": "ADC",
+      "teamId": "carmesim",
+      "imageUrl": "/players/luiz6546.jpeg"
+    },
+    {
+      "id": "vidotti-agiota",
+      "elo": "Diamante",
+      "nick": "vidotti agiota#BR1",
+      "slug": "vidotti-agiota",
+      "role1": "JUNG",
+      "role2": "SUP",
+      "teamId": "seiva",
+      "captain": true,
+      "imageUrl": "/players/vidotti-agiota-4a.webp"
+    },
+    {
+      "id": "samuel-venancio",
+      "elo": "Platina",
+      "nick": "SAMUEL VENÂNCIO#MC97",
+      "slug": "samuel-venancio",
+      "role1": "JUNG",
+      "role2": "ADC",
+      "teamId": "arcana",
+      "imageUrl": "/players/samuel-venancio-4a.webp"
+    },
+    {
+      "id": "bety-clarao",
+      "elo": "Ouro",
+      "nick": "BETY CLARAO#2424",
+      "slug": "bety-clarao",
+      "role1": "TOP",
+      "role2": "SUP",
+      "teamId": "arcana",
+      "imageUrl": "/players/bety-clarao-4a.webp"
+    },
+    {
+      "id": "gabriel-bontempo",
+      "elo": "Diamante",
+      "nick": "gabriel bontempo#888",
+      "slug": "gabriel-bontempo",
+      "role1": "ADC",
+      "role2": "MID",
+      "teamId": "arcana",
+      "imageUrl": "/players/gabriel-bontempo-4a.webp"
+    },
+    {
+      "id": "t1-kratos",
+      "elo": "Ouro",
+      "nick": "T1 Kratos#6071",
+      "slug": "t1-kratos",
+      "role1": "TOP",
+      "role2": "JUNG",
+      "teamId": "carmesim",
+      "imageUrl": "/players/t1-kratos.jpeg"
+    },
+    {
+      "id": "maxmp",
+      "elo": "Esmeralda",
+      "nick": "Maxmp#BR1",
+      "slug": "maxmp",
+      "role1": "SUP",
+      "role2": "MID",
+      "teamId": "carmesim",
+      "captain": true,
+      "imageUrl": "/players/maxmp.jpeg"
+    },
+    {
+      "id": "weslay",
+      "elo": "Esmeralda",
+      "nick": "WeSlay#153",
+      "slug": "weslay",
+      "role1": "ADC",
+      "role2": "SUP",
+      "teamId": "verdante",
+      "imageUrl": "/players/weslay-4a.webp"
+    },
+    {
+      "id": "iklra",
+      "elo": "Platina",
+      "nick": "Iklra#BR1",
+      "slug": "iklra",
+      "role1": "ADC",
+      "role2": "MID",
+      "teamId": "carmesim",
+      "imageUrl": "/players/iklra.jpeg"
+    },
+    {
+      "id": "tapa-de-doido",
+      "elo": "Esmeralda",
+      "nick": "Tapa de Doido#ATS",
+      "slug": "tapa-de-doido",
+      "role1": "TOP",
+      "role2": "ADC",
+      "teamId": "seiva",
+      "imageUrl": "/players/tapa-de-doido-4a.webp"
+    },
+    {
+      "id": "miva",
+      "elo": "Platina",
+      "nick": "Miva#BR1",
+      "slug": "miva",
+      "role1": "SUP",
+      "role2": "JUNG",
+      "teamId": "aurea",
+      "imageUrl": "/players/miva-4a.webp"
+    },
+    {
+      "id": "famoso-parrudao",
+      "elo": "Diamante",
+      "nick": "Famoso Parrudao#6969",
+      "slug": "famoso-parrudao",
+      "role1": "JUNG",
+      "role2": "TOP",
+      "teamId": "verdante",
+      "captain": true,
+      "imageUrl": "/players/famoso-parrudao-4a.webp"
+    },
+    {
+      "id": "omegafuria",
+      "elo": "Bronze",
+      "nick": "OmegaFuria#2929",
+      "slug": "omegafuria",
+      "role1": "ADC",
+      "role2": "JUNG",
+      "teamId": "seiva",
+      "imageUrl": "/players/omegafuria-4a.webp"
+    },
+    {
+      "id": "midas",
+      "elo": "Esmeralda",
+      "nick": "MIDAS#AYLA",
+      "slug": "midas",
+      "role1": "SUP",
+      "role2": "ADC",
+      "teamId": "mare",
+      "captain": true,
+      "imageUrl": "/players/midas.jpeg"
+    },
+    {
+      "id": "iranildo-gari",
+      "elo": "Platina",
+      "nick": "Iranildo Gari#PILAR",
+      "slug": "iranildo-gari",
+      "role1": "JUNG",
+      "role2": "ADC",
+      "teamId": "gelida",
+      "imageUrl": "/players/iranildo-gari-4a.webp"
+    },
+    {
+      "id": "saborenergetico",
+      "elo": "Prata",
+      "nick": "SaborEnergetico#1777",
+      "slug": "saborenergetico",
+      "role1": "SUP",
+      "role2": "JUNG",
+      "teamId": "seiva",
+      "imageUrl": "/players/saborenergetico-4a.webp"
+    },
+    {
+      "id": "sou-adc-nao-deus",
+      "elo": "Platina",
+      "nick": "SOU ADC NÃO DEUS#BR1",
+      "slug": "sou-adc-nao-deus",
+      "role1": "ADC",
+      "role2": "JUNG",
+      "teamId": "gelida",
+      "captain": true,
+      "imageUrl": "/players/sou-adc-nao-deus-4a.webp"
+    },
+    {
+      "id": "cacu",
+      "elo": "Diamante",
+      "nick": "Caçu#Caçu",
+      "slug": "cacu",
+      "role1": "SUP",
+      "role2": "ADC",
+      "teamId": "verdante",
+      "imageUrl": "/players/cacu-4a.webp"
+    },
+    {
+      "id": "sr-hades",
+      "elo": "Ouro",
+      "nick": "Sr Hades#2522",
+      "slug": "sr-hades",
+      "role1": "MID",
+      "role2": "ADC",
+      "teamId": "gelida",
+      "imageUrl": "/players/sr-hades-4a.webp"
+    },
+    {
+      "id": "n4firida-agiota",
+      "elo": "Prata",
+      "nick": "N4firida  agiota#7937",
+      "slug": "n4firida-agiota",
+      "role1": "MID",
+      "role2": "TOP",
+      "teamId": "aurea",
+      "imageUrl": "/players/n4firida-agiota-4a.webp"
+    },
+    {
+      "id": "ironclaw",
+      "elo": "Prata",
+      "nick": "Ironclaw#ZKING",
+      "slug": "ironclaw",
+      "role1": "MID",
+      "role2": "SUP",
+      "teamId": "carmesim",
+      "imageUrl": "/players/ironclaw.jpeg"
+    },
+    {
+      "id": "goom-gum",
+      "elo": "Esmeralda",
+      "nick": "GOOM GUM#LARI",
+      "slug": "goom-gum",
+      "role1": "TOP",
+      "role2": "SUP",
+      "teamId": "aurea",
+      "imageUrl": "/players/goom-gum-4a.webp"
+    },
+    {
+      "id": "aura-mais-ego-67",
+      "elo": "Esmeralda",
+      "nick": "AURA MAIS EGO 67#DUDU",
+      "slug": "aura-mais-ego-67",
+      "role1": "JUNG",
+      "role2": "MID",
+      "teamId": "mare",
+      "imageUrl": "/players/aura-mais-ego-67.jpeg"
+    },
+    {
+      "id": "nikiti",
+      "elo": "Diamante",
+      "nick": "Nikiti#BR1",
+      "slug": "nikiti",
+      "role1": "JUNG",
+      "role2": "MID",
+      "teamId": "aurea",
+      "imageUrl": "/players/nikiti-4a.webp"
+    },
+    {
+      "id": "peidei-caldinho",
+      "elo": "Diamante",
+      "nick": "Peidei caldinho#PEI",
+      "slug": "peidei-caldinho",
+      "role1": "SUP",
+      "role2": "MID",
+      "teamId": "arcana",
+      "captain": true,
+      "imageUrl": "/players/peidei-caldinho-4a.webp"
+    },
+    {
+      "id": "lelei-de-ozorio",
+      "elo": "Esmeralda",
+      "nick": "Lelei de Ozorio#CBR",
+      "slug": "lelei-de-ozorio",
+      "role1": "MID",
+      "role2": "TOP",
+      "teamId": "mare",
+      "imageUrl": "/players/lelei-de-ozorio.jpeg"
+    },
+    {
+      "id": "d1elzera",
+      "elo": "Mestre",
+      "nick": "D1elzera#GOAT",
+      "slug": "d1elzera",
+      "role1": "MID",
+      "role2": "TOP",
+      "teamId": "seiva",
+      "imageUrl": "/players/d1elzera-4a.webp"
+    },
+    {
+      "id": "bobbie-goods",
+      "elo": "Esmeralda",
+      "nick": "bobbie goods#FINAL",
+      "slug": "bobbie-goods",
+      "role1": "TOP",
+      "role2": "ADC",
+      "teamId": "verdante",
+      "imageUrl": "/players/bobbie-goods-4a.webp"
+    },
+    {
+      "id": "z0e-baiana",
+      "elo": "Platina",
+      "nick": "Z0E baiana#BR1",
+      "slug": "z0e-baiana",
+      "role1": "SUP",
+      "role2": "MID",
+      "teamId": "gelida",
+      "imageUrl": "/players/z0e-baiana-4a.webp"
+    },
+    {
+      "id": "presunto",
+      "elo": "Ferro",
+      "nick": "PRESUNTO#KRYS",
+      "slug": "presunto",
+      "role1": "MID",
+      "role2": "ADC",
+      "teamId": "verdante",
+      "imageUrl": "/players/presunto-4a.webp"
+    },
+    {
+      "id": "giripoca",
+      "elo": "Diamante",
+      "nick": "Giripoca#T3UC0",
+      "slug": "giripoca",
+      "role1": "ADC",
+      "role2": "MID",
+      "teamId": "aurea",
+      "captain": true,
+      "imageUrl": "/players/giripoca-4a.webp"
+    },
+    {
+      "id": "cachasa",
+      "elo": "Ouro",
+      "nick": "Cachasa#0007",
+      "slug": "cachasa",
+      "role1": "TOP",
+      "role2": "MID",
+      "teamId": "mare",
+      "imageUrl": "/players/cachasa.jpeg"
+    },
+    {
+      "id": "dingobeell",
+      "elo": "Diamante",
+      "nick": "Dingobeell#BR1",
+      "slug": "dingobeell",
+      "role1": "TOP",
+      "role2": "MID",
+      "teamId": "gelida",
+      "imageUrl": "/players/dingobeell-4a.webp"
+    },
+    {
+      "id": "lucrecia-pontius",
+      "elo": "Platina",
+      "nick": "Lucrecia Pontius#BR1",
+      "slug": "lucrecia-pontius",
+      "role1": "ADC",
+      "role2": "MID",
+      "teamId": "mare",
+      "imageUrl": "/players/lucrecia-pontius.jpeg"
+    },
+    {
+      "id": "onigami",
+      "elo": "Platina",
+      "nick": "Onigami#666",
+      "slug": "onigami",
+      "role1": "TOP",
+      "role2": "ADC",
+      "teamId": "chama",
+      "imageUrl": "/players/onigami-4a.webp"
+    },
+    {
+      "id": "nak4y",
+      "elo": "Mestre",
+      "nick": "nak4y#JPN",
+      "slug": "nak4y",
+      "role1": "JUNG",
+      "role2": "TOP",
+      "teamId": "chama",
+      "captain": true,
+      "imageUrl": "/players/nak4y-4a.webp"
+    },
+    {
+      "id": "r-a-z-e-r-a-l",
+      "elo": "Diamante",
+      "nick": "R A Z E R A L#DEV",
+      "slug": "r-a-z-e-r-a-l",
+      "role1": "MID",
+      "role2": "ADC",
+      "teamId": "chama",
+      "imageUrl": "/players/r-a-z-e-r-a-l-4a.webp"
+    },
+    {
+      "id": "gaylord",
+      "elo": "Esmeralda",
+      "nick": "GayLord#GLD",
+      "slug": "gaylord",
+      "role1": "ADC",
+      "role2": "MID",
+      "teamId": "chama",
+      "imageUrl": "/players/gaylord-4a.webp"
+    },
+    {
+      "id": "thalao",
+      "elo": "Ouro",
+      "nick": "THALAO#PRIME",
+      "slug": "thalao",
+      "role1": "SUP",
+      "role2": "TOP",
+      "teamId": "chama",
+      "imageUrl": "/players/thalao-4a.webp"
+    },
+    {
+      "id": "satoshi",
+      "elo": "Platina",
+      "nick": "Satoshi#VDD",
+      "slug": "satoshi",
+      "role1": "MID",
+      "teamId": "arcana",
+      "imageUrl": "/players/satoshi-4a.webp"
+    }
+  ],
+  "seriesMatches": [
+    {
+      "id": "4a-jogo-01",
+      "date": "2026-11-13T20:00:00-03:00",
+      "games": [],
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "teamAId": "carmesim",
+      "teamBId": "gelida"
+    },
+    {
+      "id": "4a-jogo-02",
+      "date": "2026-11-13T22:00:00-03:00",
+      "games": [],
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "teamAId": "chama",
+      "teamBId": "verdante"
+    },
+    {
+      "id": "4a-jogo-03",
+      "date": "2026-11-14T08:30:00-03:00",
+      "games": [],
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "teamAId": "aurea",
+      "teamBId": "seiva"
+    },
+    {
+      "id": "4a-jogo-04",
+      "date": "2026-11-14T10:30:00-03:00",
+      "games": [],
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "teamAId": "mare",
+      "teamBId": "carmesim"
+    },
+    {
+      "id": "4a-jogo-05",
+      "date": "2026-11-14T14:30:00-03:00",
+      "games": [],
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "teamAId": "aurea",
+      "teamBId": "arcana"
+    },
+    {
+      "id": "4a-jogo-06",
+      "date": "2026-11-14T16:30:00-03:00",
+      "games": [],
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "teamAId": "verdante",
+      "teamBId": "gelida"
+    },
+    {
+      "id": "4a-jogo-07",
+      "date": "2026-11-14T18:30:00-03:00",
+      "games": [],
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "teamAId": "arcana",
+      "teamBId": "seiva"
+    },
+    {
+      "id": "4a-jogo-08",
+      "date": "2026-11-14T20:30:00-03:00",
+      "games": [],
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "teamAId": "verdante",
+      "teamBId": "carmesim"
+    },
+    {
+      "id": "4a-jogo-09",
+      "date": "2026-11-15T08:30:00-03:00",
+      "games": [],
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "teamAId": "mare",
+      "teamBId": "seiva"
+    },
+    {
+      "id": "4a-jogo-10",
+      "date": "2026-11-15T10:30:00-03:00",
+      "games": [],
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "teamAId": "chama",
+      "teamBId": "aurea"
+    },
+    {
+      "id": "4a-jogo-11",
+      "date": "2026-11-27T20:00:00-03:00",
+      "games": [],
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "teamAId": "chama",
+      "teamBId": "seiva"
+    },
+    {
+      "id": "4a-jogo-12",
+      "date": "2026-11-27T22:00:00-03:00",
+      "games": [],
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "teamAId": "aurea",
+      "teamBId": "mare"
+    },
+    {
+      "id": "4a-jogo-13",
+      "date": "2026-11-28T08:30:00-03:00",
+      "games": [],
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "teamAId": "arcana",
+      "teamBId": "carmesim"
+    },
+    {
+      "id": "4a-jogo-14",
+      "date": "2026-11-28T10:30:00-03:00",
+      "games": [],
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "teamAId": "mare",
+      "teamBId": "verdante"
+    },
+    {
+      "id": "4a-jogo-15",
+      "date": "2026-11-28T14:30:00-03:00",
+      "games": [],
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "teamAId": "seiva",
+      "teamBId": "verdante"
+    },
+    {
+      "id": "4a-jogo-16",
+      "date": "2026-11-28T16:30:00-03:00",
+      "games": [],
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "teamAId": "mare",
+      "teamBId": "gelida"
+    },
+    {
+      "id": "4a-jogo-17",
+      "date": "2026-11-28T18:30:00-03:00",
+      "games": [],
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "teamAId": "chama",
+      "teamBId": "carmesim"
+    },
+    {
+      "id": "4a-jogo-18",
+      "date": "2026-11-28T20:30:00-03:00",
+      "games": [],
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "teamAId": "arcana",
+      "teamBId": "gelida"
+    },
+    {
+      "id": "4a-jogo-19",
+      "date": "2026-11-29T08:30:00-03:00",
+      "games": [],
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "teamAId": "chama",
+      "teamBId": "gelida"
+    },
+    {
+      "id": "4a-jogo-20",
+      "date": "2026-11-29T10:30:00-03:00",
+      "games": [],
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "teamAId": "aurea",
+      "teamBId": "carmesim"
+    },
+    {
+      "id": "4a-jogo-21",
+      "date": "2026-12-04T20:00:00-03:00",
+      "games": [],
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "teamAId": "arcana",
+      "teamBId": "mare"
+    },
+    {
+      "id": "4a-jogo-22",
+      "date": "2026-12-04T22:00:00-03:00",
+      "games": [],
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "teamAId": "aurea",
+      "teamBId": "gelida"
+    },
+    {
+      "id": "4a-jogo-23",
+      "date": "2026-12-05T08:30:00-03:00",
+      "games": [],
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "teamAId": "arcana",
+      "teamBId": "verdante"
+    },
+    {
+      "id": "4a-jogo-24",
+      "date": "2026-12-05T10:30:00-03:00",
+      "games": [],
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "teamAId": "seiva",
+      "teamBId": "gelida"
+    },
+    {
+      "id": "4a-jogo-25",
+      "date": "2026-12-05T14:30:00-03:00",
+      "games": [],
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "teamAId": "chama",
+      "teamBId": "mare"
+    },
+    {
+      "id": "4a-jogo-26",
+      "date": "2026-12-05T16:30:00-03:00",
+      "games": [],
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "teamAId": "seiva",
+      "teamBId": "carmesim"
+    },
+    {
+      "id": "4a-jogo-27",
+      "date": "2026-12-05T18:30:00-03:00",
+      "games": [],
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "teamAId": "chama",
+      "teamBId": "arcana"
+    },
+    {
+      "id": "4a-jogo-28",
+      "date": "2026-12-05T20:30:00-03:00",
+      "games": [],
+      "stage": "REGULAR_SEASON",
+      "format": "BO3",
+      "teamAId": "aurea",
+      "teamBId": "verdante"
+    }
+  ],
+  "standingsSeed": [],
+  "archivedSeasons": []
+}
