@@ -1,0 +1,390 @@
+/*
+ * A ficha do jogador no cenário "album": o retrato é a figurinha ampliada colada na vaga, com duas
+ * repetidas abertas atrás; o nick é um adesivo grande; as estatísticas, adesivos de número; os
+ * companheiros, mini-figurinhas. Mesmas regras: `.raiz` + o seletor da base; conteúdo só transform.
+ * Keyframes daqui são DAQUI (o CSS Modules põe hash por arquivo), com nome que não existe em nenhum
+ * outro módulo. Peças com classe dos DOIS módulos (kicker, chips, heroi): nada aqui repete propriedade
+ * que album.module.css declara nelas. Conteúdo em 2D (o nick tem `background-clip: text`).
+ * Laços infinitos da ficha (≤ 4): o cone e o selo do capitão, mais o halo e a varredura da base.
+ */
+
+/* ------------------------------------------------------------------ retrato: a figurinha grande */
+/* Na mão, ela vem mais de cima que da esquerda: com −18 px o canto girado do quadro 0 saía 1–3 px da tela
+   (390–430 e 1024, onde o retrato encosta na margem); com −6 px sobram 9 px ou mais. */
+@keyframes colaRetrato {
+  0%,
+  40% {
+    transform: translate(-6px, -26px) rotate(-6deg) scale(1.05);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5);
+  }
+  55% {
+    transform: translate(1px, 2px) rotate(0.6deg) scale(0.98);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1);
+  }
+  68% {
+    transform: rotate(-0.3deg) scale(1.01);
+  }
+  100% {
+    transform: none;
+  }
+}
+/* A casca fica (a vaga e as repetidas são dela); quem cola é o .retrato. */
+.raiz .retratoCasca {
+  width: min(100% - 56px, 400px);
+  margin-top: 28px;
+  animation: none;
+}
+@media (min-width: 900px) {
+  .raiz .retratoCasca {
+    width: min(100%, 440px);
+  }
+}
+/* De 900 a 1279 a coluna do retrato encosta na borda da tela: o retrato estreita para as repetidas
+   caberem (em 1024, a da esquerda saía 54 px da tela — medido no harness). */
+@media (min-width: 900px) and (max-width: 1279px) {
+  .raiz .retratoCasca {
+    width: min(100% - 48px, 440px);
+  }
+}
+.raiz .retratoCapitao {
+  margin-top: 44px;
+}
+.raiz .enfHaloRetrato {
+  inset: -8%;
+  z-index: -4;
+  border-radius: 30px;
+  background: radial-gradient(closest-side, rgba(199, 125, 255, 0.4), rgba(106, 242, 255, 0.1) 60%, transparent);
+}
+.raiz .retrato {
+  isolation: isolate;
+  overflow: hidden;
+  clip-path: none;
+  padding: 3px;
+  border-radius: 18px;
+  background: linear-gradient(160deg, var(--papel), var(--papel-sombra));
+  box-shadow: 0 26px 40px -22px #000;
+  animation: colaRetrato 1500ms linear;
+}
+/* A BRILHANTE: o cone arco-íris girando por baixo do papel. */
+.raiz .retratoCapitao .retrato {
+  background: var(--papel);
+}
+@keyframes aroGiraAlbumFicha {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.raiz .retratoCapitao .retrato::before {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  z-index: -1;
+  background: var(--holo);
+  animation: aroGiraAlbumFicha 14s linear infinite;
+}
+/* 4:5 em TODA largura (a base faz 4:3 de 600 a 899 e cortaria as artes). */
+.raiz .retratoMiolo {
+  clip-path: none;
+  aspect-ratio: var(--proporcao, 4 / 5);
+  border-radius: 15px;
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0 6px, transparent 6px 12px),
+    linear-gradient(180deg, #4b22a6, var(--tm-abismo));
+}
+.raiz .retratoMiolo > img {
+  inset: 10px;
+  width: calc(100% - 20px);
+  height: calc(100% - 20px);
+  border-radius: 9px;
+  filter: none;
+}
+.raiz .enfGradacao {
+  inset: 10px;
+  border-radius: 9px;
+  background:
+    linear-gradient(125deg, rgba(255, 255, 255, 0.18) 0 9%, transparent 24%),
+    linear-gradient(180deg, transparent 64%, rgba(18, 8, 31, 0.6));
+}
+.raiz .enfVarreduraLenta {
+  background: linear-gradient(100deg, transparent 42%, rgba(255, 255, 255, 0.16) 50%, transparent 58%);
+}
+.raiz .retratoCapitao .enfVarreduraLenta {
+  mix-blend-mode: color-dodge;
+  background: linear-gradient(100deg, transparent 38%, rgba(255, 122, 217, 0.45) 44%, rgba(255, 211, 110, 0.45) 48%, rgba(184, 255, 106, 0.45) 52%, rgba(106, 242, 255, 0.45) 56%, transparent 62%);
+}
+/* Rota e elo já estão nos chips: a arte fica livre (as frases das fotos aparecem inteiras). */
+.raiz .topo {
+  display: none;
+}
+.raiz .placa {
+  left: 20px;
+  bottom: 20px;
+  border-radius: 999px;
+  padding: 6px 12px 5px;
+  background: var(--holo-claro);
+  color: var(--tm-tinta);
+  font: 400 12px / 1 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.08em;
+  box-shadow: 0 0 0 2px var(--creme), 0 6px 12px -6px #000;
+}
+@keyframes seloGiraAlbumFicha {
+  from {
+    transform: rotate(12deg);
+  }
+  to {
+    transform: rotate(372deg);
+  }
+}
+/* O selo-estrela no canto de CIMA À DIREITA, girando devagar. */
+.raiz .coroaDoRetrato {
+  width: 84px;
+  top: -40px;
+  left: auto;
+  right: -20px;
+  translate: none;
+  filter: drop-shadow(0 8px 10px rgba(0, 0, 0, 0.6));
+  animation: seloGiraAlbumFicha 30s linear infinite;
+}
+@media (max-width: 899px) {
+  .raiz .coroaDoRetrato {
+    width: 64px;
+    top: -30px;
+    right: -10px;
+  }
+}
+/* AtrasDoRetrato: a vaga deslocada e as duas repetidas em leque (saem de trás na entrada). */
+.enfVagaRetrato {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  translate: -14px -12px;
+  border-radius: 20px;
+  pointer-events: none;
+  background: var(--vaga);
+  box-shadow: inset 0 0 0 1px rgba(10, 4, 20, 0.7);
+}
+.enfVagaRetrato::before {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  border-radius: 14px;
+  border: 2px dashed rgba(255, 246, 230, 0.3);
+}
+@keyframes repetidaAbre {
+  0%,
+  30% {
+    transform: translateX(var(--anda)) rotate(var(--volta));
+  }
+  100% {
+    transform: none;
+  }
+}
+.enfRepetida {
+  position: absolute;
+  z-index: -3;
+  top: 6%;
+  width: 56%;
+  height: auto;
+  pointer-events: none;
+  filter: drop-shadow(0 16px 20px rgba(0, 0, 0, 0.55)); /* estático */
+  animation: repetidaAbre 1600ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.enfRepetida1 {
+  --anda: 40%;
+  --volta: 10deg;
+  left: -12%;
+  rotate: -10deg;
+}
+.enfRepetida2 {
+  --anda: -40%;
+  --volta: -8deg;
+  right: -12%;
+  top: 14%;
+  rotate: 8deg;
+}
+/* As repetidas grandes só a partir de 1360 (em 1280 a da esquerda saía 8 px da tela). */
+@media (max-width: 1359px) {
+  .enfRepetida {
+    width: 50%;
+  }
+  .enfRepetida1 {
+    --volta: 7deg;
+    left: -6%;
+    rotate: -7deg;
+  }
+  .enfRepetida2 {
+    --volta: -6deg;
+    right: -6%;
+    rotate: 6deg;
+  }
+}
+
+/* ------------------------------------------------------------------ texto */
+.raiz .escudoMini {
+  border-radius: 6px;
+}
+/* O nick: o adesivo grande, colado no tapa. 2D. */
+@keyframes bafoNick {
+  0%,
+  50% {
+    transform: translate(-0.03em, -0.06em) rotate(5deg) scale(1.08);
+    animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.45);
+  }
+  62% {
+    transform: translate(0, 0.02em) scale(1.05, 0.9);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1);
+  }
+  74% {
+    transform: scale(0.98, 1.03);
+  }
+  86% {
+    transform: scale(1.01);
+  }
+  100% {
+    transform: none;
+  }
+}
+/* Pela largura MEDIDA do nick em até duas linhas (--largura-nick-em): PEIDEI / CALDINHO = 5,464 em. */
+.raiz .nickVisual {
+  display: inline-grid; /* eco e cromo na mesma célula: quebram igual */
+  line-height: 0.98;
+  letter-spacing: 0.06em;
+  font-kerning: none;
+  font-variant-ligatures: none;
+  overflow-wrap: break-word;
+  text-wrap: balance;
+  margin-top: 0.22em; /* o acento sobe a 0,91 em */
+  margin-bottom: 0.08em;
+  rotate: -2deg; /* estático */
+  font-size: clamp(30px, calc(100cqi / var(--largura-nick-em, calc(var(--maior-palavra, 6) * 0.75))), 96px);
+  transform-origin: 20% 80%;
+  animation: bafoNick 1500ms linear;
+}
+@media (min-width: 900px) {
+  .raiz .nickVisual {
+    font-size: clamp(40px, calc(100cqi / var(--largura-nick-em, calc(var(--maior-palavra, 6) * 0.75))), 124px);
+  }
+}
+.raiz .nickVisual > * {
+  grid-area: 1 / 1;
+}
+.raiz .nomeReal {
+  font: 700 15px / 1.35 var(--tm-fonte-assinatura), Arial, sans-serif;
+  letter-spacing: 0.02em;
+}
+.raiz .texto .chips {
+  justify-content: flex-start;
+}
+/* O título não sobe (desceria em cima da 1ª linha de estatísticas). */
+.raiz .performance {
+  font: 400 clamp(18px, 1.8vw, 22px) / 1 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.04em;
+  color: var(--creme);
+  animation-name: none;
+}
+.raiz .performance::after {
+  height: 2px;
+  background: repeating-linear-gradient(90deg, rgba(255, 246, 230, 0.5) 0 10px, transparent 10px 16px);
+}
+/* Estatísticas: adesivos de número. O item também tem o .sobe da base (0,1,0): esta regra (0,2,0) troca
+   o keyframe e fica com a duração em cascata dele. */
+@keyframes adesivoPop {
+  0%,
+  70% {
+    transform: translate(0, 6px) scale(0.92);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1.2);
+  }
+  84% {
+    transform: scale(1.04);
+  }
+  93% {
+    transform: scale(0.99);
+  }
+  100% {
+    transform: none;
+  }
+}
+.raiz .estatisticas {
+  gap: 12px 8px;
+}
+.raiz .estatistica {
+  gap: 6px;
+  padding: 12px 4px 10px;
+  border: 0;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #3a1a80, var(--tm-abismo));
+  box-shadow: 0 0 0 2px var(--creme), 0 10px 16px -10px #000;
+  animation-name: adesivoPop;
+  animation-timing-function: linear;
+}
+.raiz .estatistica::before {
+  left: 22%;
+  right: 22%;
+  top: 5px;
+  height: 2px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.22);
+}
+.raiz .valor {
+  padding: 0;
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  color: var(--creme); /* 14,7:1 */
+  font: 400 clamp(22px, 2.4vw, 30px) / 1 var(--tm-fonte-titulo), sans-serif;
+}
+.raiz .rotulo {
+  font: 700 10.5px / 1.15 var(--tm-fonte-assinatura), Arial, sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.raiz .nota {
+  font: 500 12px / 1.5 var(--tm-fonte-assinatura), Arial, sans-serif;
+}
+
+/* ------------------------------------------------------------------ companheiros: mini-figurinhas */
+.raiz .companheiros {
+  gap: 12px 10px;
+}
+.raiz .companheiroLink {
+  align-items: center;
+  min-height: 76px;
+  border: 0;
+  border-radius: 12px;
+  background: linear-gradient(90deg, #4b22a6, var(--tm-abismo));
+  box-shadow: 0 0 0 2px var(--creme), 0 10px 18px -10px #000;
+}
+.raiz .companheiroLink:hover {
+  box-shadow: 0 0 0 2px var(--tm-acento), 0 14px 22px -10px #000;
+}
+.raiz .companheiroFoto {
+  flex: 0 0 56px;
+  height: 56px;
+  margin: 10px 0 10px 10px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 0 0 2px var(--creme);
+}
+.raiz .companheiroRota {
+  --tm-icone: var(--tm-acento);
+  color: var(--tm-acento);
+  font: 400 11px / 1 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.08em;
+}
+.raiz .companheiroNick {
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  overflow-wrap: break-word;
+}
+@media (max-width: 599px) {
+  .raiz .companheiroFoto {
+    flex-basis: 44px;
+    height: 44px;
+    margin: 8px 0 8px 8px;
+  }
+  .raiz .companheiroTexto {
+    padding: 10px 8px;
+  }
+  .raiz .companheiroNick {
+    font-size: 13px;
+  }
+}

@@ -1,1 +1,1551 @@
-/* Os 5 Furiosos — cenário «album» (components/times/cenarios/album.tsx). BASE: o tema chega depois. */
+/*
+ * Cenário "album" — OS 5 FURIOSOS, «A Figurinha Brilhante» (cenarios/album.tsx).
+ *
+ * Duas famílias de regra:
+ *  - ENFEITES (`.enf…`, aria-hidden, sem texto de conteúdo): página impressa, folha que vira, picote,
+ *    fita holográfica, vaga, pacotinho, aro holográfico, faixa de brilho, brilhos, rótulo do pacotinho.
+ *  - GANCHOS: `.raiz` + o MESMO seletor da base (comCenario). Nada de @layer.
+ * Conteúdo só anima transform, sem delay nem fill-mode, com a espera dentro do keyframe — e em 2D: nada de
+ * translate3d/perspective no conteúdo nem em ancestral de `background-clip: text` (o WebKit apaga as
+ * letras; a lição da Queijo Minas). 3D só na folha que vira (enfeite do palco, sem texto). Nenhuma regra
+ * mistura `transform:` literal com translate/rotate/scale (o lightningcss do build descarta o individual).
+ * Flashes (pequenos, ≤ 2 por segundo): o estouro da colada (0,99 s), os brilhinhos do selo (uma vez, aos
+ * 1,6 s) e os dois brilhos da figurinha (picos a 2,4 e 3,6 s, depois a cada 4,8 s cada um).
+ * Laços infinitos (≤ 8 na página, juiz.md §5): no herói o aro (14 s), a faixa (7 s) e os dois brilhos; no
+ * elenco o cone e o selo do capitão (mais o halo da base); na cartela o brilho do pacotinho.
+ * Os nomes genéricos de keyframe levam «Album» (o teste junta os keyframes da pasta pelo nome).
+ */
+
+/* A reserva da Lilita One (fontes-dos-temas.ts: `fallback`): Arial a 66% é MAIS ESTREITA que ela em todo
+   caractere medido (pior caso o espaço: 0,278 × 0,66 = 0,183 contra 0,188 em; É 0,440 contra 0,488). */
+@font-face {
+  font-family: "Lilita One Caixa Alta";
+  src: local("Arial"), local("ArialMT"), local("Helvetica"), local("Helvetica Neue"), local("Roboto"), local("Arimo"), local("Liberation Sans");
+  size-adjust: 66%;
+}
+
+/* ======================================================================= raiz */
+.raiz {
+  --tm-titulo-estilo: normal;
+  --tm-titulo-peso: 400;
+  --tm-titulo-peso-medio: 400;
+  /* Os tons que na RX são fixos (tema.module.css guarda os dela como padrão). */
+  --tm-placa-topo: var(--tm-metal-luz);
+  --tm-nick-meio: var(--tm-prata);
+  --tm-nick-base: var(--tm-metal-alto);
+  --tm-valor-base: var(--tm-metal-alto);
+  --tm-etiqueta: var(--tm-tinta);
+  --tm-foto-fundo: var(--tm-abismo);
+  --tm-chip-capitao: var(--tm-texto);
+  --tm-mono: var(--tm-acento);
+  /* Do cenário: papel, vaga, folha anterior, luzes do pôster, holográfico. */
+  --creme: #fff6e6;
+  --papel: #fffdf8;
+  --papel-sombra: #e9dfcc;
+  --vaga: #33196a;
+  --folha: #2c2442;
+  --magenta: 255 79 176;
+  --azul: 74 134 255;
+  --holo-1: #ff7ad9;
+  --holo-2: #ffd36e;
+  --holo-3: #b8ff6a;
+  --holo-4: #6af2ff;
+  --holo-5: #8a7dff;
+  --holo: conic-gradient(from 0deg, var(--holo-1), var(--holo-2), var(--holo-3), var(--holo-4), var(--holo-5), var(--holo-1));
+  --holo-claro: linear-gradient(90deg, #ffd0f1, #fff3c4 30%, #d9ffb8 55%, #c9f8ff 78%, #d9d2ff);
+  font-synthesis: none;
+}
+.enfFonteTitulo {
+  font-family: var(--tm-fonte-titulo), "Arial Black", sans-serif;
+}
+.enfFonteAssinatura {
+  font-family: var(--tm-fonte-assinatura), Arial, sans-serif;
+  font-weight: 800;
+}
+
+/* ======================================================================= palco: a página do álbum */
+/* A câmera: o álbum é ajeitado na mesa (a RX dá zoom; a QM desce de grua; o GdB entra pela porta). */
+@keyframes ajeitaAlbum {
+  from {
+    transform: rotate(-1.2deg) scale(1.05);
+  }
+  to {
+    transform: none;
+  }
+}
+.raiz .enfCamera {
+  animation: ajeitaAlbum 1600ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+/* A página impressa: as luzes vermelha (magenta) e azul do palco do pôster, e o roxo subindo do pé. */
+.enfPagina {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(60% 46% at 8% 14%, rgb(var(--magenta) / 0.22), transparent 70%),
+    radial-gradient(56% 46% at 92% 10%, rgb(var(--azul) / 0.24), transparent 70%),
+    radial-gradient(70% 50% at 50% 112%, rgba(155, 92, 255, 0.2), transparent 70%),
+    linear-gradient(180deg, #170a2d 0%, var(--tm-ceu) 34%, #1a0b33 72%, var(--tm-breu) 100%);
+}
+/* Raios impressos, centrados atrás da figurinha (o contêiner é centrado e vai até 1280: o centro do
+   escudo cai em 50% + min(355px, 27vw) a partir de 900). Parados. */
+.enfRaios {
+  --cx: calc(50% + min(355px, 27vw));
+  --cy: 56%;
+  position: absolute;
+  inset: 0;
+  background: repeating-conic-gradient(from 0deg at var(--cx) var(--cy), rgba(220, 190, 255, 0.055) 0 4deg, transparent 4deg 12deg);
+  -webkit-mask: radial-gradient(circle at var(--cx) var(--cy), #000 0 6%, transparent 62%);
+  mask: radial-gradient(circle at var(--cx) var(--cy), #000 0 6%, transparent 62%);
+}
+@media (max-width: 899px) {
+  .enfRaios {
+    --cx: 50%;
+    --cy: 35%;
+  }
+}
+.enfReticula {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, rgba(233, 210, 255, 0.14) 0 1.1px, transparent 1.6px) 0 0 / 11px 11px;
+  -webkit-mask: linear-gradient(200deg, transparent 40%, #000 92%);
+  mask: linear-gradient(200deg, transparent 40%, #000 92%);
+}
+.enfCincoF {
+  position: absolute;
+  left: -3vw;
+  bottom: -14vh;
+  height: 78vh;
+  width: auto;
+  overflow: visible;
+}
+.enfCincoF text {
+  font-family: var(--tm-fonte-titulo), "Arial Black", sans-serif;
+  font-size: 100px;
+  fill: none;
+  stroke: rgba(220, 190, 255, 0.075);
+  stroke-width: 1.2px;
+}
+@media (max-width: 599px) {
+  .enfCincoF {
+    height: 46vh;
+    bottom: -8vh;
+  }
+}
+/* O abajur. */
+.enfLuz {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(42% 36% at 28% 20%, rgba(255, 232, 200, 0.09), transparent 72%);
+}
+/* A folha anterior do álbum: cobre a página no quadro 0 e VIRA pela lombada (a borda esquerda). O estilo
+   PARADO é a folha já virada (invisível): movimento reduzido e fim da entrada mostram a página. */
+.enfFolha {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 50%;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  background:
+    radial-gradient(circle, rgba(230, 220, 255, 0.1) 0 1.1px, transparent 1.6px) 0 0 / 11px 11px,
+    linear-gradient(90deg, rgba(0, 0, 0, 0.35), transparent 6%),
+    linear-gradient(180deg, #332a4c, var(--folha) 60%, #241d38);
+  transform: perspective(1800px) rotateY(-100deg);
+  animation: folhaVira 1000ms cubic-bezier(0.5, 0, 0.35, 1);
+}
+/* As vagas vazias da página anterior (grade de linhas fracas). */
+.enfFolha::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 4%, rgba(255, 255, 255, 0.07) 4% calc(4% + 2px), transparent calc(4% + 2px) 22%),
+    repeating-linear-gradient(180deg, transparent 0 8%, rgba(255, 255, 255, 0.07) 8% calc(8% + 2px), transparent calc(8% + 2px) 34%);
+}
+.enfFolha::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.55));
+  animation: folhaEscurece 1000ms cubic-bezier(0.5, 0, 0.35, 1);
+}
+@keyframes folhaVira {
+  0%,
+  10% {
+    transform: perspective(1800px) rotateY(0deg);
+  }
+  100% {
+    transform: perspective(1800px) rotateY(-100deg);
+  }
+}
+@keyframes folhaEscurece {
+  0%,
+  10% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+/* A sombra que a folha joga na página nova, varrendo da direita para a esquerda. */
+.enfFolhaSombra {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(5, 0, 12, 0.45) 70%, transparent);
+  transform: translateX(110%);
+  animation: sombraDaFolha 1000ms cubic-bezier(0.5, 0, 0.35, 1);
+}
+@keyframes sombraDaFolha {
+  0%,
+  10% {
+    transform: translateX(30%);
+  }
+  100% {
+    transform: translateX(-260%);
+  }
+}
+
+/* ======================================================================= moldura */
+/* (aqui, e não em .raiz: a base declara --barra em .raiz com a mesma especificidade) */
+.raiz .heroi {
+  --barra: clamp(14px, 2.4vw, 32px);
+}
+/* O picote da margem do álbum: furos a cada 12 px e o fio lima. Desliza junto com a folha. */
+.enfPicote {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 3;
+  height: var(--barra);
+  pointer-events: none;
+  background:
+    radial-gradient(circle 3px at 50% calc(100% - 7px), var(--tm-breu) 0 2.4px, transparent 3px) 0 0 / 12px 100% repeat-x,
+    linear-gradient(var(--tm-acento), var(--tm-acento)) 0 calc(100% - 1px) / 100% 1px no-repeat,
+    linear-gradient(180deg, #140928, #1b0c34);
+  animation: picoteEntra 1000ms cubic-bezier(0.5, 0, 0.35, 1);
+}
+@keyframes picoteEntra {
+  0%,
+  10% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: none;
+  }
+}
+/* A fita holográfica embaixo: colada da esquerda, e fica (parada: o orçamento de laços é do aro e da faixa). */
+.enfFitaHolo {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  height: 5px;
+  overflow: hidden;
+  pointer-events: none;
+  transform-origin: 0 50%;
+  animation: fitaCola 1100ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.enfFitaHolo::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, var(--holo-1), var(--holo-2), var(--holo-3), var(--holo-4), var(--holo-5), var(--holo-1), var(--holo-2), var(--holo-3), var(--holo-4), var(--holo-5), var(--holo-1));
+}
+@keyframes fitaCola {
+  0%,
+  30% {
+    transform: scaleX(0);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/* ======================================================================= herói: a colagem */
+/* Sem tremor (quem bate é a figurinha). */
+.raiz .heroiGrade {
+  --escudo: clamp(200px, 60vw, 250px);
+  animation-name: none;
+}
+/* Em cima, a folga do quadro 0: a figurinha na mão (girada, erguida e maior) passava a 1–3 px do «voltar»
+   e em 320 encostava nele; com 0,11E sobram 6 px ou mais (medido de 320 a 899). */
+.raiz .blocoEscudo {
+  margin-top: calc(var(--escudo) * 0.11);
+  margin-bottom: calc(var(--escudo) * 0.24);
+}
+@media (min-width: 600px) and (max-width: 899px) {
+  .raiz .heroiGrade {
+    --escudo: clamp(240px, min(40vw, 36svh), 300px);
+  }
+}
+@media (min-width: 900px) {
+  .raiz .heroiGrade {
+    --escudo: clamp(280px, min(27vw, 46svh), 400px);
+    grid-template-columns: minmax(0, 1.12fr) minmax(300px, 0.88fr);
+  }
+  .raiz .blocoEscudo {
+    margin-top: calc(var(--escudo) * 0.1);
+    margin-bottom: calc(var(--escudo) * 0.2);
+  }
+  /* As margens da base são do chão espelhado da RX. */
+  .raiz .blocoTexto {
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+}
+
+/* -------------------------------------------- atrás do escudo: halo, vaga, etiqueta, pacotinho */
+.enfHalo {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 0;
+  width: 180%;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(closest-side, rgba(199, 125, 255, 0.42), rgba(106, 242, 255, 0.09) 46%, rgba(255, 122, 217, 0.08) 60%, transparent 72%);
+  animation: haloAlbum 1400ms cubic-bezier(0.16, 1, 0.3, 1); /* nasce e fica parado */
+}
+@keyframes haloAlbum {
+  from {
+    transform: scale(0.7);
+  }
+  to {
+    transform: none;
+  }
+}
+/* A vaga impressa da FOTO DO TIME: colada torta, a vaga aparece em L no alto à esquerda. */
+.enfVaga {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  translate: -6% -5%;
+  border-radius: 12%;
+  pointer-events: none;
+  background: var(--vaga);
+  box-shadow: inset 0 0 0 1px rgba(10, 4, 20, 0.7);
+}
+.enfVaga::before {
+  content: "";
+  position: absolute;
+  inset: 2.2%;
+  border-radius: 10.5%;
+  border: 2px dashed rgba(255, 246, 230, 0.32);
+}
+.enfRotuloVaga {
+  position: absolute;
+  left: -6%;
+  top: calc(100% + 14px);
+  z-index: 0;
+  height: 20px;
+  width: auto;
+  overflow: visible;
+  pointer-events: none;
+}
+@media (min-width: 900px) {
+  .enfRotuloVaga {
+    left: auto;
+    right: 0;
+  }
+}
+/* O pacotinho rasgado: canto de BAIXO à direita no celular, de CIMA à direita no computador. */
+.enfPacote {
+  position: absolute;
+  z-index: 0;
+  right: -20%;
+  bottom: -8%;
+  width: 36%;
+  rotate: 13deg;
+  pointer-events: none;
+  animation: pacoteBalanca 1300ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+@media (min-width: 900px) {
+  .enfPacote {
+    right: -12%;
+    bottom: auto;
+    top: -12%;
+    width: 34%;
+    rotate: 16deg;
+  }
+}
+@media (min-width: 1360px) {
+  .enfPacote {
+    right: -24%;
+    width: 40%;
+  }
+}
+@keyframes pacoteBalanca {
+  0%,
+  14% {
+    transform: rotate(5deg);
+  }
+  40% {
+    transform: rotate(-2deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+/* O corpo tem classe PRÓPRIA: um `.enfPacote > svg` (0,1,1) venceria o `.enfRasgo` (0,1,0) e a tira cairia
+   embaixo do pacote, em vez de por cima (achado no harness com o CSS real). */
+.enfCorpoPacote {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.enfVersos {
+  position: absolute;
+  inset: 0;
+  animation: versosSaem 1300ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.enfVersos > svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+@keyframes versosSaem {
+  0%,
+  24% {
+    transform: translateY(28%);
+  }
+  100% {
+    transform: none;
+  }
+}
+.enfRasgo {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  opacity: 0;
+  transform-origin: 50% 6%;
+  animation: rasgoVoa 900ms cubic-bezier(0.3, 0.7, 0.4, 1);
+}
+@keyframes rasgoVoa {
+  0%,
+  16% {
+    transform: none;
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-34%, -30%) rotate(-38deg);
+    opacity: 0;
+  }
+}
+
+/* -------------------------------------------- a figurinha: COLA na vaga (2D) */
+@keyframes colaFoto {
+  0%,
+  40% {
+    transform: translate(-5%, -8%) rotate(-7deg) scale(1.07);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5);
+  }
+  55% {
+    transform: translate(0.4%, 0.6%) rotate(0.8deg) scale(0.975);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1);
+  }
+  68% {
+    transform: rotate(-0.3deg) scale(1.012);
+  }
+  100% {
+    transform: none;
+  }
+}
+.raiz .escudo {
+  transform-origin: 50% 50%;
+  animation: colaFoto 1500ms linear;
+}
+/* O aro holográfico: um cone arco-íris girando ATRÁS da foto, visível só na borda. */
+.enfAro {
+  position: absolute;
+  inset: -2.4%;
+  z-index: -2;
+  border-radius: 12.6%;
+  overflow: hidden;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+.enfAroGira {
+  position: absolute;
+  inset: -35%;
+  background: var(--holo);
+  animation: aroGiraAlbum 14s linear infinite;
+}
+@keyframes aroGiraAlbum {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* O papel creme do adesivo (preenche os cantos transparentes do webp). */
+.enfPapel {
+  position: absolute;
+  inset: -0.7%;
+  z-index: -1;
+  border-radius: 11.8%;
+  pointer-events: none;
+  background: linear-gradient(160deg, var(--papel), var(--papel-sombra));
+}
+/* O ar que sai de baixo na colada. */
+.enfBafo {
+  position: absolute;
+  inset: -4%;
+  z-index: -3;
+  border-radius: 15%;
+  pointer-events: none;
+  opacity: 0;
+  box-shadow: 0 0 0 2px rgba(255, 246, 230, 0.45), 0 0 22px 6px rgba(226, 198, 255, 0.28);
+  animation: bafoSopra 1500ms cubic-bezier(0.15, 0.7, 0.2, 1);
+}
+@keyframes bafoSopra {
+  0%,
+  54% {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  57% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.22);
+    opacity: 0;
+  }
+}
+/* O reflexo do papel brilhante: faixa arco-íris estreita (color-dodge, só clareia), logo depois da
+   colada e a cada 7 s. A inclinação mora DENTRO do transform. */
+.enfFaixa {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: 11.25%;
+  overflow: hidden;
+  pointer-events: none;
+  mix-blend-mode: color-dodge;
+}
+.enfFaixa::before {
+  content: "";
+  position: absolute;
+  top: -25%;
+  bottom: -25%;
+  left: 0;
+  width: 34%;
+  opacity: 0.32;
+  background: linear-gradient(90deg, transparent, var(--holo-1) 22%, var(--holo-2) 36%, var(--holo-3) 50%, var(--holo-4) 64%, var(--holo-5) 78%, transparent);
+  transform: rotate(18deg) translateX(-120%);
+  animation: faixaPassaAlbum 7s cubic-bezier(0.4, 0, 0.3, 1) infinite;
+}
+@keyframes faixaPassaAlbum {
+  0%,
+  12% {
+    transform: rotate(18deg) translateX(-120%);
+  }
+  30%,
+  100% {
+    transform: rotate(18deg) translateX(330%);
+  }
+}
+.enfVerniz {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: 11.25%;
+  pointer-events: none;
+  background: linear-gradient(125deg, rgba(255, 255, 255, 0.2) 0 11%, transparent 26%, transparent 74%, rgba(255, 255, 255, 0.07) 85%, transparent);
+}
+/* Estrelas de 4 pontas (forma por clip-path ESTÁTICO). Centradas por margem negativa: o estado parado é
+   transform: scale(0), e um translate na mesma regra sumiria no build. */
+.enfEstouro,
+.enfBrilho {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  z-index: 3;
+  width: var(--t);
+  height: var(--t);
+  margin: calc(var(--t) / -2) 0 0 calc(var(--t) / -2);
+  pointer-events: none;
+  clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%);
+  background: radial-gradient(closest-side, #fff 0 40%, #f3e8ff 70%, #d9c2ff);
+  transform: scale(0);
+}
+.enfEstouro {
+  animation: estouraAlbum 1500ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+@keyframes estouraAlbum {
+  0%,
+  55% {
+    transform: translate(0, 0) scale(0);
+  }
+  66% {
+    transform: translate(var(--dx), var(--dy)) scale(1.1);
+  }
+  100% {
+    transform: translate(calc(var(--dx) * 1.6), calc(var(--dy) * 1.6)) scale(0) rotate(45deg);
+  }
+}
+/* var() no shorthand atrapalha o CSS Modules: longhands. Atraso só em enfeite. Dois brilhos em toda
+   largura (album.tsx, BRILHOS). */
+.enfBrilho {
+  animation-name: piscaAlbum;
+  animation-duration: 4.8s;
+  animation-timing-function: ease-in-out;
+  animation-delay: var(--atraso);
+  animation-iteration-count: infinite;
+}
+@keyframes piscaAlbum {
+  0%,
+  70%,
+  100% {
+    transform: scale(0) rotate(0deg);
+  }
+  82% {
+    transform: scale(1) rotate(0deg);
+  }
+  90% {
+    transform: scale(0.4) rotate(30deg);
+  }
+}
+/* A sombra no papel (peça Chao): longe e fraca na mão, encostada depois da colada. */
+.enfSombra {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: 12%;
+  pointer-events: none;
+  background: radial-gradient(closest-side, rgba(5, 0, 12, 0.75), rgba(5, 0, 12, 0.45) 70%, transparent);
+  transform: translate(2%, 3%) scale(1.04);
+  animation: sombraCola 1500ms linear;
+}
+@keyframes sombraCola {
+  0%,
+  40% {
+    transform: translate(9%, 12%) scale(1.12);
+    opacity: 0.45;
+    animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5);
+  }
+  55%,
+  100% {
+    transform: translate(2%, 3%) scale(1.04);
+    opacity: 1;
+  }
+}
+
+/* ======================================================================= texto do herói */
+/* Kicker e créditos não sobem (o .sobe da base os desceria 14 px no quadro 0, em cima do selo). Vale
+   também para o kicker da ficha (o nick erguido encostaria). */
+.raiz .kicker {
+  text-wrap: balance;
+  animation-name: none;
+}
+.raiz .nomesDoElenco {
+  text-wrap: balance; /* em ~1024 a 2ª linha levava só «CALDINHO» */
+  animation-name: none;
+}
+
+/* -------------------------------------------- título: OS 5 em cima, FURIOSOS em adesivos */
+/* Pela largura MEDIDA da maior palavra (--largura-em, lib/temas/metricas.ts): FURIOSOS = 5,353 em. */
+.raiz .tituloVisual {
+  --tm-titulo-max: 120px;
+  --tam: clamp(40px, calc(100cqi / var(--largura-em, calc(var(--letras) * 0.7))), var(--tm-titulo-max));
+  flex-direction: column-reverse;
+  margin-top: max(18px, calc(var(--tam) * 0.2));
+}
+@media (min-width: 600px) {
+  .raiz .tituloVisual {
+    --tm-titulo-max: min(150px, 18svh);
+  }
+}
+@media (min-width: 900px) {
+  .raiz .tituloVisual {
+    align-items: flex-start;
+  }
+}
+@media (min-width: 1024px) {
+  .raiz .tituloVisual {
+    --tm-titulo-max: min(176px, 20svh);
+  }
+}
+.raiz .marca {
+  font-size: var(--tam);
+  line-height: 1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: normal;
+  font-kerning: none;
+  font-variant-ligatures: none;
+  padding: 0 0.1em 0 0.04em;
+  animation: none;
+}
+.raiz .palavra {
+  display: inline-block;
+  white-space: nowrap;
+}
+/* Em 2D: a letra tem `background-clip: text` (translate3d a apagaria no Safari). */
+@keyframes bafo {
+  0%,
+  60% {
+    transform: translate(0, -0.03em) rotate(7deg) scale(1.08);
+    animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.45);
+  }
+  70% {
+    transform: translate(0, 0.02em) scale(1.06, 0.9);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1);
+  }
+  80% {
+    transform: scale(0.97, 1.04);
+  }
+  90% {
+    transform: scale(1.01);
+  }
+  100% {
+    transform: none;
+  }
+}
+/* Cada letra é um adesivo: giro estático (rotate) + a colada (transform). A cascata sai da DURAÇÃO:
+   batida a 70% → F aos 1050 ms, cada letra 70 ms depois; a 8ª aos 1540. */
+.raiz .letra {
+  display: inline-grid;
+  rotate: var(--giro, 0deg);
+  transform-origin: 50% 20%; /* pivô perto do topo das maiúsculas: no quadro 0 a letra cresce para BAIXO, longe do selo */
+  animation-name: bafo;
+  animation-duration: calc(1500ms + var(--i, 0) * 100ms);
+  animation-timing-function: linear;
+}
+.raiz .letra > * {
+  grid-area: 1 / 1;
+}
+.raiz .letra:nth-child(8n + 1) {
+  --giro: -4deg;
+}
+.raiz .letra:nth-child(8n + 2) {
+  --giro: 3deg;
+}
+.raiz .letra:nth-child(8n + 3) {
+  --giro: -2deg;
+}
+.raiz .letra:nth-child(8n + 4) {
+  --giro: 4deg;
+}
+.raiz .letra:nth-child(8n + 5) {
+  --giro: -3deg;
+}
+.raiz .letra:nth-child(8n + 6) {
+  --giro: 2deg;
+}
+.raiz .letra:nth-child(8n + 7) {
+  --giro: -4deg;
+}
+.raiz .letra:nth-child(8n) {
+  --giro: 3deg;
+}
+/* Folga de tinta para o recorte e os acentos (o background-clip nunca corta o Â). */
+.raiz .eco,
+.raiz .cromo {
+  padding: 0.3em 0.14em 0.24em;
+  margin: -0.3em -0.14em -0.24em;
+}
+/* O RECORTE creme: traço de 0,16 em centrado no contorno; o cromo esconde a metade de dentro. */
+.raiz .eco {
+  position: static;
+  inset: auto;
+  z-index: auto;
+  color: var(--creme);
+  -webkit-text-stroke: 0.16em var(--creme);
+  text-shadow: 0 0.05em 0 rgba(27, 11, 58, 0.55), 0 0.1em 0.14em rgba(0, 0, 0, 0.5);
+  user-select: none;
+}
+/* A tinta garantida: vinil sólido. */
+.raiz .cromo {
+  color: var(--tm-metal-meio);
+}
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  /* O vinil: na caixa da letra (1,54 em) o topo das maiúsculas fica a 29% e a linha de base a 75%. */
+  .raiz .cromo {
+    background-image: linear-gradient(180deg, var(--tm-metal-meio) 0 29%, var(--tm-metal-fundo) 48%, var(--tm-metal-base) 64%, var(--tm-metal-sombra) 75% 100%);
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    background-position: 0 0;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: none;
+  }
+}
+
+/* -------------------------------------------- OS 5: o selo lima */
+@keyframes bafoSelo {
+  0%,
+  60% {
+    transform: translate(-4%, -6%) rotate(-3deg) scale(1.06);
+    animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.45);
+  }
+  70% {
+    transform: translate(0, 4%) scale(1.08, 0.88);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1);
+  }
+  80% {
+    transform: scale(0.97, 1.03);
+  }
+  100% {
+    transform: none;
+  }
+}
+.raiz .assinatura {
+  align-self: flex-start;
+  margin: 0 0 max(10px, calc(var(--tam) * 0.14)) 0.04em; /* a folga que o quadro 0 pede: tinta em comum com as letras = 0 (medido de 320 a 1440) */
+  animation: bafoSelo 1400ms linear;
+}
+.raiz .pincel {
+  transform: rotate(-7deg);
+  padding: 0.16em 0.5em 0.1em;
+  border-radius: 999px;
+  background: var(--tm-acento);
+  color: var(--tm-tinta);
+  font: 400 max(22px, calc(var(--tam) * 0.34)) / 1 var(--tm-fonte-titulo), "Arial Black", sans-serif;
+  letter-spacing: 0.05em;
+  font-kerning: none;
+  text-shadow: none;
+  box-shadow: 0 0 0 0.1em var(--creme), 0 0.12em 0.18em rgba(0, 0, 0, 0.45);
+}
+/* Os dois brilhinhos do selo (TracoDoNome): no canto de cima à direita. */
+.raiz .assinatura .enfTraco {
+  position: absolute;
+  top: -0.5em;
+  right: -0.55em;
+  width: 1.3em;
+  height: 1.3em;
+  margin: 0;
+  font-size: max(22px, calc(var(--tam) * 0.34));
+  animation: none;
+}
+/* Piscam UMA vez, juntos (um flash só), com o pico aos 1,6 s (26,7% de 6 s), e somem: parados, ficam
+   escondidos (scale 0), inclusive no movimento reduzido. */
+.enfBrilhoSeloA,
+.enfBrilhoSeloB {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(0);
+  animation: brilhoDoSeloAlbum 6s ease-out;
+}
+@keyframes brilhoDoSeloAlbum {
+  0%,
+  22% {
+    transform: scale(0) rotate(0deg);
+  }
+  26.7% {
+    transform: scale(1.15) rotate(20deg);
+  }
+  32%,
+  100% {
+    transform: scale(0) rotate(45deg);
+  }
+}
+
+/* -------------------------------------------- o lema: balão de fala */
+@keyframes balaoPula {
+  0%,
+  74% {
+    transform: translate(0, 10px) scale(0.9) rotate(-5deg);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1.2);
+  }
+  86% {
+    transform: scale(1.04) rotate(0.6deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+.raiz .lema {
+  position: relative;
+  width: fit-content;
+  max-width: min(100%, 24em);
+  margin: clamp(20px, 2.4vw, 28px) auto 0;
+  padding: 0.62em 1.1em 0.56em;
+  border-radius: 22px;
+  background: var(--papel);
+  color: var(--tm-tinta);
+  font: 800 clamp(15px, 1.25vw, 18px) / 1.2 var(--tm-fonte-assinatura), Arial, sans-serif;
+  letter-spacing: 0.01em;
+  text-wrap: balance;
+  rotate: -1.5deg; /* estático; a entrada é transform */
+  box-shadow: 0 0 0 4px var(--creme), 0 0 0 6px rgba(27, 11, 58, 0.55), 0 12px 22px -10px #000;
+  animation: balaoPula 2000ms linear;
+}
+/* No computador o balão encosta à esquerda, com o título (DEPOIS da regra acima: mesma especificidade). */
+@media (min-width: 900px) {
+  .raiz .lema {
+    margin-inline: 0;
+  }
+}
+/* O rabinho do balão (forma por clip-path estático). */
+.raiz .lema::after {
+  content: "";
+  position: absolute;
+  left: 30px;
+  top: calc(100% - 2px);
+  width: 22px;
+  height: 18px;
+  background: var(--papel);
+  clip-path: polygon(0 0, 100% 0, 8% 100%);
+}
+
+/* -------------------------------------------- chips: pílulas de adesivo */
+.raiz .chip::before {
+  transform: none;
+  border-radius: 12px;
+}
+.raiz .chipPts::before {
+  rotate: -2deg;
+  background: linear-gradient(180deg, var(--tm-metal-luz), var(--tm-metal-placa));
+  box-shadow: 0 0 0 3px var(--creme), 0 6px 14px -6px #000;
+}
+.raiz .chipCapitao::before {
+  border: 0;
+  background: var(--tm-abismo);
+  box-shadow: inset 0 0 0 1px rgba(200, 245, 74, 0.55);
+}
+.raiz .chipCapitao .coroaMini {
+  color: var(--tm-acento);
+}
+.raiz .chipOpgg::before {
+  border: 2px solid var(--tm-neon);
+  background: rgba(18, 8, 31, 0.55);
+}
+.raiz .chipOpgg:hover::before {
+  background: var(--tm-royal);
+}
+/* No celular os chips descem: o rabinho do balão (16 px abaixo dele) encostava no 1º chip, e no vídeo do
+   celular (405×720) o 1º chip saía cortado ao meio pela dobra — assim ele fica inteiro abaixo dela (a
+   dobra mostra a figurinha, o nome e o balão; juiz.md §5.8). Só no herói (a ficha tem os seus). */
+@media (max-width: 599px) {
+  .raiz .blocoTexto .chips {
+    margin-top: 36px;
+  }
+}
+/* Na coluna única do tablet o balão fica centrado em cima dos chips: o rabinho pede a mesma folga. */
+@media (min-width: 600px) and (max-width: 899px) {
+  .raiz .blocoTexto .chips {
+    margin-top: 28px;
+  }
+}
+/* Nick de capitão longo: o chip vira texto corrido (em bloco, não flex: a leitura não zigue-zagueia). */
+@media (max-width: 419px) {
+  .raiz .blocoTexto .chipCapitao {
+    flex: 1 1 100%;
+    display: block;
+    padding-block: 12px;
+    line-height: 1.6;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-wrap: balance;
+    text-align: center;
+  }
+  .raiz .blocoTexto .chipCapitao > svg {
+    display: inline-block;
+    vertical-align: -3px;
+    margin-right: 8px;
+  }
+}
+
+/* ======================================================================= elenco: as figurinhas */
+.raiz .elencoSecao {
+  padding-bottom: clamp(56px, 7vw, 96px);
+}
+.raiz .estrelando {
+  margin-top: clamp(8px, 1.4vw, 18px);
+  font-size: clamp(24px, 2.8vw, 38px);
+  letter-spacing: 0.04em;
+  color: var(--creme);
+}
+/* A linha de recorte. */
+.raiz .estrelando::after {
+  height: 2px;
+  background: repeating-linear-gradient(90deg, rgba(255, 246, 230, 0.55) 0 10px, transparent 10px 16px);
+}
+.raiz .aviso {
+  margin-top: -10px;
+  font: 700 clamp(14px, 1.2vw, 16px) / 1.4 var(--tm-fonte-assinatura), Arial, sans-serif;
+  color: var(--tm-apoio);
+}
+.raiz .aviso::before {
+  content: "!" / "";
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--tm-acento);
+  color: var(--tm-tinta);
+  font: 400 13px / 1 var(--tm-fonte-titulo), sans-serif;
+  vertical-align: 1px;
+}
+/* A 1ª figurinha é a 5F 2 (a 5F 1 é a foto do time, lá em cima). */
+.raiz .elenco {
+  counter-reset: figurinha 1;
+}
+@media (min-width: 600px) and (max-width: 1023px) {
+  .raiz .elenco {
+    row-gap: 34px; /* o selo do capitão */
+  }
+}
+/* A casca fica parada (vence as duas animações da base): quem anda é a carta. O ::before é a VAGA. */
+.raiz .casca {
+  counter-increment: figurinha;
+  border-radius: 12px; /* o anel de foco acompanha */
+  animation: none;
+}
+.raiz .casca::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  translate: -6px -6px;
+  border-radius: 12px;
+  pointer-events: none;
+  background: var(--vaga);
+  box-shadow: inset 0 0 0 1px rgba(10, 4, 20, 0.7), inset 0 0 0 4px rgba(255, 246, 230, 0.1);
+}
+/* A colada: de baixo (de cima, cobriria o rodapé da linha anterior), achata e assenta. */
+@keyframes figurinhaCola {
+  from {
+    transform: translate(-4px, 18px) scale(1.04);
+  }
+  70% {
+    transform: translate(0, 1px) scale(0.985);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes figurinhaColaRelogio {
+  0%,
+  60% {
+    transform: translate(-4px, 18px) scale(1.04);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5);
+  }
+  80% {
+    transform: translate(0, 1px) scale(0.985);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1);
+  }
+  100% {
+    transform: none;
+  }
+}
+/* O papel do adesivo. */
+.raiz .carta {
+  container-type: inline-size;
+  clip-path: none;
+  padding: 2px;
+  border-radius: 12px;
+  background: linear-gradient(160deg, var(--papel), var(--papel-sombra));
+  animation-name: figurinhaColaRelogio;
+  animation-duration: calc(2000ms + var(--i, 0) * 140ms);
+  animation-timing-function: linear;
+}
+@supports (animation-timeline: view()) {
+  .raiz .carta {
+    animation: figurinhaCola linear; /* o shorthand primeiro: ele zera a timeline */
+    animation-timeline: view();
+    animation-range: entry 0% entry calc(60% + var(--col, 0) * 12%);
+  }
+}
+@media (min-width: 1024px) {
+  @supports (animation-timeline: view()) {
+    .raiz .carta {
+      animation-range: entry 0% entry calc(50% + var(--i, 0) * 8%);
+    }
+  }
+}
+/* A moldura impressa da figurinha. */
+.raiz .miolo {
+  clip-path: none;
+  overflow: hidden;
+  border-radius: 10px;
+  padding: 6px 6px 0;
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0 5px, transparent 5px 10px),
+    linear-gradient(180deg, #4b22a6, var(--tm-abismo));
+}
+.raiz .foto {
+  aspect-ratio: 5 / 7;
+  border-radius: 6px;
+  background: var(--tm-abismo);
+}
+.raiz .foto img {
+  filter: none;
+}
+.raiz .enfGradacao {
+  border-radius: 6px;
+  background:
+    linear-gradient(125deg, rgba(255, 255, 255, 0.18) 0 10%, transparent 26%),
+    linear-gradient(180deg, transparent 52%, rgba(18, 8, 31, 0.5) 78%, rgba(18, 8, 31, 0.88) 100%);
+}
+.raiz .enfRotaGigante {
+  display: none;
+}
+/* O texto sobre a foto (sem position: o link esticado se mede pelo .miolo). */
+.raiz .sobreFoto {
+  padding: 8px 8px 0;
+}
+.raiz .etiquetaRota {
+  --tm-icone: var(--tm-tinta);
+  border: 0;
+  border-radius: 999px;
+  padding: 4px 8px 3px 7px;
+  background: var(--tm-acento);
+  color: var(--tm-tinta);
+  font: 400 10.5px / 1 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.06em;
+  box-shadow: 0 0 0 2px var(--creme), 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+/* A faixa do nome, de ponta a ponta da foto. Só fundo, margem e padding (caminho do link). */
+.raiz .identidade {
+  margin: 0 -8px;
+  padding: 8px 10px 9px;
+  gap: 5px;
+  background: linear-gradient(90deg, var(--tm-royal), #3a1a90 70%, rgba(58, 26, 144, 0.92));
+}
+/* O nick pela palavra mais larga do ELENCO, medida (--maior-palavra-em: BONTEMPO = 5,886 em). SEM
+   filter, transform, position: é o pai do link da carta. */
+.raiz .nick {
+  --nick: clamp(15px, calc((100cqi - 24px) / var(--maior-palavra-em, 7)), 24px);
+  padding: 0.08em 0.1em 0.06em 0;
+  margin-right: 0;
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  color: var(--creme);
+  letter-spacing: 0.02em;
+  line-height: 1.02;
+  font-kerning: none;
+  font-variant-ligatures: none;
+  text-wrap: balance;
+  text-shadow: 0 2px 0 rgba(27, 11, 58, 0.6);
+}
+.raiz .placaCapitao {
+  border-radius: 999px;
+  padding: 3px 9px 2px;
+  background: var(--holo-claro);
+  color: var(--tm-tinta);
+  font: 400 10px / 1 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.08em;
+  box-shadow: 0 0 0 1.5px var(--creme);
+}
+.raiz .placaCapitao .coroaMini {
+  width: 12px;
+}
+/* A linha impressa: código 5F n, nome, «FICHA →». Sem espaço, o «FICHA →» desce. */
+.raiz .rodape {
+  flex-wrap: wrap;
+  justify-content: flex-start; /* a base usa space-between: com quebra, o nome ia para a direita */
+  gap: 4px 6px;
+  padding: 7px 4px 8px;
+  border-top: 0;
+}
+.raiz .rodape::before {
+  content: "5F " counter(figurinha) / "";
+  flex: 0 0 auto;
+  padding: 3px 6px 2px;
+  border-radius: 4px;
+  background: var(--creme);
+  color: var(--tm-tinta);
+  font: 400 11px / 1 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.04em;
+}
+.raiz .nome {
+  overflow: visible;
+  white-space: normal;
+  text-overflow: clip;
+  overflow-wrap: break-word;
+  color: var(--tm-prata);
+  font: 700 12px / 1.15 var(--tm-fonte-assinatura), Arial, sans-serif;
+}
+.raiz .ficha {
+  margin-left: auto;
+  color: var(--tm-acento);
+  font: 400 11px / 1 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.06em;
+}
+/* A sombra da figurinha (o halo da base). Cola junto com a carta, pela rolagem dela. */
+.raiz .enfHaloCarta {
+  inset: 10px -2px -8px 8px;
+  border-radius: 14px;
+  background: radial-gradient(closest-side, rgba(5, 0, 12, 0.7), rgba(5, 0, 12, 0.35) 70%, transparent);
+  transform: none;
+}
+@keyframes sombraFigurinha {
+  from {
+    transform: translate(8px, 22px) scale(1.06);
+    opacity: 0.35;
+  }
+  70% {
+    transform: translate(2px, 4px);
+    opacity: 0.9;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@supports (animation-timeline: view()) {
+  .raiz .casca:not(.cascaCapitao) .enfHaloCarta {
+    animation: sombraFigurinha linear;
+    animation-timeline: view();
+    animation-range: entry 0% entry calc(60% + var(--col, 0) * 12%);
+  }
+}
+/* Hover/foco: a figurinha DESCOLA (a casca, a vaga e o anel ficam). */
+@media (hover: hover) and (pointer: fine) {
+  .raiz .casca:hover,
+  .raiz .casca:has(.link:focus-visible) {
+    translate: none;
+  }
+  .raiz .carta {
+    transition: translate 0.28s cubic-bezier(0.2, 0.7, 0.2, 1), rotate 0.28s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .raiz .casca:hover .carta,
+  .raiz .casca:has(.link:focus-visible) .carta {
+    translate: 0 -7px;
+    rotate: -1.2deg;
+  }
+  .raiz .casca:hover .enfHaloCarta,
+  .raiz .casca:has(.link:focus-visible) .enfHaloCarta {
+    transform: translate(4px, 10px) scale(1.04);
+  }
+}
+@media (hover: hover) and (pointer: fine) and (min-width: 1024px) {
+  .raiz .cascaCapitao:hover,
+  .raiz .cascaCapitao:has(.link:focus-visible) {
+    translate: 0 -14px; /* o erguido da base, sem os −22 px */
+  }
+}
+
+/* -------------------------------------------- o capitão: a BRILHANTE */
+/* A moldura arco-íris anda: um cone girando por baixo do papel, visível nos 3 px da borda. */
+.raiz .cascaCapitao .carta {
+  overflow: hidden;
+  isolation: isolate;
+  padding: 3px;
+  background: var(--papel);
+}
+.raiz .cascaCapitao .carta::before {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  z-index: -1;
+  background: var(--holo);
+  animation: aroGiraAlbum 14s linear infinite;
+}
+.raiz .cascaCapitao .miolo {
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0 5px, transparent 5px 10px),
+    linear-gradient(180deg, #6a2fd0, #2e1170);
+}
+.raiz .cascaCapitao .identidade {
+  background: linear-gradient(90deg, var(--tm-metal-fundo), #4b1fb0 70%);
+}
+.raiz .cascaCapitao .enfHaloCarta {
+  background: radial-gradient(closest-side, rgba(199, 125, 255, 0.55), rgba(106, 242, 255, 0.18) 60%, transparent);
+}
+/* O reflexo do capitão é o do hover da base, igual ao das outras figurinhas: «a brilhante» já é a
+   moldura que gira (uma segunda faixa em color-dodge estourava o orçamento de laços). */
+/* O selo-estrela girando devagar (a partir de −8°). */
+@keyframes seloGiraAlbum {
+  from {
+    transform: rotate(-8deg);
+  }
+  to {
+    transform: rotate(352deg);
+  }
+}
+.raiz .coroaDoCapitao {
+  width: 56px;
+  top: -30px;
+  filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.55));
+  animation: seloGiraAlbum 30s linear infinite;
+}
+@media (max-width: 599px) {
+  .raiz .coroaDoCapitao {
+    width: 48px;
+    top: -26px;
+  }
+}
+
+/* Celular: o capitão DEITADO na largura toda (foto à esquerda, texto à direita). */
+@media (max-width: 599px) {
+  .raiz .cascaLarga {
+    margin-top: 26px;
+  }
+  .raiz .cascaLarga .miolo {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);
+    grid-template-rows: 1fr auto;
+    padding: 6px;
+  }
+  .raiz .cascaLarga .foto {
+    grid-area: 1 / 1 / 3 / 2;
+    aspect-ratio: 5 / 7;
+  }
+  .raiz .cascaLarga .sobreFoto {
+    display: contents;
+  }
+  .raiz .cascaLarga .topo {
+    grid-area: 1 / 1;
+    align-self: start;
+    z-index: 2;
+    padding: 8px;
+  }
+  .raiz .cascaLarga .identidade {
+    grid-area: 1 / 2;
+    align-self: end;
+    z-index: 2;
+    margin: 0;
+    padding: 12px 6px 6px 12px;
+    background: none;
+  }
+  .raiz .cascaLarga .rodape {
+    grid-area: 2 / 2;
+    padding: 6px 6px 6px 12px;
+  }
+  .raiz .cascaLarga .nick {
+    --nick: clamp(20px, calc((100cqi * 0.52 - 22px) / var(--maior-palavra-em, 7)), 30px);
+  }
+  .raiz .cascaLarga .coroaDoCapitao {
+    left: 24%;
+  }
+}
+
+/* ======================================================================= cartela: o pacotinho */
+.raiz .enfLinhaCromo {
+  color: var(--tm-acento);
+}
+.raiz .enfLinhaCromo::before,
+.raiz .enfLinhaCromo::after {
+  height: 2px;
+  background: repeating-linear-gradient(90deg, rgba(255, 246, 230, 0.55) 0 8px, transparent 8px 14px);
+}
+.raiz .enfLinhaCromo svg {
+  width: 20px;
+}
+@keyframes pacoteCai {
+  from {
+    transform: translate(0, 28px) rotate(-3deg);
+  }
+  to {
+    transform: none;
+  }
+}
+/* O pacote em pé: papel laminado com serrilhado em cima e embaixo (máscara ESTÁTICA, dentes de 8 px a cada
+   16; o texto mora no padding e a máscara nunca toca nele). Em cada ladrilho de 16 × 8, o cone sai do meio
+   da borda e só o dente (a cunha de 90° voltada para DENTRO do pacote) é opaco: os vãos entre os dentes
+   ficam transparentes. (Com a cunha transparente voltada para fora, o ladrilho saía todo opaco: borda reta.) */
+.raiz .cartelaCorpo {
+  isolation: isolate;
+  width: min(100%, 400px);
+  margin: 0 auto 40px;
+  padding: 58px 22px 50px;
+  background: linear-gradient(160deg, #4a1fa8, #24104f 45%, #3a1888 70%, #1e0c40);
+  -webkit-mask:
+    conic-gradient(from 135deg at 50% 0, #000 0 90deg, #0000 0) 50% 0 / 16px 8px repeat-x,
+    linear-gradient(#000, #000) 0 8px / 100% calc(100% - 16px) no-repeat,
+    conic-gradient(from -45deg at 50% 100%, #000 0 90deg, #0000 0) 50% 100% / 16px 8px repeat-x;
+  mask:
+    conic-gradient(from 135deg at 50% 0, #000 0 90deg, #0000 0) 50% 0 / 16px 8px repeat-x,
+    linear-gradient(#000, #000) 0 8px / 100% calc(100% - 16px) no-repeat,
+    conic-gradient(from -45deg at 50% 100%, #000 0 90deg, #0000 0) 50% 100% / 16px 8px repeat-x;
+}
+@supports (animation-timeline: view()) {
+  .raiz .cartelaCorpo {
+    animation: pacoteCai linear;
+    animation-timeline: view();
+    animation-range: entry 10% entry 70%;
+  }
+}
+/* NaCartela: o brilho do laminado, o picote de abrir e o rótulo escuro (atrás do texto). */
+.enfBrilhoPacote {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.enfBrilhoPacote::before {
+  content: "";
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  left: 0;
+  width: 40%;
+  background: linear-gradient(100deg, transparent, rgba(255, 122, 217, 0.22) 30%, rgba(255, 211, 110, 0.2) 45%, rgba(106, 242, 255, 0.22) 60%, transparent);
+  transform: rotate(14deg) translateX(-130%);
+  animation: pacoteBrilha 9s cubic-bezier(0.4, 0, 0.3, 1) infinite;
+}
+@keyframes pacoteBrilha {
+  0%,
+  50% {
+    transform: rotate(14deg) translateX(-130%);
+  }
+  80%,
+  100% {
+    transform: rotate(14deg) translateX(330%);
+  }
+}
+.enfPicotePacote {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: 24px;
+  z-index: 0;
+  height: 2px;
+  pointer-events: none;
+  background: repeating-linear-gradient(90deg, rgba(255, 246, 230, 0.5) 0 6px, transparent 6px 10px);
+}
+.enfRotuloPacote {
+  position: absolute;
+  inset: 40px 14px 32px;
+  z-index: 0;
+  border-radius: 14px;
+  pointer-events: none;
+  background: #1a0b33;
+  box-shadow: inset 0 0 0 2px rgba(200, 245, 74, 0.5);
+}
+.raiz .cartelaEscudo,
+.raiz .cartelaNome,
+.raiz .cartelaDestino,
+.raiz .cartelaData {
+  position: relative;
+  z-index: 1;
+}
+.raiz .cartelaEscudo {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 10px;
+}
+.raiz .cartelaNome {
+  color: var(--creme);
+  font-size: clamp(26px, 3vw, 34px);
+  letter-spacing: 0.03em;
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+}
+.raiz .cartelaDestino {
+  margin: 10px 0 0;
+  font: 800 13px / 1.3 var(--tm-fonte-assinatura), Arial, sans-serif;
+  letter-spacing: 0.06em;
+  color: var(--tm-acento); /* 14,6:1 no rótulo */
+}
+.raiz .cartelaData {
+  margin: 8px 6px 0;
+  line-height: 1.5;
+  letter-spacing: 0.2em;
+}
+/* O selo SABOR MEIO ROXO: DENTRO do pacote (a máscara cortaria o que saísse), no canto de cima à direita. */
+@keyframes carimbaSabor {
+  from {
+    transform: scale(1.6) rotate(-20deg);
+  }
+  70% {
+    transform: scale(0.94) rotate(4deg);
+  }
+  to {
+    transform: none;
+  }
+}
+.raiz .cartelaCarimbo {
+  position: absolute;
+  z-index: 2;
+  top: 14px; /* o aro creme (3 px) fica abaixo dos vãos do serrilhado (8 px) */
+  right: 12px;
+  display: grid;
+  place-items: center;
+  width: 86px;
+  height: 86px;
+  margin: 0;
+  padding: 10px;
+  border-radius: 50%;
+  rotate: 12deg;
+  background: var(--tm-acento);
+  color: var(--tm-tinta); /* 14,4:1 */
+  font: 400 14px / 1 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.02em;
+  text-align: center;
+  box-shadow: 0 0 0 3px var(--creme), 0 6px 12px -6px #000;
+}
+@supports (animation-timeline: view()) {
+  .raiz .cartelaCarimbo {
+    animation: carimbaSabor linear;
+    animation-timeline: view();
+    animation-range: entry 30% cover 45%;
+  }
+}
+.raiz .cartelaFecho {
+  margin: 0 0 20px;
+  font: 700 16px / 1.4 var(--tm-fonte-assinatura), Arial, sans-serif;
+  letter-spacing: 0.01em;
+  color: var(--tm-prata);
+}
+@media (max-width: 599px) {
+  .raiz .cartelaCorpo {
+    padding: 54px 16px 46px;
+  }
+  .raiz .cartelaEscudo {
+    width: 60px;
+    height: 60px;
+  }
+  .raiz .cartelaCarimbo {
+    top: 12px;
+    right: 10px;
+    width: 72px;
+    height: 72px;
+    font-size: 12px;
+  }
+}
+
+/* ======================================================================= acessibilidade */
+/* O bloco da base (.raiz * { animation: none !important }) para tudo: vira o pôster final. Aqui só
+   some o que só faz sentido em movimento. */
+@media (prefers-reduced-motion: reduce) {
+  .enfFolha,
+  .enfFolhaSombra,
+  .enfRasgo,
+  .enfEstouro,
+  .enfBafo,
+  .enfFaixa,
+  .enfBrilho,
+  .enfBrilhoPacote {
+    display: none;
+  }
+}
+@media (forced-colors: active) {
+  .raiz .cromo {
+    background: none;
+    -webkit-text-fill-color: CanvasText;
+    color: CanvasText;
+  }
+  .raiz .eco,
+  .enfAro,
+  .enfFaixa,
+  .raiz .cascaCapitao .carta::before {
+    display: none;
+  }
+}
+/* A base esconde o eco e pinta o cromo de branco; o gancho do tema venceria e deixaria a letra
+   transparente: o tema declara de novo. */
+@media (prefers-contrast: more) {
+  .raiz .cromo {
+    background: none;
+    -webkit-text-fill-color: #fff;
+  }
+  .enfFaixa {
+    display: none;
+  }
+}

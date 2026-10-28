@@ -76,8 +76,30 @@ const SOFIA_EXTRA_CONDENSADA: MetricasDaFonte = {
 // ↑ Fãs de Rosca
 
 // ↓ Os 5 Furiosos
-/** Lilita One (Os 5 Furiosos). */
-const LILITA_ONE: MetricasDaFonte | undefined = undefined;
+/**
+ * Lilita One (Os 5 Furiosos), medida no Chromium a 1000 px com `fontKerning = "none"` (27/10/2026). A
+ * fonte TEM kerning: o título e os nicks do tema desligam (`font-kerning: none`) e aí a soma das letras
+ * é a palavra (FURIOSOS 4,573 em pelos dois caminhos). Espaçamento de 0,06 em (o recorte creme de uma
+ * letra não encosta na tinta da vizinha). Sobra: o recorte (0,16 em de traço → 0,08 de cada lado), o giro
+ * de até 4° das letras do título (~0,07 em) e folga.
+ */
+const LILITA_ONE: MetricasDaFonte = {
+  avancos: {
+    A: 0.655, B: 0.594, C: 0.561, D: 0.616, E: 0.493, F: 0.472, G: 0.621, H: 0.644, I: 0.429,
+    J: 0.462, K: 0.62, L: 0.435, M: 0.907, N: 0.648, O: 0.696, P: 0.57, Q: 0.706, R: 0.59,
+    S: 0.531, T: 0.502, U: 0.628, V: 0.661, W: 0.953, X: 0.683, Y: 0.615, Z: 0.563,
+    Á: 0.655, À: 0.655, Â: 0.655, Ã: 0.655, Ä: 0.655, É: 0.488, È: 0.488, Ê: 0.488, Ë: 0.488,
+    Í: 0.432, Ì: 0.432, Î: 0.432, Ï: 0.432, Ó: 0.696, Ò: 0.696, Ô: 0.696, Õ: 0.696, Ö: 0.696,
+    Ú: 0.628, Ù: 0.628, Û: 0.628, Ü: 0.628, Ç: 0.546, Ñ: 0.657,
+    0: 0.639, 1: 0.406, 2: 0.525, 3: 0.528, 4: 0.598, 5: 0.524, 6: 0.575, 7: 0.5, 8: 0.57, 9: 0.565,
+    " ": 0.188, ".": 0.229, ",": 0.305, "-": 0.525, _: 0.636, "'": 0.301, "!": 0.287, "?": 0.584,
+    "&": 0.667, "+": 0.602, "·": 0.309, "#": 0.833, "@": 0.867, "(": 0.43, ")": 0.422, "/": 0.573,
+    ":": 0.277, "%": 0.798, "©": 0.693, "®": 0.701, Æ: 0.917, Œ: 0.877, Þ: 0.595, Ø: 0.696,
+  },
+  padrao: 1, // o mais largo medido é o W (0,953); CJK e o ㅤ dos nicks caem em outra fonte, ~1 em
+  espacamento: 0.06,
+  sobra: 0.3,
+};
 // ↑ Os 5 Furiosos
 
 // ↓ So ADC Bronze Clube

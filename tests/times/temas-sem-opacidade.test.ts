@@ -182,6 +182,19 @@ describe("os keyframes de entrada do conteúdo", () => {
     "pinoEntra",
     // ↑ Fãs de Rosca Esporte Clube
     // ↓ Os 5 Furiosos (cenarios/album)
+    "colaFoto",
+    "bafo",
+    "bafoSelo",
+    "balaoPula",
+    "figurinhaCola",
+    "figurinhaColaRelogio",
+    "pacoteCai",
+    "carimbaSabor",
+    "seloGiraAlbum",
+    "colaRetrato",
+    "bafoNick",
+    "adesivoPop",
+    "seloGiraAlbumFicha",
     // ↑ Os 5 Furiosos
     // ↓ So ADC Bronze Clube (cenarios/estande)
     // ↑ So ADC Bronze Clube
