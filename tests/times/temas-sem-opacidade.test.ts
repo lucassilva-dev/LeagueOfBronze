@@ -167,6 +167,19 @@ describe("os keyframes de entrada do conteúdo", () => {
     "tampinhaCai",
     "tampinhaGira",
     // ↓ Fãs de Rosca Esporte Clube (cenarios/academia)
+    "roscaDireta",
+    "letraInfla",
+    "entraClube",
+    "lemaPincela",
+    "crachaBalanca",
+    "crachaBalancaRelogio",
+    "halterBalanca",
+    "sacoPousa",
+    "adesivoCola",
+    "espelhoChega",
+    "nickInfla",
+    "placaEmpilha",
+    "pinoEntra",
     // ↑ Fãs de Rosca Esporte Clube
     // ↓ Os 5 Furiosos (cenarios/album)
     // ↑ Os 5 Furiosos

@@ -1,1 +1,1649 @@
-/* Fãs de Rosca Esporte Clube — cenário «academia» (components/times/cenarios/academia.tsx). BASE: o tema chega depois. */
+/*
+ * Cenário "academia" — FÃS DE ROSCA ESPORTE CLUBE, «Dia de Braço» (cenarios/academia.tsx).
+ *
+ * A academia do time às 6h: parede de blocos cor de ameixa, basculantes com a madrugada rosada,
+ * raios de sol com poeira de magnésio, o relógio nas 6 em ponto, piso de borracha com granulado.
+ * O escudo faz a ROSCA DIRETA (sobe, segura tremendo, assenta e dá um pump); FÃS DE e ROSCA são
+ * massa de rosquinha com glacê de morango e granulado e, no computador, ficam dos dois lados do
+ * escudo, como no próprio escudo. O elenco são crachás de sócio no gancho; a cartela, o saco de
+ * pão do pós-treino; a ficha (academia-ficha.module.css), a selfie no espelho da academia.
+ *
+ * Duas famílias de regra, como nos outros cenários:
+ *  - ENFEITES próprios (`.enf…`, aria-hidden, sem texto fora de SVG);
+ *  - GANCHOS `.raiz .peca` com o nome das peças de tema.module.css. Nada de @layer.
+ * Conteúdo só anima transform (scale/rotate/translate 2D no título: background-clip:text), sem
+ * delay nem fill-mode, com a espera dentro do keyframe. Flashes (pequenos): a nuvem de magnésio
+ * (~0,44 s, suave), o brilho do bíceps (~0,97 s e a cada 10 s) e, na ficha, o flash da selfie.
+ * Nada em 3D (nem nos enfeites). Laços infinitos, todos enfeite e só transform/opacidade: no herói
+ * 8 no computador (6 grãos de poeira, o ponteiro, o brilho do bíceps) e 5 no celular (3 grãos);
+ * na ficha 3 (o ponteiro e os 2 da base: a poeira some lá). Os @keyframes de nome genérico levam o
+ * nome do cenário (faixaAbreAcademia, haloAcademia, lascaVoaAcademia): o nome é único na pasta.
+ */
+
+/* ===================================================== reserva da fonte do título (mais estreita) */
+@font-face {
+  font-family: "Rosca Reserva Impact";
+  src: local("Impact");
+  size-adjust: 63%;
+}
+@font-face {
+  font-family: "Rosca Reserva";
+  src: local("Arial"), local("ArialMT"), local("Helvetica"), local("Helvetica Neue"), local("Arimo"), local("Liberation Sans"), local("Roboto");
+  size-adjust: 40%;
+}
+
+/* ===================================================== raiz */
+.raiz {
+  --tm-titulo-estilo: italic;
+  --tm-titulo-peso: 900;
+  --tm-titulo-peso-medio: 900;
+  --tm-placa-topo: var(--tm-metal-luz);
+  --tm-nick-meio: var(--tm-metal-alto);
+  --tm-nick-base: var(--tm-metal-meio);
+  --tm-valor-base: var(--tm-metal-meio);
+  --tm-etiqueta: var(--tm-texto);
+  --tm-foto-fundo: var(--tm-abismo);
+  --tm-chip-capitao: var(--tm-texto);
+  --tm-mono: var(--tm-icone);
+  --tm-eco-base: #2b1408;
+  --giz: #f4efea;
+  --fita: #ffd23f;
+  --fita-tinta: #1c1206;
+  --borracha: #141113;
+  --massa-luz: #ffd9a0;
+  --massa-borda: #c27a36;
+  --kraft: #c99a62;
+  --kraft-tinta: #3b2412;
+  --cartao: #ffffff;
+  --caneta: #a8326a;
+  font-synthesis: none;
+}
+
+/* ===================================================== palco: a academia às 6h */
+@keyframes camNivela {
+  from {
+    transform: rotate(-1.4deg) scale(1.07) translateY(1.2%);
+  }
+  to {
+    transform: none;
+  }
+}
+.raiz .enfCamera {
+  transform-origin: 50% 65%;
+  animation: camNivela 1600ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* A parede de blocos pintada: cinza-ameixa, juntas horizontais, a faixa rosa da academia. */
+.enfParede {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(60% 46% at 74% 0%, rgba(255, 196, 160, 0.15), transparent 70%),
+    linear-gradient(180deg, transparent 0 64%, rgba(255, 142, 195, 0.07) 64% 66.4%, rgba(244, 239, 234, 0.06) 66.4% 66.8%, transparent 66.8%),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.022) 0 1px, transparent 1px 46px),
+    linear-gradient(180deg, var(--tm-ceu) 0%, #18131a 48%, var(--tm-breu) 100%);
+}
+
+/* As janelas basculantes no alto (só ≥1024): a madrugada rosada entrando. */
+.enfJanelas {
+  position: absolute;
+  top: 2.5%;
+  right: calc(4vw + 86px);
+  display: none;
+  gap: 2.6%;
+  width: min(54vw, 760px);
+  height: clamp(64px, 12vh, 116px);
+}
+@media (min-width: 1024px) {
+  .enfJanelas {
+    display: flex;
+  }
+}
+.enfJanela {
+  flex: 1;
+  border: 4px solid #2a2328;
+  border-radius: 3px;
+  background:
+    linear-gradient(90deg, transparent calc(33.3% - 2px), #2a2328 calc(33.3% - 2px) calc(33.3% + 2px), transparent calc(33.3% + 2px) calc(66.6% - 2px), #2a2328 calc(66.6% - 2px) calc(66.6% + 2px), transparent calc(66.6% + 2px)),
+    linear-gradient(180deg, transparent calc(50% - 2px), #2a2328 calc(50% - 2px) calc(50% + 2px), transparent calc(50% + 2px)),
+    linear-gradient(180deg, #ffe3cf 0%, #ffc1c9 55%, #f79bbd 100%);
+  box-shadow: 0 0 46px rgba(255, 190, 160, 0.22);
+  opacity: 0.5;
+  animation: janelaClareia 2200ms ease-out;
+}
+.enfJanela:nth-child(3) {
+  background:
+    linear-gradient(90deg, transparent calc(33.3% - 2px), #2a2328 calc(33.3% - 2px) calc(33.3% + 2px), transparent calc(33.3% + 2px) calc(66.6% - 2px), #2a2328 calc(66.6% - 2px) calc(66.6% + 2px), transparent calc(66.6% + 2px)),
+    linear-gradient(180deg, transparent calc(50% - 2px), #2a2328 calc(50% - 2px) calc(50% + 2px), transparent calc(50% + 2px)),
+    radial-gradient(circle at 58% 118%, #fffaf0 0 16%, #ffd8b0 26%, transparent 52%),
+    linear-gradient(180deg, #ffe3cf 0%, #ffc1c9 55%, #f79bbd 100%);
+}
+@keyframes janelaClareia {
+  from {
+    opacity: 0.18;
+  }
+  to {
+    opacity: 0.5;
+  }
+}
+
+/* Os raios de sol do basculante, em diagonal, com a poeira de magnésio boiando. */
+.enfRaios {
+  position: absolute;
+  inset: 0 -12% 0 0;
+  background: linear-gradient(118deg, transparent 0 33%, rgba(255, 200, 160, 0.11) 36%, rgba(255, 200, 160, 0.16) 39.5%, transparent 43.5%, transparent 47%, rgba(255, 200, 160, 0.09) 50%, rgba(255, 200, 160, 0.13) 54%, transparent 58%, transparent 61%, rgba(255, 200, 160, 0.1) 64%, transparent 69%);
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, rgba(0, 0, 0, 0.75) 45%, transparent 88%);
+  mask-image: linear-gradient(180deg, #000 0%, rgba(0, 0, 0, 0.75) 45%, transparent 88%);
+  transform-origin: 80% 0;
+  /* Depois de nascer, os raios ficam acesos parados (o juiz cortou a respiração: uma camada do
+     tamanho do palco variando de opacidade não aparece no vídeo e pesa no compositor do celular). */
+  animation: solNasce 2200ms cubic-bezier(0.3, 0.1, 0.2, 1);
+}
+@keyframes solNasce {
+  from {
+    opacity: 0.25;
+    transform: translate(-4%, 0) rotate(-2deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.enfPoeira {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.enfPo {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: var(--d);
+  height: var(--d);
+  border-radius: 50%;
+  background: #ffe9d6;
+  box-shadow: 0 0 6px rgba(255, 220, 190, 0.6);
+  opacity: 0;
+  animation-name: poeiraDeMagnesio;
+  animation-duration: var(--dur);
+  animation-timing-function: linear;
+  animation-delay: var(--atraso);
+  animation-iteration-count: infinite;
+}
+@keyframes poeiraDeMagnesio {
+  0% {
+    transform: translate(0, 0);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.85;
+  }
+  80% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translate(var(--dx), var(--dy));
+    opacity: 0;
+  }
+}
+/* 6 grãos no computador e no tablet, 3 no celular (orçamento de laços do herói: 8 e 5). */
+@media (max-width: 599px) {
+  .enfPo:nth-child(n + 4) {
+    display: none;
+  }
+}
+/* Na ficha (o mesmo palco), sem poeira: o orçamento da ficha é de 4 laços, e ficam 3 (o ponteiro do
+   relógio, o halo e a varredura do retrato da base). A ficha é a raiz que tem o nick como título. */
+.raiz:has([aria-labelledby="tm-nick"]) .enfPoeira {
+  display: none;
+}
+
+/* O relógio de parede: 6h em ponto, o ponteiro dos segundos andando. */
+.enfRelogio {
+  position: absolute;
+  top: clamp(12px, 3vh, 30px);
+  right: clamp(14px, 3vw, 44px);
+  width: clamp(40px, 4.4vw, 64px);
+  aspect-ratio: 1;
+}
+.enfRelogio svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.enfPonteiro {
+  transform-box: view-box;
+  transform-origin: 50px 50px;
+  animation: ponteiroDosSegundos 60s steps(60) infinite;
+}
+@keyframes ponteiroDosSegundos {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ===================================================== moldura: a fita métrica e a faixa de segurança */
+.enfFita {
+  --fita-h: clamp(12px, 2vw, 24px);
+  position: absolute;
+  z-index: 3;
+  top: max(0px, calc((var(--barra) - var(--fita-h)) / 2));
+  left: 0;
+  right: 0;
+  height: var(--fita-h);
+  overflow: hidden;
+  pointer-events: none;
+}
+.enfFitaTira {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--fita-h) * 1.1);
+  width: max-content;
+  animation: trenaPuxa 900ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.enfFitaTira svg {
+  display: block;
+  height: 100%;
+  width: auto;
+}
+.enfFitaTira text {
+  font: 700 10px var(--font-body), "Chakra Petch", sans-serif;
+  fill: var(--fita-tinta);
+}
+@keyframes trenaPuxa {
+  0%,
+  8% {
+    transform: translateX(-101%);
+  }
+  72% {
+    transform: translateX(1.2%);
+  }
+  86% {
+    transform: translateX(-0.4%);
+  }
+  100% {
+    transform: none;
+  }
+}
+/* A caixa da trena, presa na borda esquerda (parada). */
+.enfTrena {
+  position: absolute;
+  z-index: 1;
+  left: calc(var(--fita-h) * -0.9);
+  top: 50%;
+  width: calc(var(--fita-h) * 2.4);
+  aspect-ratio: 1;
+  margin-top: calc(var(--fita-h) * -1.2);
+  border-radius: 50%;
+  background: radial-gradient(circle at 62% 50%, var(--fita) 0 22%, #2a2328 23% 60%, #3a3238 61% 100%);
+  box-shadow: inset 0 0 0 2px #4a4046, 2px 0 6px rgba(0, 0, 0, 0.6);
+}
+.enfFaixaSeguranca {
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: clamp(8px, 1.1vw, 14px);
+  background: repeating-linear-gradient(-45deg, #ff8ec3 0 12px, #1a1316 12px 24px);
+  box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+  animation: faixaAbreAcademia 1000ms cubic-bezier(0.7, 0, 0.2, 1);
+}
+@keyframes faixaAbreAcademia {
+  0%,
+  10% {
+    transform: scaleX(0);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/* ===================================================== herói: empilhado no celular; «FÃS DE (escudo) ROSCA» no computador */
+.raiz .heroiGrade {
+  /* 30svh: no celular baixo (405×720 do vídeo, 375×667) o escudo encolhe e o lema cabe inteiro na
+     1ª dobra; nos altos (390×844, 360×780, 414×896) quem manda é o 58vw. */
+  --escudo: clamp(190px, min(58vw, 30svh), 250px);
+  --folga: clamp(18px, 2.4vw, 34px);
+  animation-name: none;
+}
+.raiz .blocoEscudo {
+  margin-top: calc(var(--escudo) * 0.08);
+  margin-bottom: calc(var(--escudo) * 0.15);
+}
+@media (min-width: 600px) and (max-width: 1023px) {
+  .raiz .heroiGrade {
+    --escudo: clamp(230px, min(36vw, 30svh), 290px);
+  }
+}
+@media (min-width: 900px) {
+  .raiz .heroiGrade {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    justify-items: center;
+    text-align: center;
+    gap: 0;
+    min-height: 0;
+  }
+  .raiz .blocoEscudo {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: center;
+    margin-top: calc(var(--escudo) * 0.1);
+    margin-bottom: calc(var(--escudo) * 0.2);
+  }
+  .raiz .blocoTexto {
+    grid-column: 1;
+    grid-row: 2;
+    margin: 0;
+  }
+  .raiz .blocoTexto .chips {
+    justify-content: center;
+  }
+  .raiz .lema {
+    margin-inline: auto;
+  }
+}
+@media (min-width: 1024px) {
+  .raiz .heroiGrade {
+    --escudo: clamp(230px, min(22vw, 36svh), 340px);
+  }
+}
+/* ≥1024: «FÃS DE (escudo) ROSCA» numa linha só, como no escudo. Só quando o nome bate com o
+   escudo (há assinatura: o sufixo ESPORTE CLUBE casou) e o navegador entende :has(); senão o
+   herói fica empilhado como no tablet. O bloco de texto some como caixa (display: contents): o
+   kicker, os créditos, o título, o lema e os chips viram linhas da grade, e o escudo divide a
+   linha 3 com o título. A grade vira o contêiner das unidades cqi do título. */
+@supports selector(:has(*)) {
+  @media (min-width: 1024px) {
+    .raiz .heroiGrade:has(.assinatura) {
+      container-type: inline-size;
+    }
+    .raiz .heroiGrade:has(.assinatura) .blocoTexto {
+      display: contents;
+    }
+    .raiz .heroiGrade:has(.assinatura) .kicker,
+    .raiz .heroiGrade:has(.assinatura) .nomesDoElenco,
+    .raiz .heroiGrade:has(.assinatura) .lema,
+    .raiz .heroiGrade:has(.assinatura) .chips {
+      position: relative;
+      z-index: 2; /* acima do escudo, do magnésio e do piso (o bloco do escudo é z-index 1) */
+    }
+    .raiz .heroiGrade:has(.assinatura) .kicker {
+      grid-row: 1;
+    }
+    .raiz .heroiGrade:has(.assinatura) .nomesDoElenco {
+      grid-row: 2;
+    }
+    .raiz .heroiGrade:has(.assinatura) .titulo {
+      position: relative;
+      z-index: 2;
+      grid-row: 3;
+      grid-column: 1;
+      width: 100%;
+    }
+    .raiz .heroiGrade:has(.assinatura) .blocoEscudo {
+      grid-row: 3;
+      grid-column: 1;
+      align-self: start;
+      margin: calc(var(--folga) * 0.6) 0 0;
+    }
+    .raiz .heroiGrade:has(.assinatura) .lema {
+      grid-row: 4;
+    }
+    .raiz .heroiGrade:has(.assinatura) .chips {
+      grid-row: 5;
+    }
+  }
+}
+
+/* ===================================================== escudo: a ROSCA DIRETA */
+@keyframes roscaDireta {
+  0%,
+  12% {
+    transform: translate(2%, 5%) rotate(6deg) scale(0.97);
+    animation-timing-function: cubic-bezier(0.45, 0, 0.25, 1);
+  }
+  38% {
+    transform: translate(0, -3%) rotate(-3deg) scale(1.02);
+    animation-timing-function: linear;
+  }
+  41% {
+    transform: translate(0, -3%) rotate(-2.3deg) scale(1.02);
+  }
+  44% {
+    transform: translate(0, -3%) rotate(-3.5deg) scale(1.02);
+  }
+  47% {
+    transform: translate(0, -3%) rotate(-2.4deg) scale(1.02);
+  }
+  50% {
+    transform: translate(0, -3%) rotate(-3.1deg) scale(1.02);
+    animation-timing-function: cubic-bezier(0.3, 0, 0.2, 1);
+  }
+  60% {
+    transform: translate(0, 0.6%) rotate(0.5deg) scale(0.995);
+    animation-timing-function: ease-out;
+  }
+  67% {
+    transform: none;
+    animation-timing-function: cubic-bezier(0.3, 0, 0.3, 1);
+  }
+  75% {
+    transform: scale(1.035);
+    animation-timing-function: cubic-bezier(0.3, 0, 0.3, 1);
+  }
+  82% {
+    transform: scale(0.994);
+  }
+  88%,
+  100% {
+    transform: none;
+  }
+}
+.raiz .escudo {
+  --biceps-x: 34%;
+  --biceps-y: 41%;
+  transform-origin: 30% 92%;
+  animation: roscaDireta 2400ms linear;
+}
+
+/* -------- atrás do escudo: contraluz, nuvem de magnésio, arcos da rosca */
+.enfHaloEscudo {
+  position: absolute;
+  left: 50%;
+  top: 48%;
+  z-index: 0;
+  width: 190%;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(closest-side, rgba(255, 190, 150, 0.3), rgba(255, 142, 195, 0.12) 55%, transparent 75%);
+  animation: haloAcademia 1400ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+@keyframes haloAcademia {
+  from {
+    opacity: 0.3;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.enfMagnesio {
+  position: absolute;
+  z-index: 0;
+  left: -35%;
+  right: -35%;
+  top: 50%;
+  height: 66%;
+  pointer-events: none;
+}
+.enfNuvem {
+  position: absolute;
+  left: calc(var(--x) - var(--d) / 2);
+  top: calc(var(--y) - var(--d) * 0.36);
+  width: var(--d);
+  aspect-ratio: 1.4;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(244, 239, 234, 0.85), rgba(244, 239, 234, 0.4) 48%, transparent 74%);
+  opacity: 0.16;
+  transform: translate(var(--dx), var(--dy)) scale(1.25);
+  animation: magnesioEstoura 1700ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+@keyframes magnesioEstoura {
+  0%,
+  6% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  26% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0.16;
+    transform: translate(var(--dx), var(--dy)) scale(1.25);
+  }
+}
+.enfLasca {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--giz);
+  opacity: 0;
+  animation: lascaVoaAcademia 1100ms cubic-bezier(0.15, 0.7, 0.3, 1);
+}
+@keyframes lascaVoaAcademia {
+  0%,
+  10% {
+    opacity: 0;
+    transform: translate(0, 0);
+  }
+  18% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx), var(--dy)) scale(0.5);
+  }
+}
+.enfArcos {
+  position: absolute;
+  z-index: 1;
+  left: 46%;
+  right: -16%;
+  top: -6%;
+  bottom: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+.enfArcos svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.enfArco {
+  fill: none;
+  stroke: var(--giz);
+  stroke-width: 2.8;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  opacity: 0;
+  animation: arcoRisca 1400ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.enfArco2 {
+  stroke-width: 1.5;
+  animation-duration: 1500ms;
+}
+@keyframes arcoRisca {
+  0%,
+  22% {
+    stroke-dashoffset: 1;
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.85;
+  }
+  62% {
+    stroke-dashoffset: 0;
+    opacity: 0.8;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+
+/* -------- no escudo: o suor e o brilho do bíceps */
+.enfSuor {
+  position: absolute;
+  z-index: 3;
+  left: var(--sx);
+  top: var(--sy);
+  width: 3.4%;
+  aspect-ratio: 0.72;
+  border-radius: 50% 50% 50% 50% / 64% 64% 36% 36%;
+  background: radial-gradient(circle at 36% 30%, #fff 0 16%, #d8f1ff 30%, #8fd0f2 78%);
+  box-shadow: 0 0 0 1px rgba(27, 58, 77, 0.55);
+  opacity: 0;
+  animation: suorVoa 2400ms cubic-bezier(0.2, 0.6, 0.3, 1);
+}
+@keyframes suorVoa {
+  0%,
+  36% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.4);
+  }
+  39% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  62%,
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx), var(--dy)) rotate(var(--r)) scale(0.75);
+  }
+}
+.enfBrilho {
+  position: absolute;
+  z-index: 3;
+  left: calc(var(--biceps-x) - 6.5%);
+  top: calc(var(--biceps-y) - 6.5%);
+  width: 13%;
+  aspect-ratio: 1;
+  transform: scale(0);
+  pointer-events: none;
+  animation: brilhoBiceps 2400ms linear, brilhoBicepsDeNovo 10s linear 2400ms infinite;
+}
+.enfBrilho svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+@keyframes brilhoBiceps {
+  0%,
+  37% {
+    transform: scale(0) rotate(0);
+  }
+  40.5% {
+    transform: scale(1.1) rotate(40deg);
+  }
+  46%,
+  100% {
+    transform: scale(0) rotate(90deg);
+  }
+}
+@keyframes brilhoBicepsDeNovo {
+  0%,
+  90% {
+    transform: scale(0);
+  }
+  93% {
+    transform: scale(0.9) rotate(45deg);
+  }
+  97%,
+  100% {
+    transform: scale(0) rotate(90deg);
+  }
+}
+
+/* -------- o chão: piso de borracha com granulado, a sombra e a marca de magnésio */
+.enfPiso {
+  position: absolute;
+  z-index: 0;
+  top: 93%;
+  left: 50%;
+  width: 200vw;
+  margin-left: -100vw;
+  height: calc(var(--escudo) * 0.9);
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 30% 46% at 50% 0%, rgba(255, 200, 160, 0.16), transparent 70%),
+    linear-gradient(180deg, rgba(244, 239, 234, 0.12) 0 1px, transparent 1px),
+    radial-gradient(circle at 12% 22%, rgba(255, 142, 195, 0.45) 0 1.4px, transparent 1.9px) 0 0 / 46px 34px,
+    radial-gradient(circle at 63% 71%, rgba(244, 239, 234, 0.34) 0 1.2px, transparent 1.7px) 0 0 / 46px 34px,
+    radial-gradient(circle at 81% 18%, rgba(127, 211, 255, 0.34) 0 1.2px, transparent 1.7px) 0 0 / 46px 34px,
+    radial-gradient(circle at 36% 58%, rgba(255, 210, 63, 0.34) 0 1.2px, transparent 1.7px) 0 0 / 46px 34px,
+    radial-gradient(circle at 92% 88%, rgba(139, 224, 138, 0.3) 0 1.1px, transparent 1.6px) 0 0 / 46px 34px,
+    linear-gradient(180deg, #1c171a, var(--borracha) 40%, var(--tm-breu));
+  -webkit-mask-image: linear-gradient(180deg, #000 55%, transparent);
+  mask-image: linear-gradient(180deg, #000 55%, transparent);
+}
+.enfSombraEscudo {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: calc(var(--escudo) * 0.82);
+  height: calc(var(--escudo) * 0.09);
+  margin: calc(var(--escudo) * -0.045) 0 0 calc(var(--escudo) * -0.41);
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.75), transparent);
+  animation: sombraRosca 2400ms linear;
+}
+@keyframes sombraRosca {
+  0%,
+  12% {
+    transform: scaleX(1.06);
+    animation-timing-function: cubic-bezier(0.45, 0, 0.25, 1);
+  }
+  38% {
+    transform: scaleX(0.8);
+  }
+  60% {
+    transform: scaleX(1.01);
+  }
+  75% {
+    transform: scaleX(1.04);
+  }
+  88%,
+  100% {
+    transform: none;
+  }
+}
+.enfMarcaMagnesio {
+  position: absolute;
+  left: 50%;
+  top: 2%;
+  width: calc(var(--escudo) * 1.3);
+  height: calc(var(--escudo) * 0.16);
+  margin-left: calc(var(--escudo) * -0.65);
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(244, 239, 234, 0.16), transparent);
+  animation: marcaDeMagnesio 1700ms ease-out;
+}
+@keyframes marcaDeMagnesio {
+  0%,
+  14% {
+    opacity: 0;
+  }
+  40% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.8;
+  }
+}
+
+/* ===================================================== texto do herói */
+.raiz .kicker {
+  text-wrap: balance;
+}
+.raiz .blocoTexto .kicker {
+  animation-name: none;
+}
+.raiz .nomesDoElenco {
+  position: relative;
+  z-index: 1;
+  animation-name: none;
+}
+
+/* -------- o título: FÃS DE ROSCA de massa com glacê de morango e granulado */
+.raiz .tituloVisual {
+  --tm-titulo-max: 112px;
+  --tam: clamp(44px, calc(100cqi / var(--largura-em, 2.72)), var(--tm-titulo-max));
+}
+@media (min-width: 600px) {
+  .raiz .tituloVisual {
+    --tm-titulo-max: min(150px, 17svh);
+  }
+}
+.raiz .marca {
+  font-size: var(--tam);
+  line-height: 0.9;
+  letter-spacing: 0.02em;
+  margin-top: 0.14em;
+  text-transform: uppercase;
+  font-kerning: none;
+  font-variant-ligatures: none;
+  animation-name: none;
+}
+.raiz .palavra {
+  display: inline-block;
+  white-space: nowrap;
+}
+/* O nome que bate com o escudo (FÃS DE + ROSCA, com a assinatura ESPORTE CLUBE): FÃS DE menor em
+   cima, ROSCA grande embaixo — como no escudo. */
+.raiz .tituloVisual:has(.assinatura) .marca {
+  font-size: calc(var(--tam) * 0.58);
+}
+.raiz .tituloVisual:has(.assinatura) .palavra:last-child {
+  display: block;
+  font-size: var(--tam);
+}
+/* ≥1024 (com :has): FÃS DE e ROSCA no mesmo tamanho, dos dois lados do escudo. As duas metades
+   medem o mesmo (FÃS DE 2,684 em, ROSCA 2,679 em): o vão do meio cai exatamente no escudo.
+   A linha das maiúsculas fica centrada no escudo (topo das maiúsculas a 0,09 em da caixa de
+   0,9 em; centro delas a 0,42 em). O espaço entre DE e ROSCA (0,123 em) sai da margem. */
+@supports selector(:has(*)) {
+  @media (min-width: 1024px) {
+    .raiz .tituloVisual:has(.assinatura) {
+      --tam: clamp(60px, calc((100cqi - var(--escudo) - 2 * var(--folga)) / (2 * var(--largura-em, 2.72))), 172px);
+      width: 100%;
+    }
+    .raiz .tituloVisual:has(.assinatura) .marca {
+      font-size: var(--tam);
+      margin-top: calc(var(--folga) * 0.6 + var(--escudo) * 0.5 - var(--tam) * 0.42);
+    }
+    .raiz .tituloVisual:has(.assinatura) .palavra:last-child {
+      display: inline-block;
+      margin-left: calc(var(--escudo) + 2 * var(--folga) - 0.123em);
+    }
+    /* esporte clube embaixo do escudo, no piso */
+    .raiz .tituloVisual:has(.assinatura) .assinatura {
+      margin-top: calc(var(--escudo) * 0.5 - var(--tam) * 0.48 + var(--folga) * 0.4);
+    }
+  }
+}
+.raiz .letra {
+  display: inline-grid;
+  transform-origin: 50% 88%;
+  animation-name: letraInfla;
+  animation-duration: calc(1250ms + var(--i, 0) * 80ms);
+  animation-timing-function: linear;
+}
+.raiz .letra > * {
+  grid-area: 1 / 1;
+}
+@keyframes letraInfla {
+  0%,
+  34% {
+    transform: scale(0.8);
+    animation-timing-function: cubic-bezier(0.3, 0, 0.3, 1);
+  }
+  58% {
+    transform: scale(1.09);
+    animation-timing-function: cubic-bezier(0.3, 0, 0.4, 1);
+  }
+  70% {
+    transform: scale(0.97);
+  }
+  82% {
+    transform: scale(1.015);
+  }
+  100% {
+    transform: none;
+  }
+}
+.raiz .eco,
+.raiz .cromo {
+  padding: 0.3em 0.2em 0.22em 0.12em;
+  margin: -0.3em -0.2em -0.22em -0.12em;
+}
+.raiz .eco {
+  position: static;
+  inset: auto;
+  z-index: -1;
+  color: var(--tm-eco-base);
+  -webkit-text-stroke: 0.1em var(--tm-eco-base);
+  text-shadow:
+    0 0.08em 0 #120700,
+    0 0.14em 0.2em rgba(0, 0, 0, 0.55),
+    0 0 0.34em rgba(255, 94, 168, 0.3);
+  user-select: none;
+}
+.raiz .cromo {
+  color: var(--tm-metal-meio);
+}
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .raiz .cromo {
+    background-image: linear-gradient(180deg, var(--tm-metal-luz) 0%, var(--tm-metal-alto) 30%, var(--tm-metal-meio) 50%, var(--massa-luz) 52%, var(--tm-metal-fundo) 70%, var(--massa-borda) 100%);
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    -webkit-text-stroke: 0;
+    animation: none;
+  }
+  /* A letra é uma rosca: massa dourada embaixo, glacê de morango escorrendo por cima, granulado.
+     Caixa da letra = 1,42 em (0,3 + 0,9 + 0,22): topo das maiúsculas a 27,5%, linha de base a 74%. */
+  .raiz .letra .cromo {
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 90 142' preserveAspectRatio='none'%3E%3Cg fill='none' stroke-linecap='round' stroke-width='3.4'%3E%3Cpath d='M10 45l6-3' stroke='%23fff'/%3E%3Cpath d='M34 40l2 7' stroke='%237fd3ff'/%3E%3Cpath d='M58 49l7 2' stroke='%23ffe45c'/%3E%3Cpath d='M20 59l2 6' stroke='%238be08a'/%3E%3Cpath d='M46 61l6-3' stroke='%23fff'/%3E%3Cpath d='M76 56l5 4' stroke='%23ffb067'/%3E%3C/g%3E%3C/svg%3E"),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 110 142' preserveAspectRatio='none'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='.35' stop-color='%23ffe3f0'/%3E%3Cstop offset='.52' stop-color='%23ffb3d6'/%3E%3Cstop offset='.78' stop-color='%23ff8ec3'/%3E%3Cstop offset='.97' stop-color='%23e9649f'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath fill='url(%23g)' d='M0 0H110V70C110 74 106 76 103 73C100 70 98 74 98 80V86C98 91 92 91 92 86V78C92 73 87 71 83 74C79 77 76 72 71 72C66 72 64 77 60 76C56 75 55 70 50 70C45 70 44 76 44 82V90C44 96 37 96 37 90V80C37 74 32 72 28 74C24 76 20 72 15 72C10 72 8 76 5 76C2 76 0 73 0 70Z'/%3E%3Cpath d='M8 44C16 40 26 40 34 42' fill='none' stroke='%23fff' stroke-opacity='.55' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E"),
+      linear-gradient(180deg, var(--massa-luz) 0%, var(--massa-luz) 46%, var(--tm-metal-volta) 52%, var(--tm-metal-fundo) 63%, var(--massa-borda) 74%, var(--tm-metal-base) 86%, #8e4a1c 100%);
+    background-size: 0.9em 100%, 1.1em 100%, 100% 100%;
+    background-repeat: repeat-x, repeat-x, no-repeat;
+    background-position: calc(var(--i, 0) * -0.29em) 0, calc(var(--i, 0) * -0.37em) 0, 0 0;
+  }
+}
+
+/* -------- esporte clube: pincel em minúsculas, na barrinha com duas anilhas de rosca */
+@keyframes entraClube {
+  0%,
+  52% {
+    transform: translate(-0.6em, 0) skewX(-12deg);
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.3, 1);
+  }
+  82% {
+    transform: translate(0.04em, 0) skewX(1deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+.raiz .assinatura {
+  position: relative;
+  isolation: isolate;
+  margin-top: calc(var(--tam) * 0.02);
+  padding-bottom: 0.5em;
+  font-size: clamp(26px, calc(var(--tam) * 0.34), 52px);
+  animation: entraClube 1900ms linear;
+}
+.raiz .pincel {
+  transform: rotate(-4deg);
+  padding: 0 0.5em;
+  font: 400 1em / 1.05 var(--tm-fonte-assinatura), cursive;
+  letter-spacing: 0.01em;
+  text-transform: lowercase;
+  color: #fff1da;
+  text-shadow: 0 0.05em 0 #2b1408, 0 0.1em 0.2em rgba(0, 0, 0, 0.6);
+}
+.raiz .assinatura .enfTraco {
+  position: absolute;
+  z-index: -1;
+  left: -0.1em;
+  right: -0.1em;
+  bottom: 0.02em;
+  width: auto;
+  height: 0.84em;
+  margin: 0;
+  transform: rotate(-4deg);
+  animation: none;
+}
+.enfBarra {
+  position: absolute;
+  left: 0.4em;
+  right: 0.4em;
+  top: calc(50% - 0.06em);
+  height: 0.12em;
+  border-radius: 0.06em;
+  background: linear-gradient(180deg, #f6f8fa, #b9c0c8 45%, #6f7780 60%, #d7dde2);
+  box-shadow: 0 0.04em 0.08em rgba(0, 0, 0, 0.6);
+  transform-origin: 50% 50%;
+  animation: barrinhaCresce 1900ms linear;
+}
+@keyframes barrinhaCresce {
+  0%,
+  56% {
+    transform: scaleX(0.2);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1);
+  }
+  74% {
+    transform: scaleX(1.03);
+  }
+  100% {
+    transform: none;
+  }
+}
+.enfAnilha {
+  position: absolute;
+  top: 50%;
+  width: 0.56em;
+  height: 0.82em;
+  margin-top: -0.41em;
+  overflow: visible;
+}
+.enfAnilhaEsq {
+  left: 0;
+  animation: anilhaEntraEsq 1900ms linear;
+}
+.enfAnilhaDir {
+  right: 0;
+  animation: anilhaEntraDir 1900ms linear;
+}
+@keyframes anilhaEntraEsq {
+  0%,
+  70% {
+    transform: translateX(-1em) rotate(-30deg);
+    opacity: 0;
+    animation-timing-function: cubic-bezier(0.3, 0.7, 0.4, 1);
+  }
+  71% {
+    opacity: 1;
+  }
+  84% {
+    transform: translateX(0.07em) rotate(5deg);
+  }
+  92% {
+    transform: translateX(-0.02em);
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes anilhaEntraDir {
+  0%,
+  74% {
+    transform: translateX(1em) rotate(30deg);
+    opacity: 0;
+    animation-timing-function: cubic-bezier(0.3, 0.7, 0.4, 1);
+  }
+  75% {
+    opacity: 1;
+  }
+  87% {
+    transform: translateX(-0.07em) rotate(-5deg);
+  }
+  94% {
+    transform: translateX(0.02em);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/* -------- lema */
+/* O lema é pincel, como o «esporte clube»: entra deslizando de lado (a duração e a curva são as do
+   `.sobe` da base). Sem subir, o quadro 0 já tem o lema na altura final — inteiro na 1ª dobra do
+   vídeo do celular (405×720), onde os 14 px do `.sobe` o punham meio para fora da tela. */
+@keyframes lemaPincela {
+  0%,
+  70% {
+    transform: translateX(-0.5em) skewX(-10deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+.raiz .lema {
+  max-width: 30ch;
+  margin-top: clamp(10px, 1.6vw, 18px);
+  font: 400 clamp(18px, 1.7vw, 24px) / 1.3 var(--tm-fonte-assinatura), cursive;
+  color: var(--tm-prata);
+  text-wrap: balance;
+  rotate: -2deg;
+  animation-name: lemaPincela;
+}
+
+/* -------- chips: etiquetas de academia (cantos de 10 px) */
+.raiz .chip::before {
+  transform: none;
+  border-radius: 10px;
+}
+.raiz .chipPts::before {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='44'%3E%3Cg fill='none' stroke-linecap='round' stroke-width='3'%3E%3Cpath d='M8 9l6-2' stroke='%23fff'/%3E%3Cpath d='M30 6l2 6' stroke='%237fd3ff'/%3E%3Cpath d='M47 10l6 1' stroke='%23ffe45c'/%3E%3Cpath d='M19 34l5-3' stroke='%238be08a'/%3E%3Cpath d='M41 35l5 3' stroke='%23fff'/%3E%3C/g%3E%3C/svg%3E") 0 0 / 60px 44px,
+    linear-gradient(180deg, var(--tm-metal-luz), var(--tm-metal-placa) 60%, var(--tm-primaria));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7), 0 6px 18px -6px rgba(255, 94, 168, 0.55);
+}
+.raiz .chipCapitao::before {
+  background: var(--tm-abismo);
+  border: 1px solid rgba(255, 142, 195, 0.6);
+}
+.raiz .chipOpgg::before {
+  border: 2px solid var(--tm-neon);
+  background: rgba(18, 14, 17, 0.55);
+}
+.raiz .chipOpgg:hover::before {
+  background: var(--tm-royal);
+}
+.raiz .chipCapitao .coroaMini {
+  width: 18px;
+  color: var(--tm-icone);
+}
+
+/* ===================================================== elenco: os crachás de sócio no gancho */
+.raiz .elencoSecao {
+  padding-bottom: clamp(56px, 7vw, 96px);
+}
+.raiz .elencoSecao .conteiner {
+  position: relative;
+  z-index: 1;
+}
+.raiz .estrelando {
+  font-size: clamp(26px, 3.2vw, 44px);
+  letter-spacing: 0.02em;
+}
+/* A fita métrica sublinha (o mesmo desenho da moldura). */
+.raiz .estrelando::after {
+  height: clamp(10px, 1.1vw, 14px);
+  border-radius: 2px;
+  background:
+    repeating-linear-gradient(90deg, var(--fita-tinta) 0 1px, transparent 1px 5px) 0 0 / 100% 40% no-repeat,
+    repeating-linear-gradient(90deg, var(--fita-tinta) 0 1.5px, transparent 1.5px 25px) 0 0 / 100% 70% no-repeat,
+    linear-gradient(180deg, #ffe17a, var(--fita) 60%, #e6b300);
+  -webkit-mask-image: linear-gradient(90deg, #000 70%, transparent);
+  mask-image: linear-gradient(90deg, #000 70%, transparent);
+}
+.raiz .aviso {
+  margin-top: -6px;
+  font: 400 clamp(16px, 1.4vw, 19px) / 1.35 var(--tm-fonte-assinatura), cursive;
+  color: var(--tm-apoio);
+}
+/* O muro pintado atrás dos crachás: FOCO · FORÇA · FÉ / & ROSCA, a 7% de giz. */
+.enfMuro {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.enfMuro svg {
+  position: absolute;
+  left: 50%;
+  top: 56%;
+  width: min(160%, 1760px);
+  height: auto;
+  translate: -50% -50%;
+  overflow: visible;
+}
+.enfMuro text {
+  font-family: var(--tm-fonte-titulo), sans-serif;
+  font-style: italic;
+  font-weight: 900;
+  fill: none;
+  stroke: rgba(244, 239, 234, 0.075);
+  stroke-width: 2.4px;
+}
+@media (max-width: 599px) {
+  .enfMuro svg {
+    width: 300%;
+    top: 50%;
+  }
+}
+
+.raiz .elenco {
+  padding-top: 54px;
+  row-gap: 58px;
+}
+@media (min-width: 1024px) {
+  .raiz .elenco {
+    padding-top: 64px;
+  }
+}
+
+@keyframes crachaBalanca {
+  from {
+    transform: rotate(-6deg);
+  }
+  38% {
+    transform: rotate(3.6deg);
+  }
+  62% {
+    transform: rotate(-1.8deg);
+  }
+  82% {
+    transform: rotate(0.7deg);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes crachaBalancaRelogio {
+  0%,
+  40% {
+    transform: rotate(-6deg);
+    animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
+  }
+  62% {
+    transform: rotate(3.6deg);
+    animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
+  }
+  77% {
+    transform: rotate(-1.8deg);
+  }
+  89% {
+    transform: rotate(0.7deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+.raiz .casca {
+  --giro: 0deg;
+  rotate: calc(var(--giro) * var(--giro-escala, 1));
+  transform-origin: 50% -38px;
+  border-radius: 16px;
+  animation-name: crachaBalancaRelogio;
+  animation-duration: calc(1800ms + var(--i, 0) * 150ms);
+  animation-timing-function: linear;
+}
+@supports (animation-timeline: view()) {
+  .raiz .casca {
+    animation: crachaBalanca linear;
+    animation-timeline: view();
+    animation-range: entry 0% entry calc(70% + var(--col, 0) * 12%);
+  }
+}
+.raiz .casca:nth-child(4n + 1) {
+  --giro: -1.2deg;
+}
+.raiz .casca:nth-child(4n + 2) {
+  --giro: 0.8deg;
+}
+.raiz .casca:nth-child(4n + 3) {
+  --giro: -0.5deg;
+}
+.raiz .casca:nth-child(4n) {
+  --giro: 1.1deg;
+}
+.raiz .cascaCapitao:nth-child(n) {
+  --giro: 0deg;
+}
+@media (max-width: 599px) {
+  .raiz .casca {
+    --giro-escala: 0.5;
+  }
+}
+/* O gancho na parede e o cordão do crachá. */
+.raiz .casca::before {
+  content: "";
+  position: absolute;
+  z-index: 5;
+  top: -44px;
+  left: 50%;
+  width: 46px;
+  height: 48px;
+  margin-left: -23px;
+  pointer-events: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 46 48'%3E%3Cdefs%3E%3CradialGradient id='p' cx='.38' cy='.34' r='.7'%3E%3Cstop offset='0' stop-color='%23ffffff'/%3E%3Cstop offset='.5' stop-color='%23b9c0c8'/%3E%3Cstop offset='1' stop-color='%234d545c'/%3E%3C/radialGradient%3E%3C/defs%3E%3Cpath d='M19 9L14 40M27 9L32 40' stroke='%237a1f48' stroke-width='7' stroke-linecap='round'/%3E%3Cpath d='M19 9L14 40M27 9L32 40' stroke='%23ff8ec3' stroke-width='4.4' stroke-linecap='round'/%3E%3Ccircle cx='23' cy='8' r='6.5' fill='url(%23p)' stroke='%232a2328' stroke-width='1.5'/%3E%3Crect x='11' y='36' width='24' height='10' rx='3' fill='%23c9ced4' stroke='%233a3f45' stroke-width='1.5'/%3E%3Crect x='17' y='39' width='12' height='4' rx='2' fill='%233a3f45'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.raiz .cascaCapitao::before {
+  top: -30px;
+  height: 34px;
+  background-position: center bottom;
+  background-size: 46px 48px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .raiz .casca {
+    transition: translate 0.28s cubic-bezier(0.2, 0.7, 0.2, 1), rotate 0.4s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .raiz .casca:hover,
+  .raiz .casca:has(.link:focus-visible) {
+    translate: 0 -4px;
+    rotate: calc(var(--giro) * var(--giro-escala, 1) + 1.6deg);
+  }
+}
+@media (hover: hover) and (pointer: fine) and (min-width: 1024px) {
+  .raiz .cascaCapitao:hover,
+  .raiz .cascaCapitao:has(.link:focus-visible) {
+    translate: 0 -18px; /* a base ergue o capitão 14 px: o hover sobe mais 4, nunca desce */
+  }
+}
+/* O crachá: plástico branco com a fenda do cordão em cima. */
+.raiz .carta {
+  container-type: inline-size;
+  clip-path: none;
+  padding: 18px 7px 7px;
+  border-radius: 16px;
+  background:
+    radial-gradient(closest-side, #3a2a32 88%, transparent) 50% 5px / 34px 8px no-repeat,
+    linear-gradient(160deg, #ffffff, #fff4f9 55%, #fbe3ee);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.8), 0 0 0 1px rgba(43, 20, 8, 0.25), 0 18px 30px -16px rgba(0, 0, 0, 0.9);
+}
+/* O miolo sem posição: o `::after` do link (tema.module.css) passa a se medir pela CARTA, e o crachá
+   inteiro abre a ficha, inclusive a moldura de plástico e a faixa da fenda do cordão (18 px em cima).
+   Nada aqui dentro se posiciona pelo miolo (a foto tem posição própria; o resto é item de grade). */
+.raiz .miolo {
+  position: static;
+  clip-path: none;
+  overflow: hidden;
+  border-radius: 10px;
+  grid-template-rows: auto 1fr auto;
+  padding-top: 15px;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 22' preserveAspectRatio='none'%3E%3Cpath fill='%23ff8ec3' d='M0 0H120V10C120 13 117 14 115 12C113 10 111 12 111 15V17C111 20 107 20 107 17V13C107 11 104 10 102 12C99 14 97 11 93 11C89 11 88 15 85 15C82 15 81 11 77 11C73 11 72 16 72 19V20C72 22 68 22 68 20V15C68 12 65 11 62 12C58 13 56 10 52 10C48 10 47 14 44 14C41 14 39 10 35 11C31 12 30 16 30 18C30 21 26 21 26 18V15C26 12 23 11 20 12C16 13 14 10 10 10C6 10 5 13 3 13C1 13 0 12 0 10Z'/%3E%3C/svg%3E") top / 100% 22px no-repeat,
+    var(--cartao);
+}
+.raiz .sobreFoto {
+  display: contents;
+}
+.raiz .foto {
+  grid-row: 1;
+  aspect-ratio: 4 / 5;
+  margin: 0 8px;
+  border-radius: 8px;
+  background: var(--tm-abismo);
+  box-shadow: 0 0 0 2px var(--cartao), 0 0 0 3px rgba(43, 20, 8, 0.22);
+}
+.raiz .foto img {
+  filter: saturate(1.05) contrast(1.02);
+}
+.raiz .enfGradacao {
+  background: linear-gradient(128deg, rgba(255, 255, 255, 0.2), transparent 32%), linear-gradient(180deg, transparent 70%, rgba(43, 20, 8, 0.28));
+}
+.raiz .enfRotaGigante {
+  display: none;
+}
+.raiz .enfVarredura {
+  inset: -10% -70%;
+  background: linear-gradient(100deg, transparent 42%, rgba(255, 179, 214, 0.32) 48%, rgba(127, 211, 255, 0.28) 52%, transparent 58%);
+}
+.raiz .topo {
+  grid-area: 1 / 1;
+  align-self: start;
+  z-index: 2;
+  padding: 7px 15px;
+}
+.raiz .etiquetaRota {
+  border: 0;
+  border-radius: 999px;
+  padding: 4px 8px 4px 7px;
+  background: #2b1408;
+  color: #fff1da;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+.raiz .identidade {
+  grid-area: 2 / 1;
+  align-self: center;
+  z-index: 2;
+  align-items: center;
+  text-align: center;
+  gap: 5px;
+  padding: 9px 8px 4px;
+}
+.raiz .nick {
+  --nick: clamp(15px, calc((100cqi - 20px) / var(--maior-palavra-em, 7)), 28px);
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  color: #2b1408;
+  text-shadow: 0 0.07em 0 #ff8ec3;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  font-kerning: none;
+  text-wrap: balance;
+  padding: 0.04em 0.1em 0.08em;
+  margin-right: 0;
+}
+.raiz .placaCapitao {
+  border-radius: 999px;
+  padding: 4px 10px 3px;
+  background: #ff8ec3;
+  color: #2b1408;
+}
+.raiz .mono {
+  border-color: rgba(43, 20, 8, 0.4);
+  color: #2b1408;
+}
+/* O rodapé é a assinatura do sócio, sobre a linha, e o código de barras. */
+.raiz .rodape {
+  grid-area: 3 / 1;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  row-gap: 2px;
+  border-top: 0;
+  margin: 6px 12px 0;
+  padding: 6px 0 16px;
+  background:
+    linear-gradient(90deg, rgba(43, 20, 8, 0.35), rgba(43, 20, 8, 0.35)) 0 calc(100% - 13px) / 100% 1px no-repeat,
+    repeating-linear-gradient(90deg, #2b1408 0 2px, transparent 2px 3px, #2b1408 3px 4px, transparent 4px 7px, #2b1408 7px 10px, transparent 10px 12px) 0 100% / 62% 6px no-repeat;
+}
+.raiz .nome {
+  overflow: visible;
+  white-space: normal;
+  text-overflow: clip;
+  overflow-wrap: break-word;
+  color: #2b1408;
+  font: 400 15px / 1.15 var(--tm-fonte-assinatura), cursive;
+}
+.raiz .ficha {
+  margin-left: auto;
+  color: var(--caneta);
+  font: italic 900 12px / 1 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.06em;
+}
+/* O capitão: o crachá BLACK, pendurado no halter de ouro. */
+.raiz .cascaCapitao .carta {
+  background:
+    radial-gradient(closest-side, #000 88%, transparent) 50% 5px / 34px 8px no-repeat,
+    linear-gradient(160deg, #2f262c, #120d10 55%, #241c21);
+  box-shadow: inset 0 0 0 1.5px rgba(255, 142, 195, 0.75), 0 0 0 1px #000, 0 22px 36px -16px rgba(0, 0, 0, 0.95);
+}
+.raiz .cascaCapitao .miolo {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 22' preserveAspectRatio='none'%3E%3Cpath fill='%23ffd79a' d='M0 0H120V10C120 13 117 14 115 12C113 10 111 12 111 15V17C111 20 107 20 107 17V13C107 11 104 10 102 12C99 14 97 11 93 11C89 11 88 15 85 15C82 15 81 11 77 11C73 11 72 16 72 19V20C72 22 68 22 68 20V15C68 12 65 11 62 12C58 13 56 10 52 10C48 10 47 14 44 14C41 14 39 10 35 11C31 12 30 16 30 18C30 21 26 21 26 18V15C26 12 23 11 20 12C16 13 14 10 10 10C6 10 5 13 3 13C1 13 0 12 0 10Z'/%3E%3C/svg%3E") top / 100% 22px no-repeat,
+    #161115;
+}
+.raiz .cascaCapitao .foto {
+  box-shadow: 0 0 0 2px #161115, 0 0 0 3.5px #ff8ec3;
+}
+.raiz .cascaCapitao .nick {
+  color: #fff1da;
+  text-shadow: 0 0.07em 0 #c2457e;
+}
+.raiz .cascaCapitao .nome {
+  color: #fff1da;
+}
+.raiz .cascaCapitao .ficha {
+  color: #ffb8d9;
+}
+.raiz .cascaCapitao .rodape {
+  background:
+    linear-gradient(90deg, rgba(255, 241, 218, 0.4), rgba(255, 241, 218, 0.4)) 0 calc(100% - 13px) / 100% 1px no-repeat,
+    repeating-linear-gradient(90deg, #ffd79a 0 2px, transparent 2px 3px, #ffd79a 3px 4px, transparent 4px 7px, #ffd79a 7px 10px, transparent 10px 12px) 0 100% / 62% 6px no-repeat;
+}
+.raiz .cascaCapitao .enfHaloCarta {
+  background: radial-gradient(closest-side, rgba(255, 142, 195, 0.45), rgba(255, 210, 63, 0.14) 60%, transparent);
+}
+.raiz .coroaDoCapitao {
+  width: 66px;
+  top: -62px;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 12px rgba(255, 210, 63, 0.4));
+}
+/* O halter de ouro balança quando o crachá do capitão entra na tela (sem view(), fica parado: um
+   relógio aqui terminaria antes de alguém rolar até o elenco). */
+@supports (animation-timeline: view()) {
+  .raiz .coroaDoCapitao {
+    animation: halterBalanca linear;
+    animation-timeline: view();
+    animation-range: entry 0% entry 90%;
+  }
+}
+@keyframes halterBalanca {
+  0%,
+  30% {
+    transform: rotate(-24deg);
+    animation-timing-function: cubic-bezier(0.3, 0.7, 0.4, 1);
+  }
+  60% {
+    transform: rotate(9deg);
+  }
+  80% {
+    transform: rotate(-3deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+@media (max-width: 599px) {
+  .raiz .coroaDoCapitao {
+    width: 54px;
+    top: -52px;
+  }
+}
+/* Celular: o capitão em crachá DEITADO (cartão black), foto à esquerda. */
+@media (max-width: 599px) {
+  .raiz .cascaLarga .miolo {
+    grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+    grid-template-rows: 1fr auto;
+    padding-top: 15px;
+  }
+  .raiz .cascaLarga .foto {
+    grid-area: 1 / 1 / 3 / 2;
+    aspect-ratio: 4 / 5;
+    margin: 0 0 8px 8px;
+  }
+  .raiz .cascaLarga .topo {
+    grid-area: 1 / 1 / 3 / 2;
+    padding: 6px 6px 6px 14px;
+  }
+  .raiz .cascaLarga .identidade {
+    grid-area: 1 / 2;
+    align-self: center;
+    align-items: flex-start;
+    text-align: left;
+    padding: 8px 12px 4px 12px;
+  }
+  .raiz .cascaLarga .rodape {
+    grid-area: 2 / 2;
+    margin: 0 12px 0 12px;
+  }
+  .raiz .cascaLarga .nick {
+    --nick: clamp(20px, calc((100cqi * 0.56 - 24px) / var(--maior-palavra-em, 7)), 34px);
+  }
+}
+
+/* ===================================================== cartela: o saco de pão do pós-treino */
+.raiz .enfLinhaCromo {
+  color: var(--fita);
+}
+.raiz .enfLinhaCromo::before,
+.raiz .enfLinhaCromo::after {
+  height: 8px;
+  border-radius: 2px;
+  background:
+    repeating-linear-gradient(90deg, var(--fita-tinta) 0 1px, transparent 1px 5px) 0 0 / 100% 40% no-repeat,
+    linear-gradient(180deg, #ffe17a, var(--fita) 60%, #e6b300);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 30%, #000 70%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 30%, #000 70%, transparent);
+}
+.raiz .enfLinhaCromo svg {
+  width: 26px;
+}
+@keyframes sacoPousa {
+  from {
+    transform: translate(0, -22px) rotate(-3deg);
+  }
+  70% {
+    transform: translate(0, 3px) rotate(0.6deg);
+  }
+  to {
+    transform: none;
+  }
+}
+.raiz .cartelaCorpo {
+  width: min(100%, 400px);
+  margin: 9px auto 26px;
+  padding: 70px 26px 40px;
+  color: var(--tm-tinta);
+  background:
+    linear-gradient(180deg, transparent 0 54px, rgba(59, 36, 18, 0.35) 54px 56px, rgba(255, 255, 255, 0.12) 56px 58px, transparent 58px),
+    linear-gradient(90deg, rgba(59, 36, 18, 0.22) 0 16px, transparent 16px calc(100% - 16px), rgba(59, 36, 18, 0.22) calc(100% - 16px)),
+    repeating-linear-gradient(93deg, rgba(255, 255, 255, 0.04) 0 2px, transparent 2px 7px),
+    repeating-linear-gradient(178deg, rgba(59, 36, 18, 0.05) 0 1px, transparent 1px 5px),
+    linear-gradient(180deg, #d1a46d, var(--kraft) 40%, #b88a52);
+  filter: drop-shadow(0 22px 26px rgba(0, 0, 0, 0.7));
+}
+/* A boca serrilhada do saco: dentes de papel acima da borda reta (sem máscara, para a sombra valer). */
+.raiz .cartelaCorpo::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -9px;
+  height: 9px;
+  background: conic-gradient(from 135deg at 50% 0, #d1a46d 90deg, #0000 0) 50% 0 / 16px 9px repeat-x;
+}
+@supports (animation-timeline: view()) {
+  .raiz .cartelaCorpo {
+    animation: sacoPousa linear;
+    animation-timeline: view();
+    animation-range: entry 10% entry 70%;
+  }
+}
+.enfMancha {
+  position: absolute;
+  right: 18%;
+  bottom: 16%;
+  width: 34%;
+  aspect-ratio: 1.2;
+  border-radius: 46% 54% 40% 60%;
+  background: radial-gradient(closest-side, rgba(110, 70, 30, 0.28), rgba(110, 70, 30, 0.12) 60%, transparent);
+  rotate: -18deg;
+  pointer-events: none;
+}
+.raiz .cartelaEscudo {
+  width: 84px;
+  height: 84px;
+  margin: 0 auto 10px;
+  filter: drop-shadow(0 2px 0 rgba(59, 36, 18, 0.4));
+}
+.raiz .cartelaNome {
+  font-size: clamp(28px, 3vw, 38px);
+  line-height: 0.95;
+  color: var(--tm-tinta);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.raiz .cartelaDestino {
+  margin: 12px 0 0;
+  font: 400 17px / 1.3 var(--tm-fonte-assinatura), cursive;
+  letter-spacing: 0.01em;
+  color: var(--tm-tinta);
+}
+.raiz .cartelaData {
+  margin: 10px 0 0;
+  color: var(--kraft-tinta);
+  letter-spacing: 0.16em;
+  line-height: 1.6;
+}
+/* O adesivo redondo que fecha o saco: TÁ PAGO. */
+.raiz .cartelaCarimbo {
+  position: absolute;
+  z-index: 2;
+  top: 26px;
+  right: -10px;
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  margin: 0;
+  padding: 10px;
+  border-radius: 50%;
+  rotate: 10deg;
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.55), transparent 32%),
+    radial-gradient(closest-side, #ff9fcb 0 76%, #fff 77% 82%, #ff8ec3 83%);
+  box-shadow: 0 6px 12px -4px rgba(0, 0, 0, 0.55);
+  color: var(--tm-tinta);
+  font: italic 900 19px / 0.95 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.02em;
+  text-align: center;
+  white-space: normal;
+}
+@keyframes adesivoCola {
+  from {
+    transform: scale(1.5) rotate(-24deg);
+  }
+  55% {
+    transform: scale(0.94) rotate(3deg);
+  }
+  75% {
+    transform: scale(1.03);
+  }
+  to {
+    transform: none;
+  }
+}
+@supports (animation-timeline: view()) {
+  .raiz .cartelaCarimbo {
+    animation: adesivoCola linear;
+    animation-timeline: view();
+    animation-range: entry 30% cover 45%;
+  }
+}
+.raiz .cartelaFecho {
+  margin: 4px 0 22px;
+  font: 400 17px / 1.4 var(--tm-fonte-assinatura), cursive;
+  letter-spacing: 0.01em;
+  color: var(--tm-apoio);
+}
+@media (max-width: 599px) {
+  .raiz .cartelaCorpo {
+    width: min(100% - 24px, 340px);
+    padding: 66px 26px 34px;
+  }
+  .raiz .cartelaData {
+    letter-spacing: 0.12em;
+  }
+  .raiz .cartelaCarimbo {
+    width: 72px;
+    height: 72px;
+    top: 18px;
+    right: 6px;
+    font-size: 16px;
+  }
+}
+
+/* ===================================================== celular e acessibilidade */
+@media (prefers-reduced-motion: reduce) {
+  .enfArcos,
+  .enfSuor,
+  .enfBrilho,
+  .enfLasca,
+  .enfPoeira {
+    display: none;
+  }
+}
+@media (forced-colors: active) {
+  .raiz .cromo,
+  .raiz .letra .cromo {
+    background: none;
+    -webkit-text-fill-color: CanvasText;
+    color: CanvasText;
+  }
+  .raiz .eco,
+  .raiz .assinatura .enfTraco {
+    display: none;
+  }
+}
+@media (prefers-contrast: more) {
+  .raiz .cromo,
+  .raiz .letra .cromo {
+    background: none;
+    -webkit-text-fill-color: #ffb3d6;
+  }
+  .raiz .eco {
+    display: block;
+  }
+}

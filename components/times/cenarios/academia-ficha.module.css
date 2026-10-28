@@ -1,0 +1,377 @@
+/*
+ * A ficha do jogador no cenário "academia" (cenarios/academia.tsx: classesDaFicha). Peças de
+ * ficha.module.css com o gancho `.raiz .peca`; eco e cromo do nick são de OUTRO módulo (o da
+ * página), então o glacê do nick mira `.nickVisual > :last-child`, como o boteco faz com `> *`.
+ * A ficha é a SELFIE NO ESPELHO da academia: moldura de alumínio, reflexos, o flash do celular,
+ * as mãos de magnésio na parede; o nick de rosca glaceada; as estatísticas na pilha de placas.
+ */
+
+/* ------------------------------------------------------------------ retrato: a selfie no espelho */
+@keyframes espelhoChega {
+  0%,
+  18% {
+    transform: translate(-16px, 10px) rotate(-2.5deg) scale(0.97);
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.3, 1);
+  }
+  62% {
+    transform: rotate(0.6deg);
+  }
+  80% {
+    transform: rotate(-0.2deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+.raiz .retratoCasca {
+  width: min(100% - 48px, 430px);
+  margin-top: 34px;
+  animation: espelhoChega 1500ms linear;
+}
+.raiz .retratoCapitao {
+  margin-top: 70px;
+}
+@media (max-width: 899px) {
+  .raiz .retratoCasca {
+    width: min(100% - 40px, 360px);
+  }
+}
+.raiz .enfHaloRetrato {
+  inset: -14%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 190, 150, 0.26), rgba(255, 142, 195, 0.12) 60%, transparent);
+}
+/* A moldura de alumínio escovado com quatro parafusos. */
+.raiz .retrato {
+  clip-path: none;
+  padding: 11px;
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 12px 12px, #4d545c 0 2.6px, #e8edf1 3.2px, transparent 4px),
+    radial-gradient(circle at calc(100% - 12px) 12px, #4d545c 0 2.6px, #e8edf1 3.2px, transparent 4px),
+    radial-gradient(circle at 12px calc(100% - 12px), #4d545c 0 2.6px, #e8edf1 3.2px, transparent 4px),
+    radial-gradient(circle at calc(100% - 12px) calc(100% - 12px), #4d545c 0 2.6px, #e8edf1 3.2px, transparent 4px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0 1px, transparent 1px 3px),
+    linear-gradient(135deg, #f4f7fa, #9aa3ad 22%, #e8edf1 45%, #7d8690 70%, #dfe5ea);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6), 0 0 0 1px #1a1418, 0 30px 60px -28px #000;
+}
+.raiz .retratoMiolo {
+  clip-path: none;
+  aspect-ratio: var(--proporcao, 4 / 5);
+  border-radius: 3px;
+  background: #1a1418;
+}
+.raiz .retratoMiolo > img {
+  filter: saturate(1.04) contrast(1.03);
+}
+/* Os reflexos do espelho (parados) e a sombra de baixo. */
+.raiz .enfGradacao {
+  background:
+    linear-gradient(115deg, transparent 0 16%, rgba(255, 255, 255, 0.15) 16% 24%, transparent 24% 29%, rgba(255, 255, 255, 0.07) 29% 31.5%, transparent 31.5%),
+    linear-gradient(180deg, transparent 70%, rgba(18, 14, 17, 0.5));
+}
+.raiz .topo {
+  top: 12px;
+  left: 12px;
+  right: 12px;
+}
+.raiz .placa {
+  left: 14px;
+  bottom: 14px;
+  border-radius: 999px;
+  padding: 5px 12px 4px;
+  background: #ff8ec3;
+  color: #2b1408;
+}
+.raiz .coroaDoRetrato {
+  width: 96px;
+  top: -66px;
+  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 14px rgba(255, 210, 63, 0.4));
+}
+/* As mãos de magnésio na parede, atrás do espelho, e o flash da selfie. */
+.enfMaos {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+.enfMao {
+  position: absolute;
+  width: 42%;
+  height: auto;
+  opacity: 0.26;
+  animation-name: maoBate;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.enfMao1 {
+  left: -24%;
+  top: 6%;
+  rotate: -26deg;
+  animation-duration: 1000ms;
+}
+.enfMao2 {
+  right: -22%;
+  top: 52%;
+  rotate: 22deg;
+  scale: -1 1;
+  animation-duration: 1250ms;
+}
+@keyframes maoBate {
+  0%,
+  22% {
+    opacity: 0;
+    transform: scale(1.35);
+  }
+  40% {
+    opacity: 0.38;
+    transform: scale(0.95);
+  }
+  100% {
+    opacity: 0.26;
+    transform: none;
+  }
+}
+.enfFlash {
+  position: absolute;
+  z-index: 4;
+  left: 66%;
+  top: 14%;
+  width: 18%;
+  aspect-ratio: 1;
+  transform: scale(0);
+  pointer-events: none;
+  animation: flashSelfie 1500ms linear;
+}
+.enfFlash svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+@keyframes flashSelfie {
+  0%,
+  40% {
+    transform: scale(0);
+  }
+  46% {
+    transform: scale(1.2) rotate(30deg);
+  }
+  56%,
+  100% {
+    transform: scale(0) rotate(60deg);
+  }
+}
+
+/* ------------------------------------------------------------------ texto */
+.raiz .escudoMini {
+  width: 30px;
+  height: 30px;
+}
+@keyframes nickInfla {
+  0%,
+  30% {
+    transform: scale(0.86);
+    animation-timing-function: cubic-bezier(0.3, 0, 0.3, 1);
+  }
+  62% {
+    transform: scale(1.05);
+  }
+  80% {
+    transform: scale(0.99);
+  }
+  100% {
+    transform: none;
+  }
+}
+/* O nick pela largura MEDIDA em até duas linhas (--largura-nick-em): TAPA DE / DOIDO = 3,185 em. */
+.raiz .nickVisual {
+  display: inline-grid;
+  line-height: 0.95;
+  letter-spacing: 0.02em;
+  font-kerning: none;
+  overflow-wrap: break-word;
+  text-wrap: balance;
+  margin-top: 0.22em;
+  margin-bottom: 0.08em;
+  font-size: clamp(30px, calc(100cqi / var(--largura-nick-em, calc(var(--maior-palavra, 6) * 0.5))), 104px);
+  transform-origin: 0 90%;
+  animation: nickInfla 1300ms linear;
+}
+@media (min-width: 900px) {
+  .raiz .nickVisual {
+    font-size: clamp(42px, calc(100cqi / var(--largura-nick-em, calc(var(--maior-palavra, 6) * 0.5))), 136px);
+  }
+}
+.raiz .nickVisual > * {
+  grid-area: 1 / 1;
+}
+/* O glacê do nick é por LINHA: o ladrilho tem a altura de uma linha (0,95 em), começando no topo
+   do conteúdo (0,3 em de respiro). Topo das maiúsculas a 12% da linha, linha de base a 82%. */
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .raiz .nickVisual > :last-child {
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 90 95' preserveAspectRatio='none'%3E%3Cg fill='none' stroke-linecap='round' stroke-width='3.2'%3E%3Cpath d='M10 20l6-3' stroke='%23fff'/%3E%3Cpath d='M34 15l2 7' stroke='%237fd3ff'/%3E%3Cpath d='M58 24l7 2' stroke='%23ffe45c'/%3E%3Cpath d='M20 33l2 6' stroke='%238be08a'/%3E%3Cpath d='M46 35l6-3' stroke='%23fff'/%3E%3Cpath d='M76 30l5 4' stroke='%23ffb067'/%3E%3C/g%3E%3C/svg%3E"),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 110 95' preserveAspectRatio='none'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='.12' stop-color='%23ffe3f0'/%3E%3Cstop offset='.38' stop-color='%23ffb3d6'/%3E%3Cstop offset='.72' stop-color='%23ff8ec3'/%3E%3Cstop offset='.98' stop-color='%23e9649f'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath fill='url(%23g)' d='M0 0H110V44C110 48 106 50 103 47C100 44 98 48 98 54V60C98 65 92 65 92 60V52C92 47 87 45 83 48C79 51 76 46 71 46C66 46 64 51 60 50C56 49 55 44 50 44C45 44 44 50 44 56V64C44 70 37 70 37 64V54C37 48 32 46 28 48C24 50 20 46 15 46C10 46 8 50 5 50C2 50 0 47 0 44Z'/%3E%3Cpath d='M8 20C16 16 26 16 34 18' fill='none' stroke='%23fff' stroke-opacity='.55' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E"),
+      linear-gradient(180deg, var(--massa-luz) 0%, var(--massa-luz) 44%, var(--tm-metal-volta) 50%, var(--tm-metal-fundo) 64%, var(--massa-borda) 82%, var(--tm-metal-base) 92%, #8e4a1c 100%);
+    background-size: 0.9em 0.95em, 1.1em 0.95em, 100% 0.95em;
+    background-repeat: repeat, repeat, repeat-y;
+    background-position: 0 0.3em, 0 0.3em, 0 0.3em;
+  }
+}
+.raiz .nomeReal {
+  font: 400 18px / 1.3 var(--tm-fonte-assinatura), cursive;
+  letter-spacing: 0.01em;
+}
+.raiz .texto .chips {
+  justify-content: flex-start;
+}
+.raiz .performance {
+  font: italic 900 clamp(20px, 2vw, 26px) / 1 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.03em;
+  color: var(--tm-texto);
+  animation-name: none;
+}
+.raiz .performance::after {
+  height: 10px;
+  border-radius: 2px;
+  background:
+    repeating-linear-gradient(90deg, var(--fita-tinta) 0 1px, transparent 1px 5px) 0 0 / 100% 40% no-repeat,
+    repeating-linear-gradient(90deg, var(--fita-tinta) 0 1.5px, transparent 1.5px 25px) 0 0 / 100% 70% no-repeat,
+    linear-gradient(180deg, #ffe17a, var(--fita) 60%, #e6b300);
+  -webkit-mask-image: linear-gradient(90deg, #000 70%, transparent);
+  mask-image: linear-gradient(90deg, #000 70%, transparent);
+}
+
+/* ------------------------------------------------------------------ estatísticas: a pilha de placas */
+@keyframes placaEmpilha {
+  0%,
+  56% {
+    transform: translateY(-9px);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5);
+  }
+  72% {
+    transform: translateY(2px) scaleY(0.97);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1);
+  }
+  86% {
+    transform: translateY(-1px);
+  }
+  100% {
+    transform: none;
+  }
+}
+.raiz .estatisticas {
+  position: relative;
+  gap: 10px 8px;
+}
+.raiz .estatistica {
+  gap: 4px;
+  padding: 16px 4px 10px;
+  border: 0;
+  border-radius: 6px;
+  background:
+    radial-gradient(circle at 50% 8px, #0b090a 0 3.4px, #595058 4.2px, transparent 5px),
+    linear-gradient(180deg, #3a3238 0%, #2a2428 42%, #1e191d 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), inset 0 -2px 0 rgba(0, 0, 0, 0.5), 0 6px 12px -6px #000;
+  animation-name: placaEmpilha;
+  animation-timing-function: linear;
+}
+.raiz .estatistica::before {
+  display: none;
+}
+.raiz .valor {
+  padding: 0;
+  background: none;
+  color: var(--tm-texto);
+  -webkit-text-fill-color: var(--tm-texto);
+  font: italic 900 clamp(22px, 2.4vw, 30px) / 1 var(--tm-fonte-titulo), sans-serif;
+}
+.raiz .rotulo {
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  color: var(--tm-apoio);
+}
+/* O pino rosa da pilha, entrando na primeira placa. */
+.raiz .estatisticas::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  top: 3px;
+  left: calc(12.5% - 4px);
+  width: 34px;
+  height: 10px;
+  border-radius: 5px;
+  background:
+    radial-gradient(circle at 28px 5px, #ffe3f0 0 2px, #ff5ea8 2.5px 5px, transparent 5.5px),
+    linear-gradient(180deg, #e9eef2, #8a9099) 0 3px / 26px 4px no-repeat;
+  pointer-events: none;
+  animation: pinoEntra 2400ms linear;
+}
+@keyframes pinoEntra {
+  0%,
+  78% {
+    transform: translateX(26px);
+    animation-timing-function: cubic-bezier(0.3, 0.7, 0.4, 1);
+  }
+  92% {
+    transform: translateX(-2px);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/* ------------------------------------------------------------------ companheiros: crachás pequenos */
+.raiz .companheiros {
+  gap: 12px 10px;
+}
+.raiz .companheiroLink {
+  align-items: center;
+  min-height: 74px;
+  border: 0;
+  border-radius: 10px;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 22' preserveAspectRatio='none'%3E%3Cpath fill='%23ff8ec3' d='M0 0H120V10C120 13 117 14 115 12C113 10 111 12 111 15V17C111 20 107 20 107 17V13C107 11 104 10 102 12C99 14 97 11 93 11C89 11 88 15 85 15C82 15 81 11 77 11C73 11 72 16 72 19V20C72 22 68 22 68 20V15C68 12 65 11 62 12C58 13 56 10 52 10C48 10 47 14 44 14C41 14 39 10 35 11C31 12 30 16 30 18C30 21 26 21 26 18V15C26 12 23 11 20 12C16 13 14 10 10 10C6 10 5 13 3 13C1 13 0 12 0 10Z'/%3E%3C/svg%3E") top / 100% 12px no-repeat,
+    var(--cartao);
+  color: var(--tm-tinta);
+  box-shadow: 0 0 0 1px rgba(43, 20, 8, 0.25), 0 10px 20px -10px #000;
+}
+.raiz .companheiroLink:hover {
+  border-color: transparent;
+  box-shadow: 0 0 0 2px var(--tm-neon), 0 10px 20px -10px #000;
+}
+.raiz .companheiroFoto {
+  flex: 0 0 56px;
+  height: 56px;
+  margin: 12px 0 8px 10px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 0 0 2px var(--cartao), 0 0 0 3px rgba(43, 20, 8, 0.25);
+}
+.raiz .companheiroRota {
+  --tm-icone: var(--caneta);
+  color: var(--caneta);
+}
+.raiz .companheiroNick {
+  color: var(--tm-tinta);
+  font-size: 16px;
+  letter-spacing: 0.02em;
+  overflow-wrap: break-word;
+}
+@media (max-width: 599px) {
+  .raiz .companheiroFoto {
+    flex-basis: 46px;
+    height: 46px;
+    margin: 12px 0 8px 8px;
+  }
+  .raiz .companheiroTexto {
+    padding: 12px 8px 8px;
+  }
+  .raiz .companheiroNick {
+    font-size: 13.5px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .enfFlash {
+    display: none;
+  }
+}

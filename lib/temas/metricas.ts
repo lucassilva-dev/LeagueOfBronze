@@ -48,8 +48,31 @@ const KNEWAVE: MetricasDaFonte = {
 
 // Os temas da 4ª Edição: cada implementador troca o `undefined` do seu bloco pela métrica MEDIDA.
 // ↓ Fãs de Rosca
-/** Sofia Sans Extra Condensed 900 itálico (Fãs de Rosca). */
-const SOFIA_EXTRA_CONDENSADA: MetricasDaFonte | undefined = undefined;
+/**
+ * Sofia Sans Extra Condensed 900 itálico (Fãs de Rosca), medida no Chromium em 27/10/2026 com o
+ * woff2 do Google Fonts (canvas `measureText` a 100 px, `fontKerning = "none"`): o título e o
+ * nick usam `font-kerning: none`, então a soma das letras é a palavra. A tinta: o itálico passa
+ * até 0,15 em à direita (Ï; 0,083 em nas maiúsculas sem acento, Y) e 0,07 em à esquerda (J),
+ * mais o contorno de 0,1 em do eco e uma folga. O I e o J são estreitíssimos (0,21 em).
+ * O caractere de fora da tabela conta 1,0 em (o «ㅤ» dos nicks de LoL, o mais largo medido).
+ */
+const SOFIA_EXTRA_CONDENSADA: MetricasDaFonte = {
+  avancos: {
+    A: 0.454, B: 0.433, C: 0.459, D: 0.459, E: 0.387, F: 0.38, G: 0.464, H: 0.47, I: 0.21, J: 0.211,
+    K: 0.453, L: 0.353, M: 0.57, N: 0.472, O: 0.462, P: 0.412, Q: 0.462, R: 0.443, S: 0.401, T: 0.396,
+    U: 0.463, V: 0.454, W: 0.632, X: 0.437, Y: 0.437, Z: 0.396,
+    Á: 0.454, À: 0.454, Â: 0.454, Ã: 0.454, Ä: 0.454, É: 0.387, È: 0.387, Ê: 0.387, Ë: 0.387,
+    Í: 0.21, Ì: 0.21, Î: 0.21, Ï: 0.21, Ó: 0.462, Ò: 0.462, Ô: 0.462, Õ: 0.462, Ö: 0.462,
+    Ú: 0.463, Ù: 0.463, Û: 0.463, Ü: 0.463, Ç: 0.459, Ñ: 0.472,
+    0: 0.43, 1: 0.376, 2: 0.392, 3: 0.402, 4: 0.445, 5: 0.409, 6: 0.429, 7: 0.4, 8: 0.433, 9: 0.428,
+    " ": 0.123, ".": 0.242, ",": 0.247, "-": 0.315, _: 0.37, "'": 0.183, "!": 0.229, "?": 0.373,
+    "&": 0.464, "+": 0.42, "·": 0.252, "#": 0.451, "@": 0.65, "(": 0.213, ")": 0.213, "/": 0.324,
+    ":": 0.232, "%": 0.727, "©": 0.509, "®": 0.372, Æ: 0.605, Œ: 0.623, Þ: 0.412, Ø: 0.462,
+  },
+  padrao: 1,
+  espacamento: 0.02,
+  sobra: 0.36,
+};
 // ↑ Fãs de Rosca
 
 // ↓ Os 5 Furiosos
