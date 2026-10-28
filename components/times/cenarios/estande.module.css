@@ -1,1 +1,1554 @@
-/* So ADC Bronze Clube — cenário «estande» (components/times/cenarios/estande.tsx). BASE: o tema chega depois. */
+/*
+ * Cenário "estande" — SO ADC BRONZE CLUBE, «A Mosca Intacta» (cenarios/estande.tsx).
+ *
+ * Fim de tarde no estande de arco e flecha do clube. Duas famílias de regra:
+ *  - ENFEITES próprios (`.enf…`, aria-hidden, sem texto): céu da hora azul, nuvens, serra, mata,
+ *    alvos (o do clube e os das raias vizinhas), flechas, biruta, gramado, rajada, linha de tiro,
+ *    a placa de bronze, as fitas da inauguração.
+ *  - GANCHOS: classe com o MESMO nome de uma peça da base (casca, marca, chip…), que a página soma à
+ *    peça (comCenario). Sempre `.raiz` + o MESMO seletor da base: um nível acima. Nada de @layer.
+ * Conteúdo só anima transform, sem delay nem fill-mode, com a espera dentro do keyframe. A única
+ * pintura no conteúdo é o «último raio de sol» que atravessa o ADC uma vez (background-position,
+ * nunca esconde). Flashes: só o brilho da mosca (1,9 s e a cada 9 s, pequeno).
+ * Nenhuma regra mistura `translate:`/`rotate:`/`scale:` com um `transform:` literal (o lightningcss
+ * do build descartaria a propriedade individual): quem gira parado e quem voa são elementos diferentes.
+ */
+
+/* A reserva da Alfa Slab One (fontes-dos-temas.ts: `fallback`), enquanto ela não chega ou se falhar:
+   Arial a 88% é MAIS ESTREITA que a Alfa em toda letra, dígito e acento (medido: ADC 1,888 contra
+   2,362 em; PRESUNTO 4,954 contra 6,300; WMW 2,424 contra 3,587), então a largura medida
+   (lib/temas/metricas.ts) vale para as duas e o título nunca sai cortado. */
+@font-face {
+  font-family: "Alfa Slab Caixa Alta";
+  src: local("Arial"), local("ArialMT"), local("Helvetica"), local("Helvetica Neue"), local("Roboto"), local("Arimo"), local("Liberation Sans");
+  size-adjust: 88%;
+}
+
+/* ======================================================================= raiz */
+.raiz {
+  --tm-titulo-estilo: normal;
+  --tm-titulo-peso: 400;
+  --tm-titulo-peso-medio: 400;
+  /* Os tons que na RX são fixos (tema.module.css guarda os dela como padrão). */
+  --tm-placa-topo: #fbf3e2;
+  --tm-nick-meio: var(--tm-prata);
+  --tm-nick-base: #d8c39c;
+  --tm-valor-base: #2a3550;
+  --tm-etiqueta: var(--tm-tinta);
+  --tm-foto-fundo: var(--tm-abismo);
+  --tm-chip-capitao: var(--tm-texto);
+  --tm-mono: var(--tm-icone);
+  --tm-eco-base: #0a1222;
+  --tm-miolo-topo: var(--tm-abismo);
+  --tm-miolo-base: #070b14;
+  /* Do cenário: contorno do letreiro, extrusão de cobre, papel, coral das penas, gramado. */
+  --contorno: #0a1222;
+  --extrusao: #b8652f;
+  --papel: #f1e5cb;
+  --coral: #ff6b7a;
+  --gramado: #101a13;
+  font-synthesis: none;
+}
+
+/* ======================================================================= palco: a hora azul */
+/* O fôlego do arqueiro: a câmera puxa (tensão) e dá o tranco no disparo, aos 544 ms. */
+@keyframes folego {
+  0% {
+    transform: scale(1.06) translate3d(0, 1%, 0);
+    animation-timing-function: cubic-bezier(0.3, 0, 0.6, 1);
+  }
+  30% {
+    transform: scale(1.075) translate3d(0, 1.3%, 0);
+    animation-timing-function: cubic-bezier(0.1, 0.9, 0.2, 1);
+  }
+  34% {
+    transform: scale(1) translate3d(0, -0.35%, 0);
+    animation-timing-function: cubic-bezier(0.3, 0, 0.3, 1);
+  }
+  44% {
+    transform: translate3d(0, 0.15%, 0);
+  }
+  56%,
+  100% {
+    transform: none;
+  }
+}
+.raiz .enfCamera {
+  animation: folego 1600ms linear;
+}
+
+/* O céu: breu lá em cima, azul-ardósia, malva e a brasa do sol que já se pôs atrás da mata.
+   O ponto mais claro (#66382C) fica atrás da mata; o texto mais fraco (apoio) dá 5,4:1 nele. */
+.enfCeu {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(46% 20% at 50% 67%, rgba(150, 74, 46, 0.55), rgba(110, 58, 42, 0.22) 55%, transparent 80%),
+    linear-gradient(180deg, #060a12 0%, #0b1324 24%, #122039 44%, #1c2643 54%, #2d2b46 60%, #4a2f38 64.5%, #66382c 66.6%, #0d1410 67%, #0a100c 100%);
+}
+/* Nuvens compridas (estrato), com a barriga acesa de cobre; derivam devagar. */
+.enfNuvem {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: var(--w);
+  height: var(--h);
+  border-radius: 50%;
+  background:
+    radial-gradient(60% 55% at 50% 72%, rgba(170, 92, 64, 0.32), transparent 72%),
+    radial-gradient(50% 60% at 40% 40%, rgba(58, 66, 104, 0.55), transparent 75%);
+  /* var() no shorthand atrapalha o CSS Modules: longhands */
+  animation-name: nuvemDeriva;
+  animation-duration: var(--dur);
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+@keyframes nuvemDeriva {
+  from {
+    transform: translateX(-3vw);
+  }
+  to {
+    transform: translateX(3vw);
+  }
+}
+/* A serra ao longe e a mata na linha do horizonte (ladrilhos SVG, parados). */
+.enfSerra {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 57.5%;
+  height: 9.6%;
+  background: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 60' width='600' height='60' preserveAspectRatio='none'%3E%3Cpath d='M0 60V38Q60 22 120 30T250 20Q330 8 400 26T520 24Q570 18 600 30V60Z' fill='%23161d30'/%3E%3C/svg%3E") 0 100% / 600px 100% repeat-x;
+}
+.enfMata {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 61.6%;
+  height: 5.6%;
+  background: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 360 40' width='360' height='40' preserveAspectRatio='none'%3E%3Cpath d='M0 40V28Q8 18 16 26Q22 12 32 22Q38 8 48 20Q56 14 62 24Q70 16 78 26Q86 6 98 18Q106 12 112 24Q120 18 128 28Q138 20 146 26Q152 10 164 20Q172 14 178 24Q188 4 200 18Q208 10 216 22Q226 16 232 26Q240 20 250 28Q258 14 268 22Q276 8 288 20Q296 16 302 26Q312 18 320 24Q328 10 340 20Q348 14 356 26L360 28V40Z' fill='%230b110e'/%3E%3C/svg%3E") 0 100% / 360px 100% repeat-x;
+}
+
+/* ======================================================================= moldura */
+/* A faixa do herói e da ficha (aqui, e não em .raiz: a base declara --barra em .raiz). */
+.raiz .heroi {
+  --barra: clamp(20px, 2.6vw, 36px);
+}
+/* A rajada: uma fila de flechinhas atravessa o topo da tela no começo do filme. */
+.enfRajada {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 3;
+  height: var(--barra);
+  pointer-events: none;
+  background:
+    linear-gradient(#c56a3c, #c56a3c) 0 100% / 100% 1px no-repeat,
+    url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 24' width='120' height='24'%3E%3Cpath d='M14 12H92' stroke='%23f1e5cb' stroke-opacity='.55' stroke-width='1.6'/%3E%3Cpath d='M92 7L104 12L92 17Z' fill='%23d9a066'/%3E%3Cpath d='M14 12L6 6H16L22 12L16 18H6Z' fill='%23ff6b7a' fill-opacity='.85'/%3E%3C/svg%3E") 0 50% / auto 70% repeat-x,
+    #070b14;
+  animation: rajada 700ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes rajada {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: none;
+  }
+}
+/* A linha de tiro pintada no gramado, com os divisores das raias (parada). */
+.enfLinhaDeTiro {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  height: calc(var(--barra) * 0.6);
+  pointer-events: none;
+  background:
+    linear-gradient(#efe4cc, #efe4cc) 0 40% / 100% 2px no-repeat,
+    repeating-linear-gradient(90deg, #efe4cc 0 2px, transparent 2px 160px) 80px 0 / 100% 40% no-repeat,
+    #0c120e;
+  box-shadow: 0 -10px 18px -10px rgba(0, 0, 0, 0.8);
+}
+
+/* ======================================================================= herói: o eixo invertido */
+/* O NOME em cima e o ALVO embaixo, em toda largura (a RX põe o texto à esquerda; a QM, à direita;
+   os Galácticos, o escudo em cima do nome). Sem o tremor da base: quem treme é o alvo. */
+.raiz .heroiGrade {
+  --escudo: clamp(168px, 50vw, 220px);
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  text-align: center;
+  animation-name: none;
+}
+@media (min-width: 600px) and (max-width: 1023px) {
+  .raiz .heroiGrade {
+    --escudo: clamp(210px, min(34vw, 30svh), 270px);
+  }
+}
+@media (min-width: 900px) {
+  .raiz .heroiGrade {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    justify-items: center;
+    text-align: center;
+    gap: 0;
+    min-height: 0;
+  }
+  /* Sem subgrid (o @supports abaixo não vale): uma coluna só, na ordem do DOM — o alvo em cima e o
+     nome embaixo, como a base no celular. Sem isto a base põe o escudo numa 2ª coluna à direita, e
+     a raia vizinha e a biruta caíam atrás do nome e dos créditos. Com subgrid, o @supports (mais
+     abaixo, mesma especificidade) reordena: NOME em cima, ALVO embaixo. */
+  .raiz .blocoEscudo,
+  .raiz .blocoTexto {
+    grid-column: 1;
+    grid-row: auto;
+  }
+  /* .blocoTexto: só no herói (a ficha também tem .chips, em outro módulo). */
+  .raiz .blocoTexto .chips {
+    justify-content: center;
+  }
+  .raiz .lema {
+    margin-inline: auto;
+  }
+}
+/* ≥1024: o kicker sobe para a altura do «VOLTAR» (centrado, não encosta nele). */
+@media (min-width: 1024px) {
+  .raiz .heroiGrade {
+    --escudo: clamp(200px, min(17vw, 27svh), 290px);
+    margin-top: -44px;
+  }
+}
+/* A ordem visual (o DOM não muda): kicker, créditos, NOME, ALVO, lema, chips. O texto vira SUBGRADE
+   da grade do herói e o bloco do escudo cai na linha 4. Um contêiner (contain: layout) não pode ser
+   subgrade: o contêiner do título sobe para a grade (100cqi continua sendo a largura da coluna).
+   Sem subgrid (navegador antigo): o escudo fica em cima do nome, como na base — legível. */
+@supports (grid-template-rows: subgrid) {
+  .raiz .heroiGrade {
+    grid-template-rows: repeat(6, auto);
+    container-type: inline-size;
+  }
+  .raiz .blocoTexto {
+    container-type: normal;
+    grid-column: 1;
+    grid-row: 1 / -1;
+    display: grid;
+    grid-template-rows: subgrid;
+    justify-items: center;
+    margin: 0;
+  }
+  .raiz .blocoTexto > .kicker {
+    grid-row: 1;
+  }
+  .raiz .blocoTexto > .nomesDoElenco {
+    grid-row: 2;
+  }
+  .raiz .blocoTexto > .titulo {
+    grid-row: 3;
+  }
+  .raiz .blocoTexto > .lema {
+    grid-row: 5;
+  }
+  .raiz .blocoTexto > .chips {
+    grid-row: 6;
+  }
+  .raiz .blocoEscudo {
+    grid-column: 1;
+    grid-row: 4;
+  }
+}
+/* O alvo passa 0,42 E acima do escudo e o cavalete pisa a 1,22 E do centro. */
+.raiz .blocoEscudo {
+  margin-top: calc(var(--escudo) * 0.44);
+  margin-bottom: calc(var(--escudo) * 0.8);
+}
+@media (min-width: 900px) {
+  .raiz .blocoEscudo {
+    margin-top: calc(var(--escudo) * 0.44);
+    margin-bottom: calc(var(--escudo) * 0.8);
+  }
+  .raiz .blocoTexto {
+    margin: 0;
+  }
+}
+
+/* -------------------------------------------- o escudo: a mosca do alvo, cravado no centro */
+/* Quadro 0: 2% abaixo, girado −3°. Sacode nos dois impactos (700 ms à esquerda, 1000 ms à direita). */
+@keyframes cravado {
+  0%,
+  40% {
+    transform: translate(0, 2%) rotate(-3deg) scale(0.97);
+    animation-timing-function: cubic-bezier(0.3, 0, 0.6, 1);
+  }
+  44% {
+    transform: translate(1.2%, 0) rotate(1.6deg) scale(1.01);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1);
+  }
+  53% {
+    transform: rotate(-0.9deg);
+  }
+  63% {
+    transform: translate(-0.8%, 0) rotate(-1.2deg);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1);
+  }
+  72% {
+    transform: rotate(0.5deg);
+  }
+  84% {
+    transform: rotate(-0.2deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+.raiz .escudo {
+  transform-origin: 50% 50%;
+  animation: cravado 1600ms linear;
+}
+
+/* A contraluz do pôr do sol atrás do alvo (parada). */
+.enfContraluz {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 0;
+  width: 330%;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(closest-side, rgba(176, 86, 52, 0.34), rgba(120, 60, 46, 0.16) 46%, rgba(40, 40, 80, 0.06) 64%, transparent 74%);
+}
+/* O alvo do clube: fardo de palha, face de papel e cavalete. SVG de viewBox −92 −92 184 214
+   (1 unidade = 0,01 E): o centro do SVG cai no centro do escudo. */
+.enfAlvo {
+  position: absolute;
+  left: -42%;
+  top: -42%;
+  z-index: 0;
+  width: 184%;
+  height: 214%;
+  pointer-events: none;
+  transform-origin: 50% 43%;
+  animation: alvoTreme 1600ms linear;
+}
+.enfAlvo svg,
+.enfVizinho svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+@keyframes alvoTreme {
+  0%,
+  43.6% {
+    transform: none;
+  }
+  45% {
+    transform: translate3d(0.6%, -0.2%, 0) rotate(0.8deg);
+  }
+  52% {
+    transform: rotate(-0.5deg);
+  }
+  62.4% {
+    transform: none;
+  }
+  64% {
+    transform: translate3d(-0.5%, 0, 0) rotate(-0.7deg);
+  }
+  72% {
+    transform: rotate(0.3deg);
+  }
+  84%,
+  100% {
+    transform: none;
+  }
+}
+
+/* -------------------------------------------- as flechas cravadas */
+/* Posição (a PONTA) e giro parados no elemento de fora; o voo e o tremor animam por dentro. O eixo
+   local +x vai da ponta para o arqueiro (143,13° = embaixo à esquerda): o voo vem de lá. */
+.enfFlecha {
+  position: absolute;
+  z-index: 1;
+  left: calc(50% + var(--x) * 100%);
+  top: calc(50% + var(--y) * 100%);
+  width: calc(var(--escudo) * 0.5);
+  height: calc(var(--escudo) * 0.15);
+  margin-top: calc(var(--escudo) * -0.075);
+  transform-origin: 0 50%;
+  rotate: 143.13deg;
+  pointer-events: none;
+}
+.enfFlechaVoo,
+.enfFlechaHaste {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 50%;
+}
+.enfFlechaHaste svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+/* A1: anel branco, em cima à esquerda (1 ponto), aos 700 ms. A2: na palha, à direita (0), aos 1000. */
+.enfFlecha1 {
+  --x: -0.545;
+  --y: -0.545;
+}
+.enfFlecha2 {
+  --x: 0.862;
+  --y: 0.12;
+}
+.enfFlecha1 .enfFlechaVoo {
+  animation: voo1 1000ms linear;
+}
+.enfFlecha1 .enfFlechaHaste {
+  animation: treme1 1600ms linear;
+}
+.enfFlecha2 .enfFlechaVoo {
+  animation: voo2 1300ms linear;
+}
+.enfFlecha2 .enfFlechaHaste {
+  animation: treme2 1900ms linear;
+}
+@keyframes voo1 {
+  0%,
+  56% {
+    transform: translateX(180vmax) scale(1.9);
+  }
+  70%,
+  100% {
+    transform: none;
+  }
+}
+@keyframes voo2 {
+  0%,
+  66.1% {
+    transform: translateX(180vmax) scale(1.9);
+  }
+  76.9%,
+  100% {
+    transform: none;
+  }
+}
+/* O «tóim»: a haste vibra pela ponta, amortecendo em ~650 ms. */
+@keyframes treme1 {
+  0%,
+  43.75% {
+    transform: none;
+  }
+  48% {
+    transform: rotate(7deg);
+  }
+  54% {
+    transform: rotate(-5deg);
+  }
+  60% {
+    transform: rotate(3.2deg);
+  }
+  67% {
+    transform: rotate(-1.8deg);
+  }
+  75% {
+    transform: rotate(0.8deg);
+  }
+  84%,
+  100% {
+    transform: none;
+  }
+}
+@keyframes treme2 {
+  0%,
+  52.6% {
+    transform: none;
+  }
+  56% {
+    transform: rotate(-7deg);
+  }
+  61% {
+    transform: rotate(5deg);
+  }
+  66% {
+    transform: rotate(-3.2deg);
+  }
+  72% {
+    transform: rotate(1.8deg);
+  }
+  79% {
+    transform: rotate(-0.8deg);
+  }
+  86%,
+  100% {
+    transform: none;
+  }
+}
+/* O furo na face e as lascas de palha que voam no impacto (uma vez). */
+.enfFuro {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: calc(var(--escudo) * 0.05);
+  aspect-ratio: 1.4;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, #0b0805 45%, rgba(11, 8, 5, 0.4) 70%, transparent);
+  /* o furo só existe depois do tiro: aparece no impacto (a mesma duração das lascas) */
+  animation-name: furoAparece;
+  animation-duration: var(--dur-lasca);
+  animation-timing-function: linear;
+}
+@keyframes furoAparece {
+  0%,
+  46% {
+    scale: 0;
+  }
+  47%,
+  100% {
+    scale: 1;
+  }
+}
+.enfLasca {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: calc(var(--escudo) * 0.035);
+  height: 2px;
+  border-radius: 2px;
+  background: #e8c27a;
+  opacity: 0;
+  rotate: var(--a);
+  animation-name: lascaVoaEstande;
+  animation-duration: var(--dur-lasca);
+  animation-timing-function: cubic-bezier(0.1, 0.6, 0.3, 1);
+}
+.enfFlecha1 {
+  --dur-lasca: 1500ms;
+}
+.enfFlecha2 {
+  --dur-lasca: 2150ms;
+}
+.enfFlecha3 {
+  --dur-lasca: 2800ms;
+}
+/* Parada até 46% (= o impacto em cada duração: 700, 1000 e 1300 ms). */
+@keyframes lascaVoaEstande {
+  0%,
+  46% {
+    transform: none;
+    opacity: 0;
+  }
+  47% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(calc(var(--escudo) * 0.22)) rotate(160deg);
+    opacity: 0;
+  }
+}
+
+/* A3 abaixo de 1024: passa por cima do alvo e some pela direita (foi para a raia do vizinho). */
+.enfFlechaPerdida {
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  top: calc(50% - var(--escudo) * 1.1);
+  width: calc(var(--escudo) * 0.42);
+  height: calc(var(--escudo) * 0.11);
+  margin-left: calc(var(--escudo) * -0.21);
+  rotate: -3deg;
+  pointer-events: none;
+}
+.enfFlechaPerdidaVoo {
+  position: absolute;
+  inset: 0;
+  transform: translateX(120vw); /* parada: fora da tela (movimento reduzido e depois do filme) */
+  animation: passaReto 1800ms linear;
+}
+.enfFlechaPerdida svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+@keyframes passaReto {
+  0%,
+  64% {
+    transform: translateX(-120vw);
+  }
+  80%,
+  100% {
+    transform: translateX(120vw);
+  }
+}
+
+/* ≥1024: as raias vizinhas (alvos mais longe, 0,44 do tamanho) e a biruta entre o alvo e a raia 1.
+   O 3º tiro (A3) acerta a MOSCA... do alvo do vizinho. --raia nunca deixa o alvo passar da tela. */
+.enfVizinho,
+.enfFlecha3,
+.enfBiruta {
+  display: none;
+}
+@media (min-width: 1024px) {
+  .raiz .blocoEscudo {
+    --raia: min(var(--escudo) * 2.45, 50vw - var(--escudo) * 0.5);
+  }
+  .enfFlechaPerdida {
+    display: none;
+  }
+  .enfVizinho {
+    display: block;
+    position: absolute;
+    z-index: 0;
+    top: calc(50% - var(--escudo) * 0.06 - var(--escudo) * 0.4048);
+    width: calc(var(--escudo) * 0.8096);
+    height: calc(var(--escudo) * 0.9416);
+    pointer-events: none;
+  }
+  .enfVizinhoEsq {
+    left: calc(50% - var(--raia) - var(--escudo) * 0.4048);
+  }
+  .enfVizinhoDir {
+    left: calc(50% + var(--raia) - var(--escudo) * 0.4048);
+  }
+  .enfFlecha3 {
+    display: block;
+    left: calc(50% + var(--raia));
+    top: calc(50% - var(--escudo) * 0.06);
+    width: calc(var(--escudo) * 0.3);
+    height: calc(var(--escudo) * 0.09);
+    margin-top: calc(var(--escudo) * -0.045);
+  }
+  .enfFlecha3 .enfFlechaVoo {
+    animation: voo3 1600ms linear;
+  }
+  .enfFlecha3 .enfFlechaHaste {
+    animation: treme3 2000ms linear;
+  }
+  .enfBiruta {
+    display: block;
+    position: absolute;
+    z-index: 0;
+    left: calc(50% - (var(--raia) + var(--escudo) * 0.92) / 2);
+    top: calc(50% - var(--escudo) * 0.95);
+    width: calc(var(--escudo) * 0.42);
+    height: calc(var(--escudo) * 1.5);
+    pointer-events: none;
+  }
+  /* o mastro */
+  .enfBiruta::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, #2a3142, #59627a);
+  }
+}
+@keyframes voo3 {
+  0%,
+  72.5% {
+    transform: translateX(180vmax) scale(1.6);
+  }
+  81.25%,
+  100% {
+    transform: none;
+  }
+}
+@keyframes treme3 {
+  0%,
+  65% {
+    transform: none;
+  }
+  68.5% {
+    transform: rotate(6deg);
+  }
+  73% {
+    transform: rotate(-4deg);
+  }
+  78% {
+    transform: rotate(2.4deg);
+  }
+  84% {
+    transform: rotate(-1deg);
+  }
+  90%,
+  100% {
+    transform: none;
+  }
+}
+/* A biruta: listras coral e creme; enche no começo e tremula para sempre (devagar). A forma de
+   cone é um clip-path PARADO. */
+.enfBirutaSaco {
+  position: absolute;
+  left: 3px;
+  top: 3%;
+  width: 100%;
+  height: 17%;
+  transform-origin: 0 50%;
+  clip-path: polygon(0 0, 100% 22%, 100% 78%, 0 100%);
+  background: repeating-linear-gradient(90deg, #ff6b7a 0 20%, #f1e5cb 20% 40%);
+  box-shadow: inset 0 -6px 8px rgba(0, 0, 0, 0.35);
+  animation: birutaEnche 1500ms cubic-bezier(0.2, 0.8, 0.2, 1), birutaTremula 2.6s ease-in-out 1500ms infinite alternate;
+}
+@keyframes birutaEnche {
+  0%,
+  20% {
+    transform: scaleX(0.3) skewY(28deg);
+  }
+  62% {
+    transform: scaleX(1.06) skewY(-4deg);
+  }
+  80% {
+    transform: scaleX(0.97) skewY(2deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes birutaTremula {
+  from {
+    transform: rotate(-2deg);
+  }
+  to {
+    transform: rotate(3deg) scaleX(0.95);
+  }
+}
+
+/* -------------------------------------------- no escudo: a mosca intacta brilha */
+/* A estrela do escudo (50%, 50,5%): um brilho de 4 pontas aos 1,9 s e a cada 9 s. */
+.enfBrilhoMosca {
+  position: absolute;
+  left: 50%;
+  top: 50.5%;
+  z-index: 2;
+  width: 22%;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  pointer-events: none;
+  background:
+    linear-gradient(#fff6e6, #fff6e6) 50% 50% / 100% 5% no-repeat,
+    linear-gradient(#fff6e6, #fff6e6) 50% 50% / 5% 100% no-repeat,
+    radial-gradient(closest-side, #fff, rgba(255, 210, 160, 0.5) 30%, transparent 62%);
+  -webkit-mask: radial-gradient(closest-side, #000 26%, transparent);
+  mask: radial-gradient(closest-side, #000 26%, transparent);
+  /* `scale`/`rotate` e não `transform` (o `translate:` sumiria no build). */
+  scale: 0;
+  animation: moscaBrilha 9s ease-out infinite;
+}
+@keyframes moscaBrilha {
+  0%,
+  20% {
+    scale: 0;
+    rotate: 0deg;
+  }
+  21.5% {
+    scale: 1.2;
+    rotate: 45deg;
+  }
+  25%,
+  100% {
+    scale: 0;
+    rotate: 90deg;
+  }
+}
+
+/* -------------------------------------------- o chão: o gramado onde o cavalete pisa */
+.enfGramado {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + var(--escudo) * 1.17);
+  z-index: 0;
+  width: 200vw;
+  margin-left: -100vw;
+  height: calc(var(--escudo) * 2.2);
+  pointer-events: none;
+  background:
+    radial-gradient(calc(var(--escudo) * 0.9) calc(var(--escudo) * 0.09) at 50% calc(var(--escudo) * 0.07), rgba(0, 0, 0, 0.6), transparent) no-repeat,
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.018) 0 calc(var(--escudo) * 0.16), transparent calc(var(--escudo) * 0.16) calc(var(--escudo) * 0.32)),
+    linear-gradient(180deg, transparent 0, #121d15 calc(var(--escudo) * 0.06), #0e1711 40%, #0a100c);
+  -webkit-mask-image: linear-gradient(180deg, #000 55%, transparent);
+  mask-image: linear-gradient(180deg, #000 55%, transparent);
+}
+
+/* ======================================================================= texto do herói */
+/* O kicker e os créditos NÃO sobem: 14 px para baixo no quadro 0 encostariam no «So». */
+.raiz .blocoTexto .kicker,
+.raiz .nomesDoElenco {
+  text-wrap: balance;
+  animation-name: none;
+}
+.raiz .blocoTexto .kicker {
+  margin-bottom: 4px;
+}
+.raiz .nomesDoElenco {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 10px;
+}
+
+/* -------------------------------------------- título: «So» em script, ADC de letreiro, BRONZE CLUBE na flecha */
+/* Pela largura MEDIDA da maior palavra (--largura-em, lib/temas/metricas.ts): ADC = 2,582 em com o
+   espaçamento e a tinta da extrusão. Sem a métrica, um fator generoso. */
+.raiz .tituloVisual {
+  --tm-titulo-max: min(120px, 16svh);
+  --tam: clamp(44px, calc(100cqi / var(--largura-em, calc(var(--letras) * 0.9))), var(--tm-titulo-max));
+}
+@media (min-width: 600px) {
+  .raiz .tituloVisual {
+    --tm-titulo-max: min(150px, 17svh);
+  }
+}
+@media (min-width: 1024px) {
+  .raiz .tituloVisual {
+    --tm-titulo-max: min(160px, 18svh);
+  }
+}
+/* A corda: o nome é puxado como a corda do arco e SOLTA aos 544 ms (o tranco da câmera), vibra e para. */
+@keyframes corda {
+  0%,
+  30% {
+    transform: translate(-0.03em, 0) scaleX(0.95) skewX(-7deg);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5);
+  }
+  34% {
+    transform: translate(0.015em, 0) scaleX(1.035) skewX(3.5deg);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1);
+  }
+  40% {
+    transform: scaleX(0.985) skewX(-1.8deg);
+  }
+  47% {
+    transform: scaleX(1.01) skewX(1deg);
+  }
+  55% {
+    transform: skewX(-0.4deg);
+  }
+  64%,
+  100% {
+    transform: none;
+  }
+}
+/* As palavras empilham (flex em coluna; o espaço entre elas não vira item). */
+.raiz .marca {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: var(--tam);
+  line-height: 0.9;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  font-kerning: none; /* a Alfa TEM kerning: a largura medida é a soma das letras */
+  font-variant-ligatures: none;
+  transform-origin: 50% 70%;
+  animation: corda 1600ms linear;
+}
+.raiz .palavra {
+  display: inline-block;
+  white-space: nowrap;
+}
+.raiz .letra {
+  display: inline-grid;
+}
+.raiz .letra > * {
+  grid-area: 1 / 1;
+}
+/* Folga de tinta: a extrusão desce e vai para a direita 0,088 em, o contorno passa 0,035 em. */
+.raiz .eco,
+.raiz .cromo {
+  padding: 0.16em 0.18em 0.22em 0.06em;
+  margin: -0.16em -0.18em -0.22em -0.06em;
+}
+/* A extrusão de cobre (8 degraus de 0,011 em, escurecendo) com o contorno marinho. Estática, ATRÁS
+   de toda face (.marca é isolate). */
+.raiz .eco {
+  position: static;
+  inset: auto;
+  z-index: -1;
+  color: var(--extrusao);
+  -webkit-text-stroke: 0.07em var(--contorno);
+  text-shadow:
+    0.011em 0.011em 0 #b05f2c,
+    0.022em 0.022em 0 #a25628,
+    0.033em 0.033em 0 #944e24,
+    0.044em 0.044em 0 #864620,
+    0.055em 0.055em 0 #783e1c,
+    0.066em 0.066em 0 #6a3618,
+    0.077em 0.077em 0 #5c2e14,
+    0.088em 0.088em 0 var(--contorno),
+    0.1em 0.12em 0.14em rgba(0, 0, 0, 0.55);
+  user-select: none;
+}
+/* A face: creme de letreiro pintado. A tinta garantida vem antes do background-clip. */
+.raiz .cromo {
+  color: #f3e3c3;
+}
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .raiz .cromo {
+    background-image:
+      linear-gradient(100deg, transparent 42%, rgba(255, 214, 170, 0.75) 50%, transparent 58%),
+      linear-gradient(180deg, #fffaf0 0%, #f8ebcf 40%, #efd9b0 74%, #e3c38f 100%);
+    background-size: 260% 100%, 100% 100%;
+    background-repeat: no-repeat;
+    background-position: 160% 0, 0 0;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    -webkit-text-stroke: 0;
+    /* O último raio de sol atravessa UMA vez, letra a letra (cascata pela duração; --i da letra). */
+    animation: ultimoRaio 2600ms linear;
+    animation-duration: calc(2600ms + var(--i, 0) * 110ms);
+  }
+}
+@keyframes ultimoRaio {
+  0%,
+  78% {
+    background-position: 160% 0, 0 0;
+  }
+  100% {
+    background-position: -60% 0, 0 0;
+  }
+}
+/* «So»: a primeira palavra (quando há mais de uma) vira um script coral pequeno, inclinado, em cima
+   do ADC — como o "So" da faixa do escudo. Só a 1ª letra fica maiúscula. */
+.raiz .palavra:first-child:not(:last-child) {
+  font-family: var(--tm-fonte-assinatura), cursive;
+  font-size: 0.4em;
+  line-height: 1.05;
+  letter-spacing: 0;
+  rotate: -7deg;
+  margin-bottom: -0.02em;
+}
+.raiz .palavra:first-child:not(:last-child) .letra:not(:first-child) {
+  text-transform: lowercase;
+}
+.raiz .palavra:first-child:not(:last-child) .eco {
+  color: #7a1f2b;
+  -webkit-text-stroke: 0.1em var(--contorno);
+  text-shadow: 0.03em 0.05em 0 var(--contorno);
+}
+.raiz .palavra:first-child:not(:last-child) .cromo {
+  background: none;
+  color: var(--coral);
+  -webkit-text-fill-color: var(--coral);
+  animation: none;
+}
+
+/* BRONZE CLUBE: caixa alta da Alfa, espaçada, puxada pela flecha que crava embaixo (640 ms). */
+@keyframes assinaturaPuxa {
+  0%,
+  36% {
+    transform: translate(-0.25em, 0);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1);
+  }
+  48% {
+    transform: translate(0.04em, 0);
+  }
+  58%,
+  100% {
+    transform: none;
+  }
+}
+.raiz .assinatura {
+  margin-top: 0.1em;
+  animation: assinaturaPuxa 1600ms linear;
+}
+.raiz .pincel {
+  transform: none;
+  padding: 0 0.2em;
+  font: 400 max(16px, calc(var(--tam) * 0.215)) / 1.1 var(--tm-fonte-titulo), "Alfa Slab Caixa Alta", serif;
+  letter-spacing: 0.16em;
+  margin-right: -0.16em;
+  text-transform: uppercase;
+  font-kerning: none;
+  color: var(--tm-texto);
+  text-shadow: 0 0.09em 0 var(--contorno), 0 0 0.5em rgba(6, 10, 18, 0.9);
+}
+/* A flecha do nome (TracoDoNome): voa da esquerda e crava embaixo do BRONZE CLUBE aos 640 ms. */
+.raiz .assinatura .enfTraco {
+  display: block;
+  width: 122%;
+  height: max(10px, calc(var(--tam) * 0.1));
+  margin: 0.12em 0 0 -11%;
+  transform-origin: 100% 50%;
+  animation: flechaDoNome 1600ms linear;
+}
+.enfTraco svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+@keyframes flechaDoNome {
+  0%,
+  33% {
+    transform: translateX(-160vw);
+  }
+  40% {
+    transform: translateX(0.6%);
+  }
+  44% {
+    transform: rotate(-1.4deg);
+  }
+  49% {
+    transform: rotate(1deg);
+  }
+  55% {
+    transform: rotate(-0.5deg);
+  }
+  62%,
+  100% {
+    transform: none;
+  }
+}
+
+/* -------------------------------------------- o lema, em script, no gramado */
+.raiz .lema {
+  margin-top: 0;
+  max-width: 24ch;
+  font: 400 clamp(22px, 2.2vw, 30px) / 1.2 var(--tm-fonte-assinatura), cursive;
+  letter-spacing: 0;
+  color: var(--tm-texto);
+  text-shadow: 0 2px 0 #050806, 0 0 14px rgba(5, 8, 6, 0.9);
+}
+
+/* -------------------------------------------- chips: placas em forma de flecha (→) */
+/* A ponta é um clip-path PARADO no ::before (o chip focável não leva máscara). */
+.raiz .chip {
+  padding: 0 26px 0 16px;
+}
+.raiz .chip::before {
+  transform: none;
+  border-radius: 3px;
+  clip-path: polygon(0 0, calc(100% - 13px) 0, 100% 50%, calc(100% - 13px) 100%, 0 100%);
+}
+/* Pontos: a placa creme de pontuação. */
+.raiz .chipPts::before {
+  background: linear-gradient(180deg, #fbf3e2, #e7d3ad);
+  box-shadow: none;
+}
+/* O arqueiro-chefe (e rota/elo na ficha): marinho com o fio coral à esquerda. */
+.raiz .chipCapitao::before {
+  background: #16233d;
+  border: 0;
+  box-shadow: inset 3px 0 0 var(--coral);
+}
+/* OP.GG: a seta vazada (coral por fora, breu por dentro: o ::after é o miolo). */
+.raiz .chipOpgg::before {
+  border: 0;
+  background: var(--coral);
+}
+.raiz .chipOpgg::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  z-index: -1;
+  border-radius: 2px;
+  pointer-events: none;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%);
+  background: #0a1222;
+  transition: background-color 0.2s ease;
+}
+.raiz .chipOpgg:hover::before {
+  background: var(--coral);
+}
+.raiz .chipOpgg:hover::after {
+  background: var(--tm-royal);
+}
+/* «ARQUEIRO-CHEFE · FAMOSO PARRUDAO» mede ~295 px: abaixo de 420 vira texto corrido, quebrando entre
+   palavras (nunca no meio). */
+@media (max-width: 419px) {
+  .raiz .blocoTexto .chipCapitao {
+    flex: 1 1 100%;
+    display: block;
+    padding-block: 12px;
+    line-height: 1.6;
+    white-space: normal;
+    overflow-wrap: normal;
+    text-wrap: balance;
+    text-align: center;
+  }
+  .raiz .blocoTexto .chipCapitao > svg {
+    display: inline-block;
+    vertical-align: -3px;
+    margin-right: 8px;
+  }
+}
+
+/* ======================================================================= elenco: «A ALJAVA» */
+/* As cartas são flechas fincadas no gramado: penas em cima (::before), toco da haste e montinho de
+   terra embaixo (::after). --pena é a altura das penas. */
+.raiz .elencoSecao {
+  --pena: 52px;
+  padding-top: clamp(28px, 4vw, 52px);
+  padding-bottom: clamp(70px, 8vw, 110px);
+}
+@media (max-width: 599px) {
+  .raiz .elencoSecao {
+    --pena: 40px;
+  }
+}
+/* O gramado da raia atrás das cartas (AtrasDoElenco): começa embaixo do título e do aviso. */
+.enfCampo {
+  position: absolute;
+  z-index: -1;
+  left: 0;
+  right: 0;
+  top: clamp(150px, 15vw, 200px);
+  bottom: 0;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.022) 0 46px, transparent 46px 92px),
+    linear-gradient(180deg, transparent 0, #101a13 70px, #0d1610 60%, #0a100c);
+}
+.raiz .estrelando {
+  flex-wrap: wrap;
+  font: 400 clamp(28px, 3.2vw, 44px) / 1 var(--tm-fonte-titulo), "Alfa Slab Caixa Alta", serif;
+  letter-spacing: 0.04em;
+  font-kerning: none;
+  color: var(--tm-texto);
+  text-shadow: 0 0.08em 0 var(--contorno), 0 0 0.6em rgba(5, 8, 14, 0.8);
+}
+/* O fio do título vira uma flecha: penas à esquerda, ponta à direita. Quando o título não deixa
+   64 px para ela (AS OUTRAS FLECHAS no celular), a flecha desce para a linha de baixo, inteira —
+   em vez de sumir espremida ao lado do título quebrado. */
+.raiz .estrelando::after {
+  flex: 1 1 64px;
+  height: 14px;
+  background:
+    url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 14'%3E%3Cpath d='M0 1L18 7L0 13L4 7Z' fill='%23d9a066'/%3E%3C/svg%3E") 100% 50% / 18px 14px no-repeat,
+    url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 14'%3E%3Cpath d='M0 0L12 7L0 14H10L22 7L10 0Z' fill='%23ff6b7a'/%3E%3C/svg%3E") 0 50% / 30px 14px no-repeat,
+    linear-gradient(90deg, #efe4cc, #cfa56c) 20px 50% / calc(100% - 34px) 2px no-repeat;
+}
+.raiz .aviso {
+  margin: -4px 0 calc(var(--pena) + 30px);
+  font: 400 clamp(19px, 1.8vw, 24px) / 1.25 var(--tm-fonte-assinatura), cursive;
+  letter-spacing: 0;
+  color: var(--tm-prata);
+  text-shadow: 0 2px 8px rgba(5, 8, 14, 0.9);
+}
+/* ≥1024 o arqueiro-chefe está na 1ª fila, erguido 14 px, com os louros em cima das penas. */
+@media (min-width: 1024px) {
+  .raiz .aviso {
+    margin-bottom: calc(var(--pena) + 56px);
+  }
+}
+.raiz .elenco {
+  row-gap: calc(var(--pena) + 54px);
+  padding-top: 0;
+}
+@media (min-width: 1024px) {
+  .raiz .elenco {
+    padding-top: 0;
+  }
+}
+
+/* A entrada: a flecha cai e CRAVA (pivô no pé), por rolagem; sem view(), pelo relógio. */
+@keyframes crava {
+  from {
+    transform: translate(0, -30px) rotate(-2.5deg);
+  }
+  62% {
+    transform: translate(0, 3px) rotate(1.4deg);
+  }
+  74% {
+    transform: rotate(-0.9deg);
+  }
+  86% {
+    transform: rotate(0.4deg);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes cravaRelogio {
+  0%,
+  58% {
+    transform: translate(0, -30px) rotate(-2.5deg);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.4);
+  }
+  76% {
+    transform: translate(0, 3px) rotate(1.4deg);
+  }
+  84% {
+    transform: rotate(-0.9deg);
+  }
+  92% {
+    transform: rotate(0.4deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+.raiz .casca {
+  --giro: 0deg;
+  rotate: var(--giro); /* estático; a entrada é transform */
+  transform-origin: 50% 100%;
+  border-radius: 10px; /* o anel de foco acompanha a carta */
+  animation-name: cravaRelogio;
+  animation-duration: calc(2000ms + var(--i, 0) * 150ms);
+  animation-timing-function: linear;
+}
+@supports (animation-timeline: view()) {
+  .raiz .casca {
+    animation: crava linear; /* o shorthand primeiro: ele zera a timeline */
+    animation-timeline: view();
+    animation-range: entry 0% entry calc(65% + var(--col, 0) * 12%);
+  }
+}
+.raiz .casca:nth-child(odd) {
+  --giro: -0.8deg;
+}
+.raiz .casca:nth-child(even) {
+  --giro: 0.9deg;
+}
+.raiz .cascaCapitao:nth-child(n) {
+  --giro: 0deg;
+}
+/* As penas (coral; a do meio, creme) e o encaixe de bronze, em cima da carta. */
+.raiz .casca::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  bottom: calc(100% - 4px);
+  width: min(46%, 104px);
+  height: var(--pena);
+  translate: -50% 0;
+  pointer-events: none;
+  background: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 80' preserveAspectRatio='none'%3E%3Crect x='55' y='8' width='10' height='72' fill='%23f1e5cb'/%3E%3Cpath d='M55 78C48 72 24 54 18 20L55 12Z' fill='%23ff6b7a'/%3E%3Cpath d='M65 78C72 72 96 54 102 20L65 12Z' fill='%23e2505f'/%3E%3Cpath d='M50 66L30 40M52 52L26 28M53 38L28 18M70 66L90 40M68 52L94 28M67 38L92 18' stroke='%23fff' stroke-opacity='.28' stroke-width='1.6'/%3E%3Crect x='52' y='0' width='16' height='12' rx='3' fill='%23c98a3e'/%3E%3Cpath d='M56 0L60 7L64 0Z' fill='%235a2e12'/%3E%3C/svg%3E") 50% 100% / 100% 100% no-repeat;
+}
+/* O toco da haste entrando no montinho de terra, com a sombra e o capim. */
+.raiz .casca::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: 50%;
+  top: calc(100% - 6px);
+  width: min(80%, 190px);
+  height: 44px;
+  translate: -50% 0;
+  pointer-events: none;
+  background: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 44' preserveAspectRatio='none'%3E%3Cellipse cx='100' cy='34' rx='92' ry='9' fill='%23000' fill-opacity='.5'/%3E%3Crect x='94' y='0' width='12' height='32' fill='%23a46d3c'/%3E%3Crect x='94' y='0' width='4' height='32' fill='%23c99561'/%3E%3Cpath d='M38 34Q100 14 162 34Q100 42 38 34Z' fill='%234a3522'/%3E%3Cpath d='M54 31Q100 18 146 31' fill='none' stroke='%237a5a38' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M30 38l5-14 3 14M46 39l2-10 4 10M150 38l5-15 2 15M166 39l3-10 2 10M70 40l3-9 2 9M128 40l2-9 4 9' fill='none' stroke='%23284330' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") 50% 0 / 100% 100% no-repeat;
+}
+/* A carta: tábua de cedro, com as listras pintadas (cresting: coral, creme, marinho) no alto. */
+.raiz .carta {
+  container-type: inline-size;
+  clip-path: none;
+  padding: 16px 4px 4px;
+  border-radius: 10px 10px 6px 6px;
+  background:
+    linear-gradient(180deg, var(--coral) 0 5px, #f1e5cb 5px 8px, #16233d 8px 12px, transparent 12px) 0 2px / 100% 16px no-repeat,
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.07) 0 2px, transparent 2px 9px),
+    linear-gradient(180deg, #c99561, #a46d3c 55%, #7e4f28);
+  box-shadow: inset 0 0 0 1px rgba(255, 230, 190, 0.25), 0 16px 26px -14px rgba(0, 0, 0, 0.85);
+}
+/* O miolo SEM position: o `::after` esticado do link passa a se medir pela .carta (relative e com
+   contêiner), e a tábua inteira abre a ficha — as listras de cima (16 px) e a moldura de cedro
+   também. O overflow do miolo não recorta o `::after` (o bloco de contenção dele fica acima). */
+.raiz .miolo {
+  position: static;
+  clip-path: none;
+  overflow: hidden;
+  border-radius: 6px 6px 3px 3px;
+  background: var(--tm-abismo);
+}
+.raiz .foto img {
+  filter: saturate(0.96) contrast(1.04); /* estático: as fotos já são de celular */
+}
+/* O véu embaixo da foto, onde mora o nick: escurece a partir de 42% (medido nas fotos de verdade —
+   o rosto claro do Parrudão e a parede branca do WeSlay atrás do nick pediam mais que um véu de 50%). */
+.raiz .enfGradacao {
+  background: linear-gradient(180deg, rgba(7, 11, 20, 0.55) 0%, transparent 22%, transparent 42%, rgba(7, 11, 20, 0.7) 72%, rgba(7, 11, 20, 0.94) 100%);
+}
+.raiz .enfRotaGigante {
+  display: none;
+}
+/* A rota numa placa creme de raia. */
+.raiz .etiquetaRota {
+  border: 0;
+  border-radius: 3px;
+  padding: 4px 8px;
+  background: linear-gradient(180deg, #fbf3e2, #e7d3ad);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  --tm-icone: var(--tm-tinta);
+}
+/* O nick pela palavra mais larga do ELENCO, medida (--maior-palavra-em: PARRUDAO = 6,627 em):
+   todas as cartas no mesmo tamanho, quebrando só entre palavras. SEM filter, transform nem
+   position (o nick é o pai do link: a carta inteira continua clicável). */
+.raiz .nick {
+  --nick: clamp(15px, calc((100cqi - 28px) / var(--maior-palavra-em, 7.2)), 26px);
+  overflow-wrap: anywhere; /* como a base: um nick de palavra única gigante parte em vez de vazar */
+  text-wrap: balance;
+  line-height: 1.02;
+  letter-spacing: 0.01em;
+  font-kerning: none;
+  padding: 0.1em 0.1em 0.12em 0;
+  text-shadow: none;
+}
+.raiz .placaCapitao {
+  border-radius: 3px;
+  padding: 4px 9px 3px;
+  background: #ffe9c9;
+  color: var(--tm-tinta); /* 15,7:1 */
+}
+.raiz .rodape {
+  border-top: 0;
+  padding: 9px 11px 10px;
+  background: #0b1220;
+}
+.raiz .nome {
+  color: var(--tm-prata); /* 13:1 */
+}
+.raiz .ficha {
+  color: var(--coral); /* 6,8:1 */
+  font-weight: 700;
+}
+/* O arqueiro-chefe: penas douradas, cresting de ouro, moldura de bronze polido e os louros com a
+   flecha de ouro em volta das penas. */
+.raiz .cascaCapitao::before {
+  background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 80' preserveAspectRatio='none'%3E%3Crect x='55' y='8' width='10' height='72' fill='%23fff4e0'/%3E%3Cpath d='M55 78C48 72 24 54 18 20L55 12Z' fill='%23f2c38b'/%3E%3Cpath d='M65 78C72 72 96 54 102 20L65 12Z' fill='%23d99a52'/%3E%3Cpath d='M50 66L30 40M52 52L26 28M53 38L28 18M70 66L90 40M68 52L94 28M67 38L92 18' stroke='%23fff' stroke-opacity='.4' stroke-width='1.6'/%3E%3Crect x='52' y='0' width='16' height='12' rx='3' fill='%23ffe9c9'/%3E%3Cpath d='M56 0L60 7L64 0Z' fill='%235a2e12'/%3E%3C/svg%3E");
+}
+.raiz .cascaCapitao .carta {
+  background:
+    linear-gradient(180deg, #f2c38b 0 5px, #fff4e0 5px 8px, #16233d 8px 12px, transparent 12px) 0 2px / 100% 16px no-repeat,
+    linear-gradient(160deg, #ffe9c9, #e0a866 30%, #9c5f2c 60%, #f2c38b);
+}
+.raiz .coroaDoCapitao {
+  width: clamp(84px, 50%, 120px);
+  top: calc(-1 * var(--pena) - 34px);
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.6));
+}
+/* No tablet o capitão divide a linha com outra carta: só afasta as linhas. */
+@media (min-width: 600px) and (max-width: 1023px) {
+  .raiz .elenco {
+    row-gap: calc(var(--pena) + 64px);
+  }
+}
+/* Celular: o arqueiro-chefe na largura toda, foto 4:3 (a touca e o rosto do Parrudão cabem). */
+@media (max-width: 599px) {
+  .raiz .cascaLarga .foto {
+    aspect-ratio: 4 / 3;
+  }
+  .raiz .cascaLarga .nick {
+    --nick: clamp(20px, calc((100cqi - 28px) / var(--maior-palavra-em, 7.2)), 30px);
+  }
+  /* Na foto deitada o nick (duas linhas de 30 px e a placa) ocupa de 58% a 92% da altura: o véu
+     começa mais cedo, para o nick não ficar em cima do rosto claro. */
+  .raiz .cascaLarga .enfGradacao {
+    background: linear-gradient(180deg, rgba(7, 11, 20, 0.55) 0%, transparent 18%, transparent 30%, rgba(7, 11, 20, 0.76) 60%, rgba(7, 11, 20, 0.95) 100%);
+  }
+}
+
+/* ======================================================================= cartela: a placa de bronze */
+.raiz .cartela {
+  padding-top: clamp(28px, 4vw, 48px);
+}
+/* Duas flechas mirando a insígnia, uma de cada lado. */
+.raiz .enfLinhaCromo {
+  max-width: 560px;
+  color: #f2c38b;
+}
+.raiz .enfLinhaCromo::before,
+.raiz .enfLinhaCromo::after {
+  height: 12px;
+}
+.raiz .enfLinhaCromo::before {
+  background:
+    url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 12'%3E%3Cpath d='M0 1L16 6L0 11L3 6Z' fill='%23d9a066'/%3E%3C/svg%3E") 100% 50% / 16px 12px no-repeat,
+    url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 12'%3E%3Cpath d='M0 0L10 6L0 12H9L19 6L9 0Z' fill='%23ff6b7a'/%3E%3C/svg%3E") 0 50% / 26px 12px no-repeat,
+    linear-gradient(90deg, #efe4cc, #cfa56c) 18px 50% / calc(100% - 30px) 2px no-repeat;
+}
+.raiz .enfLinhaCromo::after {
+  background:
+    url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 12'%3E%3Cpath d='M16 1L0 6L16 11L13 6Z' fill='%23d9a066'/%3E%3C/svg%3E") 0 50% / 16px 12px no-repeat,
+    url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 12'%3E%3Cpath d='M26 0L16 6L26 12H17L7 6L17 0Z' fill='%23ff6b7a'/%3E%3C/svg%3E") 100% 50% / 26px 12px no-repeat,
+    linear-gradient(90deg, #cfa56c, #efe4cc) 12px 50% / calc(100% - 30px) 2px no-repeat;
+}
+.raiz .enfLinhaCromo svg {
+  width: 30px;
+}
+/* A placa: bronze fundido escovado, borda chanfrada (box-shadow, não ocupa layout), 4 parafusos. */
+.raiz .cartelaCorpo {
+  isolation: isolate;
+  width: min(100% - 40px, 640px);
+  margin: 0 auto 26px;
+  padding: clamp(22px, 4vw, 34px) clamp(18px, 6vw, 64px) clamp(22px, 3.4vw, 30px);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 18px 18px, #f2c38b 0 3px, #5a3418 3.5px 5px, transparent 5.5px),
+    radial-gradient(circle at calc(100% - 18px) 18px, #f2c38b 0 3px, #5a3418 3.5px 5px, transparent 5.5px),
+    radial-gradient(circle at 18px calc(100% - 18px), #f2c38b 0 3px, #5a3418 3.5px 5px, transparent 5.5px),
+    radial-gradient(circle at calc(100% - 18px) calc(100% - 18px), #f2c38b 0 3px, #5a3418 3.5px 5px, transparent 5.5px),
+    repeating-linear-gradient(90deg, rgba(255, 220, 170, 0.035) 0 1px, transparent 1px 4px),
+    radial-gradient(120% 90% at 30% 20%, #6a4022, #4a2a14 55%, #351d0d);
+  box-shadow: inset 0 0 0 3px #b9773f, inset 0 0 0 5px #3a200e, inset 0 0 0 7px #e0a866, inset 0 0 0 8px #5a3418, 0 26px 48px -22px #000;
+}
+/* O relevo da placa (NaCartela): os louros nos cantos de baixo e as fitas cortadas nos lados. */
+.enfPlaca {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+.enfLouro {
+  position: absolute;
+  bottom: 10%;
+  width: 12%;
+  height: auto;
+}
+.enfLouroEsq {
+  left: 3%;
+}
+.enfLouroDir {
+  right: 3%;
+  transform: scaleX(-1);
+}
+@media (max-width: 599px) {
+  .enfLouro {
+    display: none;
+  }
+}
+.enfFita {
+  position: absolute;
+  top: 18px;
+  width: 26px;
+  height: 92px;
+  pointer-events: none;
+}
+.enfFitaEsq {
+  left: -24px;
+}
+.enfFitaDir {
+  right: -24px;
+  transform: scaleX(-1);
+}
+.enfFita svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  transform-origin: 50% 5%;
+}
+/* Quando a placa entra na tela, as duas pontas da fita (recém-cortada) balançam e assentam. */
+@supports (animation-timeline: view()) {
+  .enfFita svg {
+    animation: fitaBalanca linear;
+    animation-timeline: view();
+    animation-range: entry 10% cover 45%;
+  }
+}
+@keyframes fitaBalanca {
+  from {
+    transform: rotate(-38deg);
+  }
+  40% {
+    transform: rotate(14deg);
+  }
+  65% {
+    transform: rotate(-6deg);
+  }
+  85% {
+    transform: rotate(2deg);
+  }
+  to {
+    transform: none;
+  }
+}
+.raiz .cartelaEscudo {
+  width: 84px;
+  height: 84px;
+  margin-bottom: 8px;
+  filter: drop-shadow(0 4px 0 #2a170a) drop-shadow(0 0 10px rgba(0, 0, 0, 0.5)); /* estático */
+}
+/* As letras em relevo: luz em cima à esquerda, sombra embaixo à direita. */
+.raiz .cartelaNome {
+  font: 400 clamp(22px, 3vw, 36px) / 1.05 var(--tm-fonte-titulo), "Alfa Slab Caixa Alta", serif;
+  letter-spacing: 0.03em;
+  font-kerning: none;
+  text-wrap: balance;
+  color: #f6d2a2; /* 6,2:1 no bronze claro; 9:1 no escuro */
+  text-shadow: -1px -1px 0 rgba(255, 236, 205, 0.35), 1px 2px 0 #1e1006, 0 4px 10px rgba(0, 0, 0, 0.45);
+}
+.raiz .cartelaDestino {
+  margin-top: 10px;
+  font: 400 clamp(19px, 2vw, 23px) / 1.25 var(--tm-fonte-assinatura), cursive;
+  letter-spacing: 0;
+  color: #f0cfa4; /* 6:1 */
+}
+.raiz .cartelaData {
+  margin: 12px 0 14px;
+  color: #e7c79f; /* 5,5:1 no bronze mais claro */
+  text-shadow: 1px 1px 0 #1e1006;
+}
+/* «MMR: ???»: o medalhão oval cunhado na placa. */
+.raiz .cartelaCarimbo {
+  margin: 0;
+  padding: 8px 18px 7px;
+  border-radius: 999px;
+  background: radial-gradient(120% 120% at 40% 30%, #7a4a25, #4a2a14);
+  box-shadow: inset 0 0 0 2px #e0a866, inset 0 0 0 4px #3a200e, 0 3px 0 #1e1006;
+  color: #ffe3bd; /* 6:1 */
+  font: 400 16px / 1 var(--tm-fonte-titulo), "Alfa Slab Caixa Alta", serif;
+  letter-spacing: 0.1em;
+}
+.raiz .cartelaFecho {
+  margin: 0 0 20px;
+  font: 400 clamp(19px, 1.8vw, 22px) / 1.3 var(--tm-fonte-assinatura), cursive;
+  letter-spacing: 0;
+  color: var(--tm-prata);
+  text-shadow: 0 2px 8px rgba(5, 8, 14, 0.9);
+}
+/* Time sem escudo: a placa não muda (o nome sobe). Celular: a placa estreita para as fitas caberem. */
+@media (max-width: 599px) {
+  .raiz .cartelaCorpo {
+    width: calc(100% - 44px);
+  }
+  .raiz .cartelaEscudo {
+    width: 64px;
+    height: 64px;
+  }
+}
+
+/* ======================================================================= celular e acessibilidade */
+@media (max-width: 599px) {
+  .enfNuvem:nth-child(n + 4) {
+    display: none;
+  }
+}
+/* O bloco da base (.raiz * { animation: none !important }) já para tudo: fica o pôster FINAL —
+   flechas cravadas, biruta cheia, fitas penduradas. Aqui só some o que só faz sentido em movimento. */
+@media (prefers-reduced-motion: reduce) {
+  .enfLasca,
+  .enfBrilhoMosca,
+  .enfFlechaPerdida {
+    display: none;
+  }
+}
+@media (forced-colors: active) {
+  .raiz .cromo,
+  .raiz .palavra:first-child:not(:last-child) .cromo {
+    background: none;
+    -webkit-text-fill-color: CanvasText;
+    color: CanvasText;
+  }
+  .raiz .eco {
+    display: none;
+  }
+}
+@media (prefers-contrast: more) {
+  .raiz .cromo {
+    background: none;
+    -webkit-text-fill-color: #fff6e6;
+  }
+  .raiz .eco {
+    /* o contorno marinho e a extrusão ajudam aqui: a base os esconde */
+    display: block;
+  }
+}

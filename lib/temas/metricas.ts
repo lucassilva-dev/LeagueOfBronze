@@ -103,8 +103,30 @@ const LILITA_ONE: MetricasDaFonte = {
 // ↑ Os 5 Furiosos
 
 // ↓ So ADC Bronze Clube
-/** Alfa Slab One (So ADC Bronze Clube). */
-const ALFA_SLAB_ONE: MetricasDaFonte | undefined = undefined;
+/**
+ * Alfa Slab One (So ADC Bronze Clube), medida em 27/10/2026 do mesmo jeito que a Knewave. ATENÇÃO: a
+ * Alfa TEM kerning (PARRUDAO: 6,133 em com kerning, 6,327 sem). O tema desliga (`font-kerning: none`
+ * no título, no nick da ficha, nos nicks das cartas e no nome da placa) e a soma das letras volta a
+ * ser a largura da palavra (ADC = 0,806 + 0,804 + 0,722 = 2,332 em).
+ */
+const ALFA_SLAB_ONE: MetricasDaFonte = {
+  avancos: {
+    A: 0.806, B: 0.775, C: 0.722, D: 0.804, E: 0.713, F: 0.632, G: 0.782, H: 0.84, I: 0.42,
+    J: 0.666, K: 0.835, L: 0.653, M: 1.143, N: 0.942, O: 0.792, P: 0.738, Q: 0.81, R: 0.8,
+    S: 0.674, T: 0.78, U: 0.781, V: 0.786, W: 1.207, X: 0.8, Y: 0.776, Z: 0.689,
+    Á: 0.806, À: 0.806, Â: 0.806, Ã: 0.806, Ä: 0.806, É: 0.713, È: 0.713, Ê: 0.713, Ë: 0.713,
+    Í: 0.42, Ì: 0.42, Î: 0.42, Ï: 0.42, Ó: 0.792, Ò: 0.792, Ô: 0.792, Õ: 0.792, Ö: 0.792,
+    Ú: 0.781, Ù: 0.781, Û: 0.781, Ü: 0.781, Ç: 0.722, Ñ: 0.942,
+    "0": 0.732, "1": 0.522, "2": 0.649, "3": 0.623, "4": 0.694, "5": 0.651, "6": 0.693, "7": 0.648, "8": 0.7, "9": 0.693,
+    " ": 0.3, ".": 0.244, ",": 0.245, "-": 0.389, "_": 0.6, "'": 0.193, "!": 0.339, "?": 0.63, "&": 0.828, "+": 0.576, "·": 0.204, "#": 0.732,
+    "@": 1.148, "(": 0.374, ")": 0.374, "/": 0.423, ":": 0.244, "%": 0.885, "©": 0.726, "®": 0.726, Æ: 1.138, Œ: 1.107, Þ: 0.762, Ø: 0.792,
+  },
+  /** O W, o mais largo medido (o ㅤ e o CJK dos nicks contam como ele). */
+  padrao: 1.207,
+  espacamento: 0.01,
+  /** A extrusão de cobre (0,088 em para a direita), o contorno (0,035 de cada lado) e a folga. */
+  sobra: 0.22,
+};
 // ↑ So ADC Bronze Clube
 
 // ↓ Os 5 Sem Ping

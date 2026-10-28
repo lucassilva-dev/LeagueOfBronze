@@ -197,6 +197,14 @@ describe("os keyframes de entrada do conteúdo", () => {
     "seloGiraAlbumFicha",
     // ↑ Os 5 Furiosos
     // ↓ So ADC Bronze Clube (cenarios/estande)
+    "cravado",
+    "corda",
+    "assinaturaPuxa",
+    "crava",
+    "cravaRelogio",
+    "retratoCrava",
+    "nickAcertou",
+    "anota",
     // ↑ So ADC Bronze Clube
     // ↓ Os 5 Sem Ping (cenarios/chamada)
     // ↑ Os 5 Sem Ping

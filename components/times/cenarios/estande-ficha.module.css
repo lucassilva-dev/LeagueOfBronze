@@ -1,0 +1,424 @@
+/*
+ * A ficha do jogador no cenário "estande": a FOTO OFICIAL DO SÓCIO (passe-partout creme, fio coral)
+ * com duas flechas cruzadas atrás, como no escudo; o nick em letreiro com extrusão de cobre; as
+ * estatísticas numa SÚMULA presa na prancheta; os companheiros viram FLECHAS que apontam para a ficha
+ * deles. Mesmas regras: `.raiz` + o seletor da base; conteúdo só transform. Peças com classe dos DOIS
+ * módulos do cenário (kicker, chips, heroi): nada aqui repete propriedade que estande.module.css
+ * declara nelas com a mesma especificidade.
+ */
+
+/* ------------------------------------------------------------------ palco */
+/* A ficha fica com DUAS nuvens, como o celular: o orçamento da ficha é de 4 laços infinitos (duas
+   nuvens, o halo do retrato e o reflexo que atravessa a foto, os dois da base). A 3ª nuvem é o 4º
+   filho da câmera (céu, três nuvens, serra, mata). Na página do time este .raiz não existe. */
+.raiz .enfNuvem:nth-child(n + 4) {
+  display: none;
+}
+
+/* ------------------------------------------------------------------ retrato */
+/* Crava como as cartas: cai 14 px girado −2°, bate (1,1°) e assenta. Quadro 0: inteiro e legível. */
+@keyframes retratoCrava {
+  0%,
+  30% {
+    transform: translate(0, -14px) rotate(-2deg);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.4);
+  }
+  44% {
+    transform: translate(0, 3px) rotate(1.1deg);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1);
+  }
+  56% {
+    transform: rotate(-0.6deg);
+  }
+  70% {
+    transform: rotate(0.25deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+/* As flechas cruzadas passam 16–18% para fora da foto: a casca deixa esse respiro dos lados. */
+.raiz .retratoCasca {
+  width: min(100% - 96px, 400px);
+  margin-top: 56px;
+  margin-bottom: 40px;
+  transform-origin: 50% 100%;
+  animation: retratoCrava 1500ms linear;
+}
+@media (max-width: 899px) {
+  .raiz .retratoCasca {
+    width: min(100% - 80px, 330px);
+  }
+}
+/* Os louros com a flecha de ouro em cima (112 px). */
+.raiz .retratoCapitao {
+  margin-top: 92px;
+}
+.raiz .enfHaloRetrato {
+  inset: -14%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(176, 86, 52, 0.36), rgba(120, 60, 46, 0.14) 55%, transparent);
+}
+/* A foto oficial: passe-partout creme, fio marinho, aro coral, fio marinho. */
+.raiz .retrato {
+  clip-path: none;
+  padding: 10px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #f6ecd6, #e9d9b6);
+  box-shadow: inset 0 0 0 1px #c9b48c, 0 0 0 2px #10131a, 0 0 0 5px #ff6b7a, 0 0 0 7px #10131a, 0 34px 60px -28px #000;
+}
+/* 4:5 em TODA largura (a base faz 4:3 em 600–899: a touca do Parrudão sairia cortada); a foto
+   deitada (fotos.proporcao) continua valendo. */
+.raiz .retratoMiolo {
+  clip-path: none;
+  border-radius: 2px;
+  aspect-ratio: var(--proporcao, 4 / 5);
+}
+@media (min-width: 600px) and (max-width: 899px) {
+  .raiz .retratoMiolo {
+    aspect-ratio: var(--proporcao, 4 / 5);
+  }
+}
+.raiz .retratoMiolo > img {
+  filter: saturate(0.96) contrast(1.04); /* estático */
+}
+.raiz .enfGradacao {
+  background: linear-gradient(180deg, rgba(7, 11, 20, 0.45) 0%, transparent 24%, transparent 70%, rgba(7, 11, 20, 0.7) 100%);
+}
+.raiz .placa {
+  border-radius: 3px;
+  background: #16233d;
+  color: #f7eedc; /* 13,6:1 */
+  box-shadow: inset 3px 0 0 #ff6b7a;
+  font-size: 10.5px;
+}
+.raiz .coroaDoRetrato {
+  width: 112px;
+  top: -84px;
+  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.6)); /* estático */
+}
+
+/* As duas flechas cruzadas atrás da foto (AtrasDoRetrato): pontas para cima, penas embaixo. Cada uma
+   entra pelo próprio eixo, vindo de baixo, e crava com um tremor (A aos 364 ms, B aos 504 ms). */
+.enfCruzadas {
+  position: absolute;
+  inset: -16% -18%;
+  z-index: -1;
+  pointer-events: none;
+}
+.enfCruzada {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 132%;
+  height: 9%;
+  translate: -50% -50%;
+}
+.enfCruzadaA {
+  rotate: -54deg;
+}
+.enfCruzadaB {
+  rotate: -126deg;
+}
+/* Foto deitada (só quem tem fotos.proporcao no tema): o X abre e encurta para não subir no «VOLTAR». */
+.raiz .retratoCasca:has(.retratoMiolo[style*="--proporcao"]) .enfCruzada {
+  width: 118%;
+}
+.raiz .retratoCasca:has(.retratoMiolo[style*="--proporcao"]) .enfCruzadaA {
+  rotate: -34deg;
+}
+.raiz .retratoCasca:has(.retratoMiolo[style*="--proporcao"]) .enfCruzadaB {
+  rotate: -146deg;
+}
+.enfCruzadaVoo {
+  position: absolute;
+  inset: 0;
+}
+.enfCruzada svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.enfCruzadaA .enfCruzadaVoo {
+  animation: cruzaA 1400ms linear;
+}
+.enfCruzadaB .enfCruzadaVoo {
+  animation: cruzaB 1400ms linear;
+}
+@keyframes cruzaA {
+  0%,
+  14% {
+    transform: translateX(-150%);
+    animation-timing-function: cubic-bezier(0.4, 0, 1, 1);
+  }
+  26% {
+    transform: translateX(1.5%);
+  }
+  32% {
+    transform: rotate(1.6deg);
+  }
+  39% {
+    transform: rotate(-1deg);
+  }
+  47% {
+    transform: rotate(0.4deg);
+  }
+  56%,
+  100% {
+    transform: none;
+  }
+}
+@keyframes cruzaB {
+  0%,
+  24% {
+    transform: translateX(-150%);
+    animation-timing-function: cubic-bezier(0.4, 0, 1, 1);
+  }
+  36% {
+    transform: translateX(1.5%);
+  }
+  42% {
+    transform: rotate(-1.6deg);
+  }
+  49% {
+    transform: rotate(1deg);
+  }
+  57% {
+    transform: rotate(-0.4deg);
+  }
+  66%,
+  100% {
+    transform: none;
+  }
+}
+
+/* ------------------------------------------------------------------ texto */
+.raiz .escudoMini {
+  width: 30px;
+  height: 30px;
+}
+/* O nick leva o tiro: puxado (−6° de inclinação), solta aos 504 ms (a 2ª flecha crava) e vibra. 2D. */
+@keyframes nickAcertou {
+  0%,
+  30% {
+    transform: translate(-0.03em, 0) scaleX(0.96) skewX(-6deg);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5);
+  }
+  36% {
+    transform: translate(0.012em, 0) scaleX(1.03) skewX(3deg);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1);
+  }
+  43% {
+    transform: skewX(-1.4deg);
+  }
+  51% {
+    transform: skewX(0.7deg);
+  }
+  60%,
+  100% {
+    transform: none;
+  }
+}
+/* Pela largura MEDIDA do nick em até duas linhas (--largura-nick-em, lib/temas/metricas.ts):
+   FAMOSO / PARRUDAO = 6,627 em; BOBBIE / GOODS = 4,53 em; PRESUNTO = 6,52 em numa linha. */
+.raiz .nickVisual {
+  display: inline-grid; /* eco e cromo na mesma célula: quebram igual */
+  line-height: 0.95;
+  letter-spacing: 0.01em;
+  font-kerning: none;
+  font-variant-ligatures: none;
+  overflow-wrap: break-word;
+  text-wrap: balance;
+  margin-top: 0.12em;
+  margin-bottom: 0.14em;
+  font-size: clamp(30px, calc(100cqi / var(--largura-nick-em, calc(var(--maior-palavra, 6) * 0.95))), 92px);
+  transform-origin: 30% 80%;
+  animation: nickAcertou 1400ms linear;
+}
+@media (min-width: 900px) {
+  .raiz .nickVisual {
+    font-size: clamp(40px, calc(100cqi / var(--largura-nick-em, calc(var(--maior-palavra, 6) * 0.95))), 112px);
+  }
+}
+/* Eco e cromo na MESMA célula (são peças do outro módulo: `> *`). */
+.raiz .nickVisual > * {
+  grid-area: 1 / 1;
+}
+.raiz .nomeReal {
+  font: 400 20px / 1.3 var(--tm-fonte-assinatura), cursive;
+  letter-spacing: 0;
+}
+/* .texto: só na ficha (a página centra os chips do herói em .blocoTexto). */
+.raiz .texto .chips {
+  justify-content: flex-start;
+}
+
+/* ------------------------------------------------------------------ a súmula */
+/* O título NÃO sobe (14 px no quadro 0 encostariam na prancheta). */
+.raiz .performance {
+  font: 400 clamp(15px, 1.4vw, 18px) / 1 var(--tm-fonte-titulo), "Alfa Slab Caixa Alta", serif;
+  letter-spacing: 0.08em;
+  color: var(--tm-acento); /* 11:1 */
+  animation-name: none;
+}
+.raiz .performance::after {
+  height: 12px;
+  background:
+    url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 12'%3E%3Cpath d='M0 1L16 6L0 11L3 6Z' fill='%23d9a066'/%3E%3C/svg%3E") 100% 50% / 16px 12px no-repeat,
+    linear-gradient(90deg, #efe4cc, #cfa56c) 0 50% / calc(100% - 12px) 2px no-repeat;
+}
+/* A folha pautada, presa na prancheta (o prendedor é o ::before), levemente torta (estático). */
+.raiz .estatisticas {
+  position: relative;
+  gap: 0;
+  padding: 22px 10px 10px;
+  border-radius: 4px;
+  rotate: -0.6deg;
+  background:
+    repeating-linear-gradient(180deg, transparent 0 23px, rgba(22, 35, 61, 0.1) 23px 24px),
+    linear-gradient(180deg, #f6ecd6, #ecdcba);
+  box-shadow: 0 18px 30px -16px #000, inset 0 0 0 1px #c9b48c;
+}
+.raiz .estatisticas::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -12px;
+  width: 92px;
+  height: 24px;
+  translate: -50% 0;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #d8dde6, #8f97a6);
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.25), 0 3px 6px rgba(0, 0, 0, 0.4);
+}
+/* Cada número é ANOTADO: desce 5 px e assenta, em cascata (a duração vem do .sobe da base). */
+@keyframes anota {
+  0%,
+  62% {
+    transform: translate(0, -5px) scale(1.04);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5);
+  }
+  78% {
+    transform: translate(0, 1px) scale(0.99);
+  }
+  100% {
+    transform: none;
+  }
+}
+/* O item também tem o .sobe da base (0,1,0): esta regra (0,2,0) troca o keyframe e fica com a
+   duração em cascata dele. */
+.raiz .estatistica {
+  padding: 10px 2px 9px;
+  border: 0;
+  border-right: 1px solid rgba(22, 35, 61, 0.22);
+  border-bottom: 1px solid rgba(22, 35, 61, 0.22);
+  border-radius: 0;
+  background: none;
+  animation-name: anota;
+  animation-timing-function: linear;
+}
+.raiz .estatistica:nth-child(4n) {
+  border-right: 0;
+}
+.raiz .estatistica:nth-child(n + 5) {
+  border-bottom: 0;
+}
+.raiz .estatistica::before {
+  display: none;
+}
+.raiz .valor {
+  padding: 0;
+  background: none;
+  color: #16233d; /* 11,6:1 no papel */
+  -webkit-text-fill-color: #16233d;
+  font: 400 clamp(20px, 2.2vw, 28px) / 1 var(--tm-fonte-titulo), "Alfa Slab Caixa Alta", serif;
+}
+.raiz .rotulo {
+  color: #4a3a22; /* 8:1 */
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+/* ------------------------------------------------------------------ companheiros: flechas */
+/* As penas (::before do li) à esquerda, a ponta de bronze (::after do link) à direita: a flecha
+   aponta para a ficha do companheiro. O link continua retangular (o foco é o anel dele). */
+.raiz .companheiros {
+  gap: 14px 30px;
+}
+.raiz .companheiro {
+  padding-left: 22px;
+  padding-right: 22px;
+}
+.raiz .companheiro::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  left: 0;
+  top: 50%;
+  width: 30px;
+  height: 40px;
+  translate: 0 -50%;
+  pointer-events: none;
+  background: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 40'%3E%3Cpath d='M30 17L8 2H0L14 17Z' fill='%23ff6b7a'/%3E%3Cpath d='M30 23L8 38H0L14 23Z' fill='%23e2505f'/%3E%3Crect x='6' y='18' width='24' height='4' fill='%23f1e5cb'/%3E%3C/svg%3E") 0 50% / 100% 100% no-repeat;
+}
+.raiz .companheiroLink {
+  position: relative;
+  overflow: visible;
+  min-height: 70px;
+  border: 0;
+  border-radius: 6px 0 0 6px;
+  background: linear-gradient(180deg, #1b2a47, #121d33);
+  box-shadow: 0 10px 20px -12px #000, inset 0 0 0 1px rgba(255, 211, 168, 0.12);
+}
+.raiz .companheiroLink::after {
+  content: "";
+  position: absolute;
+  left: 100%;
+  top: 0;
+  bottom: 0;
+  width: 22px;
+  pointer-events: none;
+  background: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 70' preserveAspectRatio='none'%3E%3Cpath d='M0 0L22 35L0 70Z' fill='%23d9a066'/%3E%3Cpath d='M0 0L22 35L0 35Z' fill='%23f6d3a0'/%3E%3C/svg%3E") 0 0 / 100% 100% no-repeat;
+}
+/* A flecha avança (no lugar de subir, como na base). */
+.raiz .companheiroLink:hover {
+  border-color: transparent;
+  translate: 4px 0;
+}
+.raiz .companheiroFoto {
+  flex: 0 0 64px;
+  overflow: hidden;
+  border-radius: 6px 0 0 6px;
+}
+.raiz .companheiroRota {
+  color: var(--tm-icone); /* 11,3:1 */
+}
+.raiz .companheiroNick {
+  color: var(--tm-texto);
+  font-size: 16px;
+  font-kerning: none;
+  overflow-wrap: normal; /* nunca no meio da palavra */
+  text-wrap: balance;
+}
+/* 900–1199: DUAS colunas, e não as quatro da base. Em quatro, a haste fica com ~90 px em 1024 e
+   PARRUDAO e PRESUNTO (6,3 em = 101 px a 16 px, sem quebrar no meio) vazavam pela ponta de bronze.
+   A partir de 1200 a haste tem ≥ 133 px: as quatro cabem. */
+@media (min-width: 900px) and (max-width: 1199px) {
+  .raiz .companheiros {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+/* Celular: UMA coluna (a flecha comprida; FAMOSO PARRUDAO inteiro). */
+@media (max-width: 599px) {
+  .raiz .companheiros {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+  .raiz .companheiroFoto {
+    flex-basis: 50px;
+  }
+  .raiz .companheiroNick {
+    font-size: 15px;
+  }
+}
