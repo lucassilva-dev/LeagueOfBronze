@@ -62,6 +62,12 @@
     margin-top: 80px;
     margin-bottom: 22px;
   }
+  /* Com o retrato menor, ARQUEIRO-CHEFE quebrava no hífen: a placa encosta mais e aperta o espaçamento. */
+  .raiz .retratoCapitao .placa {
+    left: 10px;
+    letter-spacing: 0.1em;
+    padding-inline: 9px;
+  }
 }
 .raiz .enfHaloRetrato {
   inset: -14%;

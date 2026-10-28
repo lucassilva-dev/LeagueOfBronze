@@ -357,7 +357,7 @@ describe("o estande cabe no vídeo", () => {
 
   it("no celular baixo (405×720) o retrato do capitão encolhe pela altura para o nick caber na 1ª dobra", () => {
     expect(ler("estande-ficha.module.css")).toMatch(
-      /@media \(max-width: 599px\) and \(max-height: 760px\) \{\s*\.raiz \.retratoCasca\.retratoCapitao \{\s*width: clamp\(180px, 28svh, min\(100% - 80px, 330px\)\);/,
+      /@media \(max-width: 599px\) and \(max-height: 760px\) \{\s*\.raiz \.retratoCasca\.retratoCapitao \{\s*width: clamp\(180px, 28svh, min\(100% - 80px, 330px\)\);[\s\S]*?\.raiz \.retratoCapitao \.placa \{\s*left: 10px;\s*letter-spacing: 0\.1em;/,
     );
   });
 });
