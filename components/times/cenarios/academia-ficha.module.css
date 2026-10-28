@@ -370,6 +370,13 @@
     font-size: 13.5px;
   }
 }
+/* Abaixo de 360 px a coluna do texto (69 px) não cabe o nick mais longo (SABORENERGETICO, 88 px) e ele
+   partiria no meio: os crachás vão para uma coluna só. */
+@media (max-width: 359px) {
+  .raiz .companheiros {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .enfFlash {
     display: none;

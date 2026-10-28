@@ -432,4 +432,10 @@ describe("o CSS do cenário academia", () => {
   it("o crachá inteiro abre a ficha: o miolo não se posiciona (o link estica até a carta)", () => {
     expect(pagina).toMatch(/\.raiz \.miolo \{\s*position: static;/);
   });
+
+  it("abaixo de 360 px os parceiros vão para uma coluna (SABORENERGETICO não parte no meio)", () => {
+    expect(fichaCss).toMatch(
+      /@media \(max-width: 359px\) \{\s*\.raiz \.companheiros \{\s*grid-template-columns: minmax\(0, 1fr\);/,
+    );
+  });
 });
