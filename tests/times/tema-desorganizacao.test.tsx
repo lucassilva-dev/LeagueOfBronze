@@ -381,11 +381,30 @@ describe("o CSS do picadeiro", () => {
     expect(css).toMatch(/@font-face \{\s*font-family: "Smokum Reserva";[^}]*size-adjust: 48%;/);
   });
 
-  it("tela baixa no computador: o herói encolhe para caber na 1ª dobra do vídeo (1440×810)", () => {
+  it("a moldura de papel do cartaz também abre a ficha (o ::after do link cobre o padding da carta)", () => {
+    expect(css).toMatch(/\.raiz \.carta \{[^}]*padding: 5px;/);
+    expect(css).toMatch(/\.raiz \.link::after \{\s*inset: -5px;/);
+  });
+
+  it("na ficha, tela baixa no computador (1440×810): o cartaz encolhe e cabe na 1ª dobra", () => {
+    expect(cssFicha).toMatch(
+      /@media \(min-width: 1024px\) and \(max-height: 860px\) \{\s*\.raiz \.retratoCasca \{\s*width: min\(100% - 24px, 400px\);\s*\}\s*\.raiz \.retratoCapitao \{\s*margin-top: 58px;/,
+    );
+    // Depois da regra base do retrato (mesma especificidade: vence a ordem).
+    expect(cssFicha.indexOf("and (max-height: 860px)")).toBeGreaterThan(cssFicha.indexOf("width: min(100% - 24px, 470px)"));
+  });
+
+  it("na ficha, celular baixo (405×720): o cartaz do capitão encolhe pela altura e o kicker cabe na 1ª dobra", () => {
+    expect(cssFicha).toMatch(
+      /@media \(max-width: 599px\) and \(max-height: 760px\) \{\s*\.raiz \.retratoCasca\.retratoCapitao \{\s*width: clamp\(190px, 27svh, min\(100% - 24px, 470px\)\);/,
+    );
+  });
+
+  it("tela baixa no computador: o herói encolhe para caber na 1ª dobra (1440×810 do vídeo, 1536×864, 1440×900)", () => {
     expect(css).toMatch(
-      /@media \(min-width: 1024px\) and \(max-height: 860px\) \{\s*\.raiz \.heroiGrade \{\s*--escudo: clamp\(200px, 27svh, 300px\);\s*\}\s*\.raiz \.tituloVisual \{\s*--tm-titulo-max: min\(168px, 13svh\);/,
+      /@media \(min-width: 1024px\) and \(max-height: 956px\) \{\s*\.raiz \.heroiGrade \{\s*--escudo: clamp\(200px, 27svh, 300px\);\s*\}\s*\.raiz \.tituloVisual \{\s*--tm-titulo-max: min\(168px, 13svh\);/,
     );
     // Depois da regra de 1024 que declara o mesmo --tm-titulo-max (vence a ordem).
-    expect(css.indexOf("and (max-height: 860px)")).toBeGreaterThan(css.indexOf("--tm-titulo-max: min(168px, 14svh)"));
+    expect(css.indexOf("and (max-height: 956px)")).toBeGreaterThan(css.indexOf("--tm-titulo-max: min(168px, 14svh)"));
   });
 });
