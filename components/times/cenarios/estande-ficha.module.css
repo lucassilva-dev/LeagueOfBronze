@@ -54,6 +54,15 @@
 .raiz .retratoCapitao {
   margin-top: 92px;
 }
+/* Celular baixo (o 405×720 do vídeo): o retrato do capitão, com os louros, ocupava a 1ª dobra inteira e
+   o nick levava o tiro fora do quadro. Encolhe pela altura (piso de 180 px) para kicker e nick caberem. */
+@media (max-width: 599px) and (max-height: 760px) {
+  .raiz .retratoCasca.retratoCapitao {
+    width: clamp(180px, 28svh, min(100% - 80px, 330px));
+    margin-top: 80px;
+    margin-bottom: 22px;
+  }
+}
 .raiz .enfHaloRetrato {
   inset: -14%;
   border-radius: 50%;

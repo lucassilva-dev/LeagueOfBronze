@@ -1106,6 +1106,10 @@
   background:
     repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.022) 0 46px, transparent 46px 92px),
     linear-gradient(180deg, transparent 0, #101a13 70px, #0d1610 60%, #0a100c);
+  /* O gramado se dissolve no céu do palco antes da cartela (sem a máscara ficava uma emenda reta
+     verde → marinho entre as cartas e a placa). */
+  -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 160px), transparent);
+  mask-image: linear-gradient(180deg, #000 calc(100% - 160px), transparent);
 }
 .raiz .estrelando {
   flex-wrap: wrap;

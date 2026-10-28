@@ -344,3 +344,20 @@ describe("o estande conferido no navegador", () => {
     for (const n of nuvens) expect(n.getAttribute("class")!.split(" ").filter((c) => c.includes("enfNuvem"))).toHaveLength(2);
   });
 });
+
+describe("o estande cabe no vídeo", () => {
+  const ler = (arquivo: string) =>
+    readFileSync(path.join(process.cwd(), "components/times/cenarios", arquivo), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+
+  it("o gramado atrás das cartas se dissolve antes da cartela (sem emenda reta com o céu)", () => {
+    const corpo = /\n\.enfCampo \{([^}]*)\}/.exec(ler("estande.module.css"))?.[1] ?? "";
+    expect(corpo).toContain("mask-image: linear-gradient(180deg, #000 calc(100% - 160px), transparent);");
+    expect(corpo).toContain("-webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 160px), transparent);");
+  });
+
+  it("no celular baixo (405×720) o retrato do capitão encolhe pela altura para o nick caber na 1ª dobra", () => {
+    expect(ler("estande-ficha.module.css")).toMatch(
+      /@media \(max-width: 599px\) and \(max-height: 760px\) \{\s*\.raiz \.retratoCasca\.retratoCapitao \{\s*width: clamp\(180px, 28svh, min\(100% - 80px, 330px\)\);/,
+    );
+  });
+});
