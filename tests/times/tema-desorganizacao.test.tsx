@@ -396,7 +396,7 @@ describe("o CSS do picadeiro", () => {
 
   it("na ficha, celular baixo (405×720): o cartaz do capitão encolhe pela altura e o kicker cabe na 1ª dobra", () => {
     expect(cssFicha).toMatch(
-      /@media \(max-width: 599px\) and \(max-height: 760px\) \{\s*\.raiz \.retratoCasca\.retratoCapitao \{\s*width: clamp\(190px, 27svh, min\(100% - 24px, 470px\)\);/,
+      /@media \(max-width: 599px\) and \(max-height: 760px\) \{\s*\.raiz \.retratoCasca\.retratoCapitao \{\s*width: clamp\(230px, 33svh, min\(100% - 24px, 470px\)\);/,
     );
   });
 
