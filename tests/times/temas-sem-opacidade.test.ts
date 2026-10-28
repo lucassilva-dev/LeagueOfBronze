@@ -207,6 +207,16 @@ describe("os keyframes de entrada do conteúdo", () => {
     "anota",
     // ↑ So ADC Bronze Clube
     // ↓ Os 5 Sem Ping (cenarios/chamada)
+    "travaEscudo",
+    "pacoteDaCall",
+    "seloConecta",
+    "notificacaoDaCall",
+    "entraNaCall",
+    "entraNaCallRelogio",
+    "colaAdesivo",
+    "encerraCall",
+    "fixaRetrato",
+    "nickConecta",
     // ↑ Os 5 Sem Ping
     // ↓ Desorganização (cenarios/picadeiro)
     // ↑ Desorganização

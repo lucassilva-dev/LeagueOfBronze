@@ -130,8 +130,32 @@ const ALFA_SLAB_ONE: MetricasDaFonte = {
 // ↑ So ADC Bronze Clube
 
 // ↓ Os 5 Sem Ping
-/** Unbounded (Os 5 Sem Ping). */
-const UNBOUNDED: MetricasDaFonte | undefined = undefined;
+/**
+ * Unbounded 800 (Os 5 Sem Ping), medida no Chromium em 28/10/2026 com o woff2 VARIÁVEL que o
+ * next/font serve na página (canvas a 100 px, `800 100px`). A fonte TEM kerning (AGIOTA 5,085 sem
+ * e 4,895 com): o título, os nicks e os números da página levam `font-kerning: none` e
+ * `font-variant-ligatures: none`, e a soma das letras dá a palavra exata (PING = 3,14 em pelos
+ * dois caminhos). `padrao` é o W (1,375), arredondado para cima. `sobra`: o adesivo de gel come
+ * 2 × (0,04 da metade do traço branco de 0,08 + 0,065 do anel escuro) = 0,21 em, mais o 0,098 de
+ * tinta do Í à direita e uma folga.
+ */
+const UNBOUNDED: MetricasDaFonte = {
+  avancos: {
+    A: 0.977, B: 0.895, C: 0.942, D: 0.936, E: 0.803, F: 0.781, G: 0.97, H: 0.947, I: 0.362,
+    J: 0.815, K: 0.882, L: 0.772, M: 1.255, N: 0.983, O: 0.97, P: 0.825, Q: 0.971, R: 0.863,
+    S: 0.857, T: 0.829, U: 0.884, V: 0.951, W: 1.375, X: 0.896, Y: 0.94, Z: 0.819,
+    Á: 0.977, À: 0.977, Â: 0.977, Ã: 0.977, Ä: 0.977, É: 0.803, È: 0.803, Ê: 0.803, Ë: 0.803,
+    Í: 0.362, Ì: 0.362, Î: 0.362, Ï: 0.362, Ó: 0.97, Ò: 0.97, Ô: 0.97, Õ: 0.97, Ö: 0.97,
+    Ú: 0.884, Ù: 0.884, Û: 0.884, Ü: 0.884, Ç: 0.942, Ñ: 0.983,
+    0: 0.935, 1: 0.536, 2: 0.85, 3: 0.85, 4: 0.88, 5: 0.817, 6: 0.867, 7: 0.769, 8: 0.905, 9: 0.867,
+    " ": 0.242, ".": 0.314, ",": 0.316, "-": 0.377, _: 0.482, "'": 0.291, "!": 0.338, "?": 0.722,
+    "&": 0.961, "+": 0.62, "·": 0.32, "#": 0.867, "@": 1.056, "(": 0.41, ")": 0.41, "/": 0.472,
+    ":": 0.339, "%": 1.321, "©": 0.898, "®": 0.802, Æ: 1.262, Œ: 1.33, Þ: 0.842, Ø: 0.97,
+  },
+  padrao: 1.4,
+  espacamento: 0.01,
+  sobra: 0.34,
+};
 // ↑ Os 5 Sem Ping
 
 // ↓ Desorganização
