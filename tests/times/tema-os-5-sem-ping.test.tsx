@@ -367,3 +367,26 @@ describe("o ping é enfeite que nunca esconde, e os laços são poucos", () => {
     expect([...infinitos].sort()).toEqual(["arcoPinga", "derivaDaCall", "falaAdm", "falaFixado", "janelaFala"]);
   });
 });
+
+describe("a call cabe no celular e no vídeo", () => {
+  const pagina = CSS("chamada.module.css");
+  const daFicha = CSS("chamada-ficha.module.css");
+
+  it("vindo da lista (?de=jogadores), abaixo de 380 px a contagem do ping sai e o status não cobre o voltar", () => {
+    expect(pagina).toMatch(
+      /@media \(max-width: 379px\) \{\s*\.raiz \.heroi:has\(\.voltar\[href\^="\/jogadores"\]\) \.enfPing \{\s*display: none;/,
+    );
+  });
+
+  it("o leque de Wi-Fi estreita onde o arco de fora passava por baixo das pílulas", () => {
+    expect(pagina).toMatch(/@media \(max-width: 599px\) \{\s*\.enfLeque \{\s*width: calc\(var\(--escudo\) \* 1\.6\);/);
+    expect(pagina).toMatch(/@media \(min-width: 1024px\) \{\s*\.enfLeque \{\s*width: calc\(var\(--escudo\) \* 1\.6\);/);
+    expect(pagina).toMatch(
+      /@media \(min-width: 1024px\) and \(max-width: 1279px\) \{\s*\.enfLeque \{\s*width: calc\(var\(--escudo\) \* 1\.5\);/,
+    );
+  });
+
+  it("abaixo de 900 o retrato da ficha se mede pela altura (o nick cabe na 1ª dobra do 405×720)", () => {
+    expect(daFicha).toMatch(/\.raiz \.retratoCasca \{\s*max-width: min\(100% - 24px, 400px, calc\(\(100svh - 372px\) \* 0\.8\)\);/);
+  });
+});

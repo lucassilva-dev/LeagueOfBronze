@@ -390,6 +390,13 @@
     display: none;
   }
 }
+/* Ficha aberta pela lista (?de=jogadores): «← VOLTAR AOS JOGADORES» é mais longo que o voltar do time e,
+   abaixo de 380 px, passava por baixo do status. Ali o status fica só com o ✓ (a contagem é enfeite). */
+@media (max-width: 379px) {
+  .raiz .heroi:has(.voltar[href^="/jogadores"]) .enfPing {
+    display: none;
+  }
+}
 
 /* Os controles da call, no pé da janela: sobem de fora da janela quando a call começa. */
 .enfControles {
@@ -598,6 +605,23 @@
   translate: -50% -100%;
   overflow: visible;
   pointer-events: none;
+}
+/* Com 1,9E o arco de fora passava por baixo das pílulas de vidro: do VOLTAR no celular (320–414) e do
+   status no computador (≥ 1024). O leque estreita só nessas faixas; o pé continua no Wi-Fi do escudo. */
+@media (max-width: 599px) {
+  .enfLeque {
+    width: calc(var(--escudo) * 1.6);
+  }
+}
+@media (min-width: 1024px) {
+  .enfLeque {
+    width: calc(var(--escudo) * 1.6);
+  }
+}
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .enfLeque {
+    width: calc(var(--escudo) * 1.5);
+  }
 }
 .enfArcoWifi {
   opacity: 0.9;

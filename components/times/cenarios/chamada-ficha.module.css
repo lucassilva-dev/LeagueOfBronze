@@ -30,8 +30,10 @@
 /* Os arcos de sinal sobem 0,22 da largura acima do retrato: a folga em cima (todos, o capitão
    inclusive) os põe entre a linha do «VOLTAR» e a câmera, sem passar por cima das pílulas. Em
    1440×810 (o quadro do vídeo) o retrato inteiro, com o anel, ainda cabe na 1ª dobra (440 px). */
+/* Abaixo de 900 o retrato também se mede pela altura: no 405×720 do vídeo o nick de qualquer uma das
+   cinco fichas fica inteiro na 1ª dobra; em telas altas (390×844, 414×896) o limite de 400 px vale antes. */
 .raiz .retratoCasca {
-  max-width: min(100% - 24px, 400px);
+  max-width: min(100% - 24px, 400px, calc((100svh - 372px) * 0.8));
   margin-top: 40px;
   animation: fixaRetrato 1300ms linear;
 }
