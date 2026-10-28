@@ -52,10 +52,11 @@
   margin-top: 44px;
 }
 /* Celular baixo (o 405×720 do vídeo): o retrato encolhe para o nick de 2 linhas caber na 1ª dobra
-   (100svh − 490 px); em telas altas (390×844, 414×896) a largura não muda; 32svh é o piso em 320×640. */
+   (100svh − 490 px); em telas altas (390×844, 414×896) a largura não muda; 32svh é o piso em 320×640 e
+   180 px o piso absoluto (celular deitado: abaixo disso a placa BRILHANTE sai cortada pela foto). */
 @media (max-width: 599px) {
   .raiz .retratoCasca {
-    width: min(100% - 56px, 400px, max(32svh, 100svh - 490px));
+    width: min(100% - 56px, 400px, max(32svh, 100svh - 490px, 180px));
   }
   .raiz .retratoCapitao {
     margin-top: 36px;
