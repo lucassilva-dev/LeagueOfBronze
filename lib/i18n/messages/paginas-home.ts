@@ -1,4 +1,9 @@
 import { definir } from "@/lib/i18n/definir";
+import { textosDesorganizacao } from "@/lib/i18n/messages/temas/desorganizacao";
+import { textosFasDeRosca } from "@/lib/i18n/messages/temas/fas-de-rosca-esporte-clube";
+import { textosOs5Furiosos } from "@/lib/i18n/messages/temas/os-5-furiosos";
+import { textosOs5SemPing } from "@/lib/i18n/messages/temas/os-5-sem-ping";
+import { textosSoAdcBronzeClube } from "@/lib/i18n/messages/temas/so-adc-bronze-clube";
 
 /**
  * Textos fixos da home, da listagem/ficha de times e da listagem/ficha de jogadores.
@@ -140,6 +145,12 @@ export const paginasHome = definir({
     temaGalacticosFiado: "FIADO SÓ AMANHÃ",
     temaGalacticosFecho: "Beba com moderação · jogue sem moderação nenhuma.",
     temaGalacticosMesa: "A MESA TODA",
+    // Os temas da 4ª Edição: um arquivo por time em lib/i18n/messages/temas (cada tema muda só o seu).
+    ...textosFasDeRosca.pt,
+    ...textosOs5Furiosos.pt,
+    ...textosSoAdcBronzeClube.pt,
+    ...textosOs5SemPing.pt,
+    ...textosDesorganizacao.pt,
 
     // ---------- jogadores ----------
     jogadoresTitulo: "JOGADORES",
@@ -310,6 +321,12 @@ export const paginasHome = definir({
     temaGalacticosFiado: "FIADO SÓ AMANHÃ",
     temaGalacticosFecho: "Drink responsibly · play irresponsibly.",
     temaGalacticosMesa: "THE WHOLE TABLE",
+    // Os temas da 4ª Edição: um arquivo por time em lib/i18n/messages/temas (cada tema muda só o seu).
+    ...textosFasDeRosca.en,
+    ...textosOs5Furiosos.en,
+    ...textosSoAdcBronzeClube.en,
+    ...textosOs5SemPing.en,
+    ...textosDesorganizacao.en,
 
     // ---------- jogadores ----------
     jogadoresTitulo: "PLAYERS",

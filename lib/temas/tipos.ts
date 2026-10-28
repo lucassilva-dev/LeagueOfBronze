@@ -10,10 +10,26 @@
 import type { PaginasHomeTextos } from "@/lib/i18n/messages/paginas-home";
 
 /** As fontes que um tema pode pedir (components/times/fontes-dos-temas.ts carrega cada uma). */
-export type ChaveDeFonte = "exo2-italico" | "permanent-marker" | "bungee" | "special-elite" | "knewave" | "kalam";
+export type ChaveDeFonte =
+  | "exo2-italico"
+  | "permanent-marker"
+  | "bungee"
+  | "special-elite"
+  | "knewave"
+  | "kalam"
+  | "sofia-extra-condensada"
+  | "kaushan"
+  | "lilita-one"
+  | "baloo-2"
+  | "alfa-slab-one"
+  | "yellowtail"
+  | "unbounded"
+  | "sora"
+  | "smokum"
+  | "playfair-italico";
 
 /** Os cenários prontos (components/times/cenarios: um componente e um CSS module por cenário). */
-export type Cenario = "tempestade" | "estacao" | "boteco";
+export type Cenario = "tempestade" | "estacao" | "boteco" | "academia" | "album" | "estande" | "chamada" | "picadeiro";
 
 /** Os textos que um tema troca ou acrescenta na página e na ficha (o lema, o "A BORDO"…). */
 export type PapelDoTexto =

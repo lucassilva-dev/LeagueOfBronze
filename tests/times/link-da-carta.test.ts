@@ -111,5 +111,14 @@ describe.each(ARQUIVOS)("$nome", ({ css }) => {
 });
 
 it("achou os módulos da página do time", () => {
-  expect(ARQUIVOS.map((a) => path.basename(a.nome))).toEqual(expect.arrayContaining(["tema.module.css", "boteco.module.css", "estacao.module.css"]));
+  expect(ARQUIVOS.map((a) => path.basename(a.nome))).toEqual(expect.arrayContaining([
+      "tema.module.css",
+      "boteco.module.css",
+      "estacao.module.css",
+      "academia.module.css",
+      "album.module.css",
+      "estande.module.css",
+      "chamada.module.css",
+      "picadeiro.module.css",
+    ]));
 });

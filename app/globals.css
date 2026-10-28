@@ -1054,3 +1054,28 @@ body:has([data-tema="queijo-minas"]) #lob-cabecalho {
   background: linear-gradient(180deg, rgba(11, 9, 7, 0.95), rgba(11, 9, 7, 0.84)) !important;
   border-bottom-color: rgba(232, 169, 42, 0.28) !important;
 }
+/* Fãs de Rosca: a parede da academia às 6h e o fio rosa do glacê. */
+body:has([data-tema="fas-de-rosca-esporte-clube"]) #lob-cabecalho {
+  background: linear-gradient(180deg, rgba(18, 14, 17, 0.95), rgba(18, 14, 17, 0.84)) !important;
+  border-bottom-color: rgba(255, 142, 195, 0.26) !important;
+}
+/* Os 5 Furiosos: a noite roxa do álbum e o fio lima do picote. */
+body:has([data-tema="os-5-furiosos"]) #lob-cabecalho {
+  background: linear-gradient(180deg, rgba(18, 8, 31, 0.95), rgba(18, 8, 31, 0.84)) !important;
+  border-bottom-color: rgba(200, 245, 74, 0.28) !important;
+}
+/* So ADC Bronze Clube: o alto do céu da hora azul e o fio de cobre do pôr do sol. */
+body:has([data-tema="so-adc-bronze-clube"]) #lob-cabecalho {
+  background: linear-gradient(180deg, rgba(7, 11, 20, 0.95), rgba(7, 11, 20, 0.84)) !important;
+  border-bottom-color: rgba(226, 115, 74, 0.28) !important;
+}
+/* Os 5 Sem Ping: o preto esverdeado da call e o fio verde da janela. */
+body:has([data-tema="os-5-sem-ping"]) #lob-cabecalho {
+  background: linear-gradient(180deg, rgba(4, 9, 7, 0.95), rgba(4, 9, 7, 0.84)) !important;
+  border-bottom-color: rgba(61, 255, 143, 0.24) !important;
+}
+/* Desorganização: o breu da lona e o fio de ouro dos frisos. */
+body:has([data-tema="desorganizacao"]) #lob-cabecalho {
+  background: linear-gradient(180deg, rgba(11, 7, 6, 0.95), rgba(11, 7, 6, 0.84)) !important;
+  border-bottom-color: rgba(224, 176, 74, 0.30) !important;
+}

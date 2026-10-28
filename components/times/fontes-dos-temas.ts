@@ -1,4 +1,21 @@
-import { Bungee, Exo_2, Kalam, Knewave, Permanent_Marker, Special_Elite } from "next/font/google";
+import {
+  Alfa_Slab_One,
+  Baloo_2,
+  Bungee,
+  Exo_2,
+  Kalam,
+  Kaushan_Script,
+  Knewave,
+  Lilita_One,
+  Permanent_Marker,
+  Playfair_Display,
+  Smokum,
+  Sofia_Sans_Extra_Condensed,
+  Sora,
+  Special_Elite,
+  Unbounded,
+  Yellowtail,
+} from "next/font/google";
 
 import type { ChaveDeFonte } from "@/lib/temas/tipos";
 
@@ -65,6 +82,109 @@ const kalam = Kalam({
   preload: false,
 });
 
+// ---------- os temas da 4ª Edição (28/10/2026) ----------
+// As reservas (`fallback`) são @font-face locais MAIS ESTREITAS que a fonte, declaradas no módulo CSS
+// do cenário de cada time (como o «Knewave Caixa Alta» em cenarios/boteco.module.css): o título nunca
+// sai cortado enquanto a fonte chega.
+
+// Fãs de Rosca (cenarios/academia): a condensada preta itálica do panfleto de academia e o pincel do
+// "esporte clube". Duas reservas: Impact encolhida onde houver e Arial encolhida no resto.
+const sofiaExtraCondensada = Sofia_Sans_Extra_Condensed({
+  subsets: ["latin"],
+  weight: "900",
+  style: "italic",
+  variable: "--tm-fonte-titulo",
+  display: "swap",
+  preload: false,
+  adjustFontFallback: false,
+  fallback: ["Rosca Reserva Impact", "Rosca Reserva"],
+});
+
+const kaushan = Kaushan_Script({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--tm-fonte-assinatura",
+  display: "swap",
+  preload: false,
+});
+
+// Os 5 Furiosos (cenarios/album): o vinil recortado das figurinhas e o impresso do álbum (Baloo 2
+// variável, um arquivo só para 500, 700 e 800).
+const lilitaOne = Lilita_One({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--tm-fonte-titulo",
+  display: "swap",
+  preload: false,
+  adjustFontFallback: false,
+  fallback: ["Lilita One Caixa Alta"],
+});
+
+const baloo2 = Baloo_2({
+  subsets: ["latin"],
+  variable: "--tm-fonte-assinatura",
+  display: "swap",
+  preload: false,
+});
+
+// So ADC Bronze Clube (cenarios/estande): o letreiro de clube (slab pesada) e o script do «So».
+const alfaSlabOne = Alfa_Slab_One({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--tm-fonte-titulo",
+  display: "swap",
+  preload: false,
+  adjustFontFallback: false,
+  fallback: ["Alfa Slab Caixa Alta"],
+});
+
+const yellowtail = Yellowtail({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--tm-fonte-assinatura",
+  display: "swap",
+  preload: false,
+});
+
+// Os 5 Sem Ping (cenarios/chamada): a geométrica larga de interface no SEM PING e a Sora da chamada
+// (as duas variáveis, um arquivo cada).
+const unbounded = Unbounded({
+  subsets: ["latin"],
+  variable: "--tm-fonte-titulo",
+  display: "swap",
+  preload: false,
+  adjustFontFallback: false,
+  fallback: ["Sem Ping Reserva"],
+});
+
+const sora = Sora({
+  subsets: ["latin"],
+  variable: "--tm-fonte-assinatura",
+  display: "swap",
+  preload: false,
+});
+
+// Desorganização (cenarios/picadeiro): a letra de cartaz de madeira do circo e o itálico do mestre de
+// picadeiro.
+const smokum = Smokum({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--tm-fonte-titulo",
+  display: "swap",
+  preload: false,
+  adjustFontFallback: false,
+  fallback: ["Smokum Reserva Estreita", "Smokum Reserva"],
+});
+
+const playfairItalico = Playfair_Display({
+  subsets: ["latin"],
+  style: ["italic"],
+  weight: ["500", "700"],
+  variable: "--tm-fonte-assinatura",
+  display: "swap",
+  preload: false,
+});
+
 export const FONTES_DOS_TEMAS: Readonly<Record<ChaveDeFonte, { variable: string }>> = {
   "exo2-italico": exo2Italico,
   "permanent-marker": permanentMarker,
@@ -72,4 +192,14 @@ export const FONTES_DOS_TEMAS: Readonly<Record<ChaveDeFonte, { variable: string 
   "special-elite": specialElite,
   knewave,
   kalam,
+  "sofia-extra-condensada": sofiaExtraCondensada,
+  kaushan,
+  "lilita-one": lilitaOne,
+  "baloo-2": baloo2,
+  "alfa-slab-one": alfaSlabOne,
+  yellowtail,
+  unbounded,
+  sora,
+  smokum,
+  "playfair-italico": playfairItalico,
 };

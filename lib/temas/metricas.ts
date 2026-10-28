@@ -46,8 +46,41 @@ const KNEWAVE: MetricasDaFonte = {
   sobra: 0.32,
 };
 
+// Os temas da 4ª Edição: cada implementador troca o `undefined` do seu bloco pela métrica MEDIDA.
+// ↓ Fãs de Rosca
+/** Sofia Sans Extra Condensed 900 itálico (Fãs de Rosca). */
+const SOFIA_EXTRA_CONDENSADA: MetricasDaFonte | undefined = undefined;
+// ↑ Fãs de Rosca
+
+// ↓ Os 5 Furiosos
+/** Lilita One (Os 5 Furiosos). */
+const LILITA_ONE: MetricasDaFonte | undefined = undefined;
+// ↑ Os 5 Furiosos
+
+// ↓ So ADC Bronze Clube
+/** Alfa Slab One (So ADC Bronze Clube). */
+const ALFA_SLAB_ONE: MetricasDaFonte | undefined = undefined;
+// ↑ So ADC Bronze Clube
+
+// ↓ Os 5 Sem Ping
+/** Unbounded (Os 5 Sem Ping). */
+const UNBOUNDED: MetricasDaFonte | undefined = undefined;
+// ↑ Os 5 Sem Ping
+
+// ↓ Desorganização
+/** Smokum (Desorganização). */
+const SMOKUM: MetricasDaFonte | undefined = undefined;
+// ↑ Desorganização
+
 /** As métricas pela fonte do título do tema (`tema.fontes.titulo`). */
-export const METRICAS: Readonly<Partial<Record<ChaveDeFonte, MetricasDaFonte>>> = { knewave: KNEWAVE };
+export const METRICAS: Readonly<Partial<Record<ChaveDeFonte, MetricasDaFonte>>> = {
+  knewave: KNEWAVE,
+  "sofia-extra-condensada": SOFIA_EXTRA_CONDENSADA,
+  "lilita-one": LILITA_ONE,
+  "alfa-slab-one": ALFA_SLAB_ONE,
+  unbounded: UNBOUNDED,
+  smokum: SMOKUM,
+};
 
 /** Três casas (o erro de arredondar, < 0,0005 em, some dentro da sobra). */
 const arredonda = (n: number) => Math.round(n * 1000) / 1000;

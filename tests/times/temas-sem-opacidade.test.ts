@@ -166,6 +166,16 @@ describe("os keyframes de entrada do conteúdo", () => {
     "nickPousa",
     "tampinhaCai",
     "tampinhaGira",
+    // ↓ Fãs de Rosca Esporte Clube (cenarios/academia)
+    // ↑ Fãs de Rosca Esporte Clube
+    // ↓ Os 5 Furiosos (cenarios/album)
+    // ↑ Os 5 Furiosos
+    // ↓ So ADC Bronze Clube (cenarios/estande)
+    // ↑ So ADC Bronze Clube
+    // ↓ Os 5 Sem Ping (cenarios/chamada)
+    // ↑ Os 5 Sem Ping
+    // ↓ Desorganização (cenarios/picadeiro)
+    // ↑ Desorganização
   ])(
     "%s anima transform e nada que esconda",
     (nome) => {
@@ -175,6 +185,15 @@ describe("os keyframes de entrada do conteúdo", () => {
       expect(corpo).not.toMatch(ESCONDE);
     },
   );
+
+  it("nenhum @keyframes com o mesmo nome em dois módulos (o mapa acima ficaria com o do último)", () => {
+    const donos = new Map<string, string[]>();
+    for (const { nome, css } of ARQUIVOS) {
+      for (const kf of analisar(css).keyframes.keys()) donos.set(kf, [...(donos.get(kf) ?? []), nome]);
+    }
+    const repetidos = [...donos].filter(([, arquivos]) => arquivos.length > 1).map(([kf, arquivos]) => `${kf}: ${arquivos.join(", ")}`);
+    expect(repetidos).toEqual([]);
+  });
 
   it("o movimento reduzido para tudo na raiz do tema", () => {
     const base = ARQUIVOS.find((a) => a.nome === "tema.module.css")!.css;

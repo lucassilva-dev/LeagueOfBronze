@@ -2,13 +2,27 @@ import type { CSSProperties } from "react";
 
 import { teamColor } from "@/lib/design";
 import type { PaginasHomeTextos } from "@/lib/i18n/messages/paginas-home";
+import { TEMA_DESORGANIZACAO } from "@/lib/temas/desorganizacao";
 import { TEMA_EQUIPE_RX } from "@/lib/temas/equipe-rx";
+import { TEMA_FAS_DE_ROSCA } from "@/lib/temas/fas-de-rosca-esporte-clube";
 import { TEMA_GALACTICOS_DO_BAR } from "@/lib/temas/galacticos-do-bar";
+import { TEMA_OS_5_FURIOSOS } from "@/lib/temas/os-5-furiosos";
+import { TEMA_OS_5_SEM_PING } from "@/lib/temas/os-5-sem-ping";
 import { TEMA_QUEIJO_MINAS } from "@/lib/temas/queijo-minas";
+import { TEMA_SO_ADC_BRONZE_CLUBE } from "@/lib/temas/so-adc-bronze-clube";
 import type { CoresDoTema, MetalDoTema, PapelDoTexto, TemaDoTime } from "@/lib/temas/tipos";
 
 /** Os times com página temática. Time novo: um arquivo em lib/temas e uma linha aqui. */
-const TEMAS: readonly TemaDoTime[] = [TEMA_EQUIPE_RX, TEMA_QUEIJO_MINAS, TEMA_GALACTICOS_DO_BAR];
+const TEMAS: readonly TemaDoTime[] = [
+  TEMA_EQUIPE_RX,
+  TEMA_QUEIJO_MINAS,
+  TEMA_GALACTICOS_DO_BAR,
+  TEMA_FAS_DE_ROSCA,
+  TEMA_OS_5_FURIOSOS,
+  TEMA_SO_ADC_BRONZE_CLUBE,
+  TEMA_OS_5_SEM_PING,
+  TEMA_DESORGANIZACAO,
+];
 
 /** O tema do time pelo slug — ou null, e a página fica com o visual padrão do site. */
 export function temaDoTime(slug: string): TemaDoTime | null {
