@@ -34,20 +34,32 @@
   margin-top: 28px;
   animation: none;
 }
+/* No computador o retrato também se mede pela altura (52svh): no 1440×810 do vídeo a moldura de baixo
+   cabe inteira na 1ª dobra; de 900 px de altura para cima nada muda (52svh > 440 px). */
 @media (min-width: 900px) {
   .raiz .retratoCasca {
-    width: min(100%, 440px);
+    width: min(100%, 440px, 52svh);
   }
 }
 /* De 900 a 1279 a coluna do retrato encosta na borda da tela: o retrato estreita para as repetidas
    caberem (em 1024, a da esquerda saía 54 px da tela — medido no harness). */
 @media (min-width: 900px) and (max-width: 1279px) {
   .raiz .retratoCasca {
-    width: min(100% - 48px, 440px);
+    width: min(100% - 48px, 440px, 52svh);
   }
 }
 .raiz .retratoCapitao {
   margin-top: 44px;
+}
+/* Celular baixo (o 405×720 do vídeo): o retrato encolhe para o nick de 2 linhas caber na 1ª dobra
+   (100svh − 490 px); em telas altas (390×844, 414×896) a largura não muda; 32svh é o piso em 320×640. */
+@media (max-width: 599px) {
+  .raiz .retratoCasca {
+    width: min(100% - 56px, 400px, max(32svh, 100svh - 490px));
+  }
+  .raiz .retratoCapitao {
+    margin-top: 36px;
+  }
 }
 .raiz .enfHaloRetrato {
   inset: -8%;

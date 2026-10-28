@@ -391,4 +391,14 @@ describe("o CSS do álbum segue os ajustes do juiz", () => {
     expect(pagina).toMatch(/\.raiz \.marca \{[^}]*font-kerning: none;/);
     expect(daFicha).toMatch(/\.raiz \.nickVisual \{[^}]*font-kerning: none;/);
   });
+
+  it("o retrato da ficha se mede pela altura: o nick (405×720) e a moldura (1440×810) cabem na 1ª dobra do vídeo", () => {
+    expect(daFicha).toMatch(/@media \(min-width: 900px\) \{\s*\.raiz \.retratoCasca \{\s*width: min\(100%, 440px, 52svh\);/);
+    expect(daFicha).toMatch(
+      /@media \(min-width: 900px\) and \(max-width: 1279px\) \{\s*\.raiz \.retratoCasca \{\s*width: min\(100% - 48px, 440px, 52svh\);/,
+    );
+    expect(daFicha).toMatch(
+      /@media \(max-width: 599px\) \{\s*\.raiz \.retratoCasca \{\s*width: min\(100% - 56px, 400px, max\(32svh, 100svh - 490px\)\);/,
+    );
+  });
 });
