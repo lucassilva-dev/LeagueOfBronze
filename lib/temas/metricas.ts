@@ -159,8 +159,31 @@ const UNBOUNDED: MetricasDaFonte = {
 // ↑ Os 5 Sem Ping
 
 // ↓ Desorganização
-/** Smokum (Desorganização). */
-const SMOKUM: MetricasDaFonte | undefined = undefined;
+/**
+ * Smokum 400 (Desorganização), medida no Chromium (canvas a 100 px, o woff2 do Google Fonts que o
+ * next/font baixa, 27/10/2026). Quase sem kerning (DESORGANIZAÇÃO = 5,558 em como palavra e 5,567
+ * somando as letras; a página usa `font-kerning: none`, então vale a soma). Fora da tabela (o ㅤ e
+ * o CJK dos nicks, que saem da fonte do sistema): 1 em, mais largo que qualquer letra (Œ 0,623).
+ * A sobra: a tinta passa no máximo 0,03 em do avanço, o contorno do eco soma 0,09 em, e o D, o E
+ * e o S tortos alargam até 0,10 em (a tinta de DESORGANIZAÇÃO ocupa 5,785 de 5,928 em).
+ */
+const SMOKUM: MetricasDaFonte = {
+  avancos: {
+    A: 0.426, B: 0.427, C: 0.388, D: 0.406, E: 0.411, F: 0.379, G: 0.378, H: 0.459, I: 0.253,
+    J: 0.323, K: 0.428, L: 0.386, M: 0.577, N: 0.464, O: 0.393, P: 0.406, Q: 0.375, R: 0.433,
+    S: 0.381, T: 0.354, U: 0.471, V: 0.466, W: 0.527, X: 0.462, Y: 0.453, Z: 0.39,
+    Á: 0.426, À: 0.426, Â: 0.426, Ã: 0.426, Ä: 0.426, É: 0.411, È: 0.411, Ê: 0.411, Ë: 0.411,
+    Í: 0.253, Ì: 0.253, Î: 0.253, Ï: 0.253, Ó: 0.393, Ò: 0.393, Ô: 0.393, Õ: 0.393, Ö: 0.393,
+    Ú: 0.471, Ù: 0.471, Û: 0.471, Ü: 0.471, Ç: 0.388, Ñ: 0.464,
+    0: 0.352, 1: 0.299, 2: 0.334, 3: 0.333, 4: 0.379, 5: 0.329, 6: 0.328, 7: 0.318, 8: 0.35, 9: 0.328,
+    " ": 0.2, ".": 0.226, ",": 0.234, "-": 0.32, _: 0.25, "'": 0.221, "!": 0.245, "?": 0.32,
+    "&": 0.422, "+": 0.35, "·": 0.226, "#": 0.409, "@": 0.587, "(": 0.293, ")": 0.293, "/": 0.33,
+    ":": 0.266, "%": 0.474, "©": 0.587, "®": 0.587, Æ: 0.614, Œ: 0.623, Þ: 0.396, Ø: 0.393,
+  },
+  padrao: 1,
+  espacamento: 0.01,
+  sobra: 0.22,
+};
 // ↑ Desorganização
 
 /** As métricas pela fonte do título do tema (`tema.fontes.titulo`). */

@@ -219,6 +219,16 @@ describe("os keyframes de entrada do conteúdo", () => {
     "nickConecta",
     // ↑ Os 5 Sem Ping
     // ↓ Desorganização (cenarios/picadeiro)
+    // (o `tremelique` do DES fica de fora: anima a propriedade `rotate`, não `transform`)
+    "saltoDoLeao",
+    "organiza",
+    "palhacos",
+    "cartazBalanca",
+    "cartazBalancaRelogio",
+    "tarjaCola",
+    "cartazDesce",
+    "nickOrganiza",
+    "cartazinhoCai",
     // ↑ Desorganização
   ])(
     "%s anima transform e nada que esconda",

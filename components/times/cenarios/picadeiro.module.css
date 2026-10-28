@@ -1,1 +1,1262 @@
-/* Desorganização — cenário «picadeiro» (components/times/cenarios/picadeiro.tsx). BASE: o tema chega depois. */
+/*
+ * Cenário "picadeiro" — DESORGANIZAÇÃO, «O Circo da Desorganização» (cenarios/picadeiro.tsx).
+ *
+ * Duas famílias de regra (como no boteco):
+ *  - ENFEITES próprios (`.enf…`, aria-hidden, sem texto): lona, trapézios, sanefa, plateia,
+ *    raios, feixe, canhão de luz, olhos do leão, picadeiro, pedestal, cortina, estrelas do cartaz.
+ *  - GANCHOS: classe com o MESMO nome de uma peça da base, sempre `.raiz` + o seletor da base.
+ *    Nada de @layer.
+ * Conteúdo só anima transform (o tremelique do DES anima `rotate`, também transformação), sem
+ * delay nem fill-mode, com a espera dentro do keyframe. Nenhum flash: o que acende só SOBE
+ * (canhão, feixe, olhos).
+ */
+
+/* As reservas da Smokum (fontes-dos-temas.ts: `fallback`), MAIS ESTREITAS que ela em toda
+   maiúscula, acento e algarismo (canvas, 27/10): Impact × 0,60 (pior caso: «6», 0,606) e Arial
+   × 0,48 (pior caso: «Q», 0,482). A largura medida (lib/temas/metricas.ts) vale para as três. */
+@font-face {
+  font-family: "Smokum Reserva Estreita";
+  src: local("Impact"), local("Impact Regular");
+  size-adjust: 60%;
+}
+@font-face {
+  font-family: "Smokum Reserva";
+  src: local("Arial"), local("ArialMT"), local("Helvetica"), local("Helvetica Neue"), local("Roboto"), local("Arimo"), local("Liberation Sans");
+  size-adjust: 48%;
+}
+
+/* ======================================================================= raiz */
+.raiz {
+  --tm-titulo-estilo: normal;
+  --tm-titulo-peso: 400;
+  --tm-titulo-peso-medio: 400;
+  --tm-placa-topo: var(--tm-metal-luz);
+  --tm-nick-meio: var(--tm-metal-alto);
+  --tm-nick-base: var(--tm-metal-meio);
+  --tm-valor-base: var(--tm-metal-meio);
+  --tm-etiqueta: var(--tm-texto);
+  --tm-foto-fundo: #1c0f0c;
+  --tm-chip-capitao: var(--tm-texto);
+  --tm-mono: var(--carmim);
+  --tm-eco-base: #170805;
+  /* Do cenário: papel de cartaz, tinta de impressão, carmim, veludo, tinta de palhaço. */
+  --papel: #f2e5c8;
+  --papel-claro: #f7ecd4;
+  --papel-sombra: #d8c49c;
+  --tinta-cartaz: #1b0c08;
+  --carmim: #8c1a2e;
+  --veludo: #6e1426;
+  --veludo-escuro: #2a0710;
+  --ouro-fio: #e0b04a;
+  --palhaco: #fbf7ee;
+  font-synthesis: none;
+}
+
+/* ======================================================================= palco */
+/* A câmera entra GIRANDO de leve, como quem roda no picadeiro (a RX dá zoom, a QM desce de
+   grua, o GdB faz travelling). */
+@keyframes picadeiroGira {
+  from {
+    transform: rotate(-3deg) scale(1.12);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes picadeiroGiraCelular {
+  from {
+    transform: rotate(-2deg) scale(1.08);
+  }
+  to {
+    transform: none;
+  }
+}
+.raiz .enfCamera {
+  animation: picadeiroGira 2200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+@media (max-width: 599px) {
+  .raiz .enfCamera {
+    animation-name: picadeiroGiraCelular;
+  }
+}
+
+/* A lona por dentro: gomos preto e vinho que convergem para o mastro (acima da tela), com
+   costura de ouro; o centro esquenta onde o canhão bate. Estático. */
+.enfLona {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(60% 46% at 50% 56%, rgba(255, 206, 130, 0.13), transparent 72%),
+    radial-gradient(130% 70% at 50% -6%, rgba(0, 0, 0, 0.82), transparent 62%),
+    linear-gradient(180deg, transparent 62%, rgba(0, 0, 0, 0.66) 100%),
+    repeating-conic-gradient(from 0deg at 50% -42%, #0e0807 0deg 3.4deg, #4a3013 3.4deg 3.62deg, #2c0912 3.62deg 7.04deg, #4a3013 7.04deg 7.26deg);
+}
+@media (max-width: 899px) {
+  .enfLona {
+    background:
+      radial-gradient(80% 40% at 50% 48%, rgba(255, 206, 130, 0.13), transparent 72%),
+      radial-gradient(150% 60% at 50% -4%, rgba(0, 0, 0, 0.82), transparent 62%),
+      linear-gradient(180deg, transparent 62%, rgba(0, 0, 0, 0.66) 100%),
+      repeating-conic-gradient(from 0deg at 50% -24%, #0e0807 0deg 5deg, #4a3013 5deg 5.3deg, #2c0912 5.3deg 10.3deg, #4a3013 10.3deg 10.6deg);
+  }
+}
+
+/* Os trapézios: duas cordas (as bordas) e a barra de madeira com ponteiras de ouro (::after).
+   Balançam devagar pelo alto. ≥1024 os dois; 600–1023 só o direito; celular nenhum. */
+.enfTrapezio {
+  position: absolute;
+  top: 0;
+  width: clamp(70px, 6.4vw, 112px);
+  height: 44vh;
+  border-inline: 2px solid rgba(201, 162, 74, 0.5);
+  transform-origin: 50% 0;
+  animation: trapezioBalanca 6.4s ease-in-out infinite alternate;
+}
+.enfTrapezio::after {
+  content: "";
+  position: absolute;
+  left: -7px;
+  right: -7px;
+  bottom: -5px;
+  height: 9px;
+  border-radius: 5px;
+  background:
+    radial-gradient(circle at 5px 50%, #f2cf7a 0 4px, transparent 4.5px),
+    radial-gradient(circle at calc(100% - 5px) 50%, #f2cf7a 0 4px, transparent 4.5px),
+    linear-gradient(180deg, #8a5426, #4a2a12);
+  box-shadow: 0 6px 10px -4px rgba(0, 0, 0, 0.7);
+}
+.enfTrapezioEsq {
+  left: 13%;
+  transform: rotate(-4deg); /* o repouso (movimento reduzido) */
+}
+.enfTrapezioDir {
+  right: 13%;
+  height: 36vh;
+  transform: rotate(4deg);
+  animation-duration: 7.6s;
+  animation-direction: alternate-reverse;
+}
+@keyframes trapezioBalanca {
+  from {
+    transform: rotate(-4deg);
+  }
+  to {
+    transform: rotate(4deg);
+  }
+}
+/* Na ficha a coluna do texto fica à direita: trapézios curtos, acima do nick. O h1 da ficha
+   tem id="tm-nick" (atributo, e não #id: id em módulo CSS ganha hash). */
+.raiz:has([id="tm-nick"]) .enfTrapezio {
+  height: 20vh;
+}
+@media (max-width: 1023px) {
+  .enfTrapezioEsq {
+    display: none;
+  }
+  .enfTrapezioDir {
+    right: 5%;
+    height: 24vh;
+  }
+}
+@media (max-width: 599px) {
+  .enfTrapezio {
+    display: none;
+  }
+}
+
+/* ======================================================================= moldura */
+/* A faixa do herói (e da ficha) ganha altura para a sanefa; o padding de baixo vira a boca de
+   cena onde a plateia senta (aqui, e não em .raiz: a base declara --barra em .raiz). */
+.raiz .heroi {
+  --barra: clamp(26px, 3.4vw, 46px);
+  --publico: clamp(58px, 7vw, 92px);
+  padding-bottom: calc(var(--publico) + 10px);
+}
+/* A sanefa da lona: veludo, debrum de ouro, recortes em meia-lua e borlas. Parada. */
+.enfSanefa {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 3;
+  height: var(--barra);
+  pointer-events: none;
+  background: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 52' width='120' height='52'%3E%3Crect width='120' height='18' fill='%235C0F20'/%3E%3Cpath d='M0 18.5Q30 50 60 18.5Q90 50 120 18.5Z' fill='%237E1830'/%3E%3Cpath d='M0 18.5Q30 50 60 18.5Q90 50 120 18.5' fill='none' stroke='%23E0B04A' stroke-width='2'/%3E%3Crect y='15.5' width='120' height='3' fill='%23E0B04A'/%3E%3Cpath d='M60 19l-3.4 12q3.4 5.5 6.8 0z' fill='%23F2CF7A'/%3E%3Cpath d='M0 19l-3.4 12q3.4 5.5 6.8 0zM120 19l-3.4 12q3.4 5.5 6.8 0z' fill='%23F2CF7A'/%3E%3C/svg%3E") 50% 0 / auto 100% repeat-x;
+  filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.55)); /* estático */
+}
+/* A plateia: silhuetas na boca de cena (o padding de baixo do herói, nunca sobre conteúdo).
+   Cartola, criança no ombro, balde de pipoca, um celular filmando (a organização gravando o
+   vídeo) e — a única coisa rosa da página — um ALGODÃO-DOCE: um ponto de cor de cena na
+   silhueta (a cor do time no resto do site é o ouro do leão, lib/temas/desorganizacao.ts). */
+.enfPublico {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  height: var(--publico);
+  pointer-events: none;
+  background: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 480 90' width='480' height='90'%3E%3Cg fill='%23070403' stroke='%233a2412' stroke-width='1.4'%3E%3Cpath d='M2 90Q6 62 32 60Q58 62 62 90Z'/%3E%3Ccircle cx='32' cy='45' r='15'/%3E%3Cpath d='M68 90Q72 66 96 64Q120 66 124 90Z'/%3E%3Ccircle cx='96' cy='50' r='14'/%3E%3Cpath d='M84 39h24v-20h-24zM78 41h36v-4h-36z'/%3E%3Cpath d='M132 90Q136 60 162 58Q188 60 192 90Z'/%3E%3Ccircle cx='162' cy='44' r='15'/%3E%3Cpath d='M150 31Q153 20 162 19Q171 20 174 31Z'/%3E%3Ccircle cx='162' cy='12' r='8'/%3E%3Cpath d='M200 90Q204 64 228 62Q252 64 256 90Z'/%3E%3Ccircle cx='228' cy='48' r='15'/%3E%3Cpath d='M246 34h16l-3 22h-10z'/%3E%3Ccircle cx='249' cy='32' r='3.5'/%3E%3Ccircle cx='255' cy='30' r='3.5'/%3E%3Ccircle cx='260' cy='33' r='3'/%3E%3Cpath d='M266 90Q270 60 296 58Q322 60 326 90Z'/%3E%3Ccircle cx='296' cy='43' r='16'/%3E%3Cpath d='M309 66l9-34' stroke-width='2.2'/%3E%3Cpath d='M334 90Q338 66 360 64Q382 66 386 90Z'/%3E%3Ccircle cx='360' cy='50' r='14'/%3E%3Cpath d='M372 66l12-34 6 2-11 33z'/%3E%3Crect x='380' y='16' width='12' height='19' rx='2'/%3E%3Cpath d='M396 90Q400 62 426 60Q452 62 456 90Z'/%3E%3Ccircle cx='426' cy='45' r='15'/%3E%3C/g%3E%3Cg fill='%23FFB3C7' fill-opacity='.9'%3E%3Ccircle cx='318' cy='24' r='9'/%3E%3Ccircle cx='327' cy='28' r='7.5'/%3E%3Ccircle cx='310' cy='29' r='7'/%3E%3Ccircle cx='320' cy='32' r='7'/%3E%3C/g%3E%3C/svg%3E") 0 100% / auto 100% repeat-x;
+}
+/* Três da primeira fila pulam no TÁ-DÁ (o leão pousa aos 896 ms). Celular: dois. */
+.enfFa {
+  position: absolute;
+  bottom: -2px;
+  width: calc(var(--publico) * 0.78);
+  height: calc(var(--publico) * 0.92);
+  transform-origin: 50% 100%;
+  animation: plateiaPula 1500ms linear;
+}
+.enfFa svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.enfFa:nth-child(1) {
+  left: 9%;
+}
+.enfFa:nth-child(2) {
+  left: 47%;
+  animation-duration: 1560ms;
+}
+.enfFa:nth-child(3) {
+  left: 80%;
+  animation-duration: 1620ms;
+}
+@keyframes plateiaPula {
+  0%,
+  62% {
+    transform: none;
+  }
+  68% {
+    transform: translateY(-22%);
+  }
+  76% {
+    transform: translateY(2%);
+  }
+  82% {
+    transform: translateY(-10%);
+  }
+  90%,
+  100% {
+    transform: none;
+  }
+}
+@media (max-width: 899px) {
+  .enfFa:nth-child(3) {
+    display: none;
+  }
+}
+
+/* ======================================================================= herói: o CARTAZ */
+/* A ordem de um cartaz de circo, em TODA largura: o nome em cima, o leão no pedestal no meio,
+   a faixa do lema e as bandeirolas embaixo. O bloco de texto vira `contents` e cada peça vai
+   para a sua linha (a ordem do DOM e do leitor de tela não muda: o escudo é decorativo). A
+   consulta de contêiner do título passa para a grade. */
+.raiz .heroiGrade {
+  --escudo: clamp(196px, 60vw, 250px);
+  container-type: inline-size;
+  animation-name: none; /* sem tremor: quem pula é o leão */
+}
+.raiz .blocoTexto {
+  display: contents;
+}
+.raiz .blocoTexto .kicker {
+  order: 1;
+  position: relative;
+  z-index: 2;
+  text-wrap: balance;
+  animation-name: none; /* o .sobe o desceria 14 px para cima do título no quadro 0 */
+}
+.raiz .nomesDoElenco {
+  order: 2;
+  position: relative;
+  z-index: 2;
+  animation-name: none;
+}
+.raiz .titulo {
+  order: 3;
+  position: relative;
+  z-index: 2;
+}
+.raiz .blocoEscudo {
+  order: 4;
+  margin-top: calc(var(--escudo) * 0.02);
+  margin-bottom: calc(var(--escudo) * 0.3); /* o pedestal e o picadeiro moram aqui */
+}
+.raiz .lema {
+  order: 5;
+}
+.raiz .blocoTexto .chips {
+  order: 6;
+  position: relative;
+  z-index: 2;
+  justify-content: center;
+}
+/* No celular as três bandeirolas empilham: mais ar entre as fileiras. No 405×720 do vídeo, a dos
+   pontos cabe inteira na 1ª dobra e a do mestre de picadeiro fica INTEIRA abaixo dela (com 10 px,
+   um fio de 6 px dela aparecia cortado pela borda). */
+@media (max-width: 599px) {
+  .raiz .blocoTexto .chips {
+    row-gap: 20px;
+  }
+}
+@media (min-width: 600px) and (max-width: 1023px) {
+  .raiz .heroiGrade {
+    --escudo: clamp(230px, min(36vw, 30svh), 290px);
+  }
+}
+@media (min-width: 900px) {
+  .raiz .heroiGrade {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+    align-items: start;
+    text-align: center;
+    gap: 0;
+    min-height: 0;
+  }
+  .raiz .blocoEscudo {
+    grid-column: 1;
+    grid-row: auto;
+    justify-self: center;
+  }
+}
+@media (min-width: 1024px) {
+  .raiz .heroiGrade {
+    --escudo: clamp(230px, min(24vw, 32svh), 340px);
+    margin-top: 6px;
+  }
+}
+
+/* -------------------------------------------- atrás do escudo: raios, feixe, canhão */
+/* Os raios de cartaz antigo: 24 gomos de ouro translúcido, abrem no pouso e giram (160 s). */
+.enfRaios {
+  position: absolute;
+  left: 50%;
+  top: 47%;
+  z-index: 0;
+  width: 230%;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  border-radius: 50%;
+  pointer-events: none;
+  background: repeating-conic-gradient(from 0deg, rgba(240, 196, 100, 0.16) 0deg 6deg, transparent 6deg 15deg);
+  -webkit-mask: radial-gradient(closest-side, #000 14%, rgba(0, 0, 0, 0.55) 42%, transparent 74%);
+  mask: radial-gradient(closest-side, #000 14%, rgba(0, 0, 0, 0.55) 42%, transparent 74%);
+  animation: raiosDoCartazAbrem 1500ms cubic-bezier(0.2, 0.7, 0.2, 1), raiosDoCartazGiram 160s linear infinite;
+}
+@keyframes raiosDoCartazAbrem {
+  0%,
+  58% {
+    scale: 0.55;
+  }
+  100% {
+    scale: 1;
+  }
+}
+@keyframes raiosDoCartazGiram {
+  to {
+    rotate: 360deg;
+  }
+}
+@media (max-width: 599px) {
+  .enfRaios {
+    width: 190%;
+  }
+}
+/* O feixe do canhão seguidor, do alto à esquerda até o leão (≥600). Forma por clip-path
+   ESTÁTICO; só a opacidade da camada sobe. */
+.enfFeixe {
+  display: none;
+}
+@media (min-width: 600px) {
+  .enfFeixe {
+    display: block;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    z-index: 0;
+    width: calc(var(--escudo) * 1.05);
+    height: 260vh;
+    transform-origin: 50% 0;
+    transform: translateX(-50%) rotate(148deg);
+    pointer-events: none;
+    background: linear-gradient(180deg, rgba(255, 228, 170, 0.15), rgba(255, 228, 170, 0.05) 45%, transparent 80%);
+    clip-path: polygon(0 0, 100% 0, 58% 100%, 42% 100%);
+    opacity: 0.9;
+    animation: feixeDoCanhaoAcende 1200ms linear;
+  }
+}
+@keyframes feixeDoCanhaoAcende {
+  0%,
+  60% {
+    opacity: 0;
+  }
+  78%,
+  100% {
+    opacity: 0.9;
+  }
+}
+/* A poça de luz: entra pela esquerda procurando o leão e PEGA ele no pouso (864 ms). */
+.enfCanhao {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 0;
+  width: 150%;
+  aspect-ratio: 1.15;
+  translate: -50% -50%;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(closest-side, rgba(255, 238, 196, 0.4), rgba(255, 214, 140, 0.15) 55%, rgba(255, 214, 140, 0.05) 72%, transparent 82%);
+  animation: canhaoProcura 1200ms linear;
+}
+@keyframes canhaoProcura {
+  0%,
+  16% {
+    transform: translate(-105%, 14%) scale(0.72);
+    opacity: 0.4;
+    animation-timing-function: cubic-bezier(0.35, 0, 0.2, 1);
+  }
+  72% {
+    transform: translate(5%, -2%) scale(1.04);
+    opacity: 1;
+    animation-timing-function: cubic-bezier(0.3, 0, 0.3, 1);
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* -------------------------------------------- o escudo: o SALTO do leão */
+/* Agachado (quadro 0: o escudo inteiro, 3% abaixo e achatado a 90%), salta, cai no pedestal
+   aos 896 ms, amassa, quica e assenta. Pivô no pé do monograma D (87% da caixa). Só 2D: dentro
+   do escudo os olhos usam mix-blend-mode (o translate3d sumia com eles no WebKit). */
+@keyframes saltoDoLeao {
+  0%,
+  30% {
+    transform: translate(0, 3%) scale(1.05, 0.9);
+    animation-timing-function: cubic-bezier(0.2, 0.6, 0.35, 1);
+  }
+  47% {
+    transform: translate(0, -9%) scale(0.96, 1.07);
+    animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.45);
+  }
+  64% {
+    transform: none;
+  }
+  68% {
+    transform: translate(0, 1.5%) scale(1.07, 0.9);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1);
+  }
+  78% {
+    transform: translate(0, -1.6%) scale(0.98, 1.03);
+  }
+  88% {
+    transform: scale(1.01, 0.99);
+  }
+  100% {
+    transform: none;
+  }
+}
+.raiz .escudo {
+  /* Pontos medidos no webp de 640 px (opaco: x 0,5–99,7%, y 12,7–87,5%). */
+  --olho-esq-x: 42.6%;
+  --olho-dir-x: 56.4%;
+  --olho-y: 37.3%;
+  transform-origin: 50% 87%;
+  animation: saltoDoLeao 1400ms linear;
+}
+/* O leão "acorda" no pouso: os olhos de ouro acendem (só sobe a luz) e ficam a 85%. */
+.enfOlho {
+  position: absolute;
+  top: var(--olho-y);
+  z-index: 1;
+  width: 8.5%;
+  aspect-ratio: 1.7;
+  translate: -50% -50%;
+  border-radius: 50%;
+  pointer-events: none;
+  mix-blend-mode: screen; /* camada pequena */
+  background: radial-gradient(closest-side, rgba(255, 240, 170, 0.95), rgba(255, 190, 60, 0.5) 45%, transparent 76%);
+  opacity: 0.85;
+  animation: olhoDoLeaoAcende 1600ms linear;
+}
+.enfOlhoEsq {
+  left: var(--olho-esq-x);
+}
+.enfOlhoDir {
+  left: var(--olho-dir-x);
+}
+@keyframes olhoDoLeaoAcende {
+  0%,
+  57% {
+    opacity: 0;
+  }
+  63% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.85;
+  }
+}
+
+/* -------------------------------------------- chão: o picadeiro e o pedestal */
+/* A caixa do chão começa a 78% do escudo: o tampo do pedestal (elipse) fica centrado a 87,6%,
+   onde pousa o pé do D; o picadeiro (serragem com meio-fio carmim e fio de ouro) em volta. */
+.enfPicadeiro {
+  position: absolute;
+  left: 50%;
+  top: 78%;
+  z-index: 0;
+  width: calc(var(--escudo) * 2.7);
+  height: calc(var(--escudo) * 0.6);
+  translate: -50% 0;
+  pointer-events: none;
+}
+.enfSerragem {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 28%;
+  height: 72%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, #4a3019 0%, #2e1c0f 62%, #1a0f08 92%, transparent 100%);
+  box-shadow: inset 0 0 0 calc(var(--escudo) * 0.022) var(--carmim), inset 0 0 0 calc(var(--escudo) * 0.03) var(--ouro-fio);
+  -webkit-mask-image: linear-gradient(180deg, #000 55%, transparent);
+  mask-image: linear-gradient(180deg, #000 55%, transparent);
+}
+.enfPedestal {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: calc(var(--escudo) * 0.8);
+  height: auto;
+  translate: -50% 0;
+  transform-origin: 50% 100%;
+  animation: pedestalAmortece 1400ms linear;
+}
+@keyframes pedestalAmortece {
+  0%,
+  64% {
+    transform: none;
+  }
+  69% {
+    transform: scaleY(0.94);
+  }
+  80% {
+    transform: scaleY(1.015);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/* ======================================================================= título: ORGANIZAÇÃO + o DES */
+/* Pela largura MEDIDA da maior palavra (--largura-em; DESORGANIZAÇÃO = 5,928 em na Smokum, com
+   espaçamento e sobra). Sem a métrica, um fator conservador. */
+.raiz .tituloVisual {
+  --tm-titulo-max: 112px;
+  --tam: clamp(36px, calc(100cqi / var(--largura-em, calc(var(--letras) * 0.48))), var(--tm-titulo-max));
+}
+@media (min-width: 600px) {
+  .raiz .tituloVisual {
+    --tm-titulo-max: min(150px, 16svh);
+  }
+}
+@media (min-width: 1024px) {
+  .raiz .tituloVisual {
+    --tm-titulo-max: min(168px, 14svh);
+  }
+}
+/* Tela baixa no computador (o 1440×810 do vídeo): o cartaz encolhe um pouco e o herói cabe
+   inteiro na 1ª dobra — nada cortado ao meio pela borda de baixo. Depois dos dois @media
+   (min-width: 1024px) que declaram as mesmas variáveis: mesma especificidade, vence a ordem. A
+   plateia desce mais 20 px: no 1440×810 ela (e os fãs no pulo do pouso) fica inteira abaixo da
+   dobra, em vez de mostrar um fio das cabeças na borda. */
+@media (min-width: 1024px) and (max-height: 860px) {
+  .raiz .heroiGrade {
+    --escudo: clamp(200px, 27svh, 300px);
+  }
+  .raiz .tituloVisual {
+    --tm-titulo-max: min(168px, 13svh);
+  }
+  .raiz .heroi {
+    padding-bottom: calc(var(--publico) + 30px);
+  }
+}
+.raiz .marca {
+  font-size: var(--tam);
+  line-height: 1;
+  letter-spacing: 0.01em;
+  margin-top: 0.12em; /* o til do Ã sobe a 0,97 em */
+  white-space: normal;
+  text-transform: uppercase;
+  font-kerning: none;
+  font-variant-ligatures: none;
+  animation: none; /* quem se mexe são as letras */
+}
+.raiz .palavra {
+  display: inline-block;
+  white-space: nowrap;
+}
+/* Cada letra nasce num lugar "bagunçado" (seno do índice: determinístico, sem JS; sem suporte
+   a sin() as variáveis ficam inválidas e a letra nasce reta) e se ORGANIZA em cascata. */
+.raiz .letra {
+  display: inline-grid;
+  --dy: calc(sin(calc(var(--i) * 2.3rad + 0.4rad)) * 0.07em);
+  --dr: calc(sin(calc(var(--i) * 1.7rad + 1.1rad)) * 8deg);
+  animation-name: organiza;
+  animation-duration: calc(1500ms + var(--i, 0) * 70ms);
+  animation-timing-function: linear;
+}
+.raiz .letra > * {
+  grid-area: 1 / 1;
+}
+/* O DES (as três primeiras letras): os palhaços. O torto é o REPOUSO; tentam se alinhar depois
+   da cascata, caem de volta e tremelicam a cada 11 s (`rotate`, que compõe com o transform). O 1º
+   tremelique cai aos ~4,2 s, com o herói ainda no vídeo (o `palhacos` acaba aos ~2,8 s). */
+.raiz .palavra > .letra:nth-child(-n + 3) {
+  transform: translateY(var(--y)) rotate(var(--r));
+  animation-name: palhacos, tremelique;
+  animation-duration: calc(2600ms + var(--i, 0) * 80ms), 11s;
+  animation-timing-function: linear, linear;
+  animation-iteration-count: 1, infinite;
+}
+.raiz .palavra > .letra:nth-child(1) {
+  --y: 0.05em;
+  --r: -9deg;
+}
+.raiz .palavra > .letra:nth-child(2) {
+  --y: -0.05em;
+  --r: 6deg;
+}
+.raiz .palavra > .letra:nth-child(3) {
+  --y: 0.07em;
+  --r: -4deg;
+}
+@keyframes organiza {
+  0%,
+  44% {
+    transform: translateY(var(--dy)) rotate(var(--dr));
+  }
+  48% {
+    transform: translateY(var(--dy)) rotate(calc(var(--dr) + 2deg));
+  }
+  52% {
+    transform: translateY(var(--dy)) rotate(calc(var(--dr) - 2deg));
+  }
+  56% {
+    transform: translateY(var(--dy)) rotate(var(--dr));
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.3, 1);
+  }
+  68% {
+    transform: translateY(-0.16em) rotate(0deg);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5);
+  }
+  78% {
+    transform: translateY(0.02em) scale(1.04, 0.95);
+  }
+  88% {
+    transform: translateY(-0.02em) scale(0.99, 1.01);
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes palhacos {
+  0%,
+  60% {
+    transform: translateY(var(--y)) rotate(var(--r));
+    animation-timing-function: cubic-bezier(0.3, 0, 0.3, 1);
+  }
+  68% {
+    transform: translateY(-0.12em) rotate(0deg);
+  }
+  73% {
+    transform: translateY(-0.1em) rotate(calc(var(--r) * -0.3));
+    animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5);
+  }
+  84% {
+    transform: translateY(0.03em) rotate(calc(var(--r) * 1.35));
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1);
+  }
+  100% {
+    transform: translateY(var(--y)) rotate(var(--r));
+  }
+}
+@keyframes tremelique {
+  0%,
+  38% {
+    rotate: 0deg;
+  }
+  40% {
+    rotate: 3deg;
+  }
+  42.5% {
+    rotate: -2.5deg;
+  }
+  45% {
+    rotate: 1deg;
+  }
+  47%,
+  100% {
+    rotate: 0deg;
+  }
+}
+/* Folga de tinta: til e acento até 0,97 em, cedilha até 0,23 em abaixo da linha de base. */
+.raiz .eco,
+.raiz .cromo {
+  padding: 0.3em 0.14em 0.26em 0.06em;
+  margin: -0.3em -0.14em -0.26em -0.06em;
+}
+/* O contorno de tinta de impressão (estático, atrás de toda face; .marca é isolate). */
+.raiz .eco {
+  position: static;
+  inset: auto;
+  z-index: -1;
+  color: var(--tm-eco-base);
+  -webkit-text-stroke: 0.09em var(--tm-eco-base);
+  text-shadow: 0 0.06em 0 #000, 0 0.12em 0.2em rgba(0, 0, 0, 0.65), 0 0 0.45em rgba(140, 26, 46, 0.5);
+  user-select: none;
+}
+/* A tinta garantida: ouro sólido. */
+.raiz .cromo {
+  color: var(--tm-metal-meio);
+}
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  /* Folha de ouro com bisel: a caixa tem 1,56 em (0,3 + 1 + 0,26); as maiúsculas vão de 26% a
+     74% dela, a faixa escura cai no meio (51–54%). Parada (nada de brilho correndo). */
+  .raiz .cromo {
+    background-image: linear-gradient(180deg, var(--tm-metal-luz) 22%, var(--tm-metal-alto) 32%, var(--tm-metal-meio) 47%, var(--tm-metal-sombra) 51%, var(--tm-metal-fundo) 54%, var(--tm-metal-volta) 64%, var(--tm-metal-luz) 69%, var(--tm-metal-base) 78%);
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    -webkit-text-stroke: 0;
+    animation: none;
+  }
+  /* O DES: tinta branca de palhaço, pincelada seca (estrias paradas). */
+  .raiz .palavra > .letra:nth-child(-n + 3) > .cromo {
+    background-image:
+      repeating-linear-gradient(97deg, transparent 0 0.05em, rgba(120, 96, 70, 0.22) 0.05em 0.065em, transparent 0.065em 0.12em),
+      linear-gradient(180deg, #fff 24%, var(--palhaco) 52%, #e6dccb 76%);
+  }
+}
+
+/* -------------------------------------------- o lema na FAIXA de cartaz */
+.raiz .lema {
+  position: relative;
+  z-index: 2;
+  width: fit-content;
+  max-width: min(100% - 44px, 32em);
+  margin: 0 auto;
+  padding: 0.5em 1.3em 0.55em;
+  background: linear-gradient(180deg, #96203a, var(--veludo) 62%, #5a0f1f);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 -2px 0 rgba(0, 0, 0, 0.25), 0 12px 22px -12px #000;
+  color: var(--tm-texto); /* 7,5:1 no ponto mais claro da faixa */
+  font: italic 500 clamp(15px, 1.25vw, 19px) / 1.35 var(--tm-fonte-assinatura), Georgia, serif;
+  text-wrap: balance;
+}
+/* As pontas dobradas da faixa (atrás dela; recorte em rabo de andorinha estático). */
+.raiz .lema::before,
+.raiz .lema::after {
+  content: "";
+  position: absolute;
+  top: 0.42em;
+  bottom: -0.42em;
+  z-index: -1;
+  width: 1.5em;
+  background: #4a0c19;
+}
+.raiz .lema::before {
+  right: calc(100% - 0.55em);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 0.5em 50%);
+}
+.raiz .lema::after {
+  left: calc(100% - 0.55em);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 0.5em) 50%, 100% 100%, 0 100%);
+}
+
+/* -------------------------------------------- chips: bandeirolas de picadeiro */
+/* Rabo de andorinha à direita, no ::before (nada de clip-path no elemento focável). */
+.raiz .chip {
+  padding-right: 28px;
+}
+.raiz .chip::before {
+  transform: none;
+  border-radius: 0;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 11px) 50%, 100% 100%, 0 100%);
+}
+.raiz .chipPts::before {
+  background: linear-gradient(180deg, var(--tm-metal-luz), var(--tm-metal-placa));
+  box-shadow: none;
+}
+.raiz .chipNumero {
+  font: 400 26px / 1 var(--tm-fonte-titulo), sans-serif;
+}
+.raiz .chipCapitao::before {
+  background: linear-gradient(180deg, #8a1c34, #5a0f1f);
+  border: 0;
+  box-shadow: inset 0 0 0 1px rgba(224, 176, 74, 0.75);
+}
+.raiz .chipOpgg::before {
+  border: 0;
+  background: rgba(11, 7, 6, 0.72);
+  box-shadow: inset 0 0 0 2px var(--tm-primaria);
+}
+.raiz .chipOpgg:hover::before {
+  background: #3a0a14;
+}
+/* «MESTRE DE PICADEIRO · nak4y» passa de ~270 px: abaixo de 420 a bandeirola ocupa a linha e o
+   texto corre em bloco (com flex, cada pedaço quebrava na própria coluna — lição do GdB). */
+@media (max-width: 419px) {
+  .raiz .blocoTexto .chipCapitao {
+    flex: 1 1 100%;
+    display: block;
+    padding-block: 12px;
+    line-height: 1.6;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-wrap: balance;
+    text-align: center;
+  }
+  .raiz .blocoTexto .chipCapitao > svg {
+    display: inline-block;
+    vertical-align: -3px;
+    margin-right: 8px;
+  }
+}
+
+/* ======================================================================= elenco: a cortina */
+.raiz .elencoSecao {
+  isolation: isolate;
+  padding-top: clamp(70px, 8vw, 104px);
+  padding-bottom: clamp(56px, 6vw, 88px);
+}
+/* O pano de boca: veludo em pregas (gradiente parado), com a bambinela de ouro em cima. */
+.enfCortina {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.5) 0%, transparent 16%, transparent 80%, rgba(0, 0, 0, 0.72) 100%),
+    radial-gradient(60% 40% at 50% 46%, rgba(255, 206, 130, 0.1), transparent 70%),
+    repeating-linear-gradient(90deg, #2a0710 0px, #4e0d1b 16px, #6e1426 28px, #521020 42px, #2a0710 60px);
+}
+.enfBambinela {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: clamp(36px, 4.4vw, 56px);
+  background: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 52' width='120' height='52'%3E%3Crect width='120' height='18' fill='%233A0812'/%3E%3Cpath d='M0 18.5Q30 50 60 18.5Q90 50 120 18.5Z' fill='%235C0F20'/%3E%3Cpath d='M0 18.5Q30 50 60 18.5Q90 50 120 18.5' fill='none' stroke='%23E0B04A' stroke-width='2'/%3E%3Crect y='15.5' width='120' height='3' fill='%23E0B04A'/%3E%3C/svg%3E") 50% 0 / auto 100% repeat-x;
+  filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.6)); /* estático */
+}
+/* «AS ATRAÇÕES» em letra de cartaz, entre dois cordões de lâmpadas apagadas (bolinhas). */
+.raiz .estrelando {
+  justify-content: center;
+  font: 400 clamp(30px, 3.6vw, 50px) / 1 var(--tm-fonte-titulo), "Arial Black", sans-serif;
+  letter-spacing: 0.04em;
+  color: var(--tm-metal-alto); /* 8,7:1 na prega mais clara */
+  text-shadow: 0 0.05em 0 #000, 0 0 0.4em rgba(0, 0, 0, 0.6);
+}
+.raiz .estrelando::before,
+.raiz .estrelando::after {
+  content: "";
+  flex: 0 1 clamp(40px, 12vw, 160px);
+  height: 10px;
+  background: radial-gradient(circle at 50% 50%, var(--tm-primaria) 0 3px, transparent 3.5px) 0 50% / 14px 10px repeat-x;
+}
+.raiz .aviso {
+  text-align: center;
+  margin: -4px auto clamp(26px, 3vw, 40px);
+  font: italic 500 clamp(15px, 1.2vw, 18px) / 1.4 var(--tm-fonte-assinatura), Georgia, serif;
+  color: #f0dcc0; /* 8,8:1 na prega mais clara */
+  text-wrap: balance;
+}
+
+/* -------------------------------------------- as cartas: CARTAZES de atração */
+/* Pendurados num prego: entram balançando (por rolagem; sem suporte, pelo relógio, com a
+   espera dentro do keyframe). O quadro 0 é o cartaz inteiro, girado 7°. */
+@keyframes cartazBalanca {
+  from {
+    transform: rotate(-7deg) translateY(-6px);
+  }
+  55% {
+    transform: rotate(2.6deg);
+  }
+  78% {
+    transform: rotate(-1deg);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes cartazBalancaRelogio {
+  0%,
+  58% {
+    transform: rotate(-7deg) translateY(-6px);
+    animation-timing-function: cubic-bezier(0.3, 0, 0.4, 1);
+  }
+  80% {
+    transform: rotate(2.6deg);
+  }
+  91% {
+    transform: rotate(-1deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+.raiz .casca {
+  transform-origin: 50% -16px; /* o prego */
+  animation-name: cartazBalancaRelogio;
+  animation-duration: calc(2000ms + var(--i, 0) * 140ms);
+  animation-timing-function: linear;
+}
+@supports (animation-timeline: view()) {
+  .raiz .casca {
+    animation: cartazBalanca linear; /* o shorthand primeiro: ele zera a timeline */
+    animation-timeline: view();
+    animation-range: entry 0% entry calc(60% + var(--col, 0) * 12%);
+  }
+}
+/* O barbante em V até o prego (o cartaz do capitão não tem: a cartola vai em cima). */
+.raiz .casca::before {
+  content: "";
+  position: absolute;
+  z-index: 5;
+  top: -18px;
+  left: 50%;
+  width: 54%;
+  height: 22px;
+  translate: -50% 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 3px, #f2cf7a 0 2.6px, #6a4a12 3px, transparent 3.6px) 50% 0 / 10px 10px no-repeat,
+    linear-gradient(to top right, transparent calc(50% - 1px), #c9a24a calc(50% - 1px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 0 0 / 50% 100% no-repeat,
+    linear-gradient(to top left, transparent calc(50% - 1px), #c9a24a calc(50% - 1px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 100% 0 / 50% 100% no-repeat;
+}
+.raiz .cascaCapitao::before {
+  display: none;
+}
+.raiz .elenco {
+  padding-top: 26px;
+  row-gap: 40px;
+}
+/* O papel do cartaz: marfim com sombra nas bordas, fio duplo de tinta e duas estrelas carmim. */
+.raiz .carta {
+  container-type: inline-size;
+  clip-path: none;
+  padding: 5px;
+  border-radius: 3px;
+  background:
+    url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M5 0l1.2 3.6H10L7 5.8l1.1 3.7L5 7.3 1.9 9.5 3 5.8 0 3.6h3.8z' fill='%238C1A2E'/%3E%3C/svg%3E") 8px 8px / 9px no-repeat,
+    url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M5 0l1.2 3.6H10L7 5.8l1.1 3.7L5 7.3 1.9 9.5 3 5.8 0 3.6h3.8z' fill='%238C1A2E'/%3E%3C/svg%3E") calc(100% - 8px) 8px / 9px no-repeat,
+    radial-gradient(120% 90% at 50% 0%, var(--papel-claro), var(--papel) 60%, var(--papel-sombra));
+  box-shadow: 0 16px 28px -14px rgba(0, 0, 0, 0.9), inset 0 0 0 1px rgba(27, 12, 8, 0.25);
+}
+.raiz .miolo {
+  clip-path: none;
+  grid-template-rows: auto 1fr auto;
+  background: none;
+  box-shadow: inset 0 0 0 1.5px var(--tinta-cartaz), inset 0 0 0 4px var(--papel), inset 0 0 0 5px var(--tinta-cartaz);
+}
+/* O texto sai de cima da foto (o link esticado continua se medindo pelo .miolo; .identidade
+   fica SEM position). */
+.raiz .sobreFoto {
+  display: contents;
+}
+/* A janela em ARCO (a porta do picadeiro), com fio de ouro e fio de tinta. */
+.raiz .foto {
+  margin: 22px 12px 0;
+  aspect-ratio: 4 / 5;
+  border-radius: 50% 50% 3px 3px / 24% 24% 3px 3px;
+  background: var(--tm-foto-fundo);
+  box-shadow: 0 0 0 2px var(--ouro-fio), 0 0 0 3.5px var(--tinta-cartaz);
+}
+.raiz .foto img {
+  filter: saturate(0.95) contrast(1.04); /* estático */
+}
+.raiz .enfGradacao {
+  background: linear-gradient(180deg, transparent 70%, rgba(27, 12, 8, 0.28));
+}
+/* A sigla gigante vazada da base sai: no cartaz a foto é uma janela limpa (a rota já está na
+   fitinha carmim), e o contorno passava por cima do rosto de quem tem o rosto baixo na foto. */
+.raiz .enfRotaGigante {
+  display: none;
+}
+.raiz .enfHaloCarta {
+  background: radial-gradient(closest-side, rgba(255, 214, 140, 0.4), rgba(224, 176, 74, 0.12) 60%, transparent);
+}
+.raiz .topo {
+  grid-area: 1 / 1;
+  align-self: start;
+  z-index: 2;
+  padding: 7px 8px 0;
+}
+/* A etiqueta da rota vira uma fitinha carmim com rabo de andorinha. */
+.raiz .etiquetaRota {
+  --tm-icone: #ffe3a3; /* 7,3:1 no carmim */
+  border: 0;
+  border-radius: 0;
+  padding: 4px 12px 4px 8px;
+  background: var(--carmim);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 6px) 50%, 100% 100%, 0 100%);
+  color: #fff4e0; /* 8,4:1 */
+}
+.raiz .identidade {
+  grid-area: 2 / 1;
+  z-index: 2;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+  padding: 10px 10px 2px;
+}
+/* O nick em tinta de impressão: todos no tamanho da MAIOR palavra do elenco (medida); quebra só
+   entre palavras. SEM filter/transform/position (ver tests/times/link-da-carta.test.ts). */
+.raiz .nick {
+  --nick: clamp(17px, calc((100cqi - 30px) / var(--maior-palavra-em, 4)), 34px);
+  color: var(--tinta-cartaz); /* 15,3:1 no papel */
+  letter-spacing: 0.01em;
+  line-height: 1.02;
+  padding: 0.08em 0.06em 0.04em;
+  margin-right: 0;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  font-kerning: none; /* a métrica é a soma dos avanços */
+  font-variant-ligatures: none;
+}
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .raiz .nick {
+    background: none;
+    -webkit-text-fill-color: currentColor;
+  }
+}
+.raiz .placaCapitao {
+  padding: 3px 12px 3px 10px;
+  border-radius: 0;
+  background: linear-gradient(180deg, var(--tm-metal-luz), var(--tm-metal-placa));
+  color: var(--tm-tinta);
+  clip-path: polygon(6px 0, calc(100% - 6px) 0, 100% 50%, calc(100% - 6px) 100%, 6px 100%, 0 50%);
+  text-wrap: balance;
+}
+/* O rodapé do cartaz: fio de tinta, o nome em itálico e «FICHA →» em carmim. */
+.raiz .rodape {
+  grid-area: 3 / 1;
+  border-top: 0;
+  padding: 6px 12px 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  row-gap: 2px;
+  column-gap: 10px;
+  background: linear-gradient(var(--tinta-cartaz), var(--tinta-cartaz)) 50% 0 / calc(100% - 24px) 1px no-repeat;
+}
+.raiz .nome {
+  color: var(--tinta-cartaz);
+  font: italic 500 13px / 1.25 var(--tm-fonte-assinatura), Georgia, serif;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: break-word;
+  text-align: center;
+}
+.raiz .ficha {
+  color: var(--carmim); /* 5,3:1 no pé do papel */
+  font-weight: 700;
+}
+/* O capitão: o cartaz da ESTRELA (papel preto, tinta de ouro) e a cartola por cima. */
+.raiz .cascaCapitao .carta {
+  background:
+    url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M5 0l1.2 3.6H10L7 5.8l1.1 3.7L5 7.3 1.9 9.5 3 5.8 0 3.6h3.8z' fill='%23E0B04A'/%3E%3C/svg%3E") 8px 8px / 9px no-repeat,
+    url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M5 0l1.2 3.6H10L7 5.8l1.1 3.7L5 7.3 1.9 9.5 3 5.8 0 3.6h3.8z' fill='%23E0B04A'/%3E%3C/svg%3E") calc(100% - 8px) 8px / 9px no-repeat,
+    radial-gradient(120% 90% at 50% 0%, #241612, #120a08 60%, #0a0605);
+  box-shadow: 0 0 0 1px #6a4a12, 0 18px 34px -14px #000;
+}
+.raiz .cascaCapitao .miolo {
+  box-shadow: inset 0 0 0 1.5px var(--ouro-fio), inset 0 0 0 4px #120a08, inset 0 0 0 5px var(--ouro-fio);
+}
+.raiz .cascaCapitao .nick {
+  color: var(--tm-metal-alto); /* 14,6:1 no papel preto */
+}
+.raiz .cascaCapitao .nome {
+  color: #f0dcc0;
+}
+.raiz .cascaCapitao .ficha {
+  color: var(--tm-acento);
+}
+.raiz .cascaCapitao .rodape {
+  background-image: linear-gradient(var(--ouro-fio), var(--ouro-fio));
+}
+.raiz .coroaDoCapitao {
+  width: 70px;
+  top: -52px;
+  rotate: -10deg;
+  filter: drop-shadow(0 8px 10px rgba(0, 0, 0, 0.6)); /* estático */
+}
+@media (max-width: 599px) {
+  .raiz .coroaDoCapitao {
+    width: 56px;
+    top: -42px;
+  }
+  .raiz .cascaCapitao {
+    margin-top: 24px;
+  }
+  /* Celular: o cartaz da estrela DEITADO na largura toda (foto à esquerda, texto à direita). */
+  .raiz .cascaLarga .miolo {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto 1fr auto;
+  }
+  .raiz .cascaLarga .foto {
+    grid-area: 1 / 1 / 4 / 2;
+    aspect-ratio: 4 / 5;
+    margin: 12px 0 12px 12px;
+    align-self: center;
+  }
+  .raiz .cascaLarga .topo {
+    grid-area: 1 / 1 / 2 / 3;
+  }
+  .raiz .cascaLarga .identidade {
+    grid-area: 2 / 2;
+    align-self: center;
+    padding: 34px 10px 4px;
+  }
+  .raiz .cascaLarga .rodape {
+    grid-area: 3 / 2;
+  }
+  .raiz .cascaLarga .nick {
+    --nick: clamp(22px, calc((100cqi * 0.5 - 24px) / var(--maior-palavra-em, 4)), 34px);
+  }
+}
+
+/* ======================================================================= cartela: o cartaz da temporada */
+.raiz .enfLinhaCromo {
+  color: var(--tm-primaria);
+}
+.raiz .cartelaCorpo {
+  max-width: 640px;
+  margin: 0 auto 30px;
+  padding: 62px 22px 26px;
+  background: radial-gradient(120% 90% at 50% 0%, var(--papel-claro), var(--papel) 60%, var(--papel-sombra));
+  box-shadow: inset 0 0 0 2px var(--tinta-cartaz), inset 0 0 0 6px var(--papel), inset 0 0 0 7px var(--tinta-cartaz), 0 30px 60px -24px #000;
+  color: var(--tinta-cartaz);
+}
+/* As estrelas dos cantos (a peça NaCartela): três — o canto de cima à direita é da tarja. */
+.enfEstrelasCartaz {
+  position: absolute;
+  inset: 14px;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M5 0l1.2 3.6H10L7 5.8l1.1 3.7L5 7.3 1.9 9.5 3 5.8 0 3.6h3.8z' fill='%238C1A2E'/%3E%3C/svg%3E") 0 0 / 12px no-repeat,
+    url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M5 0l1.2 3.6H10L7 5.8l1.1 3.7L5 7.3 1.9 9.5 3 5.8 0 3.6h3.8z' fill='%238C1A2E'/%3E%3C/svg%3E") 0 100% / 12px no-repeat,
+    url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M5 0l1.2 3.6H10L7 5.8l1.1 3.7L5 7.3 1.9 9.5 3 5.8 0 3.6h3.8z' fill='%238C1A2E'/%3E%3C/svg%3E") 100% 100% / 12px no-repeat;
+}
+.raiz .cartelaEscudo {
+  position: relative;
+  z-index: 1;
+  width: 96px;
+  height: 96px;
+  margin-bottom: 4px;
+}
+.raiz .cartelaNome {
+  position: relative;
+  z-index: 1;
+  font: 400 clamp(34px, 6vw, 52px) / 1 var(--tm-fonte-titulo), "Arial Black", sans-serif;
+  color: var(--carmim); /* 7,3:1 */
+  text-transform: uppercase;
+}
+.raiz .cartelaDestino {
+  position: relative;
+  z-index: 1;
+  margin-top: 10px;
+  font: italic 500 clamp(14px, 1.3vw, 16px) / 1.4 var(--tm-fonte-assinatura), Georgia, serif;
+  letter-spacing: 0.01em;
+  color: var(--tinta-cartaz);
+  text-wrap: balance;
+}
+.raiz .cartelaData {
+  position: relative;
+  z-index: 1;
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--tinta-cartaz);
+  color: var(--tinta-cartaz); /* 11,2:1 no pé do papel */
+  letter-spacing: 0.2em;
+  text-wrap: balance;
+}
+/* A TARJA colada na diagonal do canto: «SUJEITO A ATRASO». Fica DENTRO do cartaz (o padding de
+   cima de 62 px é dela), nunca por cima do texto. Bate e cola quando o cartaz entra na tela. */
+@keyframes tarjaCola {
+  from {
+    transform: rotate(6deg) scale(1.18) translateY(-6px);
+  }
+  60% {
+    transform: rotate(6deg) scale(0.98);
+  }
+  to {
+    transform: rotate(6deg);
+  }
+}
+.raiz .cartelaCarimbo {
+  position: absolute;
+  z-index: 2;
+  top: 14px;
+  right: 14px;
+  margin: 0;
+  padding: 7px 16px 6px;
+  background: var(--carmim);
+  color: #fff4e0; /* 8,4:1 */
+  font: 400 15px / 1 var(--tm-fonte-titulo), "Arial Black", sans-serif;
+  letter-spacing: 0.08em;
+  transform: rotate(6deg);
+  box-shadow: 0 4px 10px -4px rgba(0, 0, 0, 0.7), inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+@supports (animation-timeline: view()) {
+  .raiz .cartelaCarimbo {
+    animation: tarjaCola linear;
+    animation-timeline: view();
+    animation-range: entry 30% cover 45%;
+  }
+}
+.raiz .cartelaFecho {
+  margin: 0 0 22px;
+  font: italic 500 16px / 1.45 var(--tm-fonte-assinatura), Georgia, serif;
+  letter-spacing: 0.01em;
+  color: #f0dcc0;
+  text-wrap: balance;
+}
+
+/* ======================================================================= acessibilidade */
+/* O bloco da base (.raiz * { animation: none !important }) já para tudo: fica o pôster FINAL
+   (canhão no leão, feixe e olhos acesos, raios parados, ORGANIZAÇÃO alinhado, DES torto). */
+@media (forced-colors: active) {
+  .raiz .cromo,
+  .raiz .palavra > .letra:nth-child(-n + 3) > .cromo {
+    background: none;
+    -webkit-text-fill-color: CanvasText;
+    color: CanvasText;
+  }
+  .raiz .eco {
+    display: none;
+  }
+}
+@media (prefers-contrast: more) {
+  .raiz .cromo {
+    background: none;
+    -webkit-text-fill-color: #f9dc8a;
+  }
+  .raiz .palavra > .letra:nth-child(-n + 3) > .cromo {
+    background: none;
+    -webkit-text-fill-color: #ffffff;
+  }
+  .raiz .eco {
+    display: inline-block; /* o contorno escuro ajuda aqui: a base o esconde */
+  }
+}

@@ -1,0 +1,298 @@
+/*
+ * A ficha do jogador no cenário "picadeiro": o retrato é o CARTAZ GRANDE da atração (papel
+ * marfim, janela em arco, raios de cartaz girando atrás), o nick em folha de ouro, as
+ * estatísticas em cartazinhos pendurados e os companheiros («O RESTO DA TRUPE») em cartazes
+ * deitados. Mesmas regras: `.raiz` + o seletor da base; conteúdo só transform.
+ * Peças com classe dos DOIS módulos do cenário (heroi, kicker, chips): nada aqui repete
+ * propriedade que picadeiro.module.css declara nelas com a mesma especificidade.
+ */
+
+/* ------------------------------------------------------------------ retrato: o cartaz grande */
+/* Pendurado no prego: chega girado 6° e balança até parar. O quadro 0 é o cartaz inteiro. O giro
+   é uma variável: no celular o cartaz é alto (4:5) e a margem é curta — a −6° o canto de baixo
+   saía 17 px da tela no 405×720 do vídeo; a −2,5° ele fica dentro. */
+@keyframes cartazDesce {
+  0%,
+  16% {
+    transform: rotate(var(--giro-do-cartaz, -6deg)) translateY(-14px);
+    animation-timing-function: cubic-bezier(0.3, 0, 0.4, 1);
+  }
+  58% {
+    transform: rotate(calc(var(--giro-do-cartaz, -6deg) * -0.4));
+  }
+  78% {
+    transform: rotate(calc(var(--giro-do-cartaz, -6deg) * 0.133));
+  }
+  100% {
+    transform: none;
+  }
+}
+.raiz .retratoCasca {
+  --giro-do-cartaz: -6deg;
+  width: min(100% - 24px, 470px);
+  margin-top: 26px;
+  transform-origin: 50% -20px;
+  animation: cartazDesce 1400ms linear;
+}
+@media (max-width: 599px) {
+  .raiz .retratoCasca {
+    --giro-do-cartaz: -2.5deg;
+  }
+}
+.raiz .retratoCapitao {
+  margin-top: 70px; /* a cartola em cima */
+}
+/* A poça do canhão de luz atrás do cartaz: PARADA, como o canhão do herói depois de pegar o leão
+   (a base faria ela respirar). Assim a ficha fica em 4 laços no computador: os dois trapézios, os
+   raios do retrato e a varredura lenta da base. */
+.raiz .enfHaloRetrato {
+  inset: -14%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 228, 170, 0.26), rgba(255, 206, 130, 0.08) 60%, transparent);
+  opacity: 0.8;
+  animation: none;
+}
+/* Os raios de cartaz antigo atrás do retrato (a peça AtrasDoRetrato): giram em 160 s. */
+.enfRaiosRetrato {
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  z-index: -1;
+  width: 190%;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  border-radius: 50%;
+  pointer-events: none;
+  background: repeating-conic-gradient(from 0deg, rgba(240, 196, 100, 0.14) 0deg 6deg, transparent 6deg 15deg);
+  -webkit-mask: radial-gradient(closest-side, #000 20%, rgba(0, 0, 0, 0.5) 45%, transparent 72%);
+  mask: radial-gradient(closest-side, #000 20%, rgba(0, 0, 0, 0.5) 45%, transparent 72%);
+  animation: raiosDoCartazNaFicha 160s linear infinite;
+}
+@keyframes raiosDoCartazNaFicha {
+  to {
+    rotate: 360deg;
+  }
+}
+@media (max-width: 599px) {
+  .enfRaiosRetrato {
+    width: 150%;
+  }
+}
+.raiz .coroaDoRetrato {
+  width: 96px;
+  top: -66px;
+  rotate: -10deg;
+  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.6)); /* estático */
+}
+@media (max-width: 599px) {
+  .raiz .coroaDoRetrato {
+    width: 80px;
+    top: -56px;
+  }
+}
+/* O papel do cartaz (o capitão: papel preto e fios de ouro). */
+.raiz .retrato {
+  clip-path: none;
+  padding: 7px;
+  border-radius: 3px;
+  background: radial-gradient(120% 90% at 50% 0%, #f7ecd4, #f2e5c8 60%, #d8c49c);
+  box-shadow: inset 0 0 0 1.5px #1b0c08, inset 0 0 0 5px #f2e5c8, inset 0 0 0 6px #1b0c08, 0 30px 60px -24px #000;
+}
+.raiz .retratoCapitao .retrato {
+  background: radial-gradient(120% 90% at 50% 0%, #241612, #120a08 60%, #0a0605);
+  box-shadow: inset 0 0 0 1.5px #e0b04a, inset 0 0 0 5px #120a08, inset 0 0 0 6px #e0b04a, 0 30px 60px -24px #000;
+}
+/* A janela em arco (o mesmo arco das cartas, em grande). */
+.raiz .retratoMiolo {
+  clip-path: none;
+  margin: 16px 10px 10px;
+  border-radius: 50% 50% 3px 3px / 22% 22% 3px 3px;
+  background: #1c0f0c;
+  box-shadow: 0 0 0 2px #e0b04a, 0 0 0 3.5px #1b0c08;
+}
+.raiz .retratoMiolo > img {
+  filter: saturate(0.95) contrast(1.04); /* estático */
+}
+.raiz .enfGradacao {
+  background: linear-gradient(180deg, transparent 62%, rgba(11, 7, 6, 0.55));
+}
+/* Rota e elo descem para o pé da janela (o arco cortaria os cantos de cima). */
+.raiz .topo {
+  top: auto;
+  bottom: 14px;
+  align-items: center;
+}
+/* «MESTRE DE PICADEIRO» numa fita de ouro no pé do arco, acima da rota e do elo. */
+.raiz .placa {
+  left: 50%;
+  bottom: 60px;
+  translate: -50% 0;
+  border-radius: 0;
+  padding: 6px 16px 5px;
+  background: linear-gradient(180deg, var(--tm-metal-luz), var(--tm-metal-placa));
+  color: var(--tm-tinta); /* 10,4:1 */
+  clip-path: polygon(8px 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 8px 100%, 0 50%);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------ texto */
+.raiz .escudoMini {
+  width: 30px;
+  height: 30px;
+}
+/* O nick se ORGANIZA: nasce torto, dá o pulinho e assenta (2D: background-clip:text no WebKit). */
+@keyframes nickOrganiza {
+  0%,
+  40% {
+    transform: translateY(0.04em) rotate(-3deg);
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.3, 1);
+  }
+  60% {
+    transform: translateY(-0.08em) rotate(0.6deg);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5);
+  }
+  74% {
+    transform: translateY(0.01em) scale(1.02, 0.98);
+  }
+  100% {
+    transform: none;
+  }
+}
+/* Pela largura MEDIDA do nick em até duas linhas (--largura-nick-em; "R A Z E R A L" = 2,546 em,
+   em duas linhas). Tetos: 92 px abaixo de 900 e 150 px a partir de 900. */
+.raiz .nickVisual {
+  display: inline-grid; /* eco e cromo na mesma célula: quebram igual */
+  line-height: 1;
+  margin-top: 0.22em; /* o til do Ã e o acento sobem a 0,97 em */
+  letter-spacing: 0.01em;
+  text-wrap: balance;
+  overflow-wrap: break-word;
+  font-size: clamp(30px, calc(100cqi / var(--largura-nick-em, calc(var(--maior-palavra, 6) * 0.48))), 92px);
+  font-kerning: none; /* a métrica é a soma dos avanços */
+  font-variant-ligatures: none;
+  transform-origin: 20% 90%;
+  animation: nickOrganiza 1500ms linear;
+}
+@media (min-width: 900px) {
+  .raiz .nickVisual {
+    font-size: clamp(44px, calc(100cqi / var(--largura-nick-em, calc(var(--maior-palavra, 6) * 0.48))), 150px);
+  }
+}
+.raiz .nickVisual > * {
+  grid-area: 1 / 1;
+}
+.raiz .nomeReal {
+  font: italic 500 18px / 1.3 var(--tm-fonte-assinatura), Georgia, serif;
+  letter-spacing: 0.01em;
+  color: #f0dcc0;
+}
+.raiz .texto .chips {
+  justify-content: flex-start;
+}
+/* O título da seção NÃO sobe (o .sobe da base o desceria para cima dos cartazinhos). */
+.raiz .performance {
+  font: 400 clamp(20px, 2vw, 26px) / 1 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.04em;
+  color: var(--tm-metal-alto);
+  animation-name: none;
+}
+.raiz .performance::after {
+  height: 10px;
+  background: radial-gradient(circle at 50% 50%, var(--tm-primaria) 0 2.5px, transparent 3px) 0 50% / 12px 10px repeat-x;
+}
+/* Estatísticas: cartazinhos pendurados (o item também tem o .sobe da base: esta regra troca o
+   keyframe e fica com a duração em cascata dele). */
+@keyframes cartazinhoCai {
+  0%,
+  58% {
+    transform: rotate(-5deg) translateY(-6px);
+    animation-timing-function: cubic-bezier(0.3, 0, 0.4, 1);
+  }
+  80% {
+    transform: rotate(1.6deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+.raiz .estatisticas {
+  gap: 10px 8px;
+}
+.raiz .estatistica {
+  padding: 12px 4px 10px;
+  border: 0;
+  border-radius: 2px;
+  background: radial-gradient(120% 90% at 50% 0%, #f7ecd4, #f2e5c8 60%, #d8c49c);
+  box-shadow: inset 0 0 0 1px #1b0c08, inset 0 0 0 3px #f2e5c8, inset 0 0 0 4px #1b0c08, 0 8px 14px -8px #000;
+  transform-origin: 50% -6px;
+  animation-name: cartazinhoCai;
+  animation-timing-function: linear;
+}
+.raiz .estatistica::before {
+  display: none; /* o fio de neon da base */
+}
+.raiz .valor {
+  padding: 0;
+  background: none;
+  color: #8c1a2e; /* 7,3:1 */
+  -webkit-text-fill-color: #8c1a2e;
+  font: 400 clamp(22px, 2.3vw, 30px) / 1 var(--tm-fonte-titulo), sans-serif;
+}
+.raiz .rotulo {
+  color: #1b0c08;
+  font-weight: 700;
+}
+/* Os textos miúdos na lona: o pior ponto é a costura de ouro debaixo da luz quente do centro
+   (medido: #634722). Ali a nota fica a ≥ 5,6:1 e o kicker a ≥ 6,2:1 (medido, 320 a 1440); com
+   os tons de antes davam 4,5 e 4,8. */
+.raiz .nota {
+  color: #e0d0b4;
+}
+.raiz .kicker {
+  color: #d8c7aa;
+}
+
+/* ------------------------------------------------------------------ companheiros: a trupe */
+.raiz .companheiroLink {
+  align-items: center;
+  border: 0;
+  border-radius: 2px;
+  background: radial-gradient(120% 90% at 50% 0%, #f7ecd4, #f2e5c8 60%, #d8c49c);
+  box-shadow: inset 0 0 0 1px #1b0c08, inset 0 0 0 3px #f2e5c8, inset 0 0 0 4px #1b0c08, 0 10px 18px -10px #000;
+  color: #1b0c08;
+}
+.raiz .companheiroLink:hover {
+  border-color: transparent;
+}
+.raiz .companheiroFoto {
+  flex: 0 0 52px;
+  height: 64px;
+  margin: 8px 0 8px 10px;
+  overflow: hidden;
+  border-radius: 50% 50% 2px 2px / 30% 30% 2px 2px;
+  background: #1c0f0c;
+  box-shadow: 0 0 0 1.5px #e0b04a, 0 0 0 2.5px #1b0c08;
+}
+.raiz .companheiroRota {
+  --tm-icone: #8c1a2e;
+  color: #8c1a2e;
+}
+.raiz .companheiroNick {
+  color: #1b0c08;
+  font-size: 16px;
+  letter-spacing: 0.01em;
+  overflow-wrap: break-word;
+}
+@media (max-width: 599px) {
+  .raiz .companheiroFoto {
+    flex-basis: 44px;
+    height: 54px;
+    margin: 8px 0 8px 8px;
+  }
+  .raiz .companheiroTexto {
+    padding: 10px 8px;
+  }
+  .raiz .companheiroNick {
+    font-size: 14px;
+  }
+}
