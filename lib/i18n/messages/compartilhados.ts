@@ -159,6 +159,9 @@ export const compartilhados = definir({
       "Arena do sorteio",
     arenaSubtitulo:
       "Lados do jogo 1 e cartinhas da série. Quem sorteia é o servidor, com semente pública — a tela só revela.",
+    // A arena da partida do ARQUIVO: só registro (parte foi lançada à mão, antes do sorteio no site).
+    arenaSubtituloArquivo:
+      "Lados do jogo 1 e cartinhas registrados nesta série.",
     arenaASortear:
       "a sortear",
     arenaWo:
@@ -365,6 +368,8 @@ export const compartilhados = definir({
       "Draw arena",
     arenaSubtitulo:
       "Game 1 sides and the series wildcards. The server does the drawing, with a public seed — the screen only reveals it.",
+    arenaSubtituloArquivo:
+      "Game 1 sides and series wildcards recorded for this match.",
     arenaASortear:
       "to be drawn",
     arenaWo:

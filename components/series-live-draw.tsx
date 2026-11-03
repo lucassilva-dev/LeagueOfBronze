@@ -111,6 +111,8 @@ export function SeriesLiveDraw({
   textosDasCartas,
   ladosTravados = false,
   decididaPorWo = false,
+  somenteLeitura = false,
+  baralhoEm,
 }: Readonly<{
   seriesId: string;
   teamA: TimeRef | null;
@@ -142,6 +144,18 @@ export function SeriesLiveDraw({
   ladosTravados?: boolean;
   /** Série decidida por W.O.: não há partida para sortear. */
   decididaPorWo?: boolean;
+  /**
+   * Partida de temporada ARQUIVADA: só mostra o que foi sorteado. Nem pergunta a sessão — a rota
+   * de sorteio trabalha no campeonato no ar, e um botão aqui sortearia na série de mesmo id da
+   * temporada atual. Módulo sem registro (sem lado, sem carta) some em vez de dizer "a sortear".
+   */
+  somenteLeitura?: boolean;
+  /**
+   * A data do BARALHO das letras das cartas (A, B, C… — `letraDaCarta`). Sem ela, o de hoje. No
+   * arquivo é a data da partida: na 3ª eram seis cartas (a Yuumi era D), na 4ª são cinco, e a
+   * letra de hoje contaria a história errada.
+   */
+  baralhoEm?: string;
 }>) {
   const [podeLados, setPodeLados] = useState(false);
   const [podeCartas, setPodeCartas] = useState(false);
@@ -195,6 +209,7 @@ export function SeriesLiveDraw({
   const router = useRouter();
 
   useEffect(() => {
+    if (somenteLeitura) return;
     // `authorized` sozinho só diz que é da organização. Sortear lado e sortear carta são
     // escopos distintos — oferecer o botão a quem não os tem só entrega um 403.
     fetch("/api/admin/session", { credentials: "same-origin", cache: "no-store" })
@@ -207,7 +222,7 @@ export function SeriesLiveDraw({
         setPodeCartas(tem("series:cards"));
       })
       .catch(() => {});
-  }, []);
+  }, [somenteLeitura]);
 
   // Quem vai conduzir o sorteio de cartas já baixa as artes: na virada da carta, ao vivo, a
   // imagem precisa estar pronta (sem ela entra o emoji de reserva).
@@ -314,6 +329,9 @@ export function SeriesLiveDraw({
   const cartasDaPagina = textosDasCartas ?? textosPadraoDasCartas();
   const podeAlgo = podeLados || podeCartas;
   const semSorteio = decididaPorWo;
+  // No arquivo, módulo sem registro some (não há o que sortear nem o que mostrar).
+  const mostrarLados = temOsDois && (!somenteLeitura || blueTeam !== null);
+  const mostrarCartas = !somenteLeitura || Object.values(cardByTeam).some(Boolean);
 
   const textosDaCerimonia: TextosDaCerimonia = {
     titulo: t.cerimoniaTitulo,
@@ -380,7 +398,9 @@ export function SeriesLiveDraw({
             <h2 id="arena-do-sorteio" className={p.arenaTitulo}>
               {t.arenaTitulo}
             </h2>
-            <p className={p.arenaSub}>{t.arenaSubtitulo}</p>
+            {/* No arquivo, "quem sorteia é o servidor" seria falso para o que foi lançado à mão antes
+                de o sorteio existir no site. */}
+            <p className={p.arenaSub}>{somenteLeitura ? t.arenaSubtituloArquivo : t.arenaSubtitulo}</p>
           </div>
           {podeAlgo ? (
             <span className={p.seloAoVivo}>
@@ -390,9 +410,9 @@ export function SeriesLiveDraw({
           ) : null}
         </div>
 
-        <div className={p.arenaGrade}>
+        <div className={`${p.arenaGrade} ${mostrarLados && mostrarCartas ? "" : p.arenaGradeUnica}`}>
           {/* ------------------------------------------------ LADOS · JOGO 1 */}
-          {temOsDois ? (
+          {mostrarLados ? (
             <div className={p.modulo}>
               <p className={p.moduloTitulo}>{t.sorteioLadosTitulo}</p>
               <div className={p.portoes}>
@@ -413,7 +433,7 @@ export function SeriesLiveDraw({
                   {t.sorteioPorFulano} {ultimoLados.autor}
                 </p>
               ) : null}
-              {semSorteio ? (
+              {somenteLeitura ? null : semSorteio ? (
                 <p className={p.observacao}>{t.arenaWo}</p>
               ) : ladosTravados ? (
                 <p className={p.observacao}>
@@ -428,49 +448,53 @@ export function SeriesLiveDraw({
           ) : null}
 
           {/* ------------------------------------------------ CARTINHAS DA SÉRIE */}
-          <div className={p.modulo}>
-            <p className={p.moduloTitulo}>{t.sorteioCartinhasTitulo}</p>
-            {isDupla ? <p className={p.faixaDupla}>{t.sorteioDuplo}</p> : null}
-            <div className={p.vagas}>
-              {teamA ? (
-                <VagaDaCarta
-                  time={timeA}
-                  oponente={teamB ? timeB : null}
-                  cardId={cardByTeam[timeA.id] ?? null}
-                  registro={registroDuplo ? null : registroA}
-                  t={t}
-                  nomesCartas={nomesCartas}
-                  cartas={cartasDaPagina}
-                  podeSortear={podeCartas && !semSorteio}
-                  onSortear={() => abrir({ tipo: "carta", teamId: timeA.id })}
-                />
-              ) : null}
-              {teamB ? (
-                <VagaDaCarta
-                  time={timeB}
-                  oponente={teamA ? timeA : null}
-                  cardId={cardByTeam[timeB.id] ?? null}
-                  registro={registroDuplo ? null : registroB}
-                  t={t}
-                  nomesCartas={nomesCartas}
-                  cartas={cartasDaPagina}
-                  podeSortear={podeCartas && !semSorteio}
-                  onSortear={() => abrir({ tipo: "carta", teamId: timeB.id })}
-                />
+          {mostrarCartas ? (
+            <div className={p.modulo}>
+              <p className={p.moduloTitulo}>{t.sorteioCartinhasTitulo}</p>
+              {isDupla ? <p className={p.faixaDupla}>{t.sorteioDuplo}</p> : null}
+              <div className={p.vagas}>
+                {teamA ? (
+                  <VagaDaCarta
+                    time={timeA}
+                    oponente={teamB ? timeB : null}
+                    cardId={cardByTeam[timeA.id] ?? null}
+                    registro={registroDuplo ? null : registroA}
+                    t={t}
+                    nomesCartas={nomesCartas}
+                    cartas={cartasDaPagina}
+                    podeSortear={podeCartas && !semSorteio}
+                    baralhoEm={baralhoEm}
+                    onSortear={() => abrir({ tipo: "carta", teamId: timeA.id })}
+                  />
+                ) : null}
+                {teamB ? (
+                  <VagaDaCarta
+                    time={timeB}
+                    oponente={teamA ? timeA : null}
+                    cardId={cardByTeam[timeB.id] ?? null}
+                    registro={registroDuplo ? null : registroB}
+                    t={t}
+                    nomesCartas={nomesCartas}
+                    cartas={cartasDaPagina}
+                    podeSortear={podeCartas && !semSorteio}
+                    baralhoEm={baralhoEm}
+                    onSortear={() => abrir({ tipo: "carta", teamId: timeB.id })}
+                  />
+                ) : null}
+              </div>
+
+              {registroDuplo ? <ProcedenciaDaCarta registro={registroDuplo} t={t} /> : null}
+
+              {podeCartas && temOsDois && !semSorteio ? (
+                <div className={p.dupla}>
+                  <button type="button" className={p.botaoContorno} onClick={() => abrir({ tipo: "carta", dupla: true })}>
+                    <Users aria-hidden /> {t.sorteioBotaoDupla}
+                  </button>
+                  <p className={p.explicacao}>{t.sorteioDuplaExplicacao}</p>
+                </div>
               ) : null}
             </div>
-
-            {registroDuplo ? <ProcedenciaDaCarta registro={registroDuplo} t={t} /> : null}
-
-            {podeCartas && temOsDois && !semSorteio ? (
-              <div className={p.dupla}>
-                <button type="button" className={p.botaoContorno} onClick={() => abrir({ tipo: "carta", dupla: true })}>
-                  <Users aria-hidden /> {t.sorteioBotaoDupla}
-                </button>
-                <p className={p.explicacao}>{t.sorteioDuplaExplicacao}</p>
-              </div>
-            ) : null}
-          </div>
+          ) : null}
         </div>
 
         {/* ------------------------------------------------ painel da organização */}
@@ -529,7 +553,7 @@ export function SeriesLiveDraw({
         ) : null}
       </section>
 
-      {temOsDois ? (
+      {temOsDois && !somenteLeitura ? (
         <CerimoniaDeSorteio
           key={rodada}
           aberto={pedido !== null}
@@ -591,6 +615,7 @@ function VagaDaCarta({
   cartas,
   podeSortear,
   onSortear,
+  baralhoEm,
 }: Readonly<{
   time: TimeDoShow;
   oponente: TimeDoShow | null;
@@ -602,11 +627,13 @@ function VagaDaCarta({
   cartas: Record<string, TextoDaCarta>;
   podeSortear: boolean;
   onSortear: () => void;
+  /** O baralho da letra (ver `baralhoEm` da arena). */
+  baralhoEm?: string;
 }>) {
   const def: CardDef | undefined = cardId ? CARDS_BY_ID[cardId as CardId] : undefined;
   // O nome traduzido vem da página; sem ele vale o título em português de lib/cards.ts.
   const nome = def ? (nomesCartas?.[def.id] ?? cartas[def.id]?.nome ?? def.title) : undefined;
-  const letra = def ? letraDaCarta(def.cardId) : undefined;
+  const letra = def ? letraDaCarta(def.cardId, baralhoEm) : undefined;
 
   return (
     <div className={p.vaga}>

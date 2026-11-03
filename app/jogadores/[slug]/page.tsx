@@ -16,6 +16,7 @@ import { nomeDaTemporada } from "@/lib/i18n/nome-da-temporada";
 import { getLocale, getMessages } from "@/lib/i18n/server";
 import { getOpGgSummonerUrlFromNick } from "@/lib/opgg";
 import { buildDesignPlayers, buildDesignTeams } from "@/lib/roster";
+import { segmentoDaRota } from "@/lib/segmento-da-rota";
 import { getServerDataset } from "@/lib/server-data";
 import { temaDoTime } from "@/lib/temas/registro";
 import { calculatePlayerAggregates } from "@/lib/tournament";
@@ -31,7 +32,7 @@ type PlayerPageParams = Readonly<{
 
 /** O nick na aba e na prévia do link; sem o jogador (ou com o banco fora), o da seção. */
 export async function generateMetadata({ params }: PlayerPageParams): Promise<Metadata> {
-  const { slug } = await params;
+  const slug = segmentoDaRota((await params).slug);
   try {
     const [{ metadados, compartilhados }, { dataset }] = await Promise.all([getMessages(), getServerDataset()]);
     const player = buildDesignPlayers(dataset).find((p) => p.slug === slug);
@@ -48,7 +49,8 @@ export async function generateMetadata({ params }: PlayerPageParams): Promise<Me
 }
 
 export default async function PlayerFichaPage({ params, searchParams }: PlayerPageParams) {
-  const { slug } = await params;
+  // Nick com "#": o Next entrega o segmento ainda codificado (ver segmentoDaRota).
+  const slug = segmentoDaRota((await params).slug);
   const { de } = (await searchParams) ?? {};
   const { paginasHome: t, paginasStats: ts, compartilhados } = await getMessages();
   const te = textosElenco[await getLocale()];

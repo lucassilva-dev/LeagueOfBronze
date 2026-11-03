@@ -21,6 +21,7 @@ import { metadadosDaPagina, montarMetadados } from "@/lib/i18n/metadados";
 import { nomeDaTemporada } from "@/lib/i18n/nome-da-temporada";
 import { getMessages } from "@/lib/i18n/server";
 import { buildDesignTeams } from "@/lib/roster";
+import { segmentoDaRota } from "@/lib/segmento-da-rota";
 import { getServerArchivedSeason } from "@/lib/server-data";
 import { calculatePlayerAggregates } from "@/lib/tournament";
 
@@ -32,7 +33,8 @@ type PageParams = Readonly<{
 
 /** O time e a temporada CERTA (não a do layout, "4ª Edição") na aba e na prévia do link. */
 export async function generateMetadata({ params }: PageParams): Promise<Metadata> {
-  const { seasonId, teamSlug } = await params;
+  const { seasonId, teamSlug: bruto } = await params;
+  const teamSlug = segmentoDaRota(bruto);
   const [{ metadados, compartilhados }, result] = await Promise.all([getMessages(), getServerArchivedSeason(seasonId)]);
   const team = result ? buildDesignTeams(result.dataset).find((time) => time.slug === teamSlug) : undefined;
   if (!result || !team) return metadadosDaPagina("temporadas");
@@ -43,7 +45,9 @@ export async function generateMetadata({ params }: PageParams): Promise<Metadata
 }
 
 export default async function TemporadaTimePage({ params }: PageParams) {
-  const { seasonId, teamSlug } = await params;
+  const { seasonId, teamSlug: bruto } = await params;
+  // Os delimitadores chegam codificados (ver segmentoDaRota).
+  const teamSlug = segmentoDaRota(bruto);
   const result = await getServerArchivedSeason(seasonId);
   if (!result) notFound();
 

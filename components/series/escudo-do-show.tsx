@@ -26,10 +26,14 @@ export function varsDoTime(time: TimeDoShow): CSSProperties {
 /**
  * O escudo do time com a aura da cor dele. Sem escudo, um hexágono com a sigla — o show nunca
  * mostra um buraco no lugar de um time.
+ *
+ * É um <span> (grade por CSS), não um <div>: o escudo entra em <p> (cabeçalho do bloco de cada
+ * jogo) e em <span>. Um <div> dentro de <p> faz o navegador fechar o <p> antes — o HTML do
+ * servidor deixava de bater com o do cliente e a hidratação quebrava na página com jogos.
  */
 export function EscudoDoShow({ time, className }: Readonly<{ time: TimeDoShow; className?: string }>) {
   return (
-    <div className={`${s.escudo} ${className ?? ""}`} style={varsDoTime(time)}>
+    <span className={`${s.escudo} ${className ?? ""}`} style={varsDoTime(time)}>
       <span aria-hidden className={s.enfAura} />
       {time.escudo ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -39,7 +43,7 @@ export function EscudoDoShow({ time, className }: Readonly<{ time: TimeDoShow; c
           {time.sigla}
         </span>
       )}
-    </div>
+    </span>
   );
 }
 

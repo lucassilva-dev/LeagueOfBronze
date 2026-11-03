@@ -11,6 +11,7 @@ import { metadadosDaPagina, montarMetadados } from "@/lib/i18n/metadados";
 import { nomeDaTemporada } from "@/lib/i18n/nome-da-temporada";
 import { getLocale, getMessages } from "@/lib/i18n/server";
 import { buildDesignPlayers } from "@/lib/roster";
+import { segmentoDaRota } from "@/lib/segmento-da-rota";
 import { getServerArchivedSeason } from "@/lib/server-data";
 import { calculatePlayerAggregates, getPlayerGameHistory } from "@/lib/tournament";
 
@@ -20,7 +21,8 @@ type PageParams = Readonly<{ params: Promise<{ seasonId: string; playerSlug: str
 
 /** O nick e a temporada CERTA (não a do layout, "4ª Edição") na aba e na prévia do link. */
 export async function generateMetadata({ params }: PageParams): Promise<Metadata> {
-  const { seasonId, playerSlug } = await params;
+  const { seasonId, playerSlug: bruto } = await params;
+  const playerSlug = segmentoDaRota(bruto);
   const [{ metadados, compartilhados }, result] = await Promise.all([getMessages(), getServerArchivedSeason(seasonId)]);
   const player = result ? buildDesignPlayers(result.dataset).find((p) => p.slug === playerSlug) : undefined;
   if (!result || !player) return metadadosDaPagina("temporadas");
@@ -31,7 +33,9 @@ export async function generateMetadata({ params }: PageParams): Promise<Metadata
 }
 
 export default async function TemporadaJogadorPage({ params }: PageParams) {
-  const { seasonId, playerSlug } = await params;
+  const { seasonId, playerSlug: bruto } = await params;
+  // Nick com "#" no arquivo: o Next entrega o segmento ainda codificado (ver segmentoDaRota).
+  const playerSlug = segmentoDaRota(bruto);
   const result = await getServerArchivedSeason(seasonId);
   if (!result) notFound();
 

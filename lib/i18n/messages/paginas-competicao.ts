@@ -113,6 +113,8 @@ export const paginasCompeticao = definir({
     detalheStatusWo: "Série encerrada por W.O.",
     detalheStatusFinalizada: "Série finalizada",
     detalheStatusEmAndamento: "Série em andamento",
+    // Partida do ARQUIVO sem vencedor (a temporada acabou antes): "em andamento" mentiria.
+    detalheStatusNaoConcluida: "Série não concluída",
     detalheVencedorWo: "Vencedor por W.O.:",
     detalheMvpSerie: "MVP da série:",
     detalheMvpFinal: "MVP da final:",
@@ -243,6 +245,7 @@ export const paginasCompeticao = definir({
     detalheStatusWo: "Series ended by walkover",
     detalheStatusFinalizada: "Series completed",
     detalheStatusEmAndamento: "Series in progress",
+    detalheStatusNaoConcluida: "Series not completed",
     detalheVencedorWo: "Winner by walkover:",
     detalheMvpSerie: "Series MVP:",
     detalheMvpFinal: "Final MVP:",

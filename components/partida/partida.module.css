@@ -114,6 +114,66 @@
   animation-delay: var(--atraso, 0s);
 }
 
+/* Partida do ARQUIVO: a volta para a edição e o selo de somente leitura, no topo do cartaz. */
+.trilhaDoArquivo {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: clamp(14px, 2.4vh, 22px) clamp(16px, 3vw, 36px) 0;
+}
+
+.voltarAoArquivo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 16px 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(240, 200, 138, 0.38);
+  background: rgba(11, 8, 5, 0.62);
+  color: #f0c88a;
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.voltarAoArquivo:hover {
+  background-color: rgba(240, 200, 138, 0.14);
+  border-color: rgba(240, 200, 138, 0.65);
+}
+
+.voltarAoArquivo:focus-visible {
+  outline: 2px solid #f0c88a;
+  outline-offset: 2px;
+}
+
+.voltarAoArquivo svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.seloArquivo {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px dashed rgba(201, 138, 75, 0.5);
+  background: rgba(11, 8, 5, 0.5);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #b8ab97;
+}
+
 .versus {
   position: relative;
   display: grid;
@@ -464,6 +524,10 @@
     font-size: 9px;
     padding: 4px 6px;
     letter-spacing: 0.1em;
+    /* «LADO VERMELHO · J1» passava 3 px da coluna do time em 320 px: quebra em vez de cortar. */
+    white-space: normal;
+    max-width: 100%;
+    text-align: center;
   }
 }
 
@@ -699,6 +763,12 @@
   display: grid;
   grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
   gap: clamp(14px, 2vw, 24px);
+}
+
+/* Arquivo com um módulo só (só lados ou só cartas): ele ocupa a largura, centrado. */
+.arenaGradeUnica {
+  grid-template-columns: minmax(0, 760px);
+  justify-content: center;
 }
 
 @media (max-width: 900px) {
