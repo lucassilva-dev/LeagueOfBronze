@@ -115,3 +115,110 @@ export function fatiasCruzadas(de: number, para: number, total: number): number 
   const passo = passoDaFatia(total);
   return Math.max(0, Math.floor(para / passo) - Math.floor(de / passo));
 }
+
+// ---------------------------------------------------------------- o giro contínuo (show)
+
+/*
+ * O GIRO DO SHOW: ângulo como FUNÇÃO DO TEMPO, sem troca de transição CSS no meio.
+ *
+ * A roda antiga girava em passos de transição linear e, quando a resposta chegava, trocava
+ * para uma transição com curva de freio. A troca muda a velocidade de uma vez — o "tranco"
+ * que se vê quando o freio entra. Aqui o ângulo é calculado a cada quadro por estas funções
+ * puras e escrito direto no `transform`: o arranque sai do repouso, o giro livre é constante
+ * e o freio começa EXATAMENTE na velocidade em que a roda estava, desacelerando até parar
+ * no meio da fatia sorteada. Velocidade contínua do começo ao fim.
+ *
+ * A honestidade continua a mesma: o giro livre não conhece o resultado; só `planejarFreio`
+ * recebe o índice sorteado pelo servidor, e a parada é sempre À FRENTE (nunca de ré).
+ */
+
+/** O giro livre: parte do repouso, acelera em `arranqueMs` e segue em `velocidade` (graus/ms). */
+export type GiroLivre = Readonly<{ velocidade: number; arranqueMs: number }>;
+
+/** Ângulo do giro livre depois de `ms` (aceleração constante no arranque, depois constante). */
+export function anguloLivre(giro: GiroLivre, ms: number): number {
+  const t = Math.max(0, ms);
+  const arranque = Math.max(1, giro.arranqueMs);
+  if (t <= arranque) return (giro.velocidade * t * t) / (2 * arranque);
+  return (giro.velocidade * arranque) / 2 + giro.velocidade * (t - arranque);
+}
+
+/** Velocidade do giro livre (graus/ms) depois de `ms`. */
+export function velocidadeLivre(giro: GiroLivre, ms: number): number {
+  const t = Math.max(0, ms);
+  const arranque = Math.max(1, giro.arranqueMs);
+  return t >= arranque ? giro.velocidade : (giro.velocidade * t) / arranque;
+}
+
+export type Freio = Readonly<{
+  /** Ângulo em que o freio começou (onde a roda estava). */
+  inicio: number;
+  /** Ângulo final: o meio da fatia sorteada encostado no ponteiro. */
+  parada: number;
+  /** Quanto tempo a freada leva, em ms. */
+  duracao: number;
+  /** Expoente da queda de velocidade: v(s) = v0·(1−s)^potencia. Maior = cauda mais longa. */
+  potencia: number;
+}>;
+
+/** O expoente padrão: a roda perde força rápido e se arrasta nas últimas fatias (suspense). */
+export const POTENCIA_DO_FREIO = 1.8;
+
+/**
+ * Planeja a freada a partir de onde a roda ESTÁ e da velocidade que ela TEM.
+ *
+ * A distância até a parada sai de `anguloDeParada` (a mesma conta testada acima, que garante o
+ * meio da fatia no ponteiro e nunca anda de ré). Com velocidade inicial v0 e queda
+ * v(s) = v0·(1−s)^p, a distância percorrida é v0·T/(p+1) — então, para uma distância D, a
+ * duração é T = (p+1)·D/v0. Como D só pode crescer em voltas inteiras, escolhe-se o número de
+ * voltas cuja duração fica mais perto de `duracaoAlvo`, sem nunca frear em menos de
+ * `voltasMinimas` voltas (freada curta demais parece "parar de repente").
+ */
+export function planejarFreio({
+  giroAtual,
+  velocidade,
+  indice,
+  total,
+  duracaoAlvo,
+  potencia = POTENCIA_DO_FREIO,
+  voltasMinimas = 1,
+}: {
+  giroAtual: number;
+  /** Graus por ms no instante do freio. */
+  velocidade: number;
+  indice: number;
+  total: number;
+  duracaoAlvo: number;
+  potencia?: number;
+  voltasMinimas?: number;
+}): Freio {
+  const v0 = Math.max(0.01, velocidade);
+  let melhor: Freio | null = null;
+  for (let voltas = Math.max(0, voltasMinimas - 1); voltas <= voltasMinimas + 12; voltas += 1) {
+    const parada = anguloDeParada({ giroAtual, indice, total, voltas });
+    const distancia = parada - giroAtual;
+    if (distancia < voltasMinimas * 360) continue;
+    const duracao = ((potencia + 1) * distancia) / v0;
+    if (!melhor || Math.abs(duracao - duracaoAlvo) < Math.abs(melhor.duracao - duracaoAlvo)) {
+      melhor = { inicio: giroAtual, parada, duracao, potencia };
+    }
+    if (duracao > duracaoAlvo) break;
+  }
+  // Sempre há candidato: a 1ª volta que passa do mínimo entra no laço acima.
+  return melhor ?? { inicio: giroAtual, parada: anguloDeParada({ giroAtual, indice, total }), duracao: duracaoAlvo, potencia };
+}
+
+/** Ângulo da roda `ms` depois do início do freio. Depois do fim, a parada exata. */
+export function anguloNoFreio(freio: Freio, ms: number): number {
+  if (ms >= freio.duracao) return freio.parada;
+  const s = Math.max(0, ms) / Math.max(1, freio.duracao);
+  return freio.inicio + (freio.parada - freio.inicio) * (1 - Math.pow(1 - s, freio.potencia + 1));
+}
+
+/** Índice da fatia que está sob o ponteiro num ângulo de giro qualquer. */
+export function fatiaNoPonteiro(giro: number, total: number): number {
+  const passo = passoDaFatia(total);
+  // O ponteiro está em 0°: a fatia sob ele é a que, girada, cobre 0° — ou seja, a de ângulo −giro.
+  const posicao = (((-giro % 360) + 360) % 360) / passo;
+  return Math.min(Math.max(0, total - 1), Math.floor(posicao));
+}

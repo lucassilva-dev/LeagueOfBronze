@@ -139,3 +139,26 @@ describe("números no idioma da página", () => {
     expect(formatPercent(12.345, 2, "en-US")).toBe("12.35%");
   });
 });
+
+describe("partesDaDataDaSerie (o letreiro do cartaz da partida)", () => {
+  it("sexta 13/11 às 20:00 de Brasília, em pt e en", async () => {
+    const { partesDaDataDaSerie } = await import("@/lib/format");
+    expect(partesDaDataDaSerie("2026-11-13T20:00:00-03:00")).toEqual({ semana: "sex", dia: "13 nov", hora: "20:00" });
+    const en = partesDaDataDaSerie("2026-11-13T20:00:00-03:00", "en-US");
+    expect(en?.semana).toBe("Fri");
+    expect(en?.dia).toBe("13 Nov");
+    expect(en?.hora).toMatch(/08:00\s?PM/);
+  });
+
+  it("22:00 de Brasília continua no mesmo dia (não vira o dia seguinte em UTC)", async () => {
+    const { partesDaDataDaSerie } = await import("@/lib/format");
+    expect(partesDaDataDaSerie("2026-11-13T22:00:00-03:00")?.dia).toBe("13 nov");
+  });
+
+  it("série só com data: sem hora; sem data: nada", async () => {
+    const { partesDaDataDaSerie } = await import("@/lib/format");
+    expect(partesDaDataDaSerie("2026-08-02")).toEqual({ semana: "dom", dia: "02 ago", hora: null });
+    expect(partesDaDataDaSerie(undefined)).toBeNull();
+    expect(partesDaDataDaSerie("não é data")).toBeNull();
+  });
+});

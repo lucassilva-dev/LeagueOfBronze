@@ -2,7 +2,13 @@ import { definir } from "@/lib/i18n/definir";
 import type { CardId } from "@/lib/schema";
 
 /** Nome, frase de sabor e regra de uma cartinha, no idioma da página. */
-export type TextoCarta = { nome: string; flavor: string; descricao: string };
+/**
+ * Os textos de uma carta. `resumo` e `resumoDuplo` são a FRASE CONCRETA que o show do sorteio
+ * mostra para a plateia entender na hora ("GALÁCTICOS DO BAR não pode banir nenhum campeão"):
+ * {usuario} = quem usou, {vitima} = o adversário, {l1}/{l2} = as letras do ABCDRAFT. A versão
+ * dupla vale quando os dois capitães usaram e a carta sorteada vale para os dois times.
+ */
+export type TextoCarta = { nome: string; flavor: string; descricao: string; resumo: string; resumoDuplo: string };
 
 /** Rótulo, cabeçalho da coluna e legenda de uma métrica dos rankings. */
 export type TextoMetrica = { label: string; head: string; desc: string };
@@ -210,48 +216,64 @@ export const paginasStats = definir<TextosStats>({
         flavor: "Sorteou L e M? Torce pra Lillia não estar banida — ela levou 11 bans nesta edição.",
         descricao:
           "Duas letras são sorteadas. O capitão adversário monta a composição só com campeões cujos nomes iniciam com essas letras. Não há banimentos nesta carta.",
+        resumo: "{vitima} só pode escolher campeões que começam com {l1} ou {l2} — e ninguém bane.",
+        resumoDuplo: "Os dois times só podem escolher campeões que começam com {l1} ou {l2} — e ninguém bane.",
       },
       DRAFT_SABOTADO: {
         nome: "DRAFT SABOTADO",
         flavor: "O adversário monta metade do seu time. Respeitando a rota — pelo menos foi o combinado.",
         descricao:
           "Quem usou a carta escolhe o campeão de dois jogadores adversários, respeitando a role de cada um (ex.: nada de Yuumi na jungle). Banimentos normais.",
+        resumo: "{usuario} escolhe o campeão de 2 jogadores do {vitima}.",
+        resumoDuplo: "Cada time escolhe o campeão de 2 jogadores do outro.",
       },
       INTER_CLASSE: {
         nome: "INTER CLASSE",
         flavor: "Saiu tanque? Boa sorte fazendo dano. Saiu assassino? Boa sorte segurando torre.",
         descricao:
           "Uma classe de campeões é sorteada. O time adversário só pode escolher campeões daquela classe no draft. Banimentos normais.",
+        resumo: "{vitima} só pode escolher campeões de uma única classe.",
+        resumoDuplo: "Os dois times só podem escolher campeões de uma única classe.",
       },
       INVASAO_YUUMI: {
         nome: "INVASÃO DA YUUMI",
         flavor: "O suporte adversário não escolhe nada: cola na Yuumi e reza. THALAO e Onigami sabem como é.",
         descricao:
           "O suporte do time adversário é obrigado a jogar de Yuumi na partida. Banimentos normais.",
+        resumo: "O suporte do {vitima} joga de Yuumi.",
+        resumoDuplo: "Os dois suportes jogam de Yuumi.",
       },
       INVERSAO_ROTAS: {
         nome: "INVERSÃO DE ROTAS",
         flavor: "Seu ADC vai pro topo, seu top vai pro bot. A rota que você treinou a vida toda? Hoje não.",
         descricao:
           "Quem usou a carta escolhe dois jogadores adversários para trocarem de lane entre si. Banimentos normais.",
+        resumo: "{usuario} escolhe 2 jogadores do {vitima} para trocarem de rota.",
+        resumoDuplo: "Cada time escolhe 2 jogadores do outro para trocarem de rota.",
       },
       TUDO_LIBERADO: {
         nome: "TUDO LIBERADO",
         flavor: "O adversário perde os bans. O Mordekaiser, banido 12 vezes no campeonato, finalmente respira.",
         descricao:
           "O time adversário fica proibido de banir qualquer campeão durante a fase de banimentos.",
+        resumo: "{vitima} não pode banir nenhum campeão.",
+        resumoDuplo: "Ninguém bane nesta partida.",
       },
       AMIGOS_NATUREZA: {
         nome: "AMIGOS DA NATUREZA",
         flavor: "Sem jungler e sem Smite pros DOIS times. O vidotti agiota, 100 abates na selva, não aprovou.",
         descricao:
           "Nenhum dos dois times pode escolher Jungler nem levar o feitiço de invocador Smite na partida. Banimentos normais.",
+        resumo: "Ninguém joga de jungle nem leva Smite — nos dois times.",
+        resumoDuplo: "Ninguém joga de jungle nem leva Smite — nos dois times.",
       },
       DRAFT_INVERTIDO: {
         nome: "DRAFT INVERTIDO",
         flavor: "Você não escolhe seu campeão: o inimigo escolhe. E ele viu seu histórico.",
         descricao:
           "Cada time escolhe o draft do outro — os campeões precisam ser da rota de cada jogador, sem trocar campeões entre rotas diferentes. Banimentos normais.",
+        resumo: "Cada time escolhe os campeões do outro.",
+        resumoDuplo: "Cada time escolhe os campeões do outro.",
       },
     },
   },
@@ -360,48 +382,64 @@ export const paginasStats = definir<TextosStats>({
         flavor: "Drew L and M? Hope Lillia isn't banned — she took 11 bans this edition.",
         descricao:
           "Two letters are drawn. The opposing captain has to build the whole composition with champions whose names start with those letters. There are no bans with this card.",
+        resumo: "{vitima} can only pick champions starting with {l1} or {l2} — and nobody bans.",
+        resumoDuplo: "Both teams can only pick champions starting with {l1} or {l2} — and nobody bans.",
       },
       DRAFT_SABOTADO: {
         nome: "SABOTAGED DRAFT",
         flavor: "The opponent builds half of your team. Respecting the role — that was the deal, at least.",
         descricao:
           "Whoever played the card picks the champion for two opposing players, respecting each one's role (no Yuumi in the jungle, please). Bans as usual.",
+        resumo: "{usuario} picks the champion for 2 players of {vitima}.",
+        resumoDuplo: "Each team picks the champion for 2 players of the other.",
       },
       INTER_CLASSE: {
         nome: "INTERCLASS",
         flavor: "Tanks came up? Good luck dealing damage. Assassins? Good luck holding a tower.",
         descricao:
           "A champion class is drawn. The opposing team can only pick champions of that class in the draft. Bans as usual.",
+        resumo: "{vitima} can only pick champions of a single class.",
+        resumoDuplo: "Both teams can only pick champions of a single class.",
       },
       INVASAO_YUUMI: {
         nome: "YUUMI INVASION",
         flavor: "The enemy support picks nothing: attach to Yuumi and pray. THALAO and Onigami know the feeling.",
         descricao:
           "The opposing team's support has to play Yuumi in that game. Bans as usual.",
+        resumo: "{vitima}'s support plays Yuumi.",
+        resumoDuplo: "Both supports play Yuumi.",
       },
       INVERSAO_ROTAS: {
         nome: "ROLE SWAP",
         flavor: "Your ADC goes top, your top goes bot. The lane you trained your whole life? Not today.",
         descricao:
           "Whoever played the card picks two opposing players to swap lanes with each other. Bans as usual.",
+        resumo: "{usuario} picks 2 players of {vitima} to swap lanes.",
+        resumoDuplo: "Each team picks 2 players of the other to swap lanes.",
       },
       TUDO_LIBERADO: {
         nome: "ANYTHING GOES",
         flavor: "The opponent loses their bans. Mordekaiser, banned 12 times this tournament, can finally breathe.",
         descricao:
           "The opposing team is not allowed to ban any champion during the ban phase.",
+        resumo: "{vitima} can't ban a single champion.",
+        resumoDuplo: "Nobody bans in this game.",
       },
       AMIGOS_NATUREZA: {
         nome: "FRIENDS OF NATURE",
         flavor: "No jungler and no Smite for BOTH teams. vidotti the loan shark, 100 jungle kills, did not approve.",
         descricao:
           "Neither team may pick a Jungler or take the Smite summoner spell in that game. Bans as usual.",
+        resumo: "Nobody plays jungle or takes Smite — on both teams.",
+        resumoDuplo: "Nobody plays jungle or takes Smite — on both teams.",
       },
       DRAFT_INVERTIDO: {
         nome: "INVERTED DRAFT",
         flavor: "You don't pick your champion: the enemy does. And they have seen your match history.",
         descricao:
           "Each team drafts for the other one — champions must match each player's role, with no swapping champions between different roles. Bans as usual.",
+        resumo: "Each team picks the other team's champions.",
+        resumoDuplo: "Each team picks the other team's champions.",
       },
     },
   },

@@ -191,8 +191,8 @@ describe("páginas públicas depois da saída de vez", () => {
   it("a partida mostra o substituto na coluna do time que cobriu, marcado SUB", async () => {
     cenarioDaPagina.dataset = depoisDaSaida().antes;
     const markup = await html(PartidaPage({ params: Promise.resolve({ id: "s3" }) }));
-    // Os dois blocos do jogo 1 (o título de cada um é o nome do time): ALFA, depois GAMA.
-    const [, blocoAlfa, blocoGama] = markup.split(/<p class="mb-2 [^"]*">(?:ALFA|GAMA)<\/p>/);
+    // Os dois blocos do jogo 1, marcados pelo time de cada um: ALFA, depois GAMA.
+    const [, blocoAlfa, blocoGama] = markup.split(/data-bloco-do-time="(?:alfa|gama)"/);
     expect(blocoAlfa).toContain('/jogadores/reserva"');
     expect(blocoAlfa).toMatch(/title="Jogou como substituto"[^>]*>SUB</);
     expect(blocoGama).not.toContain('/jogadores/reserva"');

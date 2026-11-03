@@ -202,10 +202,16 @@ a:hover {
   }
 }
 
+/*
+  Movimento reduzido no site todo — MENOS quando a organização liga o "show completo" do sorteio
+  ao vivo (`data-show-completo` no <html>, posto pela cerimônia só enquanto ela está aberta).
+  No Windows, "Efeitos de animação" desligado liga esta preferência no Chrome; sem o escopo, ela
+  esmagava a cerimônia inteira na transmissão mesmo com o show completo pedido.
+*/
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  html:not([data-show-completo]) *,
+  html:not([data-show-completo]) *::before,
+  html:not([data-show-completo]) *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
@@ -698,171 +704,6 @@ a:hover {
 }
 
 /* ============================================================
-   CERIMÔNIA DO SORTEIO — os efeitos da roleta em tela cheia
-   ============================================================
-   Tudo aqui só existe dentro do overlay `.lob-cer`, que por sua vez só é montado
-   depois de um clique. Nada disto renderiza no servidor.
-
-   A REGRA DA CASA VALE AQUI TAMBÉM: nenhuma animação decide se o conteúdo é visível.
-   As opacidades animadas abaixo estão todas em elementos DECORATIVOS e `aria-hidden`
-   (anel de brilho, parafusos que faíscam, confete) — se a animação não rodar, some o
-   efeito e o resultado do sorteio continua na tela. Nome, resultado, semente e o número
-   da contagem só animam transform.
-*/
-
-/* Holofotes girando atrás da roda. */
-@keyframes lobCerHolofote {
-  to {
-    transform: rotate(360deg);
-  }
-}
-/* Pulso do anel de brilho. */
-@keyframes lobCerPulso {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 0.55;
-  }
-  50% {
-    transform: scale(1.06);
-    opacity: 0.95;
-  }
-}
-/* Tremor da tela na reta final da freada. */
-@keyframes lobCerTremor {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0);
-  }
-  20% {
-    transform: translate3d(-3px, 2px, 0) rotate(-0.22deg);
-  }
-  40% {
-    transform: translate3d(3px, -2px, 0) rotate(0.22deg);
-  }
-  60% {
-    transform: translate3d(-2px, -2px, 0) rotate(-0.14deg);
-  }
-  80% {
-    transform: translate3d(2px, 2px, 0) rotate(0.14deg);
-  }
-}
-/* Ponteiro batendo na fatia que passa. */
-@keyframes lobCerTique {
-  0% {
-    transform: rotate(0deg);
-  }
-  22% {
-    transform: rotate(-19deg);
-  }
-  55% {
-    transform: rotate(5deg);
-  }
-  100% {
-    transform: rotate(0deg);
-  }
-}
-/* Número da contagem regressiva: entra grande e assenta. É CONTEÚDO (o "3, 2, 1"), então
-   só escala e gira — antes ele também nascia quase transparente (0.15) e saía a 0.25, e
-   com o relógio de animação parado o número ficava apagado na tela. */
-@keyframes lobCerContagem {
-  0% {
-    transform: scale(2.6) rotate(-9deg);
-  }
-  45% {
-    transform: scale(1) rotate(0deg);
-  }
-  100% {
-    transform: scale(0.86) rotate(2deg);
-  }
-}
-/* Chegada do vencedor: estoura, passa do ponto e volta. */
-@keyframes lobCerSlam {
-  0% {
-    transform: scale(2.3) rotate(-7deg);
-  }
-  55% {
-    transform: scale(0.92) rotate(2deg);
-  }
-  75% {
-    transform: scale(1.05) rotate(-1deg);
-  }
-  100% {
-    transform: scale(1) rotate(0deg);
-  }
-}
-/* Confete caindo e rodopiando. */
-@keyframes lobCerConfete {
-  0% {
-    transform: translate3d(0, -12vh, 0) rotate(0deg) scale(1);
-    opacity: 1;
-  }
-  100% {
-    transform: translate3d(var(--lob-cer-desvio, 0px), 108vh, 0) rotate(var(--lob-cer-giro, 720deg))
-      scale(0.7);
-    opacity: 0;
-  }
-}
-/* Faixas de velocidade: giram rápido enquanto a roda está solta. */
-@keyframes lobCerVelocidade {
-  to {
-    transform: rotate(-360deg);
-  }
-}
-/* Frase boba trocando: entra por baixo. */
-@keyframes lobCerFrase {
-  from {
-    transform: translateY(9px);
-  }
-  to {
-    transform: none;
-  }
-}
-/* Faísca da borda. */
-@keyframes lobCerFaisca {
-  0%,
-  100% {
-    transform: scale(0.7);
-    opacity: 0.25;
-  }
-  50% {
-    transform: scale(1.25);
-    opacity: 1;
-  }
-}
-
-.lob-cer-holofote {
-  animation: lobCerHolofote 14s linear infinite;
-}
-.lob-cer-pulso {
-  animation: lobCerPulso 1.7s ease-in-out infinite;
-}
-.lob-cer-tremor {
-  animation: lobCerTremor 0.34s linear infinite;
-}
-.lob-cer-tique {
-  animation: lobCerTique 0.32s ease-out;
-}
-.lob-cer-contagem {
-  animation: lobCerContagem 0.92s ease-out;
-}
-.lob-cer-slam {
-  animation: lobCerSlam 0.72s cubic-bezier(0.2, 1.5, 0.4, 1);
-}
-.lob-cer-confete {
-  animation: lobCerConfete var(--lob-cer-dur, 2.6s) linear var(--lob-cer-atraso, 0s) forwards;
-}
-.lob-cer-velocidade {
-  animation: lobCerVelocidade 0.9s linear infinite;
-}
-.lob-cer-frase {
-  animation: lobCerFrase 0.36s ease-out;
-}
-.lob-cer-faisca {
-  animation: lobCerFaisca 1.4s ease-in-out infinite;
-}
-
-/* ============================================================
    DRAFT AO VIVO — keyframes do handoff de design
    ============================================================
    Tempos e curvas exatamente como no `README.md` do handoff.
@@ -941,6 +782,18 @@ a:hover {
 .lobd-tv header,
 .lobd-tv footer,
 .lobd-tv [role="status"][style*="ffcf3f"] {
+  display: none !important;
+}
+
+/*
+  MODO TRANSMISSÃO da página da partida (components/series-live-draw.tsx): sobra o cartaz do
+  confronto e a arena do sorteio, para o OBS capturar a janela sem o resto do site. Mesmo
+  esquema do modo TV do draft — a classe vive no <html> porque o cabeçalho está fora da árvore.
+*/
+.lob-palco header,
+.lob-palco footer,
+.lob-palco [data-fora-do-palco],
+.lob-palco [role="status"][style*="ffcf3f"] {
   display: none !important;
 }
 

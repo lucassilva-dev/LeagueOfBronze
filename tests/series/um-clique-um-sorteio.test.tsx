@@ -168,7 +168,10 @@ describe("a cerimônia revela o resultado — e revela mesmo sem animação", ()
     fireEvent.click(await screen.findByRole("button", { name: /sortear lados/i }));
 
     const dialogo = await screen.findByRole("dialog");
-    await waitFor(() => expect(dialogo.textContent).toContain("Vanguarda de Ferro"));
+    // Os nomes dos times já aparecem na abertura (a barra do confronto); o sinal de que o
+    // resultado chegou é a semente, que só existe depois da resposta do servidor.
+    await waitFor(() => expect(dialogo.textContent).toContain("a".repeat(32)));
+    expect(dialogo.textContent).toContain("Vanguarda de Ferro");
 
     // O lado sorteado, com os dois lados nomeados.
     expect(dialogo.textContent).toContain("Lado Azul");
@@ -190,5 +193,153 @@ describe("a cerimônia revela o resultado — e revela mesmo sem animação", ()
     expect(dialogo.style.zIndex).toBe("9000");
     expect(dialogo.style.background).toBe("rgb(11, 8, 4)");
     expect(dialogo.style.position).toBe("fixed");
+  });
+});
+
+describe("StrictMode (desenvolvimento): o efeito roda duas vezes, o sorteio uma", () => {
+  it("em <StrictMode> um clique faz UM pedido e a encenação anda (não congela na abertura)", async () => {
+    const { StrictMode } = await import("react");
+    const t = times();
+    render(
+      <StrictMode>
+        <SeriesLiveDraw seriesId="serie-15" teamA={t.a} teamB={t.b} initialCards={[]} />
+      </StrictMode>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: /sortear lados/i }));
+
+    const dialogo = await screen.findByRole("dialog");
+    // O StrictMode monta → limpa → monta o efeito. Antes, a 2ª montagem saía cedo pela trava do
+    // pedido e a cerimônia ficava parada na abertura para sempre; agora a encenação recomeça e
+    // a contagem chega — com UM só POST.
+    await waitFor(() => expect(dialogo.getAttribute("data-fase")).toBe("contagem"), { timeout: 4000 });
+    expect(sorteios, "o StrictMode não pode dobrar o sorteio").toBe(1);
+  });
+});
+
+describe("ENSAIO técnico: a cerimônia inteira sem sortear nem gravar", () => {
+  it("não faz pedido ao servidor, mostra a marca do ensaio e não mexe na página", async () => {
+    vi.stubGlobal("matchMedia", (consulta: string) => ({
+      matches: consulta.includes("prefers-reduced-motion"),
+      media: consulta,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+    desenhar();
+    fireEvent.click(await screen.findByRole("button", { name: /ensaio: lados/i }));
+
+    const dialogo = await screen.findByRole("dialog");
+    expect(dialogo.textContent).toContain("ENSAIO · NADA FOI SORTEADO");
+    // O resultado de demonstração chega (sem rede) e a revelação monta com o crédito do ensaio.
+    await waitFor(() => expect(dialogo.textContent).toContain("ensaio técnico: nada foi sorteado nem gravado"), {
+      timeout: 3000,
+    });
+    expect(sorteios, "o ensaio nunca chama a rota do sorteio").toBe(0);
+    expect(roteador.refresh).not.toHaveBeenCalled();
+
+    // Fechou: a arena continua "a sortear" — o ensaio não aplicou nada.
+    fireEvent.click(screen.getAllByRole("button", { name: /fechar/i })[0]!);
+    expect(screen.getAllByText(/a sortear/i)).toHaveLength(2);
+  });
+});
+
+describe("erro honesto: «nada foi gravado» só quando a rota recusou", () => {
+  /** A sessão de sempre, e o sorteio respondendo com o que o teste mandar. */
+  function rotaDoSorteio(resposta: () => Response) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (String(url).includes("/api/admin/session")) {
+          return new Response(JSON.stringify({ authorized: true, user: { isMaster: true, scopes: [] } }));
+        }
+        if (String(url).includes("/api/admin/series/sorteio")) {
+          sorteios += 1;
+          return resposta();
+        }
+        throw new Error(`fetch inesperado: ${url}`);
+      }),
+    );
+  }
+
+  const SEM_CONEXAO = "O sorteio PODE ter sido gravado";
+
+  it("gateway fora do ar (502 em HTML): PODE ter sido gravado — e a página confere ao fechar", async () => {
+    rotaDoSorteio(() => new Response("<html><body>502 Bad Gateway</body></html>", { status: 502 }));
+    desenhar();
+    fireEvent.click(await screen.findByRole("button", { name: /sortear lados/i }));
+
+    const dialogo = await screen.findByRole("dialog");
+    await waitFor(() => expect(dialogo.getAttribute("data-fase")).toBe("erro"));
+    expect(dialogo.textContent).toContain(SEM_CONEXAO);
+    expect(dialogo.textContent).not.toContain("HTTP 502");
+
+    fireEvent.click(screen.getAllByRole("button", { name: /fechar/i })[0]!);
+    expect(roteador.refresh, "o servidor pode ter gravado: a página busca o estado de verdade").toHaveBeenCalledTimes(1);
+  });
+
+  it("200 com corpo ilegível (a conexão caiu no meio da resposta): o sorteio JÁ está gravado", async () => {
+    rotaDoSorteio(() => new Response('{"ok":true,"sorteio":{"tipo":"la', { status: 200 }));
+    desenhar();
+    fireEvent.click(await screen.findByRole("button", { name: /sortear lados/i }));
+
+    const dialogo = await screen.findByRole("dialog");
+    await waitFor(() => expect(dialogo.getAttribute("data-fase")).toBe("erro"));
+    expect(dialogo.textContent).toContain(SEM_CONEXAO);
+  });
+
+  it("a rota recusou com o JSON dela (409): a mensagem dela, e nada a conferir", async () => {
+    rotaDoSorteio(
+      () =>
+        new Response(JSON.stringify({ error: "Alguém salvou o campeonato enquanto você sorteava.", conflict: true }), {
+          status: 409,
+        }),
+    );
+    desenhar();
+    fireEvent.click(await screen.findByRole("button", { name: /sortear lados/i }));
+
+    const dialogo = await screen.findByRole("dialog");
+    await waitFor(() => expect(dialogo.getAttribute("data-fase")).toBe("erro"));
+    expect(dialogo.textContent).toContain("Alguém salvou o campeonato enquanto você sorteava.");
+    expect(dialogo.textContent).not.toContain(SEM_CONEXAO);
+
+    fireEvent.click(screen.getAllByRole("button", { name: /fechar/i })[0]!);
+    expect(roteador.refresh).not.toHaveBeenCalled();
+  });
+});
+
+describe("com a cerimônia no ar, a página de baixo não recebe foco", () => {
+  it("o resto do <body> fica inerte enquanto o show está aberto, e volta ao fechar", async () => {
+    const tela = desenhar();
+    fireEvent.click(await screen.findByRole("button", { name: /sortear lados/i }));
+    await screen.findByRole("dialog");
+
+    // Com Shift+Tab o operador chegava aos botões da arena por trás do palco.
+    expect(tela.container.hasAttribute("inert")).toBe(true);
+
+    fireEvent.click(screen.getAllByRole("button", { name: /fechar/i })[0]!);
+    expect(tela.container.hasAttribute("inert")).toBe(false);
+  });
+});
+
+describe("show completo com «reduzir movimento» no sistema (o Windows com efeitos desligados)", () => {
+  it("o 1º sorteio depois de abrir a página já respeita o show completo salvo", async () => {
+    vi.stubGlobal("matchMedia", (consulta: string) => ({
+      matches: consulta.includes("prefers-reduced-motion"),
+      media: consulta,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+    window.localStorage.setItem("lob-show-completo", "1");
+    try {
+      desenhar();
+      fireEvent.click(await screen.findByRole("button", { name: /sortear lados/i }));
+      const dialogo = await screen.findByRole("dialog");
+      // Show completo = não é a versão calma: sem `data-reduzido`, e a encenação chega à contagem
+      // (na calma ela pularia direto para o resultado).
+      expect(dialogo.hasAttribute("data-reduzido")).toBe(false);
+      await waitFor(() => expect(dialogo.getAttribute("data-fase")).toBe("contagem"), { timeout: 4000 });
+      expect(sorteios).toBe(1);
+    } finally {
+      window.localStorage.removeItem("lob-show-completo");
+    }
   });
 });

@@ -15,7 +15,8 @@ import { describe, expect, it } from "vitest";
  *  - `lobdRise`, a frase da ordem serpentina, idem.
  *
  * Numa TV com a aba da transmissão atrás do OBS, a plateia via o cartão vazio. E o número
- * da contagem da cerimônia de sorteio (`lobCerContagem`) nascia a 0.15 de opacidade.
+ * da contagem da antiga cerimônia de sorteio nascia a 0.15 de opacidade (a cerimônia de hoje
+ * tem CSS próprio, conferido por tests/series/show-css-estrutura.test.ts).
  *
  * Fica permitido animar opacidade SÓ nos enfeites `aria-hidden` e sem texto (a lista
  * abaixo). Enfeite novo com opacidade entra na lista de propósito, não por descuido.
@@ -52,15 +53,12 @@ const ENFEITES = new Set([
   "lobdPulse", // quadradinho ao lado do time da vez (nasce opaco)
   "lobdFlash", // clarão radial atrás da revelação
   "lobdConfetti", // confete do fim do draft
-  "lobCerPulso", // anel de brilho atrás da roleta
-  "lobCerConfete", // confete da cerimônia
-  "lobCerFaisca", // parafusos do aro da roleta
 ]);
 
 describe("keyframes de conteúdo animam só transform", () => {
   const todos = keyframes();
 
-  it.each(["lobdRise", "lobdSlam", "lobCerContagem", "fadeUp"])("%s", (nome) => {
+  it.each(["lobdRise", "lobdSlam", "fadeUp"])("%s", (nome) => {
     const corpo = todos.get(nome);
     expect(corpo, `@keyframes ${nome} sumiu do CSS`).toBeDefined();
     expect(corpo).toContain("transform");

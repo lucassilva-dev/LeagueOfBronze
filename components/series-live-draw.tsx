@@ -1,23 +1,47 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { preload } from "react-dom";
 import { useRouter } from "next/navigation";
-import { Shuffle, Swords, Users } from "lucide-react";
+import { Lock, Maximize2, MonitorPlay, Shuffle, Swords, Users, Volume1, Volume2, VolumeX } from "lucide-react";
 
 import type { CardId } from "@/lib/schema";
-import { CARDS_BY_ID } from "@/lib/cards";
+import { CARDS_BY_ID, CARTAS_ATIVAS, letraDaCarta, type CardDef } from "@/lib/cards";
 import { compartilhados } from "@/lib/i18n/messages/compartilhados";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { paginasStats } from "@/lib/i18n/messages/paginas-stats";
+import { coresDoConfronto } from "@/lib/series/cores-do-confronto";
+import { identidadeDoTime } from "@/lib/series/identidade-do-time";
+import { criarSomDaCerimonia } from "@/lib/series/som-da-cerimonia";
 import {
   CerimoniaDeSorteio,
   type PedidoDeSorteio,
+  type RespostaSorteio,
+  type TextosDaCerimonia,
 } from "@/components/series/cerimonia-de-sorteio";
+import { EscudoDoShow, NomeDoTime, type TimeDoShow } from "@/components/series/escudo-do-show";
+import type { TextoDaCarta } from "@/components/series/palco-das-cartas";
+import {
+  DEGRAUS_DE_VOLUME,
+  useMovimentoReduzidoDoSistema,
+  useShowCompleto,
+  useTelaCheia,
+  useVolumeDoShow,
+} from "@/components/series/preferencias-do-show";
+
+import p from "@/components/partida/partida.module.css";
 
 /** Textos do bloco. Opcional: sem eles o sorteio fica em português (padrão do site). */
 type TextosSorteio = (typeof compartilhados)["pt"];
 
-type TeamRef = { id: string; name: string };
+/** O time como a página entrega: id e nome sempre; escudo, slug e fonte do tema quando houver. */
+type TimeRef = Readonly<{
+  id: string;
+  name: string;
+  slug?: string | null;
+  imageUrl?: string | null;
+  /** A classe do next/font da fonte de título do tema (a página resolve no servidor). */
+  fonteClasse?: string | null;
+}>;
 type Drawn = { teamId: string; cardId: string; dupla?: boolean };
 
 type Sorteio = {
@@ -27,100 +51,52 @@ type Sorteio = {
   /** Time que recebeu a carta (ausente no sorteio duplo, que vale para os dois). */
   teamId?: string;
   resultado: string;
-  detalhe?: { letras?: [string, string]; campeoes?: number };
-};
-type RespostaSorteio = {
-  sorteio?: Sorteio;
-  blueSideTeamId?: string | null;
-  cardsUsed?: ReadonlyArray<{ teamId: string; cardId: string; dupla?: boolean }>;
-  vezes?: number;
+  detalhe?: { letras?: [string, string]; campeoes?: number; dupla?: boolean };
 };
 type SessaoAdmin = {
   authorized?: boolean;
   user?: { isMaster?: boolean; scopes?: string[] };
 };
 
-// Declarado fora do render: componente criado durante o render perde o estado a cada
-// re-render (e o lint do React barra).
-function SideChip({
-  label,
-  color,
-  team,
-}: Readonly<{
-  label: string;
-  color: string;
-  team: TeamRef | null;
-}>) {
-  return (
-    <div
-      className="flex flex-1 flex-col items-center gap-1 rounded-2xl border p-3"
-      style={{ borderColor: `${color}55`, background: `${color}12` }}
-    >
-      <span className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color }}>
-        {label}
-      </span>
-      <span className="text-sm font-semibold text-center">{team?.name ?? "—"}</span>
-    </div>
-  );
+/**
+ * Os dois times com a identidade visual do tema e a cor de palco do confronto, memoizados por
+ * PRIMITIVOS (ver o comentário no uso).
+ */
+function useTimesDoShow(a: TimeRef | null, b: TimeRef | null): [TimeDoShow, TimeDoShow] {
+  const [idA, nomeA, slugA, imagemA, fonteA] = [a?.id, a?.name, a?.slug ?? null, a?.imageUrl ?? null, a?.fonteClasse ?? null];
+  const [idB, nomeB, slugB, imagemB, fonteB] = [b?.id, b?.name, b?.slug ?? null, b?.imageUrl ?? null, b?.fonteClasse ?? null];
+  return useMemo(() => {
+    const ia = identidadeDoTime(idA && nomeA ? { id: idA, name: nomeA, slug: slugA, imageUrl: imagemA } : null, "A");
+    const ib = identidadeDoTime(idB && nomeB ? { id: idB, name: nomeB, slug: slugB, imageUrl: imagemB } : null, "B");
+    const [palcoA, palcoB] = coresDoConfronto(ia.candidatasDePalco, ib.candidatasDePalco);
+    return [
+      { ...ia, fonteClasse: fonteA, corDePalco: palcoA },
+      { ...ib, fonteClasse: fonteB, corDePalco: palcoB },
+    ];
+  }, [idA, nomeA, slugA, imagemA, fonteA, idB, nomeB, slugB, imagemB, fonteB]);
 }
 
-function CardFace({
-  cardId,
-  t,
-  nomesCartas,
-}: Readonly<{
-  cardId?: string | null;
-  t: TextosSorteio;
-  nomesCartas?: Record<string, string>;
-}>) {
-  const def = cardId ? CARDS_BY_ID[cardId as CardId] : undefined;
-  // O nome traduzido vem da página; sem ele vale o título em português de lib/cards.ts.
-  const nome = def ? (nomesCartas?.[def.id] ?? def.title) : undefined;
-  return (
-    <div className="flex flex-col items-center gap-2 text-center">
-      <div
-        className="relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl text-5xl shadow-glow"
-        style={{
-          background: def
-            ? `linear-gradient(135deg, ${def.from}, ${def.to})`
-            : "rgba(255,255,255,0.04)",
-          border: def ? `1px solid ${def.border}` : undefined,
-        }}
-      >
-        {def?.imageUrl ? (
-          // Mesma arte da página /cartas — o emoji fica só como reserva.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={def.imageUrl}
-            alt={def.title}
-            className="absolute inset-0 h-full w-full object-cover"
-          />
-        ) : (
-          <span aria-hidden>{def?.emoji ?? "🎴"}</span>
-        )}
-      </div>
-      <p className="text-sm font-semibold">{nome ?? t.sorteioSemCarta}</p>
-      {def?.dupla ? (
-        <span className="text-[10px] uppercase tracking-[0.12em] text-accent2">
-          {t.sorteioCartaDupla}
-        </span>
-      ) : null}
-    </div>
-  );
+/** Os textos de cada carta (nome, sabor, regra, frase concreta) — da página, ou o padrão em pt. */
+function textosPadraoDasCartas(): Record<string, TextoDaCarta> {
+  return paginasStats.pt.cartas as Record<string, TextoDaCarta>;
 }
 
 /**
- * O bloco de sorteio na página pública da partida.
+ * A ARENA DO SORTEIO — o bloco de sorteios na página pública da partida.
  *
- * Ele MOSTRA o estado atual (quem está no lado azul, que cartinha cada time tirou) e, para
- * quem tem escopo, abre a cerimônia em tela cheia — a roleta. O sorteio em si não acontece
- * aqui nem na cerimônia: acontece em `POST /api/admin/series/sorteio`, no servidor, com uma
- * semente gravada na série.
+ * Ela MOSTRA o estado atual (quem está em cada lado do jogo 1, que cartinha cada time tirou, de
+ * onde veio cada resultado) e, para quem tem escopo, abre o SHOW em tela cheia
+ * (`CerimoniaDeSorteio`). O sorteio em si não acontece aqui nem na cerimônia: acontece em
+ * `POST /api/admin/series/sorteio`, no servidor, com uma semente gravada na série.
  *
- * Antes deste arquivo existir assim, o botão sorteava no próprio navegador com
+ * Antes de este arquivo existir assim, o botão sorteava no próprio navegador com
  * `Math.random()` e mandava o resultado pronto — dava para recarregar e sortear de novo até
  * gostar. E a gravação era `fetch(...).catch(() => {})`, então falha de rede deixava a tela
  * mostrando um resultado que nunca foi salvo.
+ *
+ * Para a transmissão, a organização ganha um painel: MODO TRANSMISSÃO (esconde o cabeçalho e o
+ * resto da página, deixando o confronto e a arena), TELA CHEIA, TESTAR SOM (calibrar o OBS antes
+ * de entrar no ar) e o aviso de movimento reduzido do sistema, que mataria o show ao vivo.
  */
 export function SeriesLiveDraw({
   seriesId,
@@ -128,45 +104,58 @@ export function SeriesLiveDraw({
   teamB,
   initialCards,
   initialBlueSideTeamId,
-  initialUltimoCarta,
+  initialSorteiosDasCartas,
+  initialUltimoLados,
   textos: t = compartilhados.pt,
   nomesCartas,
+  textosDasCartas,
+  ladosTravados = false,
+  decididaPorWo = false,
 }: Readonly<{
   seriesId: string;
-  teamA: TeamRef | null;
-  teamB: TeamRef | null;
+  teamA: TimeRef | null;
+  teamB: TimeRef | null;
   initialCards: Drawn[];
   initialBlueSideTeamId?: string | null;
   /**
-   * O último sorteio de CARTA já gravado nesta série.
+   * O último registro de CARTA (sorteio ou correção à mão) de cada time, por id do time — o
+   * sorteio duplo, que não tem time, vale para os dois (ver `registrosDasCartasPorTime`).
    *
-   * As letras do ABCDRAFT e a linha de procedência (semente e autor) vinham só da
-   * resposta da cerimônia, então existiam apenas na aba de quem clicou: qualquer recarga
-   * — ou qualquer outra pessoa abrindo a página — via a carta sem as letras que a
-   * completam e sem a semente que permite conferir o sorteio. Justamente a informação que
-   * torna o resultado auditável era a que não sobrevivia.
-   *
-   * É o último sorteio de CARTA, e não o último de qualquer tipo: se o último tivesse
-   * sido de lados, a seção de cartinhas passaria a exibir a semente do sorteio de lados.
+   * As letras do ABCDRAFT e a linha de procedência (semente e autor) vinham só da resposta da
+   * cerimônia, então existiam apenas na aba de quem clicou: qualquer recarga — ou qualquer outra
+   * pessoa abrindo a página — via a carta sem as letras que a completam e sem a semente que
+   * permite conferir o sorteio. E é POR TIME: com um registro só ("o último sorteio de carta"),
+   * sortear a carta do time B apagava da tela as letras e a semente da carta do time A.
    */
-  initialUltimoCarta?: Sorteio | null;
+  initialSorteiosDasCartas?: Readonly<Record<string, Sorteio>>;
+  /**
+   * O último sorteio (ou correção à mão) de LADOS. A procedência dos lados fica à vista como a
+   * das cartas: sem a semente, "o servidor sorteou" vira "confie em nós".
+   */
+  initialUltimoLados?: Sorteio | null;
   textos?: TextosSorteio;
   /** Nome de cada cartinha por id, traduzido. Opcional: sem ele vale lib/cards.ts (pt). */
   nomesCartas?: Record<string, string>;
+  /** Nome, sabor, regra e frase concreta de cada carta, traduzidos (a cerimônia mostra). */
+  textosDasCartas?: Record<string, TextoDaCarta>;
+  /** O jogo 1 já foi registrado: o servidor recusaria sortear os lados. */
+  ladosTravados?: boolean;
+  /** Série decidida por W.O.: não há partida para sortear. */
+  decididaPorWo?: boolean;
 }>) {
   const [podeLados, setPodeLados] = useState(false);
   const [podeCartas, setPodeCartas] = useState(false);
-  const [blueSideTeamId, setBlueSideTeamId] = useState<string | null>(
-    initialBlueSideTeamId ?? null,
-  );
+  const [blueSideTeamId, setBlueSideTeamId] = useState<string | null>(initialBlueSideTeamId ?? null);
   const [cardByTeam, setCardByTeam] = useState<Record<string, string | null>>(() => {
     const map: Record<string, string | null> = {};
     for (const card of initialCards) map[card.teamId] = card.cardId;
     return map;
   });
   const [isDupla, setIsDupla] = useState(() => initialCards.some((card) => card.dupla));
-  const [ultimo, setUltimo] = useState<Sorteio | null>(initialUltimoCarta ?? null);
+  const [sorteiosDasCartas, setSorteiosDasCartas] = useState<Record<string, Sorteio>>(() => ({ ...initialSorteiosDasCartas }));
+  const [ultimoLados, setUltimoLados] = useState<Sorteio | null>(initialUltimoLados ?? null);
   const [pedido, setPedido] = useState<PedidoDeSorteio | null>(null);
+  const [emTransmissao, setEmTransmissao] = useState(false);
   /*
    * Conta os cliques só para servir de `key` à cerimônia.
    *
@@ -175,16 +164,39 @@ export function SeriesLiveDraw({
    * `router.refresh()` — o que gravou 24 sorteios a partir de um clique só.
    */
   const [rodada, setRodada] = useState(0);
+  /** Quantos ensaios já rodaram (o resultado de demonstração alterna a cada um). */
+  const ensaios = useRef(0);
+  /** Há resultado novo que o resto da página (servidor) ainda não mostra. */
+  const atualizarDepois = useRef(false);
+  const cerimoniaAberta = useRef(false);
 
-  const abrir = useCallback((p: PedidoDeSorteio) => {
+  const reduzidoDoSistema = useMovimentoReduzidoDoSistema();
+  const [showCompleto, setShowCompleto] = useShowCompleto();
+  const [telaCheia, alternarTelaCheia] = useTelaCheia();
+  // O volume é UM só: o do «Testar som» é o que a cerimônia vai tocar na live.
+  const [degrau, proximoVolume, alternarMudo] = useVolumeDoShow();
+
+  /*
+   * A identidade de cada time memoizada por PRIMITIVOS, nunca pelo objeto `teamA`/`teamB`.
+   * `router.refresh()` devolve times novos em memória — mesmos dados, outra identidade —, e um
+   * memo por objeto recalculava, a cerimônia via dependência nova e sorteava OUTRA VEZ (um
+   * clique virou 24 sorteios gravados em 52 segundos).
+   */
+  const [timeA, timeB] = useTimesDoShow(teamA, teamB);
+  const temOsDois = Boolean(teamA && teamB);
+  const idA = timeA.id;
+  const idB = timeB.id;
+
+  const abrir = useCallback((novo: PedidoDeSorteio) => {
     setRodada((n) => n + 1);
-    setPedido(p);
+    cerimoniaAberta.current = true;
+    setPedido(novo);
   }, []);
   const router = useRouter();
 
   useEffect(() => {
-    // `authorized` sozinho só diz que é da organização. Sortear lado e sortear carta
-    // são escopos distintos — oferecer o botão a quem não os tem só entrega um 403.
+    // `authorized` sozinho só diz que é da organização. Sortear lado e sortear carta são
+    // escopos distintos — oferecer o botão a quem não os tem só entrega um 403.
     fetch("/api/admin/session", { credentials: "same-origin", cache: "no-store" })
       .then((response) => response.json())
       .then((data: SessaoAdmin) => {
@@ -197,25 +209,51 @@ export function SeriesLiveDraw({
       .catch(() => {});
   }, []);
 
+  // Quem vai conduzir o sorteio de cartas já baixa as artes: na virada da carta, ao vivo, a
+  // imagem precisa estar pronta (sem ela entra o emoji de reserva).
+  useEffect(() => {
+    if (!podeCartas) return;
+    for (const carta of CARTAS_ATIVAS) if (carta.imageUrl) preload(carta.imageUrl, { as: "image" });
+  }, [podeCartas]);
+
+  /*
+   * MODO TRANSMISSÃO: a classe vive no <html> porque o cabeçalho do site está fora desta árvore
+   * (o mesmo padrão do modo TV do draft). Esconde cabeçalho, rodapé e as seções marcadas
+   * `data-fora-do-palco`, deixando o confronto e a arena para o OBS.
+   */
+  useEffect(() => {
+    if (!emTransmissao) return;
+    const raiz = document.documentElement;
+    raiz.classList.add("lob-palco");
+    window.scrollTo({ top: 0 });
+    return () => raiz.classList.remove("lob-palco");
+  }, [emTransmissao]);
+
   /**
    * O resultado já está gravado quando isto roda — a cerimônia avisa assim que o servidor
-   * responde, ainda com a roda desacelerando.
+   * responde, ainda com a peça girando.
    *
-   * A tela é sincronizada aqui A PARTIR DA RESPOSTA, e não só por `router.refresh()`: os
-   * estados locais nascem de `useState` com valor inicial, e um refresh do servidor não
-   * reexecuta inicializador de estado. Sem isto, fechar a cerimônia mostraria o valor antigo.
+   * A arena é sincronizada aqui A PARTIR DA RESPOSTA: os estados locais nascem de `useState`
+   * com valor inicial, e um refresh do servidor não reexecuta inicializador de estado.
+   *
+   * O `router.refresh()` (que re-renderiza a página inteira: placar, bandeira de lado no herói)
+   * fica para QUANDO A CERIMÔNIA FECHAR. Disparado no meio do freio, ele disputava a thread com
+   * a animação — o engasgo aparecia justamente na hora que a plateia está olhando.
    */
   const aplicarResposta = useCallback(
     (resposta: RespostaSorteio) => {
-      // Só sorteio de CARTA entra em `ultimo`: ele alimenta as letras do ABCDRAFT e a
-      // linha de semente/autor da seção de cartinhas. Carimbar um sorteio de LADOS ali
-      // fazia a seção de cartas exibir a semente e o autor do sorteio de lados — e some
-      // com as letras da carta que continua na tela. É a mesma escolha que
-      // `initialUltimoCarta` já faz ao hidratar do servidor.
-      if (resposta.sorteio && resposta.sorteio.tipo !== "lados") setUltimo(resposta.sorteio);
+      // Só sorteio de CARTA entra em `sorteiosDasCartas` (as letras do ABCDRAFT e a semente de
+      // cada vaga): carimbar um sorteio de LADOS ali fazia a vaga exibir a semente dos lados.
+      if (resposta.sorteio && resposta.sorteio.tipo !== "lados") {
+        const registro = resposta.sorteio as Sorteio;
+        // Individual: o time dele. Duplo (sem time): vale para os dois.
+        const donos = registro.teamId ? [registro.teamId] : [idA, idB];
+        setSorteiosDasCartas((antes) => ({ ...antes, ...Object.fromEntries(donos.map((id) => [id, registro])) }));
+      }
 
       if (resposta.sorteio?.tipo === "lados") {
         setBlueSideTeamId(resposta.blueSideTeamId ?? null);
+        setUltimoLados(resposta.sorteio as Sorteio);
       } else {
         const cartas = resposta.cardsUsed ?? [];
         const mapa: Record<string, string | null> = {};
@@ -224,176 +262,442 @@ export function SeriesLiveDraw({
         setIsDupla(cartas.some((c) => c.dupla));
       }
 
-      // O resto da página (histórico de sorteios, jogos) vem do servidor.
-      router.refresh();
+      if (cerimoniaAberta.current) atualizarDepois.current = true;
+      else router.refresh();
     },
-    [router],
+    [router, idA, idB],
   );
 
-  const blueTeam =
-    teamA && teamB
-      ? blueSideTeamId === teamB.id
-        ? teamB
-        : blueSideTeamId === teamA.id
-          ? teamA
-          : null
-      : null;
-  const redTeam = blueTeam ? (blueTeam.id === teamA?.id ? teamB : teamA) : null;
+  /** A resposta não veio (rede, gateway): o sorteio PODE estar gravado — a página confere ao fechar. */
+  const respostaIncerta = useCallback(() => {
+    atualizarDepois.current = true;
+  }, []);
 
-  /**
-   * O último registro é um SORTEIO de carta (não uma correção à mão) e a carta na tela é a
-   * que ele deu. Só então as letras dele descrevem o que está à vista.
+  const fecharCerimonia = useCallback(() => {
+    cerimoniaAberta.current = false;
+    setPedido(null);
+    if (atualizarDepois.current) {
+      atualizarDepois.current = false;
+      router.refresh();
+    }
+  }, [router]);
+
+  const volume = DEGRAUS_DE_VOLUME[degrau] ?? 0.65;
+  const testarSom = useCallback(() => {
+    const som = criarSomDaCerimonia(volume);
+    if (!som) return;
+    som.abertura();
+    setTimeout(() => som.revelar("azul"), 900);
+    setTimeout(() => som.fechar(), 5200);
+  }, [volume]);
+  const IconeDoVolume = volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
+  const rotuloDoVolume = `${t.cerimoniaSom}: ${t.cerimoniaVolumes[degrau] ?? ""}`;
+
+  const blueTeam = temOsDois ? (blueSideTeamId === timeB.id ? timeB : blueSideTeamId === timeA.id ? timeA : null) : null;
+  const redTeam = blueTeam ? (blueTeam.id === timeA.id ? timeB : timeA) : null;
+
+  /*
+   * O registro só descreve a vaga se a carta à vista é a que ELE deu: depois de uma correção à
+   * mão, letras e semente antigas embaixo da carta nova pareciam ter produzido a nova.
    */
-  const ultimoValeParaACartaAtual =
-    ultimo?.tipo === "carta" &&
-    (ultimo.teamId
-      ? cardByTeam[ultimo.teamId] === ultimo.resultado
-      : Object.values(cardByTeam).includes(ultimo.resultado));
+  const registroDaVaga = (teamId: string): Sorteio | null => {
+    const registro = sorteiosDasCartas[teamId];
+    return registro && cardByTeam[teamId] === registro.resultado ? registro : null;
+  };
+  const registroA = registroDaVaga(idA);
+  const registroB = registroDaVaga(idB);
+  // O sorteio duplo é UM registro para as duas vagas (a mesma semente): a procedência sai uma
+  // vez, embaixo delas. Correções à mão de dupla são uma por time e ficam em cada vaga.
+  const registroDuplo =
+    isDupla && registroA && registroB && registroA.semente !== "" && registroA.semente === registroB.semente ? registroA : null;
 
-  const renderTeam = (team: TeamRef | null) => {
-    if (!team) return null;
-    return (
-      <div className="flex flex-col items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.02] p-4">
-        <p className="text-xs uppercase tracking-[0.14em] text-muted">{team.name}</p>
-        <CardFace cardId={cardByTeam[team.id]} t={t} nomesCartas={nomesCartas} />
-        {podeCartas ? (
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => abrir({ tipo: "carta", teamId: team.id })}
-          >
-            <Shuffle className="h-4 w-4" /> {t.sorteioBotaoSortear}
-          </Button>
-        ) : null}
-      </div>
-    );
+  const cartasDaPagina = textosDasCartas ?? textosPadraoDasCartas();
+  const podeAlgo = podeLados || podeCartas;
+  const semSorteio = decididaPorWo;
+
+  const textosDaCerimonia: TextosDaCerimonia = {
+    titulo: t.cerimoniaTitulo,
+    fechar: t.cerimoniaFechar,
+    vai: t.cerimoniaVai,
+    ladoAzul: t.sorteioLadoAzul,
+    ladoVermelho: t.sorteioLadoVermelho,
+    resultado: t.cerimoniaResultado,
+    semente: t.sorteioSemente,
+    porFulano: t.sorteioPorFulano,
+    falhou: t.sorteioFalhou,
+    semConexao: t.cerimoniaSemConexao,
+    semResposta: t.cerimoniaSemResposta,
+    repetido: t.sorteioRepetido,
+    sorteando: t.sorteioSorteando,
+    frases: t.cerimoniaFrases,
+    tituloLados: t.cerimoniaTituloLados,
+    tituloCarta: t.cerimoniaTituloCarta,
+    tituloDupla: t.cerimoniaTituloDupla,
+    perguntaLados: t.cerimoniaPerguntaLados,
+    jogo1: t.cerimoniaJogo1,
+    comecaNo: t.cerimoniaComecaNo,
+    som: t.cerimoniaSom,
+    volumes: t.cerimoniaVolumes,
+    telaCheia: t.cerimoniaTelaCheia,
+    sairDaTelaCheia: t.cerimoniaSairDaTelaCheia,
+    reduzidoAviso: t.cerimoniaReduzidoAviso,
+    showCompleto: t.cerimoniaShowCompleto,
+    atalhos: t.cerimoniaAtalhos,
+    atalhosTelaCheia: t.cerimoniaAtalhosTelaCheia,
+    atalhosTelaCheiaSemTrava: t.cerimoniaAtalhosTelaCheiaSemTrava,
+    aoVivo: t.cerimoniaAoVivo,
+    ensaioMarca: t.cerimoniaEnsaioMarca,
+    ensaioCreditos: t.cerimoniaEnsaioCreditos,
+    letreirosLados: t.cerimoniaLetreirosLados,
+    letreirosCarta: t.cerimoniaLetreirosCarta,
+    letreirosDupla: t.cerimoniaLetreirosDupla,
+    cartas: {
+      usouACarta: t.cerimoniaUsouACarta,
+      sofre: t.cerimoniaSofre,
+      osDoisTimes: t.cerimoniaOsDoisTimes,
+      tituloDupla: t.cerimoniaDuploCabecalho,
+      valeParaOsDois: t.cerimoniaOsDoisTimes,
+      saiuACarta: t.cerimoniaSaiuACarta,
+      carta: t.cerimoniaCarta,
+      surpresa: t.cerimoniaChipSurpresa,
+      dupla: t.cerimoniaChipDupla,
+      lendaria: t.cerimoniaLendaria,
+      oQueAcontece: t.cerimoniaOQueAcontece,
+      aRegra: t.cerimoniaARegra,
+      letras: t.sorteioLetras,
+      campeoesDisponiveis: t.sorteioCampeoesDisponiveis,
+    },
   };
 
   return (
     <>
-      <Card className="p-5">
-        {teamA && teamB ? (
-          <div className="mb-5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs uppercase tracking-[0.14em] text-muted">
-                {t.sorteioLadosTitulo}
-              </p>
-              {podeLados ? <span className="text-[11px] text-accent2">{t.sorteioAoVivo}</span> : null}
+      <section className={p.arena} aria-labelledby="arena-do-sorteio">
+        <span aria-hidden className={p.enfGradeDaArena} />
+        {/* <div>, não <header>: o modo transmissão esconde todo <header> da página (o do site). */}
+        <div className={p.arenaCabecalho}>
+          <div className={p.arenaTitulos}>
+            <p className={p.olho}>{t.arenaOlho}</p>
+            <h2 id="arena-do-sorteio" className={p.arenaTitulo}>
+              {t.arenaTitulo}
+            </h2>
+            <p className={p.arenaSub}>{t.arenaSubtitulo}</p>
+          </div>
+          {podeAlgo ? (
+            <span className={p.seloAoVivo}>
+              <span aria-hidden className={p.enfPontoAoVivo} />
+              {t.sorteioAoVivo}
+            </span>
+          ) : null}
+        </div>
+
+        <div className={p.arenaGrade}>
+          {/* ------------------------------------------------ LADOS · JOGO 1 */}
+          {temOsDois ? (
+            <div className={p.modulo}>
+              <p className={p.moduloTitulo}>{t.sorteioLadosTitulo}</p>
+              <div className={p.portoes}>
+                <Portao lado="azul" rotulo={t.sorteioLadoAzul} time={blueTeam} vazio={t.arenaASortear} />
+                <Portao lado="vermelho" rotulo={t.sorteioLadoVermelho} time={redTeam} vazio={t.arenaASortear} />
+              </div>
+              {/* Procedência dos lados: só descreve o que está na tela (o lado azul atual). */}
+              {ultimoLados?.tipo === "lados_manual" ? (
+                <p className={p.procedencia}>
+                  {t.sorteioCorrecaoManual} {ultimoLados.autor}
+                </p>
+              ) : ultimoLados?.tipo === "lados" && ultimoLados.semente && ultimoLados.resultado === blueSideTeamId ? (
+                <p className={p.procedencia}>
+                  <span className={p.mono}>
+                    {t.sorteioSemente}: {ultimoLados.semente}
+                  </span>
+                  {" · "}
+                  {t.sorteioPorFulano} {ultimoLados.autor}
+                </p>
+              ) : null}
+              {semSorteio ? (
+                <p className={p.observacao}>{t.arenaWo}</p>
+              ) : ladosTravados ? (
+                <p className={p.observacao}>
+                  <Lock aria-hidden className={p.iconeMiudo} /> {t.arenaLadosTravados}
+                </p>
+              ) : podeLados ? (
+                <button type="button" className={p.botaoOuro} onClick={() => abrir({ tipo: "lados" })}>
+                  <Swords aria-hidden /> {t.sorteioBotaoLados}
+                </button>
+              ) : null}
             </div>
-            <div className="mt-3 flex items-stretch gap-3">
-              <SideChip label={t.sorteioLadoAzul} color="#4d9bff" team={blueTeam} />
-              <SideChip label={t.sorteioLadoVermelho} color="#ff5d5d" team={redTeam} />
+          ) : null}
+
+          {/* ------------------------------------------------ CARTINHAS DA SÉRIE */}
+          <div className={p.modulo}>
+            <p className={p.moduloTitulo}>{t.sorteioCartinhasTitulo}</p>
+            {isDupla ? <p className={p.faixaDupla}>{t.sorteioDuplo}</p> : null}
+            <div className={p.vagas}>
+              {teamA ? (
+                <VagaDaCarta
+                  time={timeA}
+                  oponente={teamB ? timeB : null}
+                  cardId={cardByTeam[timeA.id] ?? null}
+                  registro={registroDuplo ? null : registroA}
+                  t={t}
+                  nomesCartas={nomesCartas}
+                  cartas={cartasDaPagina}
+                  podeSortear={podeCartas && !semSorteio}
+                  onSortear={() => abrir({ tipo: "carta", teamId: timeA.id })}
+                />
+              ) : null}
+              {teamB ? (
+                <VagaDaCarta
+                  time={timeB}
+                  oponente={teamA ? timeA : null}
+                  cardId={cardByTeam[timeB.id] ?? null}
+                  registro={registroDuplo ? null : registroB}
+                  t={t}
+                  nomesCartas={nomesCartas}
+                  cartas={cartasDaPagina}
+                  podeSortear={podeCartas && !semSorteio}
+                  onSortear={() => abrir({ tipo: "carta", teamId: timeB.id })}
+                />
+              ) : null}
             </div>
-            {podeLados ? (
-              <div className="mt-3 flex justify-center">
-                <Button variant="secondary" size="sm" onClick={() => abrir({ tipo: "lados" })}>
-                  <Swords className="h-4 w-4" /> {t.sorteioBotaoLados}
-                </Button>
+
+            {registroDuplo ? <ProcedenciaDaCarta registro={registroDuplo} t={t} /> : null}
+
+            {podeCartas && temOsDois && !semSorteio ? (
+              <div className={p.dupla}>
+                <button type="button" className={p.botaoContorno} onClick={() => abrir({ tipo: "carta", dupla: true })}>
+                  <Users aria-hidden /> {t.sorteioBotaoDupla}
+                </button>
+                <p className={p.explicacao}>{t.sorteioDuplaExplicacao}</p>
               </div>
             ) : null}
           </div>
-        ) : null}
-
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs uppercase tracking-[0.14em] text-muted">
-            {t.sorteioCartinhasTitulo}
-          </p>
-          {podeCartas ? <span className="text-[11px] text-accent2">{t.sorteioAoVivo}</span> : null}
-        </div>
-        {isDupla ? (
-          <p className="mt-2 rounded-lg border border-accent2/30 bg-accent2/[0.06] px-3 py-2 text-[11px] uppercase tracking-[0.12em] text-accent2">
-            {t.sorteioDuplo}
-          </p>
-        ) : null}
-        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {renderTeam(teamA)}
-          {renderTeam(teamB)}
         </div>
 
-        {/* As letras completam a carta: sem elas o ABCDRAFT não diz o que fazer. Mas só valem
-            enquanto a carta na tela é a que AQUELE sorteio deu: depois de uma correção à mão,
-            letras e semente antigas embaixo da carta nova pareciam ter produzido a nova. */}
-        {ultimo?.detalhe?.letras && ultimoValeParaACartaAtual ? (
-          <div className="mt-3 rounded-xl border border-accent2/30 bg-accent2/[0.06] p-3 text-center">
-            <p className="text-[10px] uppercase tracking-[0.16em] text-muted">{t.sorteioLetras}</p>
-            <p className="mt-1 text-3xl font-bold tracking-[0.2em] text-accent2">
-              {ultimo.detalhe.letras.join(" · ")}
-            </p>
-            {typeof ultimo.detalhe.campeoes === "number" ? (
-              <p className="text-[11px] text-muted">
-                {ultimo.detalhe.campeoes} {t.sorteioCampeoesDisponiveis}
+        {/* ------------------------------------------------ painel da organização */}
+        {podeAlgo ? (
+          <div className={p.operador}>
+            <p className={p.operadorRotulo}>{t.arenaOperador}</p>
+            <div className={p.operadorBotoes}>
+              <button
+                type="button"
+                className={p.botaoContorno}
+                aria-pressed={emTransmissao}
+                onClick={() => setEmTransmissao((v) => !v)}
+              >
+                <MonitorPlay aria-hidden /> {emTransmissao ? t.arenaSairDaTransmissao : t.arenaModoTransmissao}
+              </button>
+              <button type="button" className={p.botaoContorno} aria-pressed={telaCheia} onClick={alternarTelaCheia}>
+                <Maximize2 aria-hidden /> {telaCheia ? t.cerimoniaSairDaTelaCheia : t.cerimoniaTelaCheia}
+              </button>
+              <button type="button" className={p.botaoContorno} onClick={proximoVolume} aria-label={rotuloDoVolume}>
+                <IconeDoVolume aria-hidden /> {rotuloDoVolume}
+              </button>
+              <button type="button" className={p.botaoContorno} onClick={testarSom}>
+                <Volume2 aria-hidden /> {t.arenaTestarSom}
+              </button>
+            </div>
+            {temOsDois ? (
+              <div className={p.operadorBotoes}>
+                {/* ENSAIO: a cerimônia completa sem pedir nada ao servidor (nem gravar). Os nomes não
+                    repetem "sortear lados": o botão de verdade é um só. */}
+                <span className={p.operadorRotuloMiudo}>{t.arenaEnsaio}</span>
+                <button type="button" className={p.botaoEnsaio} onClick={() => abrir({ tipo: "lados", ensaio: ensaios.current++ })}>
+                  {t.arenaEnsaioLados}
+                </button>
+                <button
+                  type="button"
+                  className={p.botaoEnsaio}
+                  onClick={() => abrir({ tipo: "carta", teamId: timeA.id, ensaio: ensaios.current++ })}
+                >
+                  {t.arenaEnsaioCarta}
+                </button>
+                <button type="button" className={p.botaoEnsaio} onClick={() => abrir({ tipo: "carta", dupla: true, ensaio: ensaios.current++ })}>
+                  {t.arenaEnsaioDupla}
+                </button>
+              </div>
+            ) : null}
+            {reduzidoDoSistema ? (
+              <p className={p.avisoReduzido}>
+                <span>{showCompleto ? t.cerimoniaShowCompletoLigado : t.cerimoniaReduzidoAviso}</span>
+                <button type="button" onClick={() => setShowCompleto(!showCompleto)}>
+                  {showCompleto ? t.arenaVoltarAoCalmo : t.cerimoniaShowCompleto}
+                </button>
               </p>
             ) : null}
+            <p className={p.explicacao}>{t.arenaDicaObs}</p>
           </div>
         ) : null}
+      </section>
 
-        {/*
-          A procedência fica à vista. O sorteio é do servidor e a semente permite
-          recalculá-lo depois — mostrar isso é o que separa "confie em nós" de
-          "confira você mesmo".
-        */}
-        {/* Só sorteio de verdade tem semente. A correção à mão (registro `carta_manual`, sem
-            semente) não pode sair como "semente: · sorteado por fulano" — ela não foi
-            sorteada. Ela ganha a própria linha, «correção manual por fulano», para a carta na
-            tela não ficar sem procedência; o detalhe continua no histórico da série. */}
-        {ultimo?.tipo === "carta_manual" ? (
-          <p className="mt-3 text-center text-[10.5px] text-muted">
-            {t.sorteioCorrecaoManual} {ultimo.autor}
-          </p>
-        ) : ultimo?.semente ? (
-          <p className="mt-3 text-center text-[10.5px] text-muted">
-            <span className="font-mono">
-              {t.sorteioSemente}: {ultimo.semente}
-            </span>
-            {" · "}
-            {t.sorteioPorFulano} {ultimo.autor}
-          </p>
-        ) : null}
+      {temOsDois ? (
+        <CerimoniaDeSorteio
+          key={rodada}
+          aberto={pedido !== null}
+          pedido={pedido}
+          onFechar={fecharCerimonia}
+          onSorteado={aplicarResposta}
+          seriesId={seriesId}
+          timeA={timeA}
+          timeB={timeB}
+          t={textosDaCerimonia}
+          textosDasCartas={cartasDaPagina}
+          showCompleto={showCompleto}
+          onShowCompleto={setShowCompleto}
+          degrau={degrau}
+          onProximoVolume={proximoVolume}
+          onAlternarMudo={alternarMudo}
+          onIncerto={respostaIncerta}
+        />
+      ) : null}
+    </>
+  );
+}
 
-        {podeCartas && teamA && teamB ? (
-          <div className="mt-3 flex flex-col items-center gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => abrir({ tipo: "carta", dupla: true })}
-            >
-              <Users className="h-4 w-4" /> {t.sorteioBotaoDupla}
-            </Button>
-            <p className="text-center text-[11px] text-muted">{t.sorteioDuplaExplicacao}</p>
+// ---------------------------------------------------------------- peças da arena
+
+function Portao({
+  lado,
+  rotulo,
+  time,
+  vazio,
+}: Readonly<{ lado: "azul" | "vermelho"; rotulo: string; time: TimeDoShow | null; vazio: string }>) {
+  return (
+    <div className={`${p.portao} ${lado === "azul" ? p.portaoAzul : p.portaoVermelho} ${time ? p.portaoSorteado : ""}`}>
+      <span className={p.portaoRotulo}>{rotulo}</span>
+      {time ? (
+        <>
+          <EscudoDoShow time={time} className={p.portaoEscudo} />
+          <NomeDoTime time={time} className={p.portaoNome} />
+        </>
+      ) : (
+        <>
+          <span aria-hidden className={p.portaoInterrogacao}>
+            ?
+          </span>
+          <span className={p.portaoVazio}>{vazio}</span>
+        </>
+      )}
+    </div>
+  );
+}
+
+function VagaDaCarta({
+  time,
+  oponente,
+  cardId,
+  registro,
+  t,
+  nomesCartas,
+  cartas,
+  podeSortear,
+  onSortear,
+}: Readonly<{
+  time: TimeDoShow;
+  oponente: TimeDoShow | null;
+  cardId: string | null;
+  /** O registro que deu a carta à vista (sorteio ou correção à mão), quando ele a descreve. */
+  registro: Sorteio | null;
+  t: TextosSorteio;
+  nomesCartas?: Record<string, string>;
+  cartas: Record<string, TextoDaCarta>;
+  podeSortear: boolean;
+  onSortear: () => void;
+}>) {
+  const def: CardDef | undefined = cardId ? CARDS_BY_ID[cardId as CardId] : undefined;
+  // O nome traduzido vem da página; sem ele vale o título em português de lib/cards.ts.
+  const nome = def ? (nomesCartas?.[def.id] ?? cartas[def.id]?.nome ?? def.title) : undefined;
+  const letra = def ? letraDaCarta(def.cardId) : undefined;
+
+  return (
+    <div className={p.vaga}>
+      <div className={p.vagaCabecalho}>
+        <EscudoDoShow time={time} className={p.vagaEscudo} />
+        <NomeDoTime time={time} className={p.vagaNome} como="span" />
+      </div>
+
+      {def ? (
+        <div
+          className={p.miniCarta}
+          style={{ "--cor-carta": def.color, "--borda-carta": def.border } as CSSProperties}
+        >
+          <div className={p.miniArte}>
+            {def.imageUrl ? (
+              // Mesma arte da página /cartas — o emoji fica só como reserva.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={def.imageUrl} alt={nome ?? def.title} />
+            ) : (
+              <span aria-hidden>{def.emoji}</span>
+            )}
+            {letra ? <span className={p.miniLetra}>{letra}</span> : null}
           </div>
-        ) : null}
-      </Card>
+          <p className={p.miniNome}>{nome}</p>
+          {def.dupla ? <p className={p.miniDupla}>{t.sorteioCartaDupla}</p> : null}
+        </div>
+      ) : (
+        <div className={p.miniVerso}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="" aria-hidden />
+          <p className={p.miniSemCarta}>{t.sorteioSemCarta}</p>
+        </div>
+      )}
 
-      <CerimoniaDeSorteio
-        key={rodada}
-        aberto={pedido !== null}
-        pedido={pedido}
-        onFechar={() => setPedido(null)}
-        onSorteado={aplicarResposta}
-        seriesId={seriesId}
-        teamA={teamA}
-        teamB={teamB}
-        nomesCartas={nomesCartas}
-        t={{
-          titulo: t.cerimoniaTitulo,
-          fechar: t.cerimoniaFechar,
-          vai: t.cerimoniaVai,
-          girando: t.cerimoniaGirando,
-          ladoAzul: t.sorteioLadoAzul,
-          ladoVermelho: t.sorteioLadoVermelho,
-          resultado: t.cerimoniaResultado,
-          semente: t.sorteioSemente,
-          porFulano: t.sorteioPorFulano,
-          falhou: t.sorteioFalhou,
-          repetido: t.sorteioRepetido,
-          letras: t.sorteioLetras,
-          campeoesDisponiveis: t.sorteioCampeoesDisponiveis,
-          cartaDupla: t.sorteioCartaDupla,
-          som: t.cerimoniaSom,
-          semSom: t.cerimoniaSemSom,
-          frases: t.cerimoniaFrases,
-        }}
-      />
+      {def && !def.dupla && oponente ? (
+        <p className={p.vagaContra}>
+          {t.arenaValeContra} <span style={{ color: oponente.cor }}>{oponente.nome}</span>
+        </p>
+      ) : null}
+
+      {registro ? <ProcedenciaDaCarta registro={registro} t={t} naVaga /> : null}
+
+      {podeSortear ? (
+        <button
+          type="button"
+          className={p.botaoContorno}
+          onClick={onSortear}
+          aria-label={`${t.arenaSortearCartaPara} ${time.nome}`}
+        >
+          <Shuffle aria-hidden /> {t.sorteioBotaoSortear}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * As letras do ABCDRAFT e a PROCEDÊNCIA de uma carta. As letras completam a carta: sem elas o
+ * ABCDRAFT não diz o que fazer. A procedência fica à vista porque o sorteio é do servidor e a
+ * semente permite recalculá-lo depois — é o que separa "confie em nós" de "confira você mesmo".
+ * A correção à mão (`carta_manual`, sem semente) ganha a própria linha, «correção manual por
+ * fulano», para a carta não ficar sem procedência; o detalhe continua no histórico da série.
+ */
+function ProcedenciaDaCarta({ registro, t, naVaga = false }: Readonly<{ registro: Sorteio; t: TextosSorteio; naVaga?: boolean }>) {
+  const letras = registro.tipo === "carta" ? registro.detalhe?.letras : undefined;
+  return (
+    <>
+      {letras ? (
+        <div className={`${p.letras} ${naVaga ? p.letrasNaVaga : ""}`}>
+          <p className={p.letrasRotulo}>{t.sorteioLetras}</p>
+          <p className={p.letrasPar}>{letras.join(" · ")}</p>
+          {typeof registro.detalhe?.campeoes === "number" ? (
+            <p className={p.letrasCampeoes}>
+              {registro.detalhe.campeoes} {t.sorteioCampeoesDisponiveis}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+      {registro.tipo === "carta_manual" ? (
+        <p className={p.procedencia}>
+          {t.sorteioCorrecaoManual} {registro.autor}
+        </p>
+      ) : registro.semente ? (
+        <p className={p.procedencia}>
+          <span className={p.mono}>
+            {t.sorteioSemente}: {registro.semente}
+          </span>
+          {" · "}
+          {t.sorteioPorFulano} {registro.autor}
+        </p>
+      ) : null}
     </>
   );
 }

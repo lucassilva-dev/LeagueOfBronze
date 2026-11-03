@@ -135,7 +135,7 @@ describe("página da partida depois de uma correção manual de carta (PNL-08)",
         teamA={times.a}
         teamB={times.b}
         initialCards={[{ teamId: "time-a", cardId: cartaNaTela }]}
-        initialUltimoCarta={ultimo as never}
+        initialSorteiosDasCartas={{ [String(ultimo.teamId)]: ultimo } as never}
       />,
     );
   }
@@ -187,7 +187,7 @@ describe("página da partida depois de uma correção manual de carta (PNL-08)",
         teamA={times.a}
         teamB={times.b}
         initialCards={[{ teamId: "time-a", cardId: "TUDO_LIBERADO" }]}
-        initialUltimoCarta={{ tipo: "carta_manual", semente: "", autor: "lucas", teamId: "time-a", resultado: "TUDO_LIBERADO" } as never}
+        initialSorteiosDasCartas={{ "time-a": { tipo: "carta_manual", semente: "", autor: "lucas", teamId: "time-a", resultado: "TUDO_LIBERADO" } } as never}
         textos={compartilhados.en}
       />,
     );
@@ -216,5 +216,29 @@ describe("página da partida depois de uma correção manual de carta (PNL-08)",
       detalhe: { letras: ["A", "C"] },
     });
     expect(screen.queryByText("A · C")).toBeNull();
+  });
+
+  it("cada vaga com a SUA procedência: a carta de B sorteada depois não apaga as letras de A", () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json({ authorized: false })));
+    render(
+      <SeriesLiveDraw
+        seriesId="4a-jogo-05"
+        teamA={times.a}
+        teamB={times.b}
+        initialCards={[
+          { teamId: "time-a", cardId: "ABCDRAFT" },
+          { teamId: "time-b", cardId: "TUDO_LIBERADO" },
+        ]}
+        initialSorteiosDasCartas={
+          {
+            "time-a": { tipo: "carta", semente: "abc123", autor: "nakay", teamId: "time-a", resultado: "ABCDRAFT", detalhe: { letras: ["A", "C"] } },
+            "time-b": { tipo: "carta", semente: "def456", autor: "lucas", teamId: "time-b", resultado: "TUDO_LIBERADO" },
+          } as never
+        }
+      />,
+    );
+    expect(screen.getByText("A · C")).toBeTruthy();
+    expect(screen.getByText(/semente: abc123/)).toBeTruthy();
+    expect(screen.getByText(/semente: def456/)).toBeTruthy();
   });
 });

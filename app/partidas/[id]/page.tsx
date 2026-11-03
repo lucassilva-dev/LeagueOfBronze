@@ -1,32 +1,24 @@
+import type { CSSProperties } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Crown } from "lucide-react";
 
 import { caminhoNoArquivo } from "@/lib/arquivo";
 
-import { PageHero } from "@/components/page-hero";
-import { PageShell } from "@/components/page-shell";
-import { TeamLink } from "@/components/team-link";
-import { AnimatedCounter } from "@/components/ui/animated-counter";
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHeadCell,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { ChampionIcon } from "@/components/champion-icon";
 import { textosElenco, type TextosElenco } from "@/components/lob/textos-elenco";
 import { SeriesLiveDraw } from "@/components/series-live-draw";
-import { formatKda, formatSeriesDateLabel } from "@/lib/format";
+import { EscudoDoShow, type TimeDoShow } from "@/components/series/escudo-do-show";
+import type { TextoDaCarta } from "@/components/series/palco-das-cartas";
+import { FONTES_DOS_TEMAS } from "@/components/times/fontes-dos-temas";
+import { formatKda, formatSeriesDateLabel, partesDaDataDaSerie } from "@/lib/format";
 import type { Messages } from "@/lib/i18n/messages";
 import { metadadosDaPagina, montarMetadados } from "@/lib/i18n/metadados";
 import { nomeDaTemporada } from "@/lib/i18n/nome-da-temporada";
 import { getLocale, getMessages } from "@/lib/i18n/server";
+import { coresDoConfronto } from "@/lib/series/cores-do-confronto";
+import { identidadeDoTime } from "@/lib/series/identidade-do-time";
+import { registrosDasCartasPorTime } from "@/lib/series/procedencia-das-cartas";
 import { getServerDataset } from "@/lib/server-data";
 import {
   getGameTeamKills,
@@ -43,6 +35,8 @@ import {
 } from "@/lib/tournament";
 import type { Player, Team } from "@/lib/schema";
 
+import p from "@/components/partida/partida.module.css";
+
 export const dynamic = "force-dynamic";
 
 /** Textos desta página no idioma da requisição. */
@@ -51,69 +45,10 @@ type Textos = Messages["paginasCompeticao"];
 type PartidaDetalhePageParams = Readonly<{
   params: Promise<{ id: string }>;
 }>;
-type SeriesIdentity = Readonly<{
-  teamA: Team | null;
-  teamB: Team | null;
-  stageLabel: string;
-  seriesFormatLabel: string;
-  isGrandFinal: boolean;
-}>;
-type SeriesExtraBadgesProps = Readonly<{
-  identity: SeriesIdentity;
-  winnerTeam: Team | null;
-  winnerTeamId: string | null;
-  isWalkover: boolean;
-  seriesMvpNick: string | null;
-  textos: Textos;
-}>;
-type FinalChampionPanelProps = Readonly<{
-  winnerTeam: Team;
-  identity: SeriesIdentity;
-  championWins: number;
-  runnerUpWins: number;
-  finalSummaryText: string;
-  date: string;
-  textos: Textos;
-  localeTag: string;
-}>;
-type QuickLinksCardProps = Readonly<{
-  teamA: Team | null;
-  teamB: Team | null;
-  textos: Textos;
-}>;
 type GameTeamBlock = Readonly<{
-  teamName: string;
+  time: TimeDoShow;
   rows: ReturnType<typeof getSeriesGamesWithTeamRows>[number]["teamARows"];
 }>;
-type GameDetailsCardProps = Readonly<{
-  seriesId: string;
-  gameIndex: number;
-  winnerName: string;
-  durationMin: number | undefined;
-  gameMvpNick: string | null;
-  kills: ReturnType<typeof getGameTeamKills>;
-  teamAName: string;
-  teamBName: string;
-  blocks: readonly [GameTeamBlock, GameTeamBlock];
-  playersById: Map<string, Player>;
-  textos: Textos;
-  /** Marca do substituto avulso (regra 6). */
-  te: TextosElenco;
-  /** Idioma para os números: sem ele o KDA saía com vírgula decimal no site em inglês. */
-  localeTag: string;
-}>;
-type WalkoverGameCardProps = Readonly<{
-  gameIndex: number;
-  winnerName: string;
-  walkoverReason: string | undefined;
-  rotuloWalkover: string;
-  textos: Textos;
-  te: TextosElenco;
-}>;
-
-function isGrandFinalStage(stage: string | undefined) {
-  return (stage ?? "REGULAR_SEASON") === "FINAL";
-}
 
 /** Rótulo da fase no idioma da requisição (o helper do lib devolve só em português). */
 function stageLabelTraduzido(stage: string | undefined, textos: Textos) {
@@ -128,327 +63,294 @@ function formatLabelTraduzido(formatLabel: string, textos: Textos) {
   return formatLabel === "MD5" ? textos.formatoBo5 : textos.formatoBo3;
 }
 
-function getWinnerScore(score: ReturnType<typeof getSeriesScore>, winnerTeamId: string, teamAId: string) {
-  const winnerIsTeamA = winnerTeamId === teamAId;
-
-  if (winnerIsTeamA) {
-    return {
-      championWins: score.teamAWins,
-      runnerUpWins: score.teamBWins,
-    };
-  }
-
-  return {
-    championWins: score.teamBWins,
-    runnerUpWins: score.teamAWins,
-  };
-}
-
-function getSeriesStatusText(isWalkover: boolean, hasWinner: boolean, textos: Textos) {
-  if (isWalkover) return textos.detalheStatusWo;
-  if (hasWinner) return textos.detalheStatusFinalizada;
-  return textos.detalheStatusEmAndamento;
-}
-
-function getSeriesMvpLabel(
-  isWalkover: boolean,
-  winnerTeamName: string | null,
-  seriesMvpNick: string | null,
-  textos: Textos,
-) {
-  if (isWalkover) {
-    return {
-      variant: "accent" as const,
-      text: `${textos.detalheVencedorWo} ${winnerTeamName ?? textos.vazio}`,
-    };
-  }
-
-  if (seriesMvpNick) {
-    return {
-      variant: "accent" as const,
-      text: `${textos.detalheMvpSerie} ${seriesMvpNick}`,
-    };
-  }
-
-  return {
-    variant: "muted" as const,
-    text: `${textos.detalheMvpSerie} ${textos.vazio}`,
-  };
-}
-
-function getFinalSummaryText(isWalkover: boolean, seriesMvpNick: string | null, textos: Textos) {
-  if (isWalkover) return textos.detalheResultadoWo;
-  if (seriesMvpNick) return `${textos.detalheMvpFinal} ${seriesMvpNick}.`;
-  return "";
-}
-
 function getEmptyGamesText(isWalkover: boolean, walkoverReason: string | undefined, textos: Textos) {
   if (!isWalkover) return textos.detalheSemJogos;
   const reasonText = walkoverReason ? ` ${walkoverReason}` : "";
   return `${textos.detalheEncerradaWo}${reasonText}`;
 }
 
-function SeriesExtraBadges({
-  identity,
-  winnerTeam,
-  winnerTeamId,
-  isWalkover,
-  seriesMvpNick,
-  textos,
-}: SeriesExtraBadgesProps) {
-  const mvpLabel = getSeriesMvpLabel(
-    isWalkover,
-    winnerTeam?.name ?? winnerTeamId ?? null,
-    seriesMvpNick,
-    textos,
-  );
-  const hasWinner = Boolean(winnerTeamId);
+/**
+ * O time com a cara do tema dele (cor, metal, fonte, escudo) para o cartaz e para o show do
+ * sorteio. A fonte do tema vira classe do next/font AQUI, no servidor: o componente do cliente
+ * só recebe a string da classe.
+ */
+function timesDoShow(
+  teamA: Team | null,
+  teamB: Team | null,
+  idA: string,
+  idB: string,
+): [TimeDoShow, TimeDoShow] {
+  const a = identidadeDoTime(teamA, idA);
+  const b = identidadeDoTime(teamB, idB);
+  // O par de cores de palco que mais contrasta (RX e Galácticos são os dois azuis).
+  const [palcoA, palcoB] = coresDoConfronto(a.candidatasDePalco, b.candidatasDePalco);
+  const fonte = (chave: typeof a.fonteTitulo) => (chave ? FONTES_DOS_TEMAS[chave].variable : null);
+  return [
+    { ...a, fonteClasse: fonte(a.fonteTitulo), corDePalco: palcoA },
+    { ...b, fonteClasse: fonte(b.fonteTitulo), corDePalco: palcoB },
+  ];
+}
 
-  return (
-    <div className="flex flex-wrap gap-2">
-      <Badge variant="outline">{identity.seriesFormatLabel}</Badge>
-      <Badge
-        variant="muted"
-        className={
-          identity.isGrandFinal ? "border-accent2/20 bg-accent2/10 text-accent2" : undefined
-        }
-      >
-        {identity.stageLabel}
-      </Badge>
-      <Badge variant={hasWinner ? "success" : "muted"}>
-        {getSeriesStatusText(isWalkover, hasWinner, textos)}
-      </Badge>
-      <Badge variant={mvpLabel.variant}>{mvpLabel.text}</Badge>
+/** As variáveis do time para o CSS do cartaz (aura, metal do nome, cor do link). */
+function varsDoCartaz(time: TimeDoShow): CSSProperties {
+  return {
+    "--neon": time.neon,
+    "--cor": time.cor,
+    "--metal": time.metal,
+    "--metal-solido": time.metalSolido,
+    "--brilho-nome": `${time.neon}55`,
+    "--peso-nome": time.pesoTitulo,
+    "--estilo-nome": time.estiloTitulo,
+  } as CSSProperties;
+}
+
+/** Brasas do cartaz: posições fixas (o render do servidor é puro; nada de Math.random aqui). */
+const BRASAS = [
+  { x: 6, dur: 7.2, atraso: 0, deriva: 18, lado: "a" },
+  { x: 13, dur: 8.6, atraso: 2.1, deriva: -14, lado: "a" },
+  { x: 21, dur: 6.4, atraso: 4.3, deriva: 22, lado: "a" },
+  { x: 29, dur: 9.1, atraso: 1.2, deriva: -20, lado: "a" },
+  { x: 36, dur: 7.8, atraso: 5.6, deriva: 12, lado: "a" },
+  { x: 43, dur: 8.2, atraso: 3.4, deriva: -10, lado: "a" },
+  { x: 57, dur: 7.4, atraso: 0.8, deriva: 14, lado: "b" },
+  { x: 64, dur: 8.9, atraso: 2.9, deriva: -18, lado: "b" },
+  { x: 71, dur: 6.8, atraso: 4.9, deriva: 20, lado: "b" },
+  { x: 79, dur: 9.4, atraso: 1.7, deriva: -12, lado: "b" },
+  { x: 87, dur: 7.6, atraso: 6.1, deriva: 16, lado: "b" },
+  { x: 94, dur: 8.4, atraso: 3.8, deriva: -22, lado: "b" },
+] as const;
+
+function LadoDoCartaz({
+  time,
+  lado,
+  href,
+  textos,
+  ladoNoJogo1,
+}: Readonly<{
+  time: TimeDoShow;
+  lado: "A" | "B";
+  href: string | null;
+  textos: Textos;
+  ladoNoJogo1: "azul" | "vermelho" | null;
+}>) {
+  const conteudo = (
+    <>
+      <span className={p.escudoGrande}>
+        <span aria-hidden className={p.enfHalo} />
+        <span aria-hidden className={p.enfAnel} />
+        {time.escudo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={time.escudo} alt="" />
+        ) : (
+          <span aria-hidden className={p.sigla}>
+            {time.sigla}
+          </span>
+        )}
+      </span>
+      <span className={`${time.fonteClasse ?? ""} ${p.nomeGrande}`}>
+        {time.assinatura && time.nome.toUpperCase().startsWith(time.assinatura.toUpperCase()) ? (
+          <>
+            <span className={p.assinatura}>{time.assinatura}</span> {time.marca}
+          </>
+        ) : time.assinatura ? (
+          <>
+            {time.marca} <span className={p.assinatura}>{time.assinatura}</span>
+          </>
+        ) : (
+          time.nome
+        )}
+      </span>
+      {ladoNoJogo1 ? (
+        <span className={`${p.bandeiraDoLado} ${ladoNoJogo1 === "azul" ? p.bandeiraAzul : p.bandeiraVermelha}`}>
+          {ladoNoJogo1 === "azul" ? textos.detalheLadoAzulJ1 : textos.detalheLadoVermelhoJ1}
+        </span>
+      ) : null}
+      {href ? <span className={p.verTime}>{textos.detalheVerTimeSeta}</span> : null}
+    </>
+  );
+
+  const classe = `${p.time} ${lado === "A" ? p.timeA : p.timeB}`;
+  return href ? (
+    <Link href={href} className={classe} style={varsDoCartaz(time)}>
+      {conteudo}
+    </Link>
+  ) : (
+    <div className={classe} style={varsDoCartaz(time)}>
+      {conteudo}
     </div>
-  );
-}
-
-function FinalChampionPanel({
-  winnerTeam,
-  identity,
-  championWins,
-  runnerUpWins,
-  finalSummaryText,
-  date,
-  textos,
-  localeTag,
-}: FinalChampionPanelProps) {
-  return (
-    <section>
-      <Card className="champion-panel champion-glow overflow-hidden p-5 sm:p-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="max-w-3xl">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="bronze">{textos.detalheCampeaoBadge}</Badge>
-              <Badge variant="outline">{identity.seriesFormatLabel}</Badge>
-              <Badge variant="outline">{formatSeriesDateLabel(date, localeTag)}</Badge>
-            </div>
-
-            <div className="mt-4 flex items-start gap-3">
-              <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-accent2/25 bg-accent2/10 text-accent2">
-                <Crown className="h-6 w-6" />
-              </span>
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.22em] text-accent2/80">
-                  {textos.detalheTituloConfirmado}
-                </p>
-                <h2 className="mt-1 font-heading text-2xl font-bold tracking-tight sm:text-3xl">
-                  {winnerTeam.name}
-                </h2>
-                <p className="mt-2 text-sm text-text/75 sm:text-base">
-                  {textos.detalheFechouFinalAntes}
-                  {championWins}-{runnerUpWins}.
-                  {finalSummaryText ? ` ${finalSummaryText}` : ""}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2 lg:w-[22rem]">
-            <div className="rounded-2xl border border-accent2/20 bg-bg/40 p-4 text-center">
-              <p className="text-xs uppercase tracking-[0.16em] text-muted">{textos.detalhePlacarFinal}</p>
-              <p className="mt-2 font-display text-5xl tracking-wide text-accent2">
-                <AnimatedCounter to={championWins} />
-                <span className="mx-2 text-white/35">-</span>
-                <AnimatedCounter to={runnerUpWins} />
-              </p>
-              <p className="mt-1 text-xs text-muted">{identity.stageLabel}</p>
-            </div>
-
-            <div className="flex flex-col justify-between rounded-2xl border border-border/60 bg-bg/40 p-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.16em] text-muted">{textos.detalheTimeCampeao}</p>
-                <p className="mt-2 text-sm text-text/75">
-                  {textos.detalheTimeCampeaoTexto}
-                </p>
-              </div>
-              <Link
-                href={`/times/${winnerTeam.slug}`}
-                className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-accent2 transition hover:text-text"
-              >
-                {textos.detalheVerTimeCampeao}
-              </Link>
-            </div>
-          </div>
-        </div>
-      </Card>
-    </section>
-  );
-}
-
-function QuickLinksCard({ teamA, teamB, textos }: QuickLinksCardProps) {
-  return (
-    <Card className="p-5">
-      <p className="text-xs uppercase tracking-[0.14em] text-muted">{textos.detalheLinksRapidos}</p>
-      <div className="mt-3 grid gap-2">
-        {teamA ? <TeamLink href={`/times/${teamA.slug}`} name={`${textos.detalheVerTime} ${teamA.name}`} /> : null}
-        {teamB ? <TeamLink href={`/times/${teamB.slug}`} name={`${textos.detalheVerTime} ${teamB.name}`} /> : null}
-        <Link href="/partidas" className="font-semibold text-accent hover:underline">
-          {textos.detalheVoltarPartidas}
-        </Link>
-      </div>
-    </Card>
   );
 }
 
 function GameDetailsCard({
   seriesId,
   gameIndex,
-  winnerName,
+  vencedor,
   durationMin,
   gameMvpNick,
   kills,
-  teamAName,
-  teamBName,
+  timeA,
+  timeB,
   blocks,
   playersById,
   textos,
   te,
   localeTag,
-}: GameDetailsCardProps) {
+}: Readonly<{
+  seriesId: string;
+  gameIndex: number;
+  vencedor: TimeDoShow | null;
+  durationMin: number | undefined;
+  gameMvpNick: string | null;
+  kills: ReturnType<typeof getGameTeamKills>;
+  timeA: TimeDoShow;
+  timeB: TimeDoShow;
+  blocks: readonly [GameTeamBlock, GameTeamBlock];
+  playersById: Map<string, Player>;
+  textos: Textos;
+  /** Marca do substituto avulso (regra 6). */
+  te: TextosElenco;
+  /** Idioma para os números: sem ele o KDA saía com vírgula decimal no site em inglês. */
+  localeTag: string;
+}>) {
   return (
-    <Card className="p-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="font-heading text-lg font-semibold tracking-wide">
+    <article className={p.jogo} style={{ "--vencedor": vencedor?.cor ?? "#c98a4b" } as CSSProperties}>
+      <div className={p.jogoCabecalho}>
+        <div className={p.jogoTitulos}>
+          <p className={p.jogoTitulo}>
             {textos.detalheJogo} {gameIndex}
           </p>
-          <p className="mt-1 text-sm text-muted">
-            {textos.detalheVencedor} <span className="text-text">{winnerName}</span> •{" "}
-            {textos.detalheMvp} <span className="text-text">{gameMvpNick ?? textos.vazio}</span>
+          <p className={p.jogoDados}>
+            {textos.detalheVencedor} <strong>{vencedor?.nome ?? textos.vazio}</strong> • {textos.detalheMvp}{" "}
+            <strong>{gameMvpNick ?? textos.vazio}</strong>
             {typeof durationMin === "number" ? (
               <>
                 {" "}
                 • {textos.detalheDuracao}{" "}
-                <span className="text-text">
+                <strong>
                   {durationMin} {textos.detalheMinutos}
-                </span>
+                </strong>
               </>
             ) : null}
           </p>
         </div>
-        <div className="w-full rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2 text-sm sm:w-auto">
-          <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto_minmax(0,1fr)] items-center gap-x-2">
-            <span className="truncate text-right text-muted" title={teamAName}>
-              {teamAName}
-            </span>
-            <span className="font-semibold">{kills.teamAKills}</span>
-            <span className="text-muted">x</span>
-            <span className="font-semibold">{kills.teamBKills}</span>
-            <span className="truncate text-muted" title={teamBName}>
-              {teamBName}
-            </span>
-          </div>
+        <div className={p.abates} aria-label={`${timeA.nome} ${kills.teamAKills} × ${kills.teamBKills} ${timeB.nome}`}>
+          <span className={p.abatesNome} title={timeA.nome}>
+            {timeA.nome}
+          </span>
+          <span className={p.abatesNumero} style={{ color: timeA.cor }}>
+            {kills.teamAKills}
+          </span>
+          <span className={p.vazio}>×</span>
+          <span className={p.abatesNumero} style={{ color: timeB.cor }}>
+            {kills.teamBKills}
+          </span>
+          <span className={p.abatesNome} title={timeB.nome}>
+            {timeB.nome}
+          </span>
         </div>
       </div>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-2">
+      <div className={p.blocos}>
         {blocks.map((block) => (
           <div
-            key={`${seriesId}-${gameIndex}-${block.teamName}`}
-            className="min-w-0 overflow-hidden rounded-2xl border border-white/8 bg-white/[0.015] p-3"
+            key={`${seriesId}-${gameIndex}-${block.time.id}`}
+            className={p.bloco}
+            data-bloco-do-time={block.time.id}
+            style={{ "--cor": block.time.cor } as CSSProperties}
           >
-            <p className="mb-2 text-xs uppercase tracking-[0.14em] text-muted">{block.teamName}</p>
-            <div className="max-w-full overflow-x-auto pb-1 scrollbar-thin">
-              <Table className="min-w-[500px]">
-                <TableHeader>
-                  <TableRow>
-                    <TableHeadCell className="min-w-[170px]">{textos.detalheColJogador}</TableHeadCell>
-                    <TableHeadCell className="min-w-[96px]">
-                      <span className="sm:hidden">{textos.detalheColCampeaoCurto}</span>
-                      <span className="hidden sm:inline">{textos.detalheColCampeao}</span>
-                    </TableHeadCell>
-                    <TableHeadCell className="whitespace-nowrap">{textos.detalheColKda}</TableHeadCell>
-                    <TableHeadCell className="whitespace-nowrap text-right">{textos.detalheColKdaMedia}</TableHeadCell>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {block.rows.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-muted">
-                        {textos.detalheSemEstatisticas}
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    block.rows.map((row) => (
-                      <TableRow key={`${gameIndex}-${row.playerId}`}>
-                        <TableCell className="min-w-[170px]">
-                          <Link
-                            href={`/jogadores/${playersById.get(row.playerId)?.slug ?? row.playerId}`}
-                            className="block break-all font-semibold hover:text-accent"
-                          >
-                            {row.playerNick}
-                            {/* Substituto avulso: aparece na coluna do time que cobriu, marcado. */}
-                            {row.substituto ? (
-                              <Badge variant="outline" className="ml-2 align-middle text-[10px]" title={te.substitutoTitulo}>
-                                {te.substitutoCurto}
-                              </Badge>
-                            ) : null}
-                          </Link>
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap">
-                          <ChampionIcon champion={row.champion} size={22} showName />
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap">
-                          {row.kills}/{row.deaths}/{row.assists}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap text-right">
+            <p className={p.blocoCabecalho}>
+              <EscudoDoShow time={block.time} className={p.blocoEscudo} />
+              {block.time.nome}
+            </p>
+            <table className={p.tabela}>
+              <thead>
+                <tr>
+                  <th>{textos.detalheColJogador}</th>
+                  <th>{textos.detalheColCampeao}</th>
+                  <th>{textos.detalheColKda}</th>
+                  <th className={p.direita}>{textos.detalheColKdaMedia}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {block.rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className={p.vazio}>
+                      {textos.detalheSemEstatisticas}
+                    </td>
+                  </tr>
+                ) : (
+                  block.rows.map((row) => (
+                    <tr key={`${gameIndex}-${row.playerId}`}>
+                      <td>
+                        <Link href={`/jogadores/${playersById.get(row.playerId)?.slug ?? row.playerId}`} className={p.nick}>
+                          {row.playerNick}
+                        </Link>
+                        {/* Substituto avulso: aparece na coluna do time que cobriu, marcado. */}
+                        {row.substituto ? (
+                          <span className={p.sub} title={te.substitutoTitulo}>
+                            {te.substitutoCurto}
+                          </span>
+                        ) : null}
+                      </td>
+                      <td>
+                        <ChampionIcon champion={row.champion} size={24} showName />
+                      </td>
+                      <td>
+                        <span className={p.kda}>
+                          <span className={p.k}>{row.kills}</span>/<span className={p.d}>{row.deaths}</span>/
+                          <span className={p.a}>{row.assists}</span>
+                        </span>
+                      </td>
+                      <td className={p.direita}>
+                        <span className={p.kdaMedia}>
                           {formatKda((row.kills + row.assists) / Math.max(1, row.deaths), localeTag)}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         ))}
       </div>
-    </Card>
+    </article>
   );
 }
 
 /**
- * Um jogo de W.O. (W.O. no meio da série: "jogos valem, W.O. completa"). Não foi
- * disputado: conta no placar, mas não tem K/D/A, MVP nem duração.
+ * Um jogo de W.O. (W.O. no meio da série: "jogos valem, W.O. completa"). Não foi disputado:
+ * conta no placar, mas não tem K/D/A, MVP nem duração.
  */
-function WalkoverGameCard({ gameIndex, winnerName, walkoverReason, rotuloWalkover, textos, te }: WalkoverGameCardProps) {
+function WalkoverGameCard({
+  gameIndex,
+  winnerName,
+  walkoverReason,
+  rotuloWalkover,
+  textos,
+  te,
+}: Readonly<{
+  gameIndex: number;
+  winnerName: string;
+  walkoverReason: string | undefined;
+  rotuloWalkover: string;
+  textos: Textos;
+  te: TextosElenco;
+}>) {
   return (
-    <Card className="p-5">
-      <div className="flex flex-wrap items-center gap-2">
-        <p className="font-heading text-lg font-semibold tracking-wide">
-          {textos.detalheJogo} {gameIndex}
-        </p>
-        <Badge variant="muted">{rotuloWalkover}</Badge>
-      </div>
-      <p className="mt-1 text-sm text-muted">
-        {textos.detalheVencedorWo} <span className="text-text">{winnerName}</span>
+    <article className={`${p.jogo} ${p.jogoWo}`}>
+      <p className={p.jogoTitulo}>
+        {textos.detalheJogo} {gameIndex}
+        <span className={p.seloWo}>{rotuloWalkover}</span>
       </p>
-      <p className="mt-2 text-sm text-muted">
+      <p className={p.jogoDados}>
+        {textos.detalheVencedorWo} <strong>{winnerName}</strong>
+      </p>
+      <p className={p.jogoDados}>
         {te.jogoDeWalkoverTexto}
         {walkoverReason ? ` ${walkoverReason}` : ""}
       </p>
-    </Card>
+    </article>
   );
 }
 
@@ -474,6 +376,17 @@ export async function generateMetadata({ params }: PartidaDetalhePageParams): Pr
   return metadadosDaPagina("partidas");
 }
 
+/**
+ * A PÁGINA DA PARTIDA — pensada para a transmissão.
+ *
+ * Em cima, o CARTAZ "versus": cada time com o escudo, a fonte e o metal do tema dele (o mesmo da
+ * página do time), o placar (ou o VS antes do jogo), formato, data no horário de Brasília e o
+ * estado da série. Embaixo, a ARENA DO SORTEIO (lados do jogo 1 e cartinhas, com o show em tela
+ * cheia para a organização), o resumo da série e os jogos.
+ *
+ * O título canônico ("EQUIPE RX 0–0 GALÁCTICOS DO BAR") é o <h1>, para leitor de tela e busca;
+ * o cartaz o mostra em pedaços (nome, placar, nome), por isso o placar visual é aria-hidden.
+ */
 export default async function PartidaDetalhePage({ params }: PartidaDetalhePageParams) {
   const { id } = await params;
   const t = await getMessages();
@@ -490,11 +403,15 @@ export default async function PartidaDetalhePage({ params }: PartidaDetalhePageP
     notFound();
   }
 
+  const localeTag = t.compartilhados.localeTag;
   const teamA = indexes.teamsById.get(series.teamAId) ?? null;
   const teamB = indexes.teamsById.get(series.teamBId) ?? null;
+  const [timeA, timeB] = timesDoShow(teamA, teamB, series.teamAId, series.teamBId);
+  const timePorId = (teamId: string) => (teamId === timeA.id ? timeA : teamId === timeB.id ? timeB : null);
+
   const score = getSeriesScore(series, dataset);
   const winnerTeamId = getSeriesWinnerTeamId(series, dataset);
-  const winnerTeam = winnerTeamId ? indexes.teamsById.get(winnerTeamId) ?? null : null;
+  const vencedor = winnerTeamId ? timePorId(winnerTeamId) : null;
   const isWalkover = isWalkoverSeries(series);
   const seriesMvp = getSeriesMvp(series, dataset);
   const seriesMvpNick = seriesMvp ? indexes.playersById.get(seriesMvp.playerId)?.nick ?? seriesMvp.playerId : null;
@@ -503,137 +420,299 @@ export default async function PartidaDetalhePage({ params }: PartidaDetalhePageP
   // W.O. no meio da série: os jogos que o W.O. completou, depois dos disputados. Sem jogo
   // disputado nenhum, a página continua como sempre (o cartão "encerrada por W.O.").
   const walkoverGames = gameRows.length > 0 ? jogosDeWalkoverDaSerie(series, dataset) : [];
-  const identity: SeriesIdentity = {
-    teamA,
-    teamB,
-    stageLabel: stageLabelTraduzido(series.stage, textos),
-    seriesFormatLabel: formatLabelTraduzido(getSeriesFormatLabel(series, dataset), textos),
-    isGrandFinal: isGrandFinalStage(series.stage),
-  };
-  const finalScore =
-    winnerTeamId === null ? null : getWinnerScore(score, winnerTeamId, series.teamAId);
-  const finalSummaryText = getFinalSummaryText(isWalkover, seriesMvpNick, textos);
+  const isGrandFinal = (series.stage ?? "REGULAR_SEASON") === "FINAL";
+  const stageLabel = stageLabelTraduzido(series.stage, textos);
+  const seriesFormatLabel = formatLabelTraduzido(getSeriesFormatLabel(series, dataset), textos);
   const title = `${teamA?.name ?? series.teamAId} ${score.teamAWins}–${score.teamBWins} ${teamB?.name ?? series.teamBId}`;
-  const description = `${identity.stageLabel} • ${identity.seriesFormatLabel} • ${textos.detalheSerieRotulo} ${series.id} • ${formatSeriesDateLabel(series.date, t.compartilhados.localeTag)}`;
+  const aindaNaoComecou = gameRows.length === 0 && !isWalkover && !winnerTeamId;
+  const preJogo = gameRows.length === 0 && !isWalkover;
+  const data = partesDaDataDaSerie(series.date, localeTag);
+
+  const statusTexto = isWalkover
+    ? textos.detalheStatusWo
+    : winnerTeamId
+      ? textos.detalheStatusFinalizada
+      : gameRows.length > 0
+        ? textos.detalheStatusEmAndamento
+        : textos.detalheStatusEmBreve;
+  const statusClasse = isWalkover
+    ? p.statusWo
+    : winnerTeamId
+      ? p.statusFinalizada
+      : gameRows.length > 0
+        ? p.statusAndamento
+        : "";
+
+  const azulId = series.blueSideTeamId ?? null;
+  const ladoNoJogo1 = (teamId: string) => (!azulId ? null : azulId === teamId ? "azul" : "vermelho");
+
+  const killsA = seriesKillTotals[series.teamAId] ?? 0;
+  const killsB = seriesKillTotals[series.teamBId] ?? 0;
+  const totalKills = killsA + killsB;
+
+  const textosDasCartas = t.paginasStats.cartas as Record<string, TextoDaCarta>;
+
+  // As três seções do miolo (a ordem muda com o estado da série, ver o comentário no JSX).
+  const arena = (
+    <SeriesLiveDraw
+      key="arena"
+      seriesId={series.id}
+      teamA={teamA ? { id: teamA.id, name: teamA.name, slug: teamA.slug, imageUrl: teamA.imageUrl ?? null, fonteClasse: timeA.fonteClasse } : null}
+      teamB={teamB ? { id: teamB.id, name: teamB.name, slug: teamB.slug, imageUrl: teamB.imageUrl ?? null, fonteClasse: timeB.fonteClasse } : null}
+      initialCards={series.cardsUsed ?? []}
+      initialBlueSideTeamId={series.blueSideTeamId ?? null}
+      initialSorteiosDasCartas={registrosDasCartasPorTime(series)}
+      initialUltimoLados={
+        [...(series.sorteios ?? [])].reverse().find((s) => s.tipo === "lados" || s.tipo === "lados_manual") ?? null
+      }
+      textos={t.compartilhados}
+      nomesCartas={Object.fromEntries(Object.entries(t.paginasStats.cartas).map(([cardId, carta]) => [cardId, carta.nome]))}
+      textosDasCartas={textosDasCartas}
+      ladosTravados={series.games.length > 0}
+      decididaPorWo={isWalkover}
+    />
+  );
+  const resumo = (
+    <section key="resumo" className={`${p.resumo} ${preJogo ? p.resumoSoLinks : ""}`} data-fora-do-palco>
+      {preJogo ? null : (
+        <div className={p.cartao}>
+          <p className={p.rotulo}>{textos.detalheAbatesPorTime}</p>
+          <div className={p.cabo}>
+            <span className={p.caboLado}>
+              <EscudoDoShow time={timeA} className={p.caboEscudo} />
+              <span className={p.caboNumero} style={{ color: timeA.corDePalco }}>
+                {killsA}
+              </span>
+            </span>
+            <span className={p.caboBarra} aria-hidden>
+              <span style={{ width: totalKills ? `${(killsA / totalKills) * 100}%` : "50%", background: timeA.corDePalco }} />
+              <span style={{ width: totalKills ? `${(killsB / totalKills) * 100}%` : "50%", background: timeB.corDePalco }} />
+            </span>
+            <span className={p.caboLado}>
+              <span className={p.caboNumero} style={{ color: timeB.corDePalco }}>
+                {killsB}
+              </span>
+              <EscudoDoShow time={timeB} className={p.caboEscudo} />
+            </span>
+          </div>
+          <div className={p.caboNomes}>
+            <span>{timeA.nome}</span>
+            <span>{timeB.nome}</span>
+          </div>
+        </div>
+      )}
+
+      <nav className={`${p.cartao} ${p.links}`} aria-label={textos.detalheLinksRapidos}>
+        <p className={p.rotulo}>{textos.detalheLinksRapidos}</p>
+        {teamA ? (
+          <Link href={`/times/${teamA.slug}`} className={p.link}>
+            <EscudoDoShow time={timeA} className={p.linkEscudo} />
+            {textos.detalheVerTime} {teamA.name}
+          </Link>
+        ) : null}
+        {teamB ? (
+          <Link href={`/times/${teamB.slug}`} className={p.link}>
+            <EscudoDoShow time={timeB} className={p.linkEscudo} />
+            {textos.detalheVerTime} {teamB.name}
+          </Link>
+        ) : null}
+        <Link href="/partidas" className={p.link}>
+          {textos.detalheTodasAsPartidas}
+        </Link>
+      </nav>
+    </section>
+  );
+  const jogos = (
+    <section key="jogos" className={p.jogos} data-fora-do-palco>
+      <h2 className={p.jogosTitulo}>{textos.detalheJogosTitulo}</h2>
+      {gameRows.length === 0 ? (
+        <p className={p.semJogos}>{getEmptyGamesText(isWalkover, series.walkoverReason, textos)}</p>
+      ) : (
+        gameRows.map(({ game, gameIndex, teamARows, teamBRows }) => {
+          const gameMvpPlayerId = mvpDoJogo(game, series, indexes.playersById);
+          const gameMvpNick = indexes.playersById.get(gameMvpPlayerId)?.nick ?? gameMvpPlayerId;
+          const kills = getGameTeamKills(game, series, dataset);
+          const vencedorDoJogo =
+            timePorId(game.winnerTeamId) ?? { ...timeA, id: game.winnerTeamId, nome: indexes.teamsById.get(game.winnerTeamId)?.name ?? game.winnerTeamId };
+
+          return (
+            <GameDetailsCard
+              key={`${series.id}-g${gameIndex}`}
+              seriesId={series.id}
+              gameIndex={gameIndex}
+              localeTag={localeTag}
+              vencedor={vencedorDoJogo}
+              durationMin={game.durationMin}
+              gameMvpNick={gameMvpNick}
+              kills={kills}
+              timeA={timeA}
+              timeB={timeB}
+              blocks={[
+                { time: timeA, rows: teamARows },
+                { time: timeB, rows: teamBRows },
+              ]}
+              playersById={indexes.playersById}
+              textos={textos}
+              te={te}
+            />
+          );
+        })
+      )}
+      {walkoverGames.map((jogo) => (
+        <WalkoverGameCard
+          key={`${series.id}-wo${jogo.gameIndex}`}
+          gameIndex={jogo.gameIndex}
+          winnerName={indexes.teamsById.get(jogo.winnerTeamId)?.name ?? jogo.winnerTeamId}
+          walkoverReason={series.walkoverReason}
+          rotuloWalkover={t.compartilhados.serieWalkover}
+          textos={textos}
+          te={te}
+        />
+      ))}
+    </section>
+  );
 
   return (
-    <PageShell className="space-y-6">
-      <PageHero
-        badge={identity.isGrandFinal ? textos.detalheBadgeGrandeFinal : textos.detalheBadgeSerie}
-        title={title}
-        description={description}
-        extra={
-          <SeriesExtraBadges
-            identity={identity}
-            winnerTeam={winnerTeam}
-            winnerTeamId={winnerTeamId}
-            isWalkover={isWalkover}
-            seriesMvpNick={seriesMvpNick}
+    <div className={p.pagina}>
+      {/* ------------------------------------------------------------ o cartaz */}
+      <section
+        className={p.cartaz}
+        style={
+          {
+            "--a-neon": timeA.neon,
+            "--b-neon": timeB.neon,
+            "--a-abismo": timeA.abismo,
+            "--b-abismo": timeB.abismo,
+          } as CSSProperties
+        }
+      >
+        <span aria-hidden className={p.enfCeu} />
+        <span aria-hidden className={p.enfGrade} />
+        <span aria-hidden className={p.enfChao} />
+        <span aria-hidden className={p.enfCostura} />
+        <span aria-hidden className={p.enfBrasas}>
+          {BRASAS.map((b) => (
+            <span
+              key={b.x}
+              className={p.enfBrasa}
+              style={
+                {
+                  left: `${b.x}%`,
+                  "--dur": `${b.dur}s`,
+                  "--atraso": `${b.atraso}s`,
+                  "--deriva": `${b.deriva}px`,
+                  "--cor": b.lado === "a" ? timeA.neon : timeB.neon,
+                } as CSSProperties
+              }
+            />
+          ))}
+        </span>
+        <span aria-hidden className={p.enfVinheta} />
+
+        <h1 className="sr-only">{title}</h1>
+
+        <div className={p.versus}>
+          <LadoDoCartaz
+            time={timeA}
+            lado="A"
+            href={teamA ? `/times/${teamA.slug}` : null}
             textos={textos}
+            ladoNoJogo1={ladoNoJogo1(timeA.id)}
           />
-        }
-      />
 
-      {identity.isGrandFinal && winnerTeam && finalScore ? (
-        <FinalChampionPanel
-          winnerTeam={winnerTeam}
-          identity={identity}
-          championWins={finalScore.championWins}
-          runnerUpWins={finalScore.runnerUpWins}
-          finalSummaryText={finalSummaryText}
-          date={series.date}
-          textos={textos}
-          localeTag={t.compartilhados.localeTag}
-        />
-      ) : null}
-
-      <SeriesLiveDraw
-        seriesId={series.id}
-        teamA={teamA}
-        teamB={teamB}
-        initialCards={series.cardsUsed ?? []}
-        initialBlueSideTeamId={series.blueSideTeamId ?? null}
-        initialUltimoCarta={
-          [...(series.sorteios ?? [])]
-            .reverse()
-            .find((s) => s.tipo === "carta" || s.tipo === "carta_manual") ?? null
-        }
-        textos={t.compartilhados}
-        nomesCartas={Object.fromEntries(
-          Object.entries(t.paginasStats.cartas).map(([id, carta]) => [id, carta.nome]),
-        )}
-      />
-
-      <section className="grid gap-4 md:grid-cols-2">
-        <Card className="p-5">
-          <p className="text-xs uppercase tracking-[0.14em] text-muted">{textos.detalheAbatesPorTime}</p>
-          <div className="mt-3 grid grid-cols-2 gap-3">
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
-              <p className="text-xs text-muted">{teamA?.name ?? series.teamAId}</p>
-              <p className="mt-1 font-display text-2xl font-bold tracking-wide">
-                {seriesKillTotals[series.teamAId] ?? 0}
-              </p>
-            </div>
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
-              <p className="text-xs text-muted">{teamB?.name ?? series.teamBId}</p>
-              <p className="mt-1 font-display text-2xl font-bold tracking-wide">
-                {seriesKillTotals[series.teamBId] ?? 0}
-              </p>
-            </div>
+          {/* O centro em duas peças: no celular a de cima (fase + VS/placar) fica entre os escudos e a
+              de baixo (formato, data, estado) desce para uma linha inteira — senão a coluna do meio
+              espremia os nomes até virarem uma letra por linha. */}
+          <div className={p.centroTopo}>
+            <p className={`${p.fase} ${isGrandFinal ? p.faseFinal : ""}`}>
+              {isGrandFinal ? textos.detalheBadgeGrandeFinal : stageLabel}
+            </p>
+            <p className={p.placar} aria-hidden>
+              {aindaNaoComecou ? textos.detalheVs : `${score.teamAWins}–${score.teamBWins}`}
+            </p>
           </div>
-        </Card>
 
-        <QuickLinksCard teamA={teamA} teamB={teamB} textos={textos} />
-      </section>
+          <div className={p.centroInfo}>
+            <span className={p.formato}>{seriesFormatLabel}</span>
+            {data ? (
+              <p className={p.data}>
+                <span className={p.dataDia}>
+                  {data.semana} · {data.dia}
+                  {data.hora ? (
+                    <>
+                      {" · "}
+                      <span className={p.dataHora}>{data.hora}</span>
+                    </>
+                  ) : null}
+                </span>
+                <span className={p.fuso}>{textos.detalheHorarioBrasilia}</span>
+              </p>
+            ) : null}
+            <span className={`${p.status} ${statusClasse}`}>{statusTexto}</span>
+            {seriesMvpNick && !isWalkover ? (
+              <p className={p.mvp}>
+                {textos.detalheMvpSerie} {seriesMvpNick}
+              </p>
+            ) : null}
+            <p className={p.serieId}>
+              {textos.detalheSerieRotulo} {series.id}
+            </p>
+          </div>
 
-      <section className="space-y-4">
-        {gameRows.length === 0 ? (
-          <Card className="p-5 text-sm text-muted">
-            {getEmptyGamesText(isWalkover, series.walkoverReason, textos)}
-          </Card>
-        ) : (
-          gameRows.map(({ game, gameIndex, teamARows, teamBRows }) => {
-            const winnerName = indexes.teamsById.get(game.winnerTeamId)?.name ?? game.winnerTeamId;
-            const gameMvpPlayerId = mvpDoJogo(game, series, indexes.playersById);
-            const gameMvpNick = indexes.playersById.get(gameMvpPlayerId)?.nick ?? gameMvpPlayerId;
-            const kills = getGameTeamKills(game, series, dataset);
-
-            return (
-              <GameDetailsCard
-                key={`${series.id}-g${gameIndex}`}
-                seriesId={series.id}
-                gameIndex={gameIndex}
-                localeTag={t.compartilhados.localeTag}
-                winnerName={winnerName}
-                durationMin={game.durationMin}
-                gameMvpNick={gameMvpNick}
-                kills={kills}
-                teamAName={teamA?.name ?? series.teamAId}
-                teamBName={teamB?.name ?? series.teamBId}
-                blocks={[
-                  { teamName: teamA?.name ?? series.teamAId, rows: teamARows },
-                  { teamName: teamB?.name ?? series.teamBId, rows: teamBRows },
-                ]}
-                playersById={indexes.playersById}
-                textos={textos}
-                te={te}
-              />
-            );
-          })
-        )}
-        {walkoverGames.map((jogo) => (
-          <WalkoverGameCard
-            key={`${series.id}-wo${jogo.gameIndex}`}
-            gameIndex={jogo.gameIndex}
-            winnerName={indexes.teamsById.get(jogo.winnerTeamId)?.name ?? jogo.winnerTeamId}
-            walkoverReason={series.walkoverReason}
-            rotuloWalkover={t.compartilhados.serieWalkover}
+          <LadoDoCartaz
+            time={timeB}
+            lado="B"
+            href={teamB ? `/times/${teamB.slug}` : null}
             textos={textos}
-            te={te}
+            ladoNoJogo1={ladoNoJogo1(timeB.id)}
           />
-        ))}
+        </div>
       </section>
-    </PageShell>
+
+      <div className={p.miolo}>
+        {/* ------------------------------------------------------------ campeão (grande final) */}
+        {isGrandFinal && vencedor && winnerTeamId ? (
+          <section className={p.campeao} style={varsDoCartaz(vencedor)}>
+            <span aria-hidden className={p.enfRaiosCampeao} />
+            <span className={p.campeaoEscudo}>
+              {vencedor.escudo ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={vencedor.escudo} alt="" />
+              ) : null}
+            </span>
+            <div className={p.campeaoTexto}>
+              <p className={p.campeaoOlho}>
+                {textos.detalheCampeaoBadge} · {textos.detalheTituloConfirmado}
+              </p>
+              <h2 className={`${vencedor.fonteClasse ?? ""} ${p.campeaoNome}`}>{vencedor.nome}</h2>
+              <p className={p.campeaoResumo}>
+                {textos.detalheFechouFinalAntes}
+                {winnerTeamId === series.teamAId ? `${score.teamAWins}-${score.teamBWins}` : `${score.teamBWins}-${score.teamAWins}`}.
+                {isWalkover ? ` ${textos.detalheResultadoWo}` : seriesMvpNick ? ` ${textos.detalheMvpFinal} ${seriesMvpNick}.` : ""}
+              </p>
+            </div>
+            <div className={p.campeaoPlacar}>
+              <p className={p.rotulo}>{textos.detalhePlacarFinal}</p>
+              <p className={p.campeaoPlacarNumero}>
+                {winnerTeamId === series.teamAId ? `${score.teamAWins}–${score.teamBWins}` : `${score.teamBWins}–${score.teamAWins}`}
+              </p>
+              <Link href={`/times/${(winnerTeamId === series.teamAId ? teamA : teamB)?.slug ?? ""}`} className={p.campeaoLink}>
+                {textos.detalheVerTimeCampeao}
+              </Link>
+              <p className={p.fuso}>{formatSeriesDateLabel(series.date, localeTag)}</p>
+            </div>
+          </section>
+        ) : null}
+
+        {/*
+          A ORDEM depende da série. Antes do jogo, o que importa é o sorteio: a arena vem logo
+          depois do cartaz. Com jogo (ou W.O.), o resumo e os jogos sobem, e a arena — agora o
+          registro dos sorteios da série — desce para o fim.
+        */}
+        {/* Lista com `key`: a troca de ordem (o 1º jogo registrado) MOVE a arena em vez de
+            remontá-la — remontar zerava o modo transmissão e a cerimônia no ar. */}
+        {preJogo ? [arena, jogos, resumo] : [resumo, jogos, arena]}
+      </div>
+    </div>
   );
 }
-

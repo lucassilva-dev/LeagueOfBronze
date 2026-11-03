@@ -1,0 +1,1794 @@
+/*
+ * A PÁGINA DA PARTIDA (/partidas/[id]) — o cartaz "versus", a arena do sorteio, o resumo e os
+ * jogos. Pensada para a transmissão: tudo grande, legível a 480p e com a cara de cada time.
+ *
+ * REGRA DA CASA (tests/series/show-css-estrutura.test.ts): conteúdo nasce opaco e só anima
+ * transform, sem fill-mode e sem delay; opacidade/filtro animados só em ENFEITE (`.enf*`,
+ * aria-hidden, sem texto). Nada de `translate:` ao lado de `transform:` (o minificador do build
+ * apaga).
+ */
+
+.pagina {
+  position: relative;
+  min-height: 100vh;
+  padding-bottom: 56px;
+}
+
+/* ------------------------------------------------------------------ o cartaz (herói versus) */
+
+.cartaz {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-bottom: 1px solid rgba(201, 138, 75, 0.24);
+  background: #0b0805;
+}
+
+.enfCeu {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(70% 90% at 18% 55%, color-mix(in srgb, var(--a-neon, #c98a4b) 34%, transparent), transparent 66%),
+    radial-gradient(70% 90% at 82% 55%, color-mix(in srgb, var(--b-neon, #c98a4b) 34%, transparent), transparent 66%),
+    radial-gradient(60% 70% at 18% 60%, color-mix(in srgb, var(--a-abismo, #1a1108) 80%, transparent), transparent 72%),
+    radial-gradient(60% 70% at 82% 60%, color-mix(in srgb, var(--b-abismo, #1a1108) 80%, transparent), transparent 72%),
+    linear-gradient(180deg, #120c07, #0b0805 70%);
+}
+
+.enfGrade {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(60deg, rgba(201, 138, 75, 0.05) 0 1px, transparent 1px 28px),
+    repeating-linear-gradient(-60deg, rgba(201, 138, 75, 0.05) 0 1px, transparent 1px 28px);
+  mask-image: radial-gradient(ellipse at 50% 40%, #000 0%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse at 50% 40%, #000 0%, transparent 75%);
+}
+
+/* O chão hextech: grade em perspectiva (estática; só a luz respira). */
+.enfChao {
+  position: absolute;
+  left: -10%;
+  right: -10%;
+  bottom: -2px;
+  height: 46%;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(201, 138, 75, 0.16) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(201, 138, 75, 0.16) 1px, transparent 1px);
+  background-size: 52px 52px;
+  transform: perspective(520px) rotateX(64deg);
+  transform-origin: 50% 100%;
+  mask-image: linear-gradient(0deg, #000 0%, transparent 85%);
+  -webkit-mask-image: linear-gradient(0deg, #000 0%, transparent 85%);
+}
+
+/* A costura de energia entre os dois times. */
+.enfCostura {
+  position: absolute;
+  left: 50%;
+  top: -10%;
+  height: 120%;
+  width: 3px;
+  margin-left: -1.5px;
+  z-index: -1;
+  pointer-events: none;
+  transform: rotate(14deg);
+  background: linear-gradient(180deg, transparent, #f0c88a 22%, #fff6e0 50%, #f0c88a 78%, transparent);
+  box-shadow: 0 0 24px rgba(240, 200, 138, 0.6), 0 0 80px rgba(201, 138, 75, 0.35);
+  animation: enfRespira 2.4s ease-in-out infinite;
+}
+
+.enfVinheta {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 45%, transparent 52%, rgba(0, 0, 0, 0.62));
+}
+
+/* Brasas subindo (enfeite): pontinhos na cor de cada time. */
+.enfBrasas {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.enfBrasa {
+  position: absolute;
+  bottom: -10px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--cor, #f0c88a);
+  box-shadow: 0 0 8px var(--cor, #f0c88a);
+  opacity: 0;
+  animation: enfBrasa var(--dur, 7s) linear infinite;
+  animation-delay: var(--atraso, 0s);
+}
+
+.versus {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.78fr) minmax(0, 1fr);
+  grid-template-areas:
+    "a topo b"
+    "a info b";
+  align-items: center;
+  gap: clamp(12px, 2.4vw, 32px);
+  max-width: 1320px;
+  margin: 0 auto;
+  min-height: clamp(400px, 64vh, 720px);
+  padding: clamp(36px, 7vh, 72px) clamp(16px, 3vw, 36px) clamp(32px, 6vh, 56px);
+}
+
+.time {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(8px, 1.6vh, 14px);
+  min-width: 0;
+  text-align: center;
+  color: inherit;
+  text-decoration: none;
+}
+
+.time:focus-visible {
+  outline: 2px solid #f0c88a;
+  outline-offset: 6px;
+  border-radius: 12px;
+}
+
+.escudoGrande {
+  position: relative;
+  width: clamp(110px, 17vw, 270px);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+}
+
+.timeA {
+  grid-area: a;
+}
+
+.timeB {
+  grid-area: b;
+}
+
+.timeA .escudoGrande {
+  animation: entraEscudoA 0.9s cubic-bezier(0.2, 1.1, 0.3, 1);
+}
+
+.timeB .escudoGrande {
+  animation: entraEscudoB 0.9s cubic-bezier(0.2, 1.1, 0.3, 1);
+}
+
+.enfHalo {
+  position: absolute;
+  inset: -24%;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, color-mix(in srgb, var(--neon, #f0c88a) 46%, transparent), transparent 64%);
+  animation: enfPulso 3.6s ease-in-out infinite;
+}
+
+.enfAnel {
+  position: absolute;
+  inset: -8%;
+  border-radius: 50%;
+  pointer-events: none;
+  background: repeating-conic-gradient(color-mix(in srgb, var(--neon, #f0c88a) 30%, transparent) 0 4deg, transparent 4deg 15deg);
+  mask-image: radial-gradient(circle, transparent 0 62%, #000 63% 70%, transparent 71%);
+  -webkit-mask-image: radial-gradient(circle, transparent 0 62%, #000 63% 70%, transparent 71%);
+  animation: enfGira 24s linear infinite;
+}
+
+.escudoGrande img {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 16px 26px rgba(0, 0, 0, 0.6));
+}
+
+.sigla {
+  position: relative;
+  width: 78%;
+  height: 78%;
+  display: grid;
+  place-items: center;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: linear-gradient(160deg, var(--cor, #c98a4b), #1a1108);
+  font-family: var(--font-display), "Anton", Impact, sans-serif;
+  font-size: clamp(28px, 5vw, 70px);
+  color: #fff4dc;
+}
+
+.nomeGrande {
+  font-weight: var(--peso-nome, 400);
+  font-style: var(--estilo-nome, normal);
+  font-synthesis: none;
+  margin: 0;
+  max-width: 100%;
+  font-family: var(--tm-fonte-titulo, var(--font-display)), var(--font-display), "Anton", Impact, sans-serif;
+  font-size: clamp(20px, 3.5vw, 62px);
+  line-height: 1.02;
+  letter-spacing: 0.01em;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+  color: var(--metal-solido, #f0c88a);
+}
+
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .nomeGrande {
+    background: var(--metal, linear-gradient(180deg, #fff3dc, #f0c88a 45%, #a5692f));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.6)) drop-shadow(0 0 22px var(--brilho-nome, rgba(240, 200, 138, 0.3)));
+  }
+}
+
+.assinatura {
+  display: block;
+  font-size: 0.4em;
+  letter-spacing: 0.2em;
+}
+
+.verTime {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--cor, #f0c88a);
+}
+
+.bandeiraDoLado {
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.bandeiraAzul {
+  background: #4d9bff;
+  color: #04101f;
+  box-shadow: 0 0 18px rgba(77, 155, 255, 0.5);
+}
+
+.bandeiraVermelha {
+  background: #ff5d5d;
+  color: #1f0405;
+  box-shadow: 0 0 18px rgba(255, 93, 93, 0.5);
+}
+
+.centroTopo,
+.centroInfo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(8px, 1.5vh, 14px);
+  min-width: 0;
+  text-align: center;
+}
+
+.centroTopo {
+  grid-area: topo;
+  align-self: end;
+}
+
+.centroInfo {
+  grid-area: info;
+  align-self: start;
+}
+
+.fase {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: #c99a5e;
+}
+
+.faseFinal {
+  padding: 4px 10px;
+  border-radius: 4px;
+  background: #c98a4b;
+  color: #140d05;
+}
+
+.placar {
+  margin: 0;
+  font-family: var(--font-display), "Anton", Impact, sans-serif;
+  font-size: clamp(64px, 9vw, 156px);
+  line-height: 0.92;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  color: #f0c88a;
+  white-space: nowrap;
+  animation: entraPlacar 0.9s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .placar {
+    background: linear-gradient(180deg, #fff6e0 0%, #f6dfb5 24%, #f0c88a 44%, #5a3412 50%, #c98a4b 54%, #f6dfb5 74%, #fff6e0 86%, #b97e40 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.55)) drop-shadow(0 0 26px rgba(240, 200, 138, 0.35));
+  }
+}
+
+.formato {
+  padding: 5px 14px;
+  border: 1px solid rgba(201, 138, 75, 0.55);
+  border-radius: 6px;
+  background: #1a120a;
+  font-family: var(--font-display), "Anton", Impact, sans-serif;
+  font-size: 18px;
+  letter-spacing: 0.14em;
+  color: #f0c88a;
+}
+
+.data {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.dataDia {
+  font-family: var(--font-display), "Anton", Impact, sans-serif;
+  font-size: clamp(18px, 1.9vw, 26px);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #f3ece0;
+}
+
+.dataHora {
+  color: #f0c88a;
+}
+
+.fuso {
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #8f8472;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(201, 138, 75, 0.45);
+  background: rgba(201, 138, 75, 0.1);
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #f0c88a;
+}
+
+.statusFinalizada {
+  border-color: #c98a4b;
+  background: #c98a4b;
+  color: #140d05;
+}
+
+.statusAndamento {
+  border-color: rgba(87, 216, 203, 0.55);
+  background: rgba(87, 216, 203, 0.1);
+  color: #8fe9df;
+}
+
+.statusWo {
+  border-color: rgba(255, 93, 93, 0.55);
+  background: rgba(255, 93, 93, 0.1);
+  color: #ff9a9a;
+}
+
+.mvp {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #f0c88a;
+}
+
+.serieId {
+  margin: 0;
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #6f6157;
+}
+
+@media (max-width: 700px) {
+  .versus {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    grid-template-areas:
+      "a topo b"
+      "info info info";
+    gap: 8px;
+    min-height: 0;
+    padding: 28px 12px 26px;
+  }
+  .escudoGrande {
+    width: clamp(76px, 25vw, 120px);
+  }
+  .nomeGrande {
+    font-size: clamp(15px, 4.6vw, 24px);
+  }
+  .verTime {
+    display: none;
+  }
+  .placar {
+    font-size: clamp(42px, 13vw, 64px);
+  }
+  .centroTopo {
+    align-self: center;
+    gap: 6px;
+  }
+  .centroInfo {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px 12px;
+    padding-top: 12px;
+  }
+  .formato {
+    font-size: 13px;
+    padding: 3px 8px;
+  }
+  .fase {
+    font-size: 9.5px;
+    letter-spacing: 0.18em;
+  }
+  .bandeiraDoLado {
+    font-size: 9px;
+    padding: 4px 6px;
+    letter-spacing: 0.1em;
+  }
+}
+
+/* ------------------------------------------------------------------ o miolo (abaixo do cartaz) */
+
+.miolo {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(18px, 3vw, 28px);
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: clamp(18px, 3vw, 32px) clamp(12px, 3vw, 28px) 0;
+}
+
+/* ------------------------------------------------------------------ painel do campeão (final) */
+
+.campeao {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: clamp(14px, 3vw, 32px);
+  padding: clamp(18px, 3vw, 30px);
+  border-radius: 20px;
+  border: 1px solid rgba(240, 200, 138, 0.5);
+  background:
+    radial-gradient(60% 120% at 12% 50%, rgba(240, 200, 138, 0.22), transparent 70%),
+    linear-gradient(160deg, #20160b, #0d0905);
+  box-shadow: 0 0 60px rgba(240, 200, 138, 0.18);
+}
+
+.enfRaiosCampeao {
+  position: absolute;
+  left: -30%;
+  top: -150%;
+  width: 90%;
+  aspect-ratio: 1;
+  pointer-events: none;
+  background: repeating-conic-gradient(rgba(240, 200, 138, 0.12) 0 6deg, transparent 6deg 20deg);
+  mask-image: radial-gradient(circle, #000 0%, transparent 65%);
+  -webkit-mask-image: radial-gradient(circle, #000 0%, transparent 65%);
+  animation: enfGira 40s linear infinite;
+}
+
+.campeaoEscudo {
+  position: relative;
+  width: clamp(72px, 12vw, 150px);
+  aspect-ratio: 1;
+}
+
+.campeaoEscudo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.campeaoTexto {
+  position: relative;
+  min-width: 0;
+}
+
+.campeaoOlho {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: #f0c88a;
+}
+
+.campeaoNome {
+  font-weight: var(--peso-nome, 400);
+  font-style: var(--estilo-nome, normal);
+  font-synthesis: none;
+  margin: 6px 0 0;
+  font-family: var(--tm-fonte-titulo, var(--font-display)), var(--font-display), "Anton", Impact, sans-serif;
+  font-size: clamp(26px, 4.6vw, 64px);
+  line-height: 1.02;
+  overflow-wrap: anywhere;
+  color: var(--metal-solido, #f0c88a);
+}
+
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .campeaoNome {
+    background: var(--metal, linear-gradient(180deg, #fff3dc, #f0c88a 45%, #a5692f));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
+
+.campeaoResumo {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #d8cfc0;
+}
+
+.campeaoPlacar {
+  position: relative;
+  text-align: center;
+}
+
+.campeaoPlacarNumero {
+  margin: 0;
+  font-family: var(--font-display), "Anton", Impact, sans-serif;
+  font-size: clamp(40px, 6vw, 76px);
+  line-height: 1;
+  color: #f0c88a;
+}
+
+.campeaoLink {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #f0c88a;
+}
+
+@media (max-width: 700px) {
+  .campeao {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .campeaoPlacar {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ------------------------------------------------------------------ a arena do sorteio */
+
+.arena {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(16px, 2.6vw, 30px);
+  border-radius: 22px;
+  border: 1px solid rgba(201, 138, 75, 0.32);
+  background:
+    radial-gradient(70% 60% at 18% 0%, rgba(77, 155, 255, 0.08), transparent 70%),
+    radial-gradient(70% 60% at 82% 0%, rgba(255, 93, 93, 0.08), transparent 70%),
+    linear-gradient(180deg, #17110a, #0d0905);
+  box-shadow: inset 0 1px 0 rgba(240, 200, 138, 0.2), 0 30px 70px -40px rgba(0, 0, 0, 0.9);
+}
+
+.enfGradeDaArena {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(60deg, rgba(201, 138, 75, 0.045) 0 1px, transparent 1px 26px),
+    repeating-linear-gradient(-60deg, rgba(201, 138, 75, 0.045) 0 1px, transparent 1px 26px);
+  mask-image: linear-gradient(180deg, #000, transparent 70%);
+  -webkit-mask-image: linear-gradient(180deg, #000, transparent 70%);
+}
+
+.arenaCabecalho {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: clamp(14px, 2.4vw, 24px);
+}
+
+.arenaTitulos {
+  min-width: 0;
+}
+
+.olho {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: #c99a5e;
+}
+
+.arenaTitulo {
+  margin: 4px 0 0;
+  font-family: var(--font-display), "Anton", Impact, sans-serif;
+  font-size: clamp(30px, 4.4vw, 52px);
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #f2ebdf;
+}
+
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .arenaTitulo {
+    background: linear-gradient(180deg, #fff6e0, #f0c88a 55%, #b97e40);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
+
+.arenaSub {
+  margin: 8px 0 0;
+  max-width: 62ch;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: #a99e8b;
+}
+
+.seloAoVivo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(87, 216, 203, 0.5);
+  background: rgba(87, 216, 203, 0.1);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #8fe9df;
+}
+
+.enfPontoAoVivo {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #57d8cb;
+  box-shadow: 0 0 10px #57d8cb;
+  animation: enfPisca 1.2s ease-in-out infinite;
+}
+
+.arenaGrade {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: clamp(14px, 2vw, 24px);
+}
+
+@media (max-width: 900px) {
+  .arenaGrade {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.modulo {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  padding: clamp(14px, 2vw, 22px);
+  border-radius: 16px;
+  border: 1px solid rgba(201, 138, 75, 0.2);
+  background: rgba(11, 8, 4, 0.55);
+}
+
+.moduloTitulo {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: #d8cfc0;
+}
+
+.portoes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.portao {
+  position: relative;
+  min-width: 0;
+  min-height: 170px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 46px 10px 16px;
+  border-radius: 14px;
+  text-align: center;
+  overflow: hidden;
+}
+
+.portaoAzul {
+  border: 1.5px dashed rgba(77, 155, 255, 0.4);
+  background: linear-gradient(180deg, rgba(31, 107, 255, 0.1), rgba(11, 8, 4, 0.6));
+}
+
+.portaoVermelho {
+  border: 1.5px dashed rgba(255, 93, 93, 0.4);
+  background: linear-gradient(180deg, rgba(224, 36, 58, 0.1), rgba(11, 8, 4, 0.6));
+}
+
+.portaoSorteado.portaoAzul {
+  border: 2px solid rgba(77, 155, 255, 0.85);
+  background: linear-gradient(180deg, rgba(31, 107, 255, 0.32), rgba(10, 26, 61, 0.6) 60%, rgba(11, 8, 4, 0.7));
+  box-shadow: 0 0 34px rgba(77, 155, 255, 0.3);
+}
+
+.portaoSorteado.portaoVermelho {
+  border: 2px solid rgba(255, 93, 93, 0.85);
+  background: linear-gradient(180deg, rgba(255, 46, 62, 0.3), rgba(61, 10, 14, 0.6) 60%, rgba(11, 8, 4, 0.7));
+  box-shadow: 0 0 34px rgba(255, 93, 93, 0.28);
+}
+
+.portaoRotulo {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  padding: 7px 8px;
+  font-family: var(--font-display), "Anton", Impact, sans-serif;
+  font-size: clamp(13px, 1.5vw, 16px);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.portaoAzul .portaoRotulo {
+  background: rgba(77, 155, 255, 0.92);
+  color: #04101f;
+}
+
+.portaoVermelho .portaoRotulo {
+  background: rgba(255, 93, 93, 0.92);
+  color: #1f0405;
+}
+
+.portaoEscudo {
+  --escudo: clamp(56px, 9vw, 84px);
+  width: var(--escudo);
+  height: var(--escudo);
+}
+
+.portaoNome {
+  font-weight: var(--peso-nome, 400);
+  font-style: var(--estilo-nome, normal);
+  font-synthesis: none;
+  margin: 0;
+  max-width: 100%;
+  font-family: var(--tm-fonte-titulo, var(--font-display)), var(--font-display), "Anton", Impact, sans-serif;
+  font-size: clamp(15px, 1.8vw, 22px);
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+  color: var(--metal-solido, #f0c88a);
+}
+
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .portaoNome {
+    background: var(--metal);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
+
+.portaoInterrogacao {
+  font-family: var(--font-display), "Anton", Impact, sans-serif;
+  font-size: 44px;
+  line-height: 1;
+  color: #5d5446;
+}
+
+.portaoVazio {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #8f8472;
+}
+
+.observacao {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #a99e8b;
+}
+
+.iconeMiudo {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.botaoOuro,
+.botaoContorno {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: transform 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.botaoOuro svg,
+.botaoContorno svg {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+}
+
+.botaoOuro {
+  width: 100%;
+  min-height: 50px;
+  border: 1px solid #f0c88a;
+  background: linear-gradient(150deg, #f7bd5c, #d0731f);
+  color: #1c0e05;
+  text-transform: uppercase;
+  box-shadow: 0 10px 30px -12px rgba(240, 160, 70, 0.7);
+}
+
+.botaoOuro:hover {
+  transform: translateY(-2px);
+}
+
+.botaoContorno {
+  border: 1px solid rgba(240, 200, 138, 0.45);
+  background-color: rgba(240, 200, 138, 0.06);
+  color: #eadcc4;
+}
+
+.botaoContorno:hover {
+  background-color: rgba(240, 200, 138, 0.16);
+  border-color: rgba(240, 200, 138, 0.7);
+}
+
+.botaoOuro:focus-visible,
+.botaoContorno:focus-visible {
+  outline: 2px solid #fff4dc;
+  outline-offset: 2px;
+}
+
+.faixaDupla {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(87, 216, 203, 0.4);
+  background: rgba(87, 216, 203, 0.08);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #8fe9df;
+}
+
+.vagas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 340px) {
+  .vagas,
+  .portoes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.vaga {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  text-align: center;
+}
+
+.vagaCabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.vagaEscudo {
+  --escudo: 30px;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+}
+
+.vagaNome {
+  font-weight: var(--peso-nome, 400);
+  font-style: var(--estilo-nome, normal);
+  font-synthesis: none;
+  min-width: 0;
+  font-family: var(--tm-fonte-titulo, var(--font-display)), var(--font-display), "Anton", Impact, sans-serif;
+  font-size: 15px;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+  color: var(--metal-solido, #f0c88a);
+}
+
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .vagaNome {
+    background: var(--metal);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
+
+.miniCarta,
+.miniVerso {
+  position: relative;
+  width: min(100%, 180px);
+  aspect-ratio: 5 / 7;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.miniCarta {
+  border: 2px solid var(--borda-carta, rgba(240, 200, 138, 0.55));
+  background: linear-gradient(180deg, #241a10, #0e0a05);
+  box-shadow: 0 0 26px color-mix(in srgb, var(--cor-carta, #f0c88a) 30%, transparent), 0 16px 30px -16px rgba(0, 0, 0, 0.85);
+}
+
+.miniArte {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 8px 8px 0;
+  border-radius: 6px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  font-size: 54px;
+  background: linear-gradient(160deg, var(--cor-carta, #c98a4b), #0b0804 70%);
+}
+
+.miniArte img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.miniLetra {
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #0b0804;
+  border: 2px solid var(--cor-carta, #f0c88a);
+  font-family: var(--font-display), "Anton", Impact, sans-serif;
+  font-size: 14px;
+  color: var(--cor-carta, #f0c88a);
+}
+
+.miniNome {
+  margin: 0;
+  padding: 8px 8px 10px;
+  font-family: var(--font-display), "Anton", Impact, sans-serif;
+  font-size: clamp(14px, 1.6vw, 17px);
+  line-height: 1.05;
+  color: #f4ede1;
+}
+
+.miniDupla {
+  margin: 0 0 8px;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #57d8cb;
+}
+
+.miniVerso {
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 2px solid rgba(240, 200, 138, 0.3);
+  background:
+    radial-gradient(circle at 50% 44%, rgba(240, 200, 138, 0.14), transparent 58%),
+    repeating-linear-gradient(60deg, rgba(240, 200, 138, 0.06) 0 1px, transparent 1px 12px),
+    repeating-linear-gradient(-60deg, rgba(240, 200, 138, 0.06) 0 1px, transparent 1px 12px),
+    linear-gradient(180deg, #1c130a, #0e0a05);
+}
+
+.miniVerso img {
+  width: 52%;
+  height: auto;
+}
+
+.miniSemCarta {
+  margin: 0;
+  font-family: var(--font-display), "Anton", Impact, sans-serif;
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8f8472;
+}
+
+.vagaContra {
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #a99e8b;
+}
+
+.letras {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 18px;
+  border-radius: 14px;
+  border: 1.5px solid rgba(87, 216, 203, 0.6);
+  background: #0c2a28;
+  text-align: center;
+}
+
+.letrasRotulo {
+  margin: 0;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #a99e8b;
+}
+
+.letrasPar {
+  margin: 0;
+  font-family: var(--font-display), "Anton", Impact, sans-serif;
+  font-size: clamp(32px, 4vw, 46px);
+  letter-spacing: 0.3em;
+  color: #b9fff6;
+  text-shadow: 0 0 18px rgba(87, 216, 203, 0.55);
+}
+
+.letrasCampeoes {
+  margin: 0;
+  font-size: 12px;
+  color: #8fe9df;
+}
+
+/* As letras dentro da vaga do time (meia largura no celular): o par encolhe para caber. */
+.letrasNaVaga {
+  max-width: 100%;
+  padding: 10px 12px;
+}
+
+.letrasNaVaga .letrasPar {
+  font-size: clamp(24px, 3vw, 40px);
+  letter-spacing: 0.22em;
+}
+
+.procedencia {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #8f8472;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+.mono {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+.dupla {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.explicacao {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: #8f8472;
+  text-align: center;
+}
+
+.operador {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: clamp(14px, 2vw, 22px);
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px dashed rgba(240, 200, 138, 0.3);
+  background: rgba(11, 8, 4, 0.5);
+}
+
+.operadorRotulo {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: #c99a5e;
+}
+
+.operadorBotoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.operadorRotuloMiudo {
+  align-self: center;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #e0b062;
+}
+
+.botaoEnsaio {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px dashed rgba(224, 176, 98, 0.7);
+  background-color: rgba(224, 176, 98, 0.08);
+  color: #f3d69a;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.botaoEnsaio:hover {
+  background-color: rgba(224, 176, 98, 0.18);
+}
+
+.botaoEnsaio:focus-visible {
+  outline: 2px solid #fff4dc;
+  outline-offset: 2px;
+}
+
+.avisoReduzido {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(224, 176, 98, 0.55);
+  background: rgba(224, 176, 98, 0.1);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #f3d69a;
+}
+
+.avisoReduzido button {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 6px 10px;
+  border-radius: 7px;
+  border: 1px solid #f0c88a;
+  background: #f0c88a;
+  color: #160f06;
+  cursor: pointer;
+}
+
+/* ------------------------------------------------------------------ resumo da série */
+
+.resumo {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: clamp(14px, 2vw, 22px);
+}
+
+/* Antes do jogo o resumo é só a navegação, em linha. */
+.resumoSoLinks {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.resumoSoLinks .links {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.resumoSoLinks .links .rotulo {
+  flex-basis: 100%;
+}
+
+@media (max-width: 800px) {
+  .resumo {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.cartao {
+  position: relative;
+  min-width: 0;
+  padding: clamp(14px, 2.2vw, 22px);
+  border-radius: 18px;
+  border: 1px solid rgba(201, 138, 75, 0.24);
+  background: linear-gradient(180deg, #17110a, #0e0a06);
+}
+
+.rotulo {
+  margin: 0 0 12px;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #a99e8b;
+}
+
+.cabo {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.caboLado {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.caboEscudo {
+  --escudo: 34px;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+}
+
+.caboNumero {
+  font-family: var(--font-display), "Anton", Impact, sans-serif;
+  font-size: clamp(30px, 4vw, 44px);
+  line-height: 1;
+}
+
+.caboBarra {
+  position: relative;
+  display: flex;
+  height: 14px;
+  border-radius: 7px;
+  overflow: hidden;
+  background: #1a120b;
+}
+
+.caboBarra span {
+  display: block;
+  height: 100%;
+}
+
+.caboNomes {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #a99e8b;
+}
+
+.caboNomes span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.links {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(201, 138, 75, 0.18);
+  background: rgba(11, 8, 4, 0.4);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #eadcc4;
+  text-decoration: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.link:hover {
+  border-color: rgba(240, 200, 138, 0.55);
+  background-color: rgba(240, 200, 138, 0.08);
+}
+
+.linkEscudo {
+  --escudo: 28px;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+/* ------------------------------------------------------------------ jogos */
+
+.jogos {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.jogosTitulo {
+  margin: 0;
+  font-family: var(--font-display), "Anton", Impact, sans-serif;
+  font-size: clamp(24px, 3vw, 34px);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #f2ebdf;
+}
+
+.jogo {
+  position: relative;
+  min-width: 0;
+  padding: clamp(14px, 2.2vw, 22px);
+  border-radius: 18px;
+  border: 1px solid rgba(201, 138, 75, 0.24);
+  border-left: 4px solid var(--vencedor, #c98a4b);
+  background: linear-gradient(180deg, #17110a, #0e0a06);
+}
+
+.jogoWo {
+  border: 1px dashed rgba(224, 176, 98, 0.45);
+  border-left: 4px dashed rgba(224, 176, 98, 0.7);
+  background: rgba(224, 176, 98, 0.04);
+}
+
+.jogoCabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+
+.jogoTitulos {
+  min-width: 0;
+}
+
+.jogoTitulo {
+  margin: 0;
+  font-family: var(--font-display), "Anton", Impact, sans-serif;
+  font-size: clamp(22px, 2.6vw, 30px);
+  letter-spacing: 0.04em;
+  line-height: 1;
+  color: #f3ece0;
+}
+
+.jogoDados {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #a99e8b;
+}
+
+.jogoDados strong {
+  color: #f3ece0;
+}
+
+.seloWo {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  border: 1px solid rgba(224, 176, 98, 0.6);
+  font-family: var(--font-body), sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  vertical-align: middle;
+  color: #f3d69a;
+}
+
+.abates {
+  display: grid;
+  grid-template-columns: minmax(0, auto) auto auto auto minmax(0, auto);
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(201, 138, 75, 0.2);
+  background: rgba(11, 8, 4, 0.5);
+  font-size: 13px;
+}
+
+.abatesNome {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #a99e8b;
+}
+
+.abatesNumero {
+  font-family: var(--font-display), "Anton", Impact, sans-serif;
+  font-size: 22px;
+  color: #f3ece0;
+}
+
+.blocos {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+  margin-top: 14px;
+}
+
+@media (max-width: 1100px) {
+  .blocos {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.bloco {
+  min-width: 0;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(201, 138, 75, 0.16);
+  border-top: 3px solid var(--cor, #c98a4b);
+  background: rgba(11, 8, 4, 0.45);
+}
+
+.blocoCabecalho {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--cor, #d8cfc0);
+}
+
+.blocoEscudo {
+  --escudo: 22px;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.tabela th {
+  padding: 6px 8px;
+  text-align: left;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #8f8472;
+  border-bottom: 1px solid rgba(201, 138, 75, 0.18);
+}
+
+.tabela td {
+  padding: 8px;
+  border-bottom: 1px solid rgba(201, 138, 75, 0.08);
+  vertical-align: middle;
+}
+
+.tabela tr:last-child td {
+  border-bottom: none;
+}
+
+.direita {
+  text-align: right;
+}
+
+.nick {
+  font-weight: 700;
+  color: #f3ece0;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.nick:hover {
+  color: #f0c88a;
+}
+
+.sub {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid #e0b062;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  vertical-align: middle;
+  color: #f3d69a;
+}
+
+.kda {
+  font-family: var(--font-display), "Anton", Impact, sans-serif;
+  font-size: 16px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.k {
+  color: #8fe9df;
+}
+
+.d {
+  color: #ff8a80;
+}
+
+.a {
+  color: #f3ece0;
+}
+
+.kdaMedia {
+  font-family: var(--font-display), "Anton", Impact, sans-serif;
+  font-size: 16px;
+  color: #d8cfc0;
+}
+
+.vazio {
+  color: #8f8472;
+}
+
+/* No celular a tabela vira lista: cada jogador em duas linhas, sem rolagem lateral. */
+@media (max-width: 560px) {
+  .tabela thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .tabela,
+  .tabela tbody {
+    display: block;
+  }
+  .tabela tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2px 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(201, 138, 75, 0.1);
+  }
+  .tabela tr:last-child {
+    border-bottom: none;
+  }
+  .tabela td {
+    display: block;
+    padding: 0;
+    border: none;
+  }
+  .tabela td:nth-child(2) {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .tabela td:nth-child(3) {
+    grid-column: 2;
+    grid-row: 1;
+    text-align: right;
+  }
+  .tabela td:nth-child(4) {
+    grid-column: 2;
+    grid-row: 2;
+  }
+}
+
+.semJogos {
+  margin: 0;
+  padding: 18px;
+  border-radius: 14px;
+  border: 1px dashed rgba(201, 138, 75, 0.3);
+  font-size: 14px;
+  color: #a99e8b;
+  text-align: center;
+}
+
+.rodapeDaPagina {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* ------------------------------------------------------------------ modo transmissão */
+
+/*
+ * No modo transmissão (classe `lob-palco` no <html>, ver app/globals.css) o cabeçalho, o rodapé
+ * e as seções marcadas `data-fora-do-palco` somem; o cartaz encolhe para caber com a arena numa
+ * tela 16:9 de OBS.
+ */
+:global(html.lob-palco) .versus {
+  min-height: 0;
+  padding-top: 24px;
+  padding-bottom: 20px;
+}
+
+:global(html.lob-palco) .escudoGrande {
+  width: clamp(96px, 13vh, 200px);
+}
+
+:global(html.lob-palco) .placar {
+  font-size: clamp(56px, 9vh, 120px);
+}
+
+/* ------------------------------------------------------------------ keyframes: conteúdo */
+
+@keyframes entraEscudoA {
+  0% {
+    transform: translateX(-36px) scale(1.12);
+  }
+  100% {
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes entraEscudoB {
+  0% {
+    transform: translateX(36px) scale(1.12);
+  }
+  100% {
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes entraPlacar {
+  0% {
+    transform: scale(1.6);
+  }
+  60% {
+    transform: scale(0.96);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* ------------------------------------------------------------------ keyframes: enfeite */
+
+@keyframes enfGira {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes enfPulso {
+  0%,
+  100% {
+    transform: scale(0.96);
+    opacity: 0.65;
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 1;
+  }
+}
+
+@keyframes enfRespira {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes enfPisca {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@keyframes enfBrasa {
+  0% {
+    transform: translateY(0) translateX(0);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(-62vh) translateX(var(--deriva, 20px));
+    opacity: 0;
+  }
+}
+
+/* ------------------------------------------------------------------ movimento reduzido */
+
+@media (prefers-reduced-motion: reduce) {
+  .pagina *,
+  .pagina *::before,
+  .pagina *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

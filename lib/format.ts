@@ -96,6 +96,32 @@ export function formatSeriesDateLabel(value?: string | null, locale: string = "p
 }
 
 /**
+ * As partes da data da série para o letreiro do cartaz da partida — "SEX · 13 NOV · 20:00".
+ * No fuso de Brasília, como o resto do site; série gravada só com data fica sem hora.
+ */
+export function partesDaDataDaSerie(
+  value?: string | null,
+  locale: string = "pt-BR",
+): { semana: string; dia: string; hora: string | null } | null {
+  if (!value) return null;
+  const date = paraData(value);
+  if (Number.isNaN(date.getTime())) return null;
+  // "sex." → "sex", "nov." → "nov" (o ponto da abreviação some no letreiro em caixa alta).
+  const semPonto = (texto: string) => texto.replace(/\.$/, "");
+  const partes = new Intl.DateTimeFormat(locale, {
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+    timeZone: BRAZIL_TIME_ZONE,
+  }).formatToParts(date);
+  const parte = (tipo: Intl.DateTimeFormatPartTypes) => partes.find((p) => p.type === tipo)?.value ?? "";
+  const hora = seriesDateHasTime(value)
+    ? new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit", timeZone: BRAZIL_TIME_ZONE }).format(date)
+    : null;
+  return { semana: semPonto(parte("weekday")), dia: `${parte("day")} ${semPonto(parte("month"))}`, hora };
+}
+
+/**
  * Turno (Matutino/Vespertino/Noturno) derivado do horário, no fuso de Brasília.
  *
  * Os três cortes são os MESMOS de `lib/calendar.ts` — e precisam continuar sendo.

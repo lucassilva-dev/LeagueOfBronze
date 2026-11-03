@@ -1,0 +1,1944 @@
+/*
+ * O SHOW DO SORTEIO — a cerimônia em tela cheia (lados e cartinhas).
+ *
+ * REGRA DA CASA (tests/series/show-css-estrutura.test.ts): o CONTEÚDO — nomes, escudos, cartas,
+ * números da contagem, resultado, semente — nasce opaco e só anima `transform`, sem fill-mode e
+ * sem delay. Opacidade, filtro e clip-path animados só em ENFEITE: classes que começam com
+ * `.enf` (aria-hidden, sem texto). Se o relógio de animação parar (aba atrás do OBS), o
+ * resultado continua legível.
+ *
+ * O MINIFICADOR do build (lightningcss) descarta `translate:` ao lado de `transform:` literal:
+ * aqui tudo é `transform`.
+ */
+
+.palco {
+  --azul: #4d9bff;
+  --azul-forte: #1f6bff;
+  --azul-luz: #c7e1ff;
+  --vermelho: #ff5d5d;
+  --vermelho-forte: #e0243a;
+  --vermelho-luz: #ffc9c9;
+  --ouro: #f0c88a;
+  --ouro-forte: #e8b878;
+  --ouro-escuro: #a5692f;
+  --texto: #f6efe4;
+  --apoio: #b8ab97;
+  --fundo: #07050a;
+  --raio: 260px;
+  --escudo: clamp(84px, 19vmin, 230px);
+
+  position: fixed;
+  inset: 0;
+  /* 9000 = "cerimônia em tela cheia" na escala de components/site-frame.tsx. */
+  z-index: 9000;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  color: var(--texto);
+  font-family: var(--font-body), "Chakra Petch", system-ui, sans-serif;
+  outline: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* O céu do palco: camada filha, porque a raiz guarda o fundo opaco inline. */
+.enfFundo {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(120% 90% at 50% 46%, #1c140b 0%, #0d0907 46%, var(--fundo) 78%);
+}
+
+/* As partículas ficam por cima de tudo (menos da barra), sem pegar clique. */
+.camadaDeFaiscas {
+  position: fixed;
+  inset: 0;
+  z-index: 7;
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------------ barra do operador */
+
+.barra {
+  position: relative;
+  z-index: 6;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px clamp(12px, 3vw, 28px);
+  background: linear-gradient(180deg, rgba(7, 5, 10, 0.92), rgba(7, 5, 10, 0));
+}
+
+.selo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 93, 93, 0.45);
+  background: rgba(255, 93, 93, 0.12);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #ffd6d6;
+  white-space: nowrap;
+}
+
+.enfPontoAoVivo {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff4d5e;
+  box-shadow: 0 0 10px #ff4d5e;
+  animation: enfPisca 1.1s ease-in-out infinite;
+}
+
+.tituloDaBarra {
+  min-width: 0;
+  font-family: var(--font-display), "Anton", Impact, sans-serif;
+  font-size: clamp(15px, 2vw, 22px);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ouro);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.confronto {
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--apoio);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.botoes {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.botao {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 8px 12px;
+  border-radius: 9px;
+  border: 1px solid rgba(240, 200, 138, 0.32);
+  background: rgba(240, 200, 138, 0.08);
+  color: #eadcc4;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: background-color 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.botao:hover {
+  background-color: rgba(240, 200, 138, 0.18);
+  border-color: rgba(240, 200, 138, 0.6);
+}
+
+.botao:focus-visible {
+  outline: 2px solid var(--ouro);
+  outline-offset: 2px;
+}
+
+.botao svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.rotuloDoBotao {
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .confronto {
+    display: none;
+  }
+  /* No celular o selo fica só com o ponto vermelho: o título do sorteio cabe inteiro. */
+  .seloTexto {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .selo {
+    padding: 8px;
+  }
+  .rotuloDoBotao {
+    /* No celular o botão vira ícone; o nome acessível continua no aria-label. */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .botao {
+    padding: 8px 10px;
+  }
+}
+
+/* O atalho para o show completo (movimento reduzido no sistema): um botão âmbar na barra. Nada
+   de faixa embaixo dela — uma faixa empurrava a cena e o resultado para fora da tela. */
+.botaoAlerta {
+  border-color: rgba(255, 196, 92, 0.75);
+  background: rgba(255, 196, 92, 0.16);
+  color: #ffe2a8;
+}
+
+/* O ENSAIO no lugar do "ao vivo": selo âmbar listrado, na barra (o enquadramento não muda). */
+.seloEnsaio {
+  border-color: #e0b062;
+  background: repeating-linear-gradient(135deg, rgba(224, 176, 98, 0.3) 0 10px, rgba(224, 176, 98, 0.1) 10px 20px), #1c1307;
+  color: #f3d69a;
+}
+
+.enfPontoEnsaio {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: #e0b062;
+  box-shadow: 0 0 10px #e0b062;
+  animation: enfPisca 1.1s ease-in-out infinite;
+}
+
+/* A marca d'água do ensaio: atravessa a cena por trás de tudo (estática; o selo é o texto lido). */
+.marcaDoEnsaio {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 1;
+  margin: 0;
+  transform: translate(-50%, -50%) rotate(-14deg);
+  white-space: nowrap;
+  pointer-events: none;
+  font-family: var(--font-display), "Anton", Impact, sans-serif;
+  font-size: clamp(28px, 5.4vw, 96px);
+  letter-spacing: 0.08em;
+  color: rgba(243, 214, 154, 0.11);
+}
+
+.atalhos {
+  position: absolute;
+  left: clamp(12px, 3vw, 28px);
+  bottom: 12px;
+  z-index: 6;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: #6f6455;
+}
+
+@media (max-width: 900px), (pointer: coarse) {
+  .atalhos {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------------------------ a cena */
+
+.cena {
+  position: relative;
+  flex: 1 0 auto;
+  min-height: max(540px, calc(100dvh - 64px));
+  overflow: hidden;
+}
+
+/* O golpe da revelação (uma vez) e, antes dele, o tremor contínuo da reta final do freio. São
+   classes diferentes: trocar uma pela outra recomeça a animação do golpe. */
+.tremendo {
+  animation: tremor 0.42s linear;
+}
+
+.tremendoFreio {
+  animation: tremorFreio 0.16s linear infinite;
+}
+
+.camada {
+  position: absolute;
+  inset: 0;
+}
+
+/* Enfeites de fundo comuns: holofotes girando e vinheta. */
+.enfHolofotes {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 190vmax;
+  height: 190vmax;
+  margin-left: -95vmax;
+  margin-top: -95vmax;
+  pointer-events: none;
+  background: conic-gradient(
+    from 0deg,
+    rgba(240, 200, 138, 0.09) 0deg 12deg,
+    rgba(0, 0, 0, 0) 12deg 58deg,
+    rgba(77, 155, 255, 0.07) 58deg 70deg,
+    rgba(0, 0, 0, 0) 70deg 178deg,
+    rgba(255, 93, 93, 0.07) 178deg 190deg,
+    rgba(0, 0, 0, 0) 190deg 238deg,
+    rgba(240, 200, 138, 0.06) 238deg 250deg,
+    rgba(0, 0, 0, 0) 250deg 360deg
+  );
+  animation: enfGira 26s linear infinite;
+}
+
+.enfVinheta {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 46%, rgba(0, 0, 0, 0) 36%, rgba(4, 3, 6, 0.82) 82%);
+}
+
+.enfGrade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(240, 200, 138, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(240, 200, 138, 0.045) 1px, transparent 1px);
+  background-size: 46px 46px;
+  mask-image: radial-gradient(ellipse at 50% 55%, #000 0%, transparent 70%);
+  -webkit-mask-image: radial-gradient(ellipse at 50% 55%, #000 0%, transparent 70%);
+}
+
+.enfFlash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 8;
+  background: radial-gradient(circle at 50% 46%, #fff 0%, rgba(255, 244, 224, 0.75) 30%, rgba(255, 244, 224, 0) 70%);
+  opacity: 0;
+  animation: enfFlash 0.9s ease-out;
+}
+
+/* ------------------------------------------------------------------ abertura de trailer */
+
+/* As tarjas de cinema (enfeite): batem de cima e de baixo e ficam até o VAI!. */
+.enfTarja {
+  position: absolute;
+  left: 0;
+  right: 0;
+  /* Abaixo da pergunta e do cabeçalho das cartas (6): o título da cena fica sobre a tarja. */
+  z-index: 5;
+  height: clamp(36px, 9vh, 96px);
+  background: #000;
+  pointer-events: none;
+  animation: enfTarja 0.3s cubic-bezier(0.2, 0.9, 0.1, 1);
+}
+
+.enfTarjaCima {
+  top: 0;
+  transform-origin: 50% 0%;
+  box-shadow: 0 6px 30px rgba(0, 0, 0, 0.8);
+}
+
+.enfTarjaBaixo {
+  bottom: 0;
+  transform-origin: 50% 100%;
+  box-shadow: 0 -6px 30px rgba(0, 0, 0, 0.8);
+}
+
+/* O letreiro: uma faixa escura atravessando a tela com o texto batendo no grave. */
+.letreiro {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.letreiroTexto {
+  margin: 0;
+  width: 100%;
+  padding: clamp(14px, 3vh, 30px) 16px;
+  text-align: center;
+  font-family: var(--font-display), "Anton", Impact, sans-serif;
+  font-size: clamp(38px, 8.4vw, 140px);
+  line-height: 1;
+  letter-spacing: 0.04em;
+  color: #fff4dc;
+  text-shadow: 0 0 34px rgba(240, 200, 138, 0.55), 0 6px 0 rgba(0, 0, 0, 0.6);
+  background: linear-gradient(90deg, rgba(7, 5, 10, 0), rgba(7, 5, 10, 0.88) 18%, rgba(7, 5, 10, 0.88) 82%, rgba(7, 5, 10, 0));
+  animation: letreiroBate 0.5s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+/* ------------------------------------------------------------------ contagem e frases */
+
+.contagem {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 7;
+  margin: 0;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.numero {
+  display: block;
+  font-family: var(--font-display), "Anton", Impact, sans-serif;
+  font-size: clamp(120px, 30vmin, 340px);
+  line-height: 1;
+  color: #ffe8c2;
+  text-shadow:
+    0 0 28px rgba(240, 200, 138, 0.9),
+    0 0 90px rgba(232, 150, 60, 0.6),
+    0 8px 0 #6b3d10;
+  animation: batida 0.72s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+.vai {
+  display: block;
+  font-family: var(--font-display), "Anton", Impact, sans-serif;
+  font-size: clamp(90px, 22vmin, 260px);
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: #fff4dc;
+  text-shadow:
+    0 0 30px rgba(255, 220, 160, 0.95),
+    0 0 110px rgba(255, 140, 60, 0.75),
+    0 8px 0 #7a2f08;
+  animation: vai 0.62s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+.frase {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(26px, 7vh, 70px);
+  z-index: 7;
+  width: min(92vw, 680px);
+  margin: 0 0 0 calc(min(92vw, 680px) / -2);
+  text-align: center;
+  font-size: clamp(15px, 2.3vw, 22px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--ouro);
+  animation: frase 0.36s ease-out;
+}
+
+.demora {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(70px, 14vh, 130px);
+  z-index: 7;
+  width: min(92%, 640px);
+  margin: 0;
+  transform: translateX(-50%);
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(224, 176, 98, 0.55);
+  background: rgba(40, 26, 8, 0.9);
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #f3d69a;
+}
+
+/* ------------------------------------------------------------------ lados: zonas, pergunta e rótulos */
+
+.zona {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  pointer-events: none;
+}
+
+.zonaAzul {
+  left: 0;
+  background: linear-gradient(90deg, rgba(31, 107, 255, 0.24), rgba(31, 107, 255, 0.05) 70%, rgba(31, 107, 255, 0));
+}
+
+.zonaVermelha {
+  right: 0;
+  background: linear-gradient(270deg, rgba(224, 36, 58, 0.24), rgba(224, 36, 58, 0.05) 70%, rgba(224, 36, 58, 0));
+}
+
+/* A luz que acende o lado na revelação (enfeite). */
+.enfLuzDoLado {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.zonaAzul .enfLuzDoLado {
+  background: radial-gradient(80% 70% at 30% 52%, rgba(77, 155, 255, 0.5), rgba(31, 107, 255, 0.14) 55%, rgba(31, 107, 255, 0) 82%);
+}
+
+.zonaVermelha .enfLuzDoLado {
+  background: radial-gradient(80% 70% at 70% 52%, rgba(255, 93, 93, 0.46), rgba(224, 36, 58, 0.14) 55%, rgba(224, 36, 58, 0) 82%);
+}
+
+.revelado .zona .enfLuzDoLado {
+  opacity: 1;
+  animation: enfAcende 0.7s ease-out;
+}
+
+.enfCostura {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(240, 200, 138, 0), rgba(240, 200, 138, 0.7) 30%, rgba(255, 244, 224, 0.95) 50%, rgba(240, 200, 138, 0.7) 70%, rgba(240, 200, 138, 0));
+  box-shadow: 0 0 18px rgba(240, 200, 138, 0.55), 0 0 60px rgba(240, 200, 138, 0.22);
+  animation: enfPulsoCostura 1.6s ease-in-out infinite;
+}
+
+.pergunta {
+  position: absolute;
+  left: 50%;
+  top: clamp(12px, 3.4vh, 36px);
+  z-index: 6;
+  width: min(92%, 900px);
+  margin: 0;
+  transform: translateX(-50%);
+  text-align: center;
+  font-family: var(--font-display), "Anton", Impact, sans-serif;
+  font-size: clamp(22px, 3.6vw, 52px);
+  line-height: 1.04;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #f6efe4;
+  text-shadow: 0 0 26px rgba(240, 200, 138, 0.35), 0 4px 0 rgba(0, 0, 0, 0.6);
+  animation: desceCentro 0.7s cubic-bezier(0.2, 1.3, 0.4, 1);
+}
+
+.rotuloLado {
+  position: absolute;
+  top: 50%;
+  z-index: 4;
+  margin: 0;
+  font-family: var(--font-display), "Anton", Impact, sans-serif;
+  font-size: clamp(13px, 1.9vw, 30px);
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transform: translateY(-50%);
+}
+
+.rotuloAzul {
+  left: clamp(8px, 2.4vw, 40px);
+  color: var(--azul);
+  text-shadow: 0 0 22px rgba(77, 155, 255, 0.6);
+}
+
+.rotuloVermelho {
+  right: clamp(8px, 2.4vw, 40px);
+  color: var(--vermelho);
+  text-shadow: 0 0 22px rgba(255, 93, 93, 0.6);
+}
+
+@media (max-width: 760px), (max-width: 1000px) and (orientation: portrait) {
+  /* No celular (e no tablet em pé) as setas já dizem o lado; o rótulo desce para não encostar
+     na roda. */
+  .rotuloLado {
+    top: auto;
+    bottom: clamp(70px, 14vh, 120px);
+    transform: none;
+  }
+}
+
+/* ------------------------------------------------------------------ lados: a roda */
+
+.roda {
+  --d: min(58vh, 640px, 80vw);
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 3;
+  width: var(--d);
+  height: var(--d);
+  margin-left: calc(var(--d) / -2);
+  margin-top: calc(var(--d) / -2);
+  transition: transform 0.75s cubic-bezier(0.2, 0.9, 0.3, 1);
+  animation: entraRoda 0.9s cubic-bezier(0.2, 1.25, 0.4, 1);
+}
+
+@media (max-height: 560px) {
+  .roda {
+    --d: min(66vh, 80vw);
+  }
+}
+
+.revelado .roda {
+  /* A roda recua para o meio, entre os dois painéis. */
+  transform: scale(0.42);
+}
+
+@media (max-width: 760px), (max-width: 1000px) and (orientation: portrait) {
+  /* No celular os painéis ocupam a largura toda: a roda desce para o vão entre eles e o rodapé. */
+  .revelado .roda {
+    transform: translateY(14vh) scale(0.42);
+  }
+}
+
+/* [22] Em pé e baixo (celular com barra do navegador): não há vão — a roda revelada sai de cena
+   em vez de cobrir a semente. Os painéis já dizem o resultado. */
+@media (max-width: 760px) and (max-height: 700px), (max-width: 1000px) and (orientation: portrait) and (max-height: 700px) {
+  .revelado .roda {
+    visibility: hidden;
+  }
+}
+
+.enfHaloDaRoda {
+  position: absolute;
+  inset: -16%;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(240, 200, 138, 0.3), rgba(240, 200, 138, 0.08) 52%, rgba(240, 200, 138, 0) 70%);
+  animation: enfPulso 1.8s ease-in-out infinite;
+}
+
+.disco {
+  position: absolute;
+  inset: 4.5%;
+  border-radius: 50%;
+  overflow: hidden;
+  will-change: transform;
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.65);
+}
+
+/* Os raios de bronze entre as fatias e o escurecido do miolo (giram junto: estão no disco). */
+.raiosDoDisco {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(11, 8, 4, 0.75) 0 22%, rgba(11, 8, 4, 0) 46%),
+    repeating-conic-gradient(from 0deg, rgba(240, 200, 138, 0.85) 0deg 0.9deg, rgba(0, 0, 0, 0) 0.9deg 60deg);
+}
+
+/* O verniz não gira: a luz do estúdio fica parada enquanto a chapa passa por baixo. */
+.enfVerniz {
+  position: absolute;
+  inset: 4.5%;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle at 32% 22%, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0) 46%);
+}
+
+.aro {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  background:
+    radial-gradient(circle, rgba(0, 0, 0, 0) 0 64%, rgba(0, 0, 0, 0) 64%),
+    conic-gradient(from 10deg, #f0c88a, #7c4e22 12%, #f6d6a2 25%, #5a3412 37%, #f0c88a 50%, #7c4e22 62%, #f6d6a2 75%, #5a3412 87%, #f0c88a);
+  -webkit-mask: radial-gradient(circle closest-side, transparent 0 calc(91% - 1px), #000 91%);
+  mask: radial-gradient(circle closest-side, transparent 0 calc(91% - 1px), #000 91%);
+  box-shadow: 0 0 0 2px rgba(11, 8, 4, 0.9), 0 0 50px rgba(240, 200, 138, 0.3), 0 30px 70px -20px rgba(0, 0, 0, 0.85);
+}
+
+.girando .aro,
+.freando .aro {
+  box-shadow: 0 0 0 2px rgba(11, 8, 4, 0.9), 0 0 70px rgba(255, 210, 140, 0.55), 0 30px 70px -20px rgba(0, 0, 0, 0.85);
+}
+
+.medalhao {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--d) * 0.2);
+  height: calc(var(--d) * 0.2);
+  margin-left: calc(var(--d) * -0.1);
+  margin-top: calc(var(--d) * -0.1);
+  z-index: 2;
+  will-change: transform;
+}
+
+.escudoDoMedalhao {
+  --escudo: calc(var(--d) * 0.2);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(20, 14, 8, 0.82), rgba(11, 8, 4, 0.92));
+  box-shadow: 0 0 0 2px rgba(240, 200, 138, 0.55), 0 8px 18px rgba(0, 0, 0, 0.6);
+  padding: 12%;
+}
+
+.miolo {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 3;
+  width: calc(var(--d) * 0.3);
+  height: calc(var(--d) * 0.3);
+  margin-left: calc(var(--d) * -0.15);
+  margin-top: calc(var(--d) * -0.15);
+  display: grid;
+  place-items: center;
+  clip-path: polygon(50% 0, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+  background: radial-gradient(circle at 50% 40%, #2a1b0d, #0b0804 72%);
+}
+
+.miolo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  clip-path: polygon(50% 0, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%, 7% 25%, 11% 27.5%, 11% 72.5%, 50% 95%, 89% 72.5%, 89% 27.5%, 50% 5%, 11% 27.5%);
+  background: linear-gradient(160deg, #f6d6a2, #7c4e22 50%, #f0c88a);
+}
+
+.miolo img {
+  width: 64%;
+  height: auto;
+}
+
+/* As setas: fixas, por fora do aro, apontando para dentro. Batem a cada fatia que cruza. */
+.seta {
+  position: absolute;
+  top: 50%;
+  z-index: 4;
+  width: 0;
+  height: 0;
+  margin-top: calc(var(--d) * -0.06);
+  border-top: calc(var(--d) * 0.06) solid transparent;
+  border-bottom: calc(var(--d) * 0.06) solid transparent;
+}
+
+.setaAzul {
+  left: calc(var(--d) * -0.07);
+  border-left: calc(var(--d) * 0.1) solid var(--azul);
+  filter: drop-shadow(0 0 12px rgba(77, 155, 255, 0.9));
+  transform-origin: 0% 50%;
+}
+
+.setaVermelha {
+  right: calc(var(--d) * -0.07);
+  border-right: calc(var(--d) * 0.1) solid var(--vermelho);
+  filter: drop-shadow(0 0 12px rgba(255, 93, 93, 0.9));
+  transform-origin: 100% 50%;
+}
+
+/* ------------------------------------------------------------------ lados: os painéis da revelação */
+
+.paineis {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(130px, 22vw, 340px);
+  align-items: center;
+  padding: clamp(70px, 12vh, 120px) clamp(8px, 2vw, 40px) clamp(120px, 18vh, 180px);
+  pointer-events: none;
+}
+
+@media (max-width: 760px), (max-width: 1000px) and (orientation: portrait) {
+  .paineis {
+    gap: 10px;
+    align-items: start;
+    padding-top: clamp(64px, 11vh, 96px);
+  }
+}
+
+.painel {
+  position: relative;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(6px, 1.4vh, 14px);
+  padding: clamp(14px, 3vh, 30px) clamp(10px, 1.6vw, 26px) clamp(16px, 3vh, 30px);
+  border-radius: 20px;
+  text-align: center;
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+.painelAzul {
+  border: 2px solid var(--azul);
+  background:
+    radial-gradient(80% 60% at 50% 36%, rgba(31, 107, 255, 0.5), rgba(10, 26, 61, 0.92) 64%),
+    linear-gradient(180deg, #0a1a3d, #06101f);
+  box-shadow: 0 0 60px rgba(77, 155, 255, 0.45), inset 0 0 0 1px rgba(199, 225, 255, 0.15);
+  animation: entraPainelAzul 0.8s cubic-bezier(0.2, 1.2, 0.35, 1);
+}
+
+.painelVermelho {
+  border: 2px solid var(--vermelho);
+  background:
+    radial-gradient(80% 60% at 50% 36%, rgba(255, 46, 62, 0.46), rgba(61, 10, 14, 0.92) 64%),
+    linear-gradient(180deg, #3d0a0e, #1f0507);
+  box-shadow: 0 0 60px rgba(255, 93, 93, 0.42), inset 0 0 0 1px rgba(255, 201, 201, 0.15);
+  animation: entraPainelVermelho 1.5s cubic-bezier(0.2, 1.2, 0.35, 1);
+}
+
+.enfVarredura {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.045) 0 1px, rgba(255, 255, 255, 0) 1px 4px);
+}
+
+.painelRotulo {
+  position: relative;
+  margin: 0;
+  padding: 6px 14px;
+  border-radius: 7px;
+  font-family: var(--font-display), "Anton", Impact, sans-serif;
+  font-size: clamp(14px, 2.2vw, 34px);
+  line-height: 1;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.painelAzul .painelRotulo {
+  background: var(--azul);
+  color: #06101f;
+}
+
+.painelVermelho .painelRotulo {
+  background: var(--vermelho);
+  color: #1f0606;
+}
+
+.escudoDoPainel {
+  --escudo: clamp(84px, 26vmin, 300px);
+  width: var(--escudo);
+  height: var(--escudo);
+  animation: slamEscudo 0.75s cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+
+.painelLegenda {
+  position: relative;
+  margin: 0;
+  font-size: clamp(11px, 1.3vw, 17px);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.painelAzul .painelLegenda {
+  color: #c7e1ff;
+}
+
+.painelVermelho .painelLegenda {
+  color: #ffc9c9;
+}
+
+.nomeDoTime {
+  font-weight: var(--peso-nome, 400);
+  font-style: var(--estilo-nome, normal);
+  font-synthesis: none;
+  position: relative;
+  margin: 0;
+  max-width: 100%;
+  font-family: var(--tm-fonte-titulo, var(--font-display)), var(--font-display), "Anton", Impact, sans-serif;
+  font-size: clamp(18px, 3.6vw, 60px);
+  line-height: 1.04;
+  letter-spacing: 0.01em;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+  color: var(--metal-solido, #f0c88a);
+}
+
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .nomeDoTime {
+    background: var(--metal, linear-gradient(180deg, #fff3dc, #f0c88a 45%, #a5692f));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.55)) drop-shadow(0 0 16px var(--brilho-nome, rgba(240, 200, 138, 0.35)));
+  }
+}
+
+.assinatura {
+  display: block;
+  font-size: 0.42em;
+  letter-spacing: 0.18em;
+}
+
+/* ------------------------------------------------------------------ o escudo do time */
+
+/* O escudo: imagem do time com a aura da cor dele (a aura é enfeite). */
+.escudo {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+/* Tamanho padrão do escudo com especificidade ZERO: a classe de tamanho de quem usa (aqui ou em
+   outro módulo CSS) sempre vence, seja qual for a ordem dos arquivos no build. */
+:where(.escudo) {
+  width: 100%;
+  height: 100%;
+}
+
+.enfAura {
+  position: absolute;
+  inset: -22%;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, var(--aura, rgba(240, 200, 138, 0.5)) 0%, rgba(0, 0, 0, 0) 66%);
+  animation: enfPulso 2.2s ease-in-out infinite;
+}
+
+.escudoImagem {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.75));
+}
+
+.escudoSigla {
+  position: relative;
+  width: 82%;
+  height: 82%;
+  display: grid;
+  place-items: center;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: linear-gradient(160deg, var(--cor-time, #c98a4b), #1a1108);
+  font-family: var(--font-display), "Anton", Impact, sans-serif;
+  font-size: calc(var(--escudo) * 0.3);
+  color: #fff4dc;
+}
+
+/* ------------------------------------------------------------------ cartas: carrossel 3D */
+
+.cabecalhoCartas {
+  position: absolute;
+  left: 50%;
+  top: clamp(10px, 3vh, 30px);
+  z-index: 6;
+  width: min(94vw, 980px);
+  margin-left: calc(min(94vw, 980px) / -2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(10px, 2vw, 22px);
+  text-align: center;
+  animation: desce 0.7s cubic-bezier(0.2, 1.2, 0.3, 1);
+}
+
+.timeDoCabecalho {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.escudoPequeno {
+  width: clamp(42px, 7vmin, 78px);
+  height: clamp(42px, 7vmin, 78px);
+  flex-shrink: 0;
+}
+
+.nomePequeno {
+  font-weight: var(--peso-nome, 400);
+  font-style: var(--estilo-nome, normal);
+  font-synthesis: none;
+  margin: 0;
+  font-family: var(--tm-fonte-titulo, var(--font-display)), var(--font-display), "Anton", Impact, sans-serif;
+  font-size: clamp(14px, 2.2vw, 28px);
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+  color: var(--metal-solido, #f0c88a);
+}
+
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .nomePequeno {
+    background: var(--metal);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
+
+.legendaDoCabecalho {
+  margin: 0;
+  font-size: clamp(10px, 1.3vw, 13px);
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--apoio);
+  white-space: nowrap;
+}
+
+.legendaDupla {
+  color: #57d8cb;
+}
+
+@media (max-width: 640px) {
+  .cabecalhoCartas {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+  .legendaDoCabecalho {
+    order: 3;
+    flex-basis: 100%;
+  }
+}
+
+.cenaCartas {
+  --carta-w: clamp(104px, 17vmin, 240px);
+  --carta-h: calc(var(--carta-w) * 1.4);
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  z-index: 3;
+  perspective: calc(var(--carta-w) * 6);
+  perspective-origin: 50% 40%;
+  transition: transform 0.9s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+/* Na puxada o anel afunda e sai de cena (a carta sorteada já está na frente, grande). */
+.reveladoCartas .cenaCartas {
+  transform: translateY(130vh) scale(0.4);
+}
+
+.inclinacao {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-style: preserve-3d;
+  transform: rotateX(-10deg);
+}
+
+.anel {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.cartaNoAnel {
+  position: absolute;
+  left: calc(var(--carta-w) / -2);
+  top: calc(var(--carta-h) / -2);
+  width: var(--carta-w);
+  height: var(--carta-h);
+  transform-style: preserve-3d;
+}
+
+.face {
+  position: absolute;
+  inset: 0;
+  border-radius: calc(var(--carta-w) * 0.07);
+  overflow: hidden;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* O VERSO (de frente para a plateia no anel): bronze, rede hexagonal, emblema e a LETRA. */
+.faceVerso {
+  display: grid;
+  place-items: center;
+  border: 2px solid rgba(240, 200, 138, 0.6);
+  background:
+    radial-gradient(circle at 50% 46%, rgba(240, 200, 138, 0.26), rgba(240, 200, 138, 0) 58%),
+    repeating-linear-gradient(60deg, rgba(240, 200, 138, 0.08) 0 1px, transparent 1px 13px),
+    repeating-linear-gradient(-60deg, rgba(240, 200, 138, 0.08) 0 1px, transparent 1px 13px),
+    linear-gradient(180deg, #24170b, #120b05);
+  box-shadow:
+    inset 0 0 0 6px rgba(18, 11, 5, 0.9),
+    inset 0 0 0 7px rgba(240, 200, 138, 0.35),
+    0 18px 40px -16px rgba(0, 0, 0, 0.9);
+}
+
+.faceVerso img {
+  width: 58%;
+  height: auto;
+}
+
+/* A aba da letra no topo do verso: é ela que a plateia lê enquanto o anel desacelera. */
+.abaDaLetra {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  min-width: 34%;
+  padding: 4% 6% 5%;
+  transform: translateX(-50%);
+  border-radius: 0 0 10px 10px;
+  background: var(--cor-carta, var(--ouro));
+  color: #160f06;
+  text-align: center;
+  font-family: var(--font-display), "Anton", Impact, sans-serif;
+  font-size: calc(var(--carta-w) * 0.15);
+  line-height: 1;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
+}
+
+/* O lado de dentro da carta (visto no fundo do anel): o mesmo bronze do verso, apagado e sem
+   letra — o anel parece cheio e nenhuma arte vaza antes da puxada. */
+.faceDentro {
+  transform: rotateY(180deg);
+  border: 1px solid rgba(240, 200, 138, 0.22);
+  background:
+    repeating-linear-gradient(60deg, rgba(240, 200, 138, 0.06) 0 1px, transparent 1px 13px),
+    repeating-linear-gradient(-60deg, rgba(240, 200, 138, 0.06) 0 1px, transparent 1px 13px),
+    radial-gradient(circle at 50% 46%, rgba(240, 200, 138, 0.12), rgba(240, 200, 138, 0) 58%),
+    linear-gradient(180deg, #1a1108, #0b0703);
+  box-shadow: inset 0 0 0 6px rgba(11, 7, 3, 0.9), inset 0 0 0 7px rgba(240, 200, 138, 0.16);
+}
+
+.naFrente .faceVerso {
+  border-color: #ffe2a8;
+  box-shadow:
+    inset 0 0 0 6px rgba(18, 11, 5, 0.9),
+    inset 0 0 0 7px rgba(255, 226, 168, 0.7),
+    0 0 0 2px rgba(255, 226, 168, 0.55),
+    0 0 40px rgba(255, 210, 140, 0.6);
+}
+
+/* O ponteiro: onde a carta sorteada vai parar (a carta da frente parece ~35-45% maior pela
+   perspectiva, por isso o 0,72 da metade da altura). */
+.ponteiroCarta {
+  position: absolute;
+  left: -16px;
+  top: calc(var(--carta-h) * -0.72 - 44px);
+  z-index: 4;
+  width: 0;
+  height: 0;
+  border-left: 16px solid transparent;
+  border-right: 16px solid transparent;
+  border-top: 30px solid var(--ouro);
+  filter: drop-shadow(0 0 12px rgba(240, 200, 138, 0.8));
+  transform-origin: 50% 0%;
+}
+
+.batendo {
+  animation: tique 0.22s ease-out;
+}
+
+/* ------------------------------------------------------------------ cartas: a puxada */
+
+.revelacaoCarta {
+  position: relative;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: auto minmax(0, 560px);
+  align-items: center;
+  justify-content: center;
+  gap: clamp(18px, 4vw, 64px);
+  width: min(96%, 1240px);
+  margin: 0 auto;
+  padding: clamp(96px, 15vh, 160px) 0 clamp(24px, 5vh, 56px);
+}
+
+@media (max-width: 860px) {
+  .revelacaoCarta {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+    text-align: center;
+    padding-top: clamp(112px, 17vh, 150px);
+  }
+}
+
+/*
+ * Janela do navegador num monitor 1080p (com barra de endereço sobram ~950 px) ou notebook: a
+ * revelação inteira — carta, frase, regra, rolos do ABCDRAFT e o rodapé com «Fechar» — cabe sem
+ * rolar. Tudo encolhe pela ALTURA; o texto de sabor (o menos importante) sai.
+ */
+@media (min-width: 861px) and (max-height: 1000px) {
+  .revelacaoCarta {
+    padding-top: clamp(88px, 12vh, 120px);
+    padding-bottom: 12px;
+  }
+  .puxada {
+    --carta-w: clamp(170px, 34vh, 340px);
+  }
+  .regra {
+    gap: 10px;
+  }
+  .regraFlavor {
+    display: none;
+  }
+  .regraNome {
+    font-size: clamp(28px, 6.4vh, 64px);
+  }
+  .regraFrase {
+    font-size: clamp(16px, 2.9vh, 30px);
+  }
+  .regraCaixa {
+    padding: 12px 16px;
+  }
+  .regraTexto {
+    font-size: clamp(13px, 1.8vh, 17px);
+  }
+  .rolo {
+    --altura-rolo: clamp(50px, 7vh, 76px);
+  }
+  .rodape {
+    gap: 8px;
+    padding-bottom: clamp(14px, 3vh, 30px);
+  }
+}
+
+.palcoDaCarta {
+  position: relative;
+  display: grid;
+  place-items: center;
+  perspective: 1400px;
+}
+
+.enfRaios {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 260%;
+  aspect-ratio: 1;
+  margin-left: -130%;
+  margin-top: -130%;
+  pointer-events: none;
+  border-radius: 50%;
+  background: repeating-conic-gradient(
+    from 0deg,
+    var(--brilho-carta, rgba(255, 220, 160, 0.3)) 0deg 6deg,
+    rgba(0, 0, 0, 0) 6deg 22deg
+  );
+  mask-image: radial-gradient(circle, #000 0%, rgba(0, 0, 0, 0.6) 32%, transparent 66%);
+  -webkit-mask-image: radial-gradient(circle, #000 0%, rgba(0, 0, 0, 0.6) 32%, transparent 66%);
+  animation: enfGira 16s linear infinite;
+}
+
+/* A carta da puxada: sobe girando do VERSO (com a letra) até a FACE. Sem a animação, a face
+   já está de frente — o estado de repouso é o final. */
+.puxada {
+  --carta-w: clamp(220px, 31vmin, 360px);
+  position: relative;
+  width: var(--carta-w);
+  aspect-ratio: 5 / 7;
+  transform-style: preserve-3d;
+  animation: puxaCarta 1.15s cubic-bezier(0.2, 1.05, 0.3, 1);
+}
+
+.faceDaPuxada {
+  display: flex;
+  flex-direction: column;
+  border: 3px solid var(--borda-carta, rgba(240, 200, 138, 0.6));
+  background: linear-gradient(180deg, #2a1d10, #0e0a05);
+  box-shadow:
+    0 0 0 1px rgba(255, 244, 224, 0.15),
+    0 0 80px var(--brilho-carta, rgba(240, 200, 138, 0.45)),
+    0 30px 80px -20px rgba(0, 0, 0, 0.9);
+}
+
+.versoDaPuxada {
+  transform: rotateY(180deg);
+}
+
+.versoGrande {
+  position: absolute;
+  inset: 0;
+}
+
+.cartaGrandeTopo {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px 0;
+}
+
+.chip {
+  padding: 4px 9px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  background: rgba(10, 8, 4, 0.7);
+  border: 1px solid var(--borda-carta, rgba(240, 200, 138, 0.5));
+  color: #e9dcc5;
+}
+
+.chipLetra {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #0b0804;
+  border: 2px solid var(--cor-carta, var(--ouro));
+  font-family: var(--font-display), "Anton", Impact, sans-serif;
+  font-size: 20px;
+  color: var(--cor-carta, var(--ouro));
+}
+
+.cartaGrandeArte {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 10px 12px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: linear-gradient(160deg, var(--cor-carta, #c98a4b), #0b0804 70%);
+}
+
+.cartaGrandeArte img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cartaGrandeEmoji {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 96px;
+}
+
+.cartaGrandeNome {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  padding: 12px 12px 16px;
+  text-align: center;
+  font-family: var(--font-display), "Anton", Impact, sans-serif;
+  font-size: calc(var(--carta-w) * 0.1);
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: #fff4e2;
+  text-shadow: 0 0 18px var(--brilho-carta, rgba(240, 200, 138, 0.6));
+}
+
+/* O brilho holográfico que corre pela carta (enfeite: faixa de luz em blend). */
+.enfHolo {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  mix-blend-mode: color-dodge;
+  background: linear-gradient(
+    115deg,
+    rgba(255, 255, 255, 0) 28%,
+    rgba(255, 122, 217, 0.26) 38%,
+    rgba(122, 252, 255, 0.28) 47%,
+    rgba(255, 240, 122, 0.26) 56%,
+    rgba(160, 122, 255, 0.24) 64%,
+    rgba(255, 255, 255, 0) 74%
+  );
+  background-size: 260% 100%;
+  animation: enfHolo 2.8s ease-in-out infinite alternate;
+}
+
+.regra {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: entraRegra 1.5s cubic-bezier(0.2, 1, 0.3, 1);
+}
+
+.regraResultado {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--apoio);
+}
+
+.lendaria {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: #ffd27a;
+  color: #1c0e05;
+  font-family: var(--font-display), "Anton", Impact, sans-serif;
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  vertical-align: middle;
+}
+
+/* A frase concreta — a linha mais importante para quem assiste: o que a carta faz COM QUEM. */
+.regraFrase {
+  margin: 0;
+  font-size: clamp(18px, 2.3vw, 34px);
+  font-weight: 700;
+  line-height: 1.3;
+  color: #fff4e2;
+}
+
+
+.quemSofre {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #ff9a9a;
+}
+
+.quemSofre strong {
+  color: #fff4e2;
+}
+
+.regraNome {
+  margin: 0;
+  font-family: var(--font-display), "Anton", Impact, sans-serif;
+  font-size: clamp(34px, 6vw, 76px);
+  line-height: 0.98;
+  letter-spacing: 0.01em;
+  color: #fff4e2;
+  text-shadow: 0 0 28px var(--brilho-carta, rgba(240, 200, 138, 0.55));
+}
+
+.regraCaixa {
+  padding: 16px 18px;
+  border-radius: 14px;
+  border: 1px solid var(--borda-carta, rgba(240, 200, 138, 0.45));
+  background: linear-gradient(180deg, rgba(20, 14, 8, 0.92), rgba(12, 8, 5, 0.92));
+  text-align: left;
+}
+
+.regraRotulo {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--cor-carta, var(--ouro));
+}
+
+.regraTexto {
+  margin: 0;
+  font-size: clamp(14px, 1.7vw, 18px);
+  line-height: 1.5;
+  color: #f1e7d6;
+}
+
+.regraFlavor {
+  margin: 0;
+  font-size: 13.5px;
+  font-style: italic;
+  line-height: 1.55;
+  color: #b8ab97;
+}
+
+.dupla {
+  align-self: flex-start;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: #052a26;
+  background: #57d8cb;
+}
+
+@media (max-width: 860px) {
+  .regraCaixa {
+    text-align: center;
+  }
+  .dupla {
+    align-self: center;
+  }
+}
+
+/* As letras do ABCDRAFT: dois rolos de caça-níquel que travam na letra sorteada. */
+.letras {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rolos {
+  display: flex;
+  gap: 14px;
+}
+
+@media (max-width: 860px) {
+  .rolos {
+    justify-content: center;
+  }
+}
+
+.rolo {
+  --altura-rolo: clamp(64px, 9vmin, 92px);
+  position: relative;
+  width: calc(var(--altura-rolo) * 0.86);
+  height: var(--altura-rolo);
+  overflow: hidden;
+  border-radius: 14px;
+  border: 2px solid var(--ouro);
+  background: linear-gradient(180deg, #0b0804, #24180c 50%, #0b0804);
+  box-shadow: 0 0 26px rgba(240, 200, 138, 0.35), inset 0 0 18px rgba(0, 0, 0, 0.85);
+}
+
+.fita {
+  display: flex;
+  flex-direction: column;
+  transform: translateY(calc(var(--altura-rolo) * var(--parada) * -1));
+}
+
+.fitaA {
+  animation: rolaA 1.9s cubic-bezier(0.12, 0.8, 0.22, 1);
+}
+
+.fitaB {
+  animation: rolaB 2.6s cubic-bezier(0.12, 0.8, 0.22, 1);
+}
+
+.letraDoRolo {
+  display: grid;
+  place-items: center;
+  height: var(--altura-rolo);
+  flex-shrink: 0;
+  font-family: var(--font-display), "Anton", Impact, sans-serif;
+  font-size: calc(var(--altura-rolo) * 0.6);
+  color: var(--ouro);
+  text-shadow: 0 0 16px rgba(240, 200, 138, 0.7);
+}
+
+.campeoes {
+  margin: 0;
+  font-size: 13px;
+  color: var(--apoio);
+}
+
+/* ------------------------------------------------------------------ resultado: rodapé e semente */
+
+.rodape {
+  position: relative;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 0 clamp(14px, 4vw, 28px) clamp(22px, 5vh, 44px);
+  text-align: center;
+}
+
+.rodapeLados {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  animation: sobeRodape 1.8s cubic-bezier(0.2, 1.1, 0.3, 1);
+}
+
+
+.repetido {
+  margin: 0;
+  max-width: 560px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #e0b062;
+}
+
+.semente {
+  margin: 0;
+  max-width: 760px;
+  font-size: 11px;
+  line-height: 1.7;
+  color: #7d7263;
+  word-break: break-all;
+}
+
+.semente span {
+  color: #a98a5f;
+}
+
+.fechar {
+  min-height: 44px;
+  padding: 12px 28px;
+  border-radius: 10px;
+  border: 1px solid var(--ouro);
+  background: linear-gradient(180deg, #f7d79d, #d79a4e);
+  color: #170f06;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.fechar:hover {
+  transform: translateY(-2px);
+}
+
+.fechar:focus-visible {
+  outline: 2px solid #fff4dc;
+  outline-offset: 3px;
+}
+
+/* ------------------------------------------------------------------ erro */
+
+.erro {
+  position: relative;
+  z-index: 6;
+  max-width: 620px;
+  margin: clamp(60px, 18vh, 180px) auto 0;
+  padding: 22px 24px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 93, 93, 0.55);
+  background: rgba(40, 8, 10, 0.85);
+  text-align: center;
+}
+
+.erroTitulo {
+  margin: 0;
+  font-family: var(--font-display), "Anton", Impact, sans-serif;
+  font-size: clamp(22px, 3.6vw, 34px);
+  color: var(--vermelho);
+}
+
+.erroTexto {
+  margin: 10px 0 18px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #e7cfc8;
+}
+
+/* ------------------------------------------------------------------ keyframes: conteúdo (só transform) */
+
+/* 1,25 no 1º quadro: com 1,7 o letreiro em 140 px saía pelas bordas se o relógio parasse ali. */
+@keyframes letreiroBate {
+  0% {
+    transform: scale(1.25);
+  }
+  55% {
+    transform: scale(0.96);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes batida {
+  0% {
+    transform: scale(2.4) rotate(-8deg);
+  }
+  45% {
+    transform: scale(0.92) rotate(1deg);
+  }
+  70% {
+    transform: scale(1.05) rotate(0deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes vai {
+  0% {
+    transform: scale(2.4) rotate(-6deg);
+  }
+  38% {
+    transform: scale(0.88) rotate(2deg);
+  }
+  62% {
+    transform: scale(1.08) rotate(-1deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes frase {
+  from {
+    transform: translateY(12px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes entraRoda {
+  0% {
+    transform: scale(0.82) rotate(-24deg);
+  }
+  60% {
+    transform: scale(1.04) rotate(3deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes desceCentro {
+  from {
+    transform: translateX(-50%) translateY(-18px) scale(1.2);
+  }
+  to {
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+/* Os painéis batem no lugar; o vermelho respira um instante já na tela (a espera mora no
+   keyframe), no compasso da segunda batida do som. */
+@keyframes entraPainelAzul {
+  0% {
+    transform: translateX(-12%) scale(1.08);
+  }
+  70% {
+    transform: translateX(1.5%) scale(0.99);
+  }
+  100% {
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes entraPainelVermelho {
+  0%,
+  40% {
+    transform: translateX(12%) scale(0.94);
+  }
+  80% {
+    transform: translateX(-1.5%) scale(1.02);
+  }
+  100% {
+    transform: translateX(0) scale(1);
+  }
+}
+
+/* Termina em 1 — o repouso do escudo (terminar em 1,18 dava um pulo quando a animação acabava) —
+   e começa em 1,5, que ainda cabe no painel se o relógio de animação parar no 1º quadro. */
+@keyframes slamEscudo {
+  0% {
+    transform: scale(1.5);
+  }
+  45% {
+    transform: scale(0.94);
+  }
+  70% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes sobeRodape {
+  0% {
+    transform: translateY(24px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes desce {
+  from {
+    transform: translateY(-16px) scale(1.12);
+  }
+  to {
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes tique {
+  0% {
+    transform: rotate(0deg);
+  }
+  30% {
+    transform: rotate(-16deg);
+  }
+  65% {
+    transform: rotate(5deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes tremorFreio {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  25% {
+    transform: translate3d(-2px, 1px, 0);
+  }
+  50% {
+    transform: translate3d(2px, -1.5px, 0);
+  }
+  75% {
+    transform: translate3d(-1.5px, -1px, 0);
+  }
+}
+
+@keyframes tremor {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  15% {
+    transform: translate3d(-7px, 4px, 0) rotate(-0.3deg);
+  }
+  30% {
+    transform: translate3d(6px, -5px, 0) rotate(0.3deg);
+  }
+  45% {
+    transform: translate3d(-5px, -3px, 0) rotate(-0.2deg);
+  }
+  60% {
+    transform: translate3d(4px, 4px, 0) rotate(0.2deg);
+  }
+  80% {
+    transform: translate3d(-2px, 1px, 0);
+  }
+}
+
+/* A carta sai do anel girando do verso (com a letra) para a face (sempre visível: só transform). */
+@keyframes puxaCarta {
+  0% {
+    transform: translateY(-6vh) scale(0.84) rotateY(-180deg);
+  }
+  55% {
+    transform: translateY(0) scale(1.1) rotateY(-12deg);
+  }
+  78% {
+    transform: translateY(0) scale(0.98) rotateY(5deg);
+  }
+  100% {
+    transform: translateY(0) scale(1) rotateY(0deg);
+  }
+}
+
+@keyframes entraRegra {
+  0% {
+    transform: translateX(36px);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+@keyframes rolaA {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(calc(var(--altura-rolo) * var(--parada) * -1));
+  }
+}
+
+@keyframes rolaB {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(calc(var(--altura-rolo) * var(--parada) * -1));
+  }
+}
+
+/* ------------------------------------------------------------------ keyframes: enfeite */
+
+@keyframes enfTarja {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes enfGira {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes enfPulso {
+  0%,
+  100% {
+    transform: scale(0.94);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+}
+
+@keyframes enfPisca {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@keyframes enfPulsoCostura {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes enfFlash {
+  0% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes enfAcende {
+  0% {
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
+  }
+  55% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes enfHolo {
+  0% {
+    background-position: 120% 0;
+  }
+  100% {
+    background-position: -120% 0;
+  }
+}
+
+/* ------------------------------------------------------------------ movimento reduzido */
+
+/*
+ * Com o sistema pedindo movimento reduzido, a cerimônia vira um painel parado — A NÃO SER que o
+ * operador tenha ligado o "show completo" (a raiz perde o `data-reduzido`). O resultado nunca
+ * depende de animação, então desligar tudo não esconde nada.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .palco[data-reduzido] *,
+  .palco[data-reduzido] *::before,
+  .palco[data-reduzido] *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

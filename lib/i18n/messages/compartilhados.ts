@@ -92,10 +92,104 @@ export const compartilhados = definir({
     cerimoniaTitulo: "Sorteio ao vivo",
     cerimoniaFechar: "Fechar",
     cerimoniaVai: "VAI!",
-    cerimoniaGirando: "Girando…",
     cerimoniaResultado: "E o resultado é",
     cerimoniaSom: "Som",
-    cerimoniaSemSom: "Mudo",
+    // components/series/cerimonia-de-sorteio.tsx e components/series-live-draw.tsx — o show
+    cerimoniaSemConexao:
+      "A conexão caiu antes da resposta. O sorteio PODE ter sido gravado: feche, recarregue a página e confira antes de sortear de novo.",
+    cerimoniaSemResposta:
+      "O servidor ainda não respondeu. O sorteio pode ter sido gravado — se a resposta não chegar, feche, recarregue e confira antes de sortear de novo.",
+    cerimoniaTituloLados:
+      "Sorteio de lados",
+    cerimoniaTituloCarta:
+      "Sorteio da cartinha",
+    cerimoniaTituloDupla:
+      "Sorteio duplo",
+    cerimoniaPerguntaLados:
+      "Quem começa no lado azul?",
+    cerimoniaJogo1:
+      "jogo 1",
+    cerimoniaComecaNo:
+      "começa no",
+    cerimoniaVolumes: ["mudo", "baixo", "médio", "alto"],
+    cerimoniaTelaCheia:
+      "Tela cheia",
+    cerimoniaSairDaTelaCheia:
+      "Sair da tela cheia",
+    cerimoniaReduzidoAviso:
+      "Este computador está com «reduzir movimento» ligado (no Windows: Efeitos de animação desligados). A live vai ver a versão calma, sem giro.",
+    cerimoniaShowCompleto:
+      "Ligar o show completo",
+    cerimoniaShowCompletoLigado:
+      "Show completo ligado neste navegador, mesmo com «reduzir movimento».",
+    cerimoniaAtalhos:
+      "F tela cheia · M som · Esc fechar",
+    // Na tela cheia o Esc é do navegador; no Chrome/Edge o Keyboard Lock devolve o Esc à página.
+    cerimoniaAtalhosTelaCheia:
+      "F sair da tela cheia · M som · Esc fechar (segure o Esc para sair da tela cheia)",
+    cerimoniaAtalhosTelaCheiaSemTrava:
+      "F sair da tela cheia · M som · Esc sai da tela cheia (o segundo Esc fecha)",
+    cerimoniaAoVivo:
+      "Ao vivo",
+    cerimoniaUsouACarta:
+      "usou a carta contra",
+    cerimoniaSofre:
+      "Quem sofre",
+    cerimoniaOsDoisTimes:
+      "Vale para os dois times",
+    cerimoniaDuploCabecalho:
+      "os dois capitães usaram",
+    cerimoniaSaiuACarta:
+      "Saiu a carta",
+    cerimoniaCarta:
+      "Carta",
+    cerimoniaChipSurpresa:
+      "SURPRESA",
+    cerimoniaChipDupla:
+      "DUPLA",
+    cerimoniaLendaria:
+      "Lendária",
+    cerimoniaOQueAcontece:
+      "O que acontece",
+    cerimoniaARegra:
+      "A regra",
+    arenaOlho:
+      "Sorteios da partida",
+    arenaTitulo:
+      "Arena do sorteio",
+    arenaSubtitulo:
+      "Lados do jogo 1 e cartinhas da série. Quem sorteia é o servidor, com semente pública — a tela só revela.",
+    arenaASortear:
+      "a sortear",
+    arenaWo:
+      "Série decidida por W.O.: não há sorteio.",
+    arenaLadosTravados:
+      "Lados travados: o jogo 1 já foi registrado.",
+    arenaOperador:
+      "Painel da transmissão",
+    arenaModoTransmissao:
+      "Modo transmissão",
+    arenaSairDaTransmissao:
+      "Sair do modo transmissão",
+    arenaTestarSom:
+      "Testar som",
+    arenaVoltarAoCalmo:
+      "Voltar à versão calma",
+    arenaDicaObs:
+      "Para a live: capture a JANELA do navegador no OBS sem minimizar nem cobrir (o Chrome congela janela coberta) e use «Testar som» para acertar o volume antes de entrar no ar.",
+    cerimoniaLetreirosLados: ["DOIS TIMES.", "UM SÓ LADO AZUL."],
+    cerimoniaLetreirosCarta: ["UMA CARTA.", "NENHUMA PIEDADE."],
+    cerimoniaLetreirosDupla: ["DOIS CAPITÃES.", "UMA CARTA PARA TODOS."],
+    cerimoniaEnsaioMarca: "ENSAIO · NADA FOI SORTEADO",
+    cerimoniaEnsaioCreditos: "ensaio técnico: nada foi sorteado nem gravado",
+    arenaEnsaio: "Ensaio (não sorteia nem grava)",
+    arenaEnsaioLados: "Ensaio: lados",
+    arenaEnsaioCarta: "Ensaio: carta",
+    arenaEnsaioDupla: "Ensaio: dupla",
+    arenaValeContra:
+      "vale contra",
+    arenaSortearCartaPara:
+      "Sortear carta para",
     cerimoniaFrases: [
       "chacoalhando o pote…",
       "subornando a aleatoriedade…",
@@ -206,10 +300,102 @@ export const compartilhados = definir({
     cerimoniaTitulo: "Live draw",
     cerimoniaFechar: "Close",
     cerimoniaVai: "GO!",
-    cerimoniaGirando: "Spinning…",
     cerimoniaResultado: "And the result is",
     cerimoniaSom: "Sound",
-    cerimoniaSemSom: "Muted",
+    cerimoniaSemConexao:
+      "The connection dropped before the answer. The draw MAY have been saved: close, reload the page and check before drawing again.",
+    cerimoniaSemResposta:
+      "The server hasn't answered yet. The draw may have been saved — if no answer comes, close, reload and check before drawing again.",
+    cerimoniaTituloLados:
+      "Side draw",
+    cerimoniaTituloCarta:
+      "Wildcard draw",
+    cerimoniaTituloDupla:
+      "Double draw",
+    cerimoniaPerguntaLados:
+      "Who starts on the blue side?",
+    cerimoniaJogo1:
+      "game 1",
+    cerimoniaComecaNo:
+      "starts on the",
+    cerimoniaVolumes: ["muted", "low", "medium", "high"],
+    cerimoniaTelaCheia:
+      "Full screen",
+    cerimoniaSairDaTelaCheia:
+      "Exit full screen",
+    cerimoniaReduzidoAviso:
+      "This computer has “reduce motion” on (on Windows: Animation effects off). The stream will get the calm version, with no spin.",
+    cerimoniaShowCompleto:
+      "Turn on the full show",
+    cerimoniaShowCompletoLigado:
+      "Full show on in this browser, even with “reduce motion”.",
+    cerimoniaAtalhos:
+      "F full screen · M sound · Esc close",
+    cerimoniaAtalhosTelaCheia:
+      "F exit full screen · M sound · Esc close (hold Esc to exit full screen)",
+    cerimoniaAtalhosTelaCheiaSemTrava:
+      "F exit full screen · M sound · Esc exits full screen (a second Esc closes)",
+    cerimoniaAoVivo:
+      "Live",
+    cerimoniaUsouACarta:
+      "played the wildcard on",
+    cerimoniaSofre:
+      "Who takes it",
+    cerimoniaOsDoisTimes:
+      "Applies to both teams",
+    cerimoniaDuploCabecalho:
+      "both captains played it",
+    cerimoniaSaiuACarta:
+      "Out comes card",
+    cerimoniaCarta:
+      "Card",
+    cerimoniaChipSurpresa:
+      "SURPRISE",
+    cerimoniaChipDupla:
+      "DOUBLE",
+    cerimoniaLendaria:
+      "Legendary",
+    cerimoniaOQueAcontece:
+      "What happens",
+    cerimoniaARegra:
+      "The rule",
+    arenaOlho:
+      "Match draws",
+    arenaTitulo:
+      "Draw arena",
+    arenaSubtitulo:
+      "Game 1 sides and the series wildcards. The server does the drawing, with a public seed — the screen only reveals it.",
+    arenaASortear:
+      "to be drawn",
+    arenaWo:
+      "Series decided by walkover: there's nothing to draw.",
+    arenaLadosTravados:
+      "Sides locked: game 1 has already been recorded.",
+    arenaOperador:
+      "Broadcast panel",
+    arenaModoTransmissao:
+      "Broadcast mode",
+    arenaSairDaTransmissao:
+      "Leave broadcast mode",
+    arenaTestarSom:
+      "Test sound",
+    arenaVoltarAoCalmo:
+      "Back to the calm version",
+    arenaDicaObs:
+      "For the stream: capture the browser WINDOW in OBS without minimizing or covering it (Chrome freezes covered windows) and use “Test sound” to set the level before going live.",
+    cerimoniaLetreirosLados: ["TWO TEAMS.", "ONE BLUE SIDE."],
+    cerimoniaLetreirosCarta: ["ONE CARD.", "NO MERCY."],
+    cerimoniaLetreirosDupla: ["TWO CAPTAINS.", "ONE CARD FOR ALL."],
+    cerimoniaEnsaioMarca: "REHEARSAL · NOTHING WAS DRAWN",
+    cerimoniaEnsaioCreditos: "technical rehearsal: nothing was drawn or saved",
+    arenaEnsaio: "Rehearsal (draws and saves nothing)",
+    arenaEnsaioLados: "Rehearsal: sides",
+    arenaEnsaioCarta: "Rehearsal: wildcard",
+    arenaEnsaioDupla: "Rehearsal: double",
+    arenaValeContra:
+      "used on",
+    arenaSortearCartaPara:
+      "Draw wildcard for",
     cerimoniaFrases: [
       "shaking the jar…",
       "bribing the randomness…",
