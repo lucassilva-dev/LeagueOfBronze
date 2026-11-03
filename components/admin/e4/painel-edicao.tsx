@@ -66,6 +66,8 @@ export type ResumoDoRobo = {
   processados?: number;
   elosMudados?: number;
   itensGravados?: number;
+  /** Jogadores do site que ganharam o nick novo da conta (lib/riot/sincronizar-nicks.ts). */
+  nicksAtualizados?: number;
   erros?: number;
   parouPor?: string;
 };

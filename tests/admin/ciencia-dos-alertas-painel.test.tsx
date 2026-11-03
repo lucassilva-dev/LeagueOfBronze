@@ -133,7 +133,8 @@ function montar(d: DadosEdicao, escopos: Escopos = {}) {
   return executar;
 }
 
-const abrir = () => fireEvent.click(screen.getAllByRole("button", { name: /Fulano/ })[0]!);
+/** Abre a gaveta pela linha. Quem trocou de nick aparece na lista com o nick de HOJE. */
+const abrir = (nick: RegExp = /Fulano/) => fireEvent.click(screen.getAllByRole("button", { name: nick })[0]!);
 const gaveta = () => screen.getByRole("dialog");
 const contagemDoFiltro = () => screen.getByText(/Só quem tem ponto de atenção/).textContent;
 
@@ -197,7 +198,7 @@ describe("gaveta: «Dar ciência» e «Desfazer»", () => {
     const executar = montar(dados(inscrito({ riot_id_atual: "Outro#BR1", alertas_cientes: { declarou_diferente: CIENCIA } })), {
       compacto: true,
     });
-    abrir();
+    abrir(/Outro/);
     fireEvent.click(within(gaveta()).getByRole("button", { name: "Dar ciência" }));
     expect(executar).toHaveBeenLastCalledWith("alerta_ciencia", expect.objectContaining({ codigo: "nick_trocado" }));
     const desfazer = within(gaveta()).getByRole("button", { name: "Desfazer" });

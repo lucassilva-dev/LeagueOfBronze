@@ -5,6 +5,7 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 
 import { lerConfigOuNulo, pausarRobo, roboPausado } from "@/lib/inscricoes/store";
+import { criarClienteRiot } from "@/lib/riot/cliente";
 import { requireAdmin } from "@/lib/security/route-guard";
 
 export const dynamic = "force-dynamic";
@@ -127,6 +128,26 @@ function mensagemDeRecusaDaRiot(status: number, retryAfter: string | null, riotE
     return "A API da Riot está instável agora. Tente novamente em alguns minutos.";
   }
   return `Falha ao consultar Riot (${status}). ` + (riotError || "Confira o ID do jogo e a RIOT_API_KEY.");
+}
+
+/** O Riot ID atual de cada conta (account-v1 por PUUID). Para no primeiro limite da Riot. */
+async function riotIdsDeHoje(puuids: readonly string[]): Promise<Map<string, string>> {
+  const cliente = criarClienteRiot({ prazoMs: Date.now() + 15_000 });
+  const nomes = new Map<string, string>();
+  for (const puuid of puuids) {
+    const r = await cliente.contaPorPuuid(puuid);
+    if (r.tipo === "ok") {
+      nomes.set(puuid, `${r.dados.gameName}#${r.dados.tagLine}`);
+      continue;
+    }
+    if (r.tipo === "limite") {
+      // 429 de verdade: a mesma pausa do resto da chave. A partida já veio: segue sem os nomes.
+      if (!r.proprio) await pausarRobo(r.esperarSegundos).catch(() => {});
+      break;
+    }
+    if (r.tipo === "chave_recusada" || r.tipo === "sem_chave") break;
+  }
+  return nomes;
 }
 
 function getWinningSide(blueWins: number, redWins: number) {
@@ -257,13 +278,21 @@ export async function POST(request: NextRequest) {
       (participant) => participant.side === "RED" && participant.win,
     ).length;
 
+    // O Riot ID de HOJE de cada participante: a partida guarda o nome da hora do jogo, e uma
+    // partida de antes de uma troca de nick devolveria o nick velho ao site. Uma chamada por
+    // conta (10), na mesma cota do robô; o que não vier fica sem nome atual — e o painel, então,
+    // não mexe no nick de ninguém (o robô diário atualiza).
+    const riotIdsAtuais = await riotIdsDeHoje(participants.map((p) => p.puuid));
+
     return NextResponse.json({
       match: {
         matchId: parsed.metadata.matchId,
         durationSec: toDurationSeconds(parsed.info.gameDuration),
         durationMin: Math.max(1, Math.round(toDurationSeconds(parsed.info.gameDuration) / 60)),
         winningSide: getWinningSide(blueWins, redWins),
-        participants,
+        participants: participants.map((p) =>
+          riotIdsAtuais.has(p.puuid) ? { ...p, riotIdAtual: riotIdsAtuais.get(p.puuid)! } : p,
+        ),
       },
     });
   } catch (error) {

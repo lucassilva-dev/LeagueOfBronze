@@ -65,6 +65,7 @@ import { linkDeCobranca, listaDeQuemFaltaPagar } from "@/lib/inscricoes/cobranca
 import { lugarNaFila, perdeuOPrazo, reservaADevolverSeNaoJogar, type LugarNaFila } from "@/lib/inscricoes/fila";
 import { foraDaCobranca, prazoNoFimDoDia } from "@/lib/inscricoes/pagamento";
 import { ESTADOS_PAGAMENTO, ROTULO_PAGAMENTO, type EstadoPagamento } from "@/lib/inscricoes/schema";
+import { riotIdParaMostrar } from "@/lib/inscricoes/nick-atual";
 
 /**
  * O caixa da 4ª Edição e a fila de conferência de pagamentos.
@@ -591,7 +592,7 @@ export function SecaoPagamentos({
         pagamento,
         inscrito,
         // Sem ficha casada, o id truncado ainda permite achar a linha no banco.
-        nome: inscrito ? `${inscrito.nick}#${inscrito.tag}` : `inscrição ${pagamento.inscricao_id.slice(0, 8)}`,
+        nome: inscrito ? riotIdParaMostrar(inscrito) : `inscrição ${pagamento.inscricao_id.slice(0, 8)}`,
         venceMs: emMs(pagamento.vence_em),
         fora: inscrito ? foraDaCobranca(inscrito.situacao, pagamento.estado) : false,
         lugar: lugarNaFila(fila, pagamento.inscricao_id),

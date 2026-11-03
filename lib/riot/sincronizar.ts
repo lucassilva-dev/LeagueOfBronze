@@ -17,12 +17,15 @@ import { contaParaTimes } from "@/lib/inscricoes/schema";
 import { chaveDaRiot, criarClienteRiot, type ClienteRiot, type RespostaRiot } from "@/lib/riot/cliente";
 import {
   decidirSincronizacao,
+  mesmoRiotId,
   precisaConferirRemakes,
   precisaContarPartidas,
   type DadosRiot,
   type DecisaoDoRobo,
 } from "@/lib/riot/decidir";
 import { FILA_SOLO_DUO, FILA_SOLO_DUO_PARTIDAS, PLATAFORMA_DO_CAMPEONATO } from "@/lib/riot/elo";
+import type { MudancaDeNick } from "@/lib/riot/nicks-do-site";
+import { sincronizarNicksDoSite } from "@/lib/riot/sincronizar-nicks";
 
 /**
  * Uma rodada do robô da Riot: consulta os inscritos, decide e grava.
@@ -57,8 +60,14 @@ export type ResumoDaRodada = {
   erros: number;
   parouPor?: "limite" | "cota" | "orcamento" | "chave_recusada";
   chamadas: number;
+  /** Jogadores do site (todas as temporadas) que ganharam o nick novo da conta nesta rodada. */
+  nicksAtualizados?: number;
+  /** Jogadores do site que ganharam o vínculo com a conta (puuid) nesta rodada. */
+  jogadoresVinculados?: number;
   /** Só na simulação: o que mudaria, pelo Riot ID. Nunca contato. */
   mudancas?: MudancaSimulada[];
+  /** Só na simulação: os nicks do site que mudariam. */
+  nicksMudariam?: MudancaDeNick[];
 };
 
 type Consulta =
@@ -84,7 +93,10 @@ function falha(r: Exclude<RespostaRiot<unknown>, { tipo: "ok" } | { tipo: "nao_e
 /** As chamadas à Riot de UM inscrito. Gasta o mínimo: nível e região só 1×/semana. */
 export async function consultarInscrito(
   cliente: ClienteRiot,
-  inscrito: Pick<Inscricao, "nick" | "tag" | "puuid" | "riot_regiao" | "riot_nivel_em" | "riot_partidas_janela">,
+  inscrito: Pick<
+    Inscricao,
+    "nick" | "tag" | "puuid" | "riot_id_atual" | "riot_regiao" | "riot_nivel_em" | "riot_partidas_janela"
+  >,
   config: Pick<EdicaoConfig, "inicio_campeonato" | "min_ranqueadas">,
   agoraMs: number,
 ): Promise<Consulta> {
@@ -97,10 +109,24 @@ export async function consultarInscrito(
     else if (r.tipo !== "puuid_invalido" && r.tipo !== "nao_encontrado") return falha(r);
   }
   if (!conta) {
-    const r = await cliente.contaPorRiotId(inscrito.nick, inscrito.tag);
-    if (r.tipo === "nao_encontrado") return { tipo: "ok", riot: { conta: { tipo: "nao_encontrado" } } };
-    if (r.tipo !== "ok") return falha(r);
-    conta = r.dados;
+    // Pelo último Riot ID que a conta teve e, só então, pelo declarado na inscrição: quem
+    // trocou de nick não é mais achado pelo nome antigo, e cair direto nele apagava a conta.
+    const nomes: [string, string][] = [];
+    const atual = inscrito.riot_id_atual?.trim() ?? "";
+    const i = atual.indexOf("#");
+    if (i > 0 && i < atual.length - 1 && !mesmoRiotId(atual, `${inscrito.nick}#${inscrito.tag}`)) {
+      nomes.push([atual.slice(0, i).trim(), atual.slice(i + 1).trim()]);
+    }
+    nomes.push([inscrito.nick, inscrito.tag]);
+    for (const [nome, tag] of nomes) {
+      const r = await cliente.contaPorRiotId(nome, tag);
+      if (r.tipo === "ok") {
+        conta = r.dados;
+        break;
+      }
+      if (r.tipo !== "nao_encontrado") return falha(r);
+    }
+    if (!conta) return { tipo: "ok", riot: { conta: { tipo: "nao_encontrado" } } };
   }
 
   const riot: DadosRiot = { conta: { tipo: "ok", ...conta } };
@@ -310,10 +336,33 @@ export async function sincronizarComRiot(opcoes: {
       }
     }
     concluiu = true;
+
+    // O nick novo vai para o site (times, fichas, partidas, temporadas). Uma falha aqui não
+    // desfaz a rodada: as inscrições já foram gravadas, e a próxima rodada tenta de novo.
+    try {
+      const nicks = await sincronizarNicksDoSite({
+        cliente,
+        simular,
+        // Sem consultas novas no «atualizar» de um inscrito, nem depois que a cota parou a rodada.
+        consultarRiot: !opcoes.inscricaoId && (!resumo.parouPor || resumo.parouPor === "orcamento"),
+        prazoMs: prazo - 5_000,
+        inicioDaRodadaMs: inicio,
+      });
+      resumo.nicksAtualizados = nicks.atualizados;
+      resumo.jogadoresVinculados = nicks.vinculados;
+      if (simular) resumo.nicksMudariam = nicks.mudancas ?? [];
+      // A parada da etapa é da rodada: o painel diz «parou antes do fim» e pede a renovação da chave.
+      if (nicks.parouPor && !resumo.parouPor) resumo.parouPor = nicks.parouPor;
+      if (nicks.parouPor === "limite") await pausarRobo(nicks.esperarSegundos ?? 60);
+    } catch (erro) {
+      resumo.erros += 1;
+      console.error("[riot] falha ao levar os nicks novos para o site", erro);
+    }
   } finally {
     resumo.chamadas = cliente.chamadas;
     const contagens: Record<string, unknown> = { ...resumo };
     delete contagens.mudancas;
+    delete contagens.nicksMudariam;
     const registrar = concluiu && !simular && !opcoes.inscricaoId;
     await liberarTravaDoRobo(registrar ? contagens : undefined);
   }

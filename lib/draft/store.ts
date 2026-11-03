@@ -39,6 +39,7 @@ import { tabelaQueFecha, tentativasDaQueda, type TabelaQueFecha } from "@/lib/dr
 import { rotasDoMembro, separarTimeDefinido } from "@/lib/draft/time-definido";
 import { ORCAMENTO_DA_MONTAGEM } from "@/lib/draft/viabilidade";
 import { jogadoresForaDoDraft, type ForaDoDraft } from "@/lib/draft/virada";
+import { riotIdAtualDaInscricao } from "@/lib/inscricoes/nick-atual";
 import { embaralhar, novaSemente } from "@/lib/series/sorteio";
 
 /**
@@ -126,6 +127,76 @@ async function saidasDoPool(estado: EstadoDraft, fresco: boolean): Promise<Reado
   const saidas: ReadonlySet<string> = new Set((data ?? []).filter((l) => estaFora(l.situacao)).map((l) => l.id));
   situacoesGuardadas = { chave, ate: agora + GUARDA_DAS_SITUACOES_MS, saidas };
   return saidas;
+}
+
+const GUARDA_DOS_NICKS_MS = 60_000;
+let nicksGuardados: { ate: number; nicks: ReadonlyMap<string, string> } | null = null;
+
+/** Para os testes: esquece a leitura guardada dos nicks atuais. */
+export function esquecerNicksGuardados(): void {
+  nicksGuardados = null;
+}
+
+/**
+ * O Riot ID de HOJE de quem está no draft e trocou de nick (o robô da Riot grava
+ * `riot_id_atual` na inscrição), por id de inscrição. Guardado por um minuto: a transmissão
+ * sonda a cada 2 s, e nick não muda no meio de um draft.
+ */
+async function nicksAtuaisDosInscritos(): Promise<ReadonlyMap<string, string>> {
+  const agora = Date.now();
+  if (nicksGuardados && nicksGuardados.ate > agora) return nicksGuardados.nicks;
+  const { data, error } = await createSupabaseAdminClient()
+    .from("inscricoes")
+    .select("id,riot_id,riot_id_atual,situacao")
+    .not("riot_id_atual", "is", null)
+    .returns<{ id: string; riot_id: string; riot_id_atual: string | null; situacao: string }[]>();
+  if (error) throw new Error(`Falha ao ler os nicks atuais: ${error.message}`);
+  const nicks = new Map<string, string>();
+  for (const linha of data ?? []) {
+    // Excluído e recusado saem do robô: o que ficou gravado é velho, e a rota é pública.
+    if (linha.situacao === "excluido" || linha.situacao === "recusado") continue;
+    const atual = riotIdAtualDaInscricao(linha);
+    if (atual !== linha.riot_id) nicks.set(linha.id, atual);
+  }
+  nicksGuardados = { ate: agora + GUARDA_DOS_NICKS_MS, nicks };
+  return nicks;
+}
+
+/**
+ * O estado com o nick ATUAL de cada jogador, só para MOSTRAR (transmissão, /capitao, mesa e
+ * a virada para o site). Nunca é gravado: o draft guarda o Riot ID declarado, que é a chave
+ * com a inscrição. O casamento com a inscrição aceita os dois nomes (`nomesDaInscricao`).
+ * Falhou a leitura: o estado como está.
+ */
+export async function comNicksAtuais<T extends Pick<EstadoDraft, "jogadores">>(estado: T): Promise<T> {
+  try {
+    const nicks = await nicksAtuaisDosInscritos();
+    if (!estado.jogadores.some((j) => nicks.has(j.id))) return estado;
+    return { ...estado, jogadores: estado.jogadores.map((j) => (nicks.has(j.id) ? { ...j, riotId: nicks.get(j.id)! } : j)) };
+  } catch (erro) {
+    console.error("[draft] não foi possível ler os nicks atuais", erro);
+    return estado;
+  }
+}
+
+/**
+ * O texto de uma recusa do motor com o nome que a tela mostra. O motor decide sobre o estado
+ * GRAVADO (o Riot ID declarado também desempata a escolha automática), então o nome atual
+ * entra só no texto, trocado pelo id do jogador.
+ */
+export async function recusaComNickAtual<V extends { motivo: string; params?: Record<string, unknown> }>(
+  veredito: V,
+  estado: Pick<EstadoDraft, "jogadores">,
+  jogadorId: string,
+): Promise<V> {
+  const gravado = estado.jogadores.find((j) => j.id === jogadorId)?.riotId;
+  const mostrado = (await comNicksAtuais(estado)).jogadores.find((j) => j.id === jogadorId)?.riotId;
+  if (!gravado || !mostrado || gravado === mostrado) return veredito;
+  return {
+    ...veredito,
+    motivo: veredito.motivo.split(gravado).join(mostrado),
+    ...(veredito.params && veredito.params.riotId === gravado ? { params: { ...veredito.params, riotId: mostrado } } : {}),
+  };
 }
 
 /**
@@ -227,13 +298,13 @@ function avisosDosCapitaes(definidos: ReturnType<typeof capitaesDefinidos>, time
   if (definidos.marcados === 0) return [];
   const avisos: string[] = [];
   if (definidos.foraDoPool.length > 0) {
-    const nomes = definidos.foraDoPool.map((i) => `${i.riot_id} (${i.situacao})`).join(", ");
+    const nomes = definidos.foraDoPool.map((i) => `${riotIdAtualDaInscricao(i)} (${i.situacao})`).join(", ");
     avisos.push(
       `${nomes} ${definidos.foraDoPool.length === 1 ? "está marcado" : "estão marcados"} como capitão, mas não ${definidos.foraDoPool.length === 1 ? "está" : "estão"} entre os titulares aptos (quem joga o draft). Aprove a inscrição ou troque o capitão em «Definir capitães».`,
     );
   }
   if (definidos.saiu.length > 0) {
-    const nomes = definidos.saiu.map((i) => `${i.riot_id} (${i.situacao})`).join(", ");
+    const nomes = definidos.saiu.map((i) => `${riotIdAtualDaInscricao(i)} (${i.situacao})`).join(", ");
     avisos.push(`${nomes} tinha a marca de capitão e saiu do campeonato: não conta. Desmarque em «Definir capitães».`);
   }
   if (definidos.ids.length !== times) {
@@ -284,7 +355,7 @@ function tabelaDosQueJogam(vaoJogar: readonly Inscricao[], times: number, config
   const precoDe = new Map(comElo.map((i) => [i.id, precoNaTabela(tabela, eloDoJogadorDaInscricao(i))]));
   const semElo = vaoJogar
     .filter((i) => !temEloReconhecido(i))
-    .map((i) => `O elo de ${i.riot_id} (${eloQueVale(i)}) não é reconhecido e não tem preço na tabela: corrija na ficha antes de sortear.`);
+    .map((i) => `O elo de ${riotIdAtualDaInscricao(i)} (${eloQueVale(i)}) não é reconhecido e não tem preço na tabela: corrija na ficha antes de sortear.`);
   return { tabela, precoDe, semElo };
 }
 
@@ -472,12 +543,12 @@ export async function previaDoDraft(draftLido?: DraftGravado | Promise<DraftGrav
     timeDefinido: definido.marcado
       ? {
           ativo: definido.ativo,
-          capitaoRiotId: definido.capitaoId ? (porId.get(definido.capitaoId)?.riot_id ?? null) : null,
+          capitaoRiotId: definido.capitaoId ? (porId.get(definido.capitaoId) ? riotIdAtualDaInscricao(porId.get(definido.capitaoId)!) : null) : null,
           membros: (definido.ativo
             ? definido.membros
             : (inscritos as InscricaoComCapitao[]).filter((i) => Boolean(i.time_definido) && !estaFora(i.situacao))
           ).map((i) => ({
-            riotId: i.riot_id,
+            riotId: riotIdAtualDaInscricao(i),
             rota: definido.rotaDe.get(i.id) ?? String(i.time_definido ?? "").toUpperCase(),
             elo: eloQueVale(i),
             // Valendo, o capitão é o da separação; com o time ainda inválido (dois capitães, nenhum),
@@ -496,7 +567,7 @@ export async function previaDoDraft(draftLido?: DraftGravado | Promise<DraftGrav
     // ainda não estão aptos — não entram no sorteio, e a mesa precisa saber quem são.
     titulares: titulares.length,
     naFila: fila.reservas.length,
-    titularesNaoAptos: titularesNaoAptos.map((i) => ({ riotId: i.riot_id, situacao: i.situacao })),
+    titularesNaoAptos: titularesNaoAptos.map((i) => ({ riotId: riotIdAtualDaInscricao(i), situacao: i.situacao })),
     impedimentos,
     // Titular que ainda não está apto não impede o sorteio (C4): é aviso, e a ordem perde a
     // escolha que falta — um time termina com vaga aberta, que a fila de reserva ocupa.
@@ -540,7 +611,7 @@ export async function previaDoDraft(draftLido?: DraftGravado | Promise<DraftGrav
       const i = porId.get(id)!;
       return {
         id: i.id,
-        riotId: i.riot_id,
+        riotId: riotIdAtualDaInscricao(i),
         elo: eloQueVale(i),
         forca: forcaDoElo(candidatoACapitao(i)).rotulo,
         pontos: precoDoInscrito(i),
@@ -561,12 +632,13 @@ export async function previaDoDraft(draftLido?: DraftGravado | Promise<DraftGrav
     faltamCapitaes: ranking.faltam,
     // O preço que entra no draft é o de agora. Sem congelar, o robô da Riot ainda mexe no
     // elo de manhã — e a tabela divulgada pode não bater com o draft.
-    semEloCongelado: vaoJogar.filter((i) => !i.elo_congelado).map((i) => i.riot_id),
+    semEloCongelado: vaoJogar.filter((i) => !i.elo_congelado).map((i) => riotIdAtualDaInscricao(i)),
     // Inscrição aberta durante o draft cobra taxa de quem não tem mais vaga.
     inscricoesAbertas: estadoDaJanela(config) === "aberta",
     // Quem está no draft sorteado e a inscrição não é mais `apto` (só Riot ID e situação).
     // É aviso: o draft não tira ninguém sozinho, e a virada pede confirmação.
-    foraDoDraft: jogadoresForaDoDraft(draft.estado, inscritos),
+    // Com o nome que a mesa mostra no quadro (o atual de quem trocou de nick).
+    foraDoDraft: jogadoresForaDoDraft(draft.estado ? await comNicksAtuais(draft.estado) : null, inscritos),
   };
 }
 
@@ -887,7 +959,7 @@ function escolherCapitaes(params: {
       );
     }
     if (definidos.foraDoPool.length > 0) {
-      const nomes = definidos.foraDoPool.map((i) => `${i.riot_id} (${i.situacao})`).join(", ");
+      const nomes = definidos.foraDoPool.map((i) => `${riotIdAtualDaInscricao(i)} (${i.situacao})`).join(", ");
       throw new ErroDeRegra(
         `Capitão definido fora de quem joga o draft: ${nomes}. Só titulares aptos podem ser capitães — aprove a inscrição ou troque o capitão em «Definir capitães».`,
       );
@@ -1176,7 +1248,9 @@ export async function salvarCapitaesDefinidos(pedidos: readonly string[]): Promi
   const { data, error } = await cliente
     .from("inscricoes")
     .select("*")
-    .returns<{ id: string; riot_id: string; situacao: string; capitao: boolean | null; time_definido?: string | null }[]>();
+    .returns<
+      { id: string; riot_id: string; riot_id_atual?: string | null; situacao: string; capitao: boolean | null; time_definido?: string | null }[]
+    >();
   if (error) {
     // Sem a coluna (migração não aplicada), o recado diz o que rodar.
     if (/capitao/.test(error.message)) {
@@ -1192,7 +1266,7 @@ export async function salvarCapitaesDefinidos(pedidos: readonly string[]): Promi
     const linha = porId.get(id);
     if (!linha) throw new ErroDeRegra("Um dos capitães marcados não está entre os inscritos. Atualize o painel e marque de novo.");
     if (estaFora(linha.situacao)) {
-      throw new ErroDeRegra(`${linha.riot_id} está fora do campeonato (${linha.situacao}) e não pode ser capitão.`);
+      throw new ErroDeRegra(`${riotIdAtualDaInscricao(linha)} está fora do campeonato (${linha.situacao}) e não pode ser capitão.`);
     }
   }
 
@@ -1233,6 +1307,8 @@ export async function salvarCapitaesDefinidos(pedidos: readonly string[]): Promi
     if (erro) throw new Error(`Falha ao desmarcar os capitães antigos: ${erro.message}`);
   }
 
+  // Para a auditoria (append-only): o Riot ID declarado, a chave estável com a inscrição — o
+  // nome atual muda com o tempo.
   const riotIdDe = (id: string) => porId.get(id)?.riot_id ?? id;
   return { antes: antes.map(riotIdDe), depois: ids.map(riotIdDe) };
 }

@@ -56,7 +56,11 @@ function jogoComReserva(extra: Partial<SeriesGame["statsByPlayer"][number]> = {}
 
 function montar(
   inicial: TournamentDataset,
-  { compacto = false, regra }: { compacto?: boolean; regra?: RegraDoSubstituto | null } = {},
+  {
+    compacto = false,
+    regra,
+    podeEditarJogadores,
+  }: { compacto?: boolean; regra?: RegraDoSubstituto | null; podeEditarJogadores?: boolean } = {},
 ) {
   let atual = inicial;
   function Harness() {
@@ -75,6 +79,7 @@ function montar(
           aplicarDoServidor={mutate}
           onVersaoDoServidor={() => {}}
           {...(regra !== undefined ? { regraDoSubstituto: regra } : {})}
+          {...(podeEditarJogadores !== undefined ? { podeEditarJogadores } : {})}
         />
       </ModoCompacto>
     );
@@ -464,5 +469,93 @@ describe("W.O. com jogos lançados (monitor e celular)", () => {
     expect(confirmar).not.toHaveBeenCalled();
     expect(getSeriesScore(atual().seriesMatches[0], atual())).toEqual({ teamAWins: 0, teamBWins: 2 });
     expect(screen.getAllByText(/placar automático de 2-0 para BETA/).length).toBeGreaterThan(0);
+  });
+});
+
+describe("importar da Riot com quem trocou de nick", () => {
+  /**
+   * A ALFA x BETA completa; a MID da ALFA já ligada à conta e com o nick ANTIGO no site. A
+   * partida é de antes da troca (guarda o nome velho); `comNomeDeHoje`: a rota conseguiu ler o
+   * Riot ID atual de cada conta.
+   */
+  function partidaComNickNovo(comNomeDeHoje = true) {
+    const d = comJogos([{ winnerTeamId: "", mvpPlayerId: "", statsByPlayer: [] }]);
+    const mid = d.players.find((p) => p.id === id("alfa", "MID"))!;
+    mid.puuid = "conta-da-mid";
+    const participante = (playerId: string, side: "BLUE" | "RED", win: boolean) => {
+      const p = d.players.find((x) => x.id === playerId)!;
+      const [nome, tag] = p.nick.split("#");
+      return {
+        participantId: 0,
+        side,
+        puuid: p.puuid ?? `conta-${playerId}`,
+        riotIdGameName: nome!,
+        riotIdTagline: tag!,
+        summonerName: null,
+        riotId: p.nick,
+        ...(comNomeDeHoje ? { riotIdAtual: playerId === mid.id ? "Nick Novo Da Mid#BR9" : p.nick } : {}),
+        champion: "Ahri",
+        kills: 2,
+        deaths: 1,
+        assists: 1,
+        win,
+      };
+    };
+    const azul = ["TOP", "JUNGLE", "MID", "ADC", "SUP"].map((rota) => participante(id("alfa", rota), "BLUE", true));
+    const vermelho = ["TOP", "JUNGLE", "MID", "ADC", "SUP"].map((rota) => participante(id("beta", rota), "RED", false));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            match: { matchId: "BR1_2", durationSec: 1800, durationMin: 30, winningSide: "BLUE", participants: [...azul, ...vermelho] },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      ),
+    );
+    return { d, mid };
+  }
+
+  async function importar() {
+    abrirAlfaBeta();
+    fireEvent.change(screen.getByPlaceholderText("Ex.: 3210692404 ou BR1_3210692404"), { target: { value: "BR1_2" } });
+    fireEvent.click(botao("Importar da Riot"));
+    await waitFor(() => expect(screen.getByText(/Partida importada da Riot \(10 jogadores\)/)).toBeTruthy());
+  }
+
+  it("casa a MID pela conta, apesar do nick novo, e grava o nick de hoje (com players:write)", async () => {
+    const { d, mid } = partidaComNickNovo();
+    const { atual } = montar(d, { podeEditarJogadores: true });
+    await importar();
+
+    expect(screen.getByText(/1 nick\(s\) atualizado\(s\) para o Riot ID atual/)).toBeTruthy();
+    expect(atual().seriesMatches[0].games[0].statsByPlayer.some((l) => l.playerId === mid.id)).toBe(true);
+    const depois = atual().players.find((p) => p.id === mid.id)!;
+    expect(depois).toMatchObject({ id: mid.id, slug: mid.slug, nick: "Nick Novo Da Mid#BR9", puuid: "conta-da-mid" });
+    // Quem casou pelo Riot ID inteiro aprende a conta; o nick fica igual.
+    const top = atual().players.find((p) => p.id === id("alfa", "TOP"))!;
+    expect(top.puuid).toBe(`conta-${id("alfa", "TOP")}`);
+    expect(top.nick).toBe(d.players.find((p) => p.id === top.id)!.nick);
+    expect(servidorAceita(atual())).toBe(true);
+  });
+
+  it("sem players:write: importa a partida, mas não mexe em jogador (o salvar recusaria)", async () => {
+    const { d, mid } = partidaComNickNovo();
+    const { atual } = montar(d);
+    await importar();
+
+    expect(atual().seriesMatches[0].games[0].statsByPlayer.some((l) => l.playerId === mid.id)).toBe(true);
+    expect(atual().players).toEqual(d.players);
+    expect(screen.queryByText(/nick\(s\) atualizado/)).toBeNull();
+  });
+
+  it("sem o Riot ID de hoje (a rota não leu a conta): não mexe no nick — a partida guarda o nome da hora do jogo", async () => {
+    const { d, mid } = partidaComNickNovo(false);
+    const { atual } = montar(d, { podeEditarJogadores: true });
+    await importar();
+
+    expect(atual().players.find((p) => p.id === mid.id)!.nick).toBe(mid.nick);
+    expect(screen.queryByText(/nick\(s\) atualizado/)).toBeNull();
   });
 });

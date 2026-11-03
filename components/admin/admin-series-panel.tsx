@@ -63,6 +63,7 @@ import {
   walkoverPermitido,
 } from "@/lib/tournament";
 import { avisosDeSubstituto, type AvisoDeSubstituto, type RegraDoSubstituto } from "@/lib/roster";
+import { mesmoRiotId } from "@/lib/riot/decidir";
 import { useRegraDoSubstituto } from "@/components/admin/regra-do-substituto";
 import { formatDateLabel, formatSeriesDateLabel } from "@/lib/format";
 import { resolveRole, roleIconUrl, teamColor } from "@/lib/design";
@@ -827,6 +828,8 @@ type RiotImportedParticipant = {
   riotIdTagline: string | null;
   summonerName: string | null;
   riotId: string;
+  /** O Riot ID de HOJE da conta (a rota consulta account-v1); `riotId` é o da hora do jogo. */
+  riotIdAtual?: string;
   champion: string;
   kills: number;
   deaths: number;
@@ -852,6 +855,14 @@ type RiotImportStatus = {
   text: string;
 };
 
+/**
+ * O que a importação aprende sobre a conta de cada jogador: o nick de HOJE (a rota da Riot
+ * consulta a conta de cada participante — a partida em si guarda o nome da hora do jogo) e o
+ * vínculo com a conta (`puuid`). Só sai de casamento FORTE — pela conta, ou pelo Riot ID
+ * inteiro (nome + tag) de quem ainda não tem conta ligada; casar só pelo nome não ensina nada.
+ */
+type ContaAprendida = { playerId: string; nick?: string; puuid?: string };
+
 type ApplyRiotImportResult =
   | {
       ok: true;
@@ -861,6 +872,7 @@ type ApplyRiotImportResult =
         mvpPlayerId: string;
         statsByPlayer: PlayerGameStats[];
       };
+      contas: ContaAprendida[];
       message: string;
     }
   | {
@@ -901,6 +913,7 @@ type ImportedStatsMappingResult =
   | {
       ok: true;
       statsByPlayer: PlayerGameStats[];
+      contas: ContaAprendida[];
     }
   | {
       ok: false;
@@ -989,6 +1002,22 @@ function mapImportedStatsByPlayer(
   const usedPlayerIds = new Set<string>();
   const statsByPlayer: PlayerGameStats[] = [];
   const unmatched: string[] = [];
+  const contas: ContaAprendida[] = [];
+
+  const aprender = (participant: RiotImportedParticipant, player: Player) => {
+    const riotIdDoJogo = riotIdDoParticipante(participant);
+    if (!participant.puuid) return;
+    const pelaConta = player.puuid === participant.puuid;
+    // O Riot ID inteiro, com a mesma régua do robô (acento, caixa e espaço) — nunca a do slug,
+    // que joga fora o «#» e as letras não latinas.
+    const peloRiotIdInteiro = !player.puuid && riotIdDoJogo !== null && mesmoRiotId(riotIdDoJogo, player.nick);
+    if (!pelaConta && !peloRiotIdInteiro) return;
+    const conta: ContaAprendida = { playerId: player.id };
+    if (!pelaConta) conta.puuid = participant.puuid;
+    const hoje = participant.riotIdAtual;
+    if (hoje && hoje.includes("#") && player.nick !== hoje) conta.nick = hoje;
+    if (conta.nick || conta.puuid) contas.push(conta);
+  };
 
   const mapSideParticipants = (participants: RiotImportedParticipant[], roster: Player[], teamId: string) => {
     for (const participant of participants) {
@@ -1000,6 +1029,7 @@ function mapImportedStatsByPlayer(
       }
 
       usedPlayerIds.add(mappedPlayer.id);
+      aprender(participant, mappedPlayer);
       statsByPlayer.push({
         playerId: mappedPlayer.id,
         champion: participant.champion,
@@ -1021,7 +1051,7 @@ function mapImportedStatsByPlayer(
     };
   }
 
-  return { ok: true, statsByPlayer };
+  return { ok: true, statsByPlayer, contas };
 }
 
 function getWinningImportedSide(
@@ -1097,20 +1127,37 @@ function getParticipantLookupKeys(participant: RiotImportedParticipant) {
 
 function scoreParticipantsAgainstRoster(participants: RiotImportedParticipant[], roster: Player[]) {
   const rosterKeys = new Set(roster.flatMap((player) => getPlayerLookupKeys(player)));
+  const rosterContas = new Set(roster.map((player) => player.puuid).filter(Boolean));
   let score = 0;
   for (const participant of participants) {
-    if (getParticipantLookupKeys(participant).some((key) => rosterKeys.has(key))) {
+    if (rosterContas.has(participant.puuid) || getParticipantLookupKeys(participant).some((key) => rosterKeys.has(key))) {
       score += 1;
     }
   }
   return score;
 }
 
+/** O Riot ID inteiro do participante ("Nome#TAG"), quando a partida traz nome e tag. */
+function riotIdDoParticipante(participant: RiotImportedParticipant): string | null {
+  const nome = participant.riotIdGameName?.trim();
+  const tag = participant.riotIdTagline?.trim();
+  return nome && tag ? `${nome}#${tag}` : null;
+}
+
+/**
+ * Casa o participante com um jogador: primeiro pela CONTA (`puuid`, que não muda quando o
+ * jogador troca de nick); depois pelo nick, slug ou id, como sempre.
+ */
 function choosePlayerForParticipant(
   participant: RiotImportedParticipant,
   roster: Player[],
   usedPlayerIds: Set<string>,
 ) {
+  if (participant.puuid) {
+    const pelaConta = roster.find((player) => !usedPlayerIds.has(player.id) && player.puuid === participant.puuid);
+    if (pelaConta) return pelaConta;
+  }
+
   const participantKeys = getParticipantLookupKeys(participant);
   if (participantKeys.length === 0) return null;
 
@@ -1179,6 +1226,7 @@ function applyRiotMatchToSeriesGame({
       mvpPlayerId,
       statsByPlayer: importedStats.statsByPlayer,
     },
+    contas: importedStats.contas,
     message: `Partida importada da Riot (${importedStats.statsByPlayer.length} jogadores). MVP calculado automaticamente por KDA.${warningText}`,
   };
 }
@@ -1550,6 +1598,7 @@ export function AdminSeriesPanel({
   podeLados = true,
   podeCartas = true,
   podeRiot = true,
+  podeEditarJogadores = false,
   podeVerPrecos,
   regraDoSubstituto,
 }: Readonly<{
@@ -1569,6 +1618,12 @@ export function AdminSeriesPanel({
   podeLados?: boolean;
   podeCartas?: boolean;
   podeRiot?: boolean;
+  /**
+   * `players:write`: a importação da Riot também grava o nick de hoje e a conta de quem jogou.
+   * Sem ele, só a partida — o «Salvar» recusaria a mudança no jogador, e o robô diário da Riot
+   * atualiza o nick do mesmo jeito.
+   */
+  podeEditarJogadores?: boolean;
   /**
    * Regra 6: a pessoa pode ler as inscrições (conferir ou financeiro), de onde vêm os pontos
    * do substituto. Verdadeiro: o painel lê os preços e avisa o substituto acima do teto.
@@ -2453,19 +2508,31 @@ export function AdminSeriesPanel({
         return;
       }
 
-      updateSelectedSeries((series) => {
-        const game = series.games[gameIndex];
+      mutateDraft((next) => {
+        const series = next.seriesMatches.find((row) => row.id === selectedSeries.id);
+        const game = series?.games[gameIndex];
         if (!game) return;
 
         game.winnerTeamId = mapped.gamePatch.winnerTeamId;
         game.durationMin = mapped.gamePatch.durationMin;
         game.mvpPlayerId = mapped.gamePatch.mvpPlayerId;
         game.statsByPlayer = mapped.gamePatch.statsByPlayer;
+
+        // O nick de hoje e a conta de quem jogou (o robô da Riot faz o mesmo todo dia): vão
+        // juntos no próximo «Salvar».
+        if (!podeEditarJogadores) return;
+        for (const conta of mapped.contas) {
+          const player = next.players.find((row) => row.id === conta.playerId);
+          if (!player) continue;
+          if (conta.nick) player.nick = conta.nick;
+          if (conta.puuid) player.puuid = conta.puuid;
+        }
       });
 
+      const nicksNovos = podeEditarJogadores ? mapped.contas.filter((conta) => conta.nick).length : 0;
       setRiotImportStatusForGame(selectedSeries.id, gameIndex, {
         kind: "success",
-        text: mapped.message,
+        text: nicksNovos > 0 ? `${mapped.message} ${nicksNovos} nick(s) atualizado(s) para o Riot ID atual.` : mapped.message,
       });
     } catch (error) {
       setRiotImportStatusForGame(selectedSeries.id, gameIndex, {

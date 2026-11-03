@@ -21,6 +21,11 @@ import type { Player, Team } from "@/lib/schema";
  * `...inscrito` aqui publicaria o contato de cinquenta pessoas de uma vez, sem erro
  * nenhum aparecer.
  *
+ * Depois desta função, a rota da virada liga cada jogador à conta da Riot (`puuid`, decisão do
+ * Lucas em 03/11/2026: o vínculo que deixa o nick do site acompanhar a troca de nick — ver
+ * lib/riot/nicks-do-site.ts). É o identificador que a própria Riot devolve em qualquer partida;
+ * não é contato nem dado civil.
+ *
  * Função pura de propósito: dá para conferir num teste exatamente o que sai, que é o
  * único jeito honesto de garantir uma regra dessas.
  */

@@ -6,6 +6,7 @@ import type { DadosEdicao, Inscrito } from "@/components/admin/e4/painel-edicao"
 import { Button, C, Chip } from "@/components/admin/ui";
 import { lugarNaFila, montarFila, type Fila, type LugarNaFila } from "@/lib/inscricoes/fila";
 import { dataDoPrazo } from "@/lib/inscricoes/pagamento";
+import { riotIdParaMostrar } from "@/lib/inscricoes/nick-atual";
 
 /**
  * A fila de reserva da 4ª (decisões D1 a D5, 2026-10-22) nas abas do painel.
@@ -80,8 +81,8 @@ export function ChipDoLugar({ lugar }: Readonly<{ lugar: LugarNaFila }>) {
 }
 
 /** "Fulano#BR1", para as frases de confirmação. */
-export function nomeDe(inscrito: Pick<Inscrito, "nick" | "tag">): string {
-  return `${inscrito.nick}#${inscrito.tag}`;
+export function nomeDe(inscrito: Pick<Inscrito, "nick" | "tag" | "riot_id_atual">): string {
+  return riotIdParaMostrar(inscrito);
 }
 
 // ---------------------------------------------------------------- previsão de uma mudança

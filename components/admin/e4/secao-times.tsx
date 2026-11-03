@@ -51,6 +51,7 @@ import type { DraftPublico } from "@/lib/draft/store";
 import { ROTAS_DO_TIME_DEFINIDO, rotaNoTimeDefinido, type RotaDoTimeDefinido } from "@/lib/draft/time-definido";
 import { lugarNaFila, reservaADevolverSeNaoJogar, type LugarNaFila } from "@/lib/inscricoes/fila";
 import { contaParaTimes, distribuirTimes } from "@/lib/inscricoes/schema";
+import { nickParaMostrar, riotIdParaMostrar, tagParaMostrar } from "@/lib/inscricoes/nick-atual";
 
 /**
  * A conta que decide se o draft é possível.
@@ -201,7 +202,7 @@ function eloDePreco(inscrito: Inscrito): string {
 /** Do mais forte para o mais fraco, pela régua da tabela (a ordem antiga era pelos pontos fixos). */
 function porForcaDesc(previa: PreviaDosPrecos) {
   return (a: Inscrito, b: Inscrito) =>
-    (previa.forca(b) ?? -1) - (previa.forca(a) ?? -1) || a.nick.localeCompare(b.nick, "pt-BR");
+    (previa.forca(b) ?? -1) - (previa.forca(a) ?? -1) || nickParaMostrar(a).localeCompare(nickParaMostrar(b), "pt-BR");
 }
 
 /** Só para o <select> do substituto: opção nativa não mostra imagem, então o nome vai escrito. */
@@ -245,8 +246,8 @@ function formatarData(iso: string | null): string {
 function CelulaJogador({ inscrito }: Readonly<{ inscrito: Inscrito }>) {
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-      <span style={{ color: C.ink, fontWeight: 600 }}>{inscrito.nick}</span>
-      <span style={{ color: C.ink4, fontSize: 11.5 }}>#{inscrito.tag}</span>
+      <span style={{ color: C.ink, fontWeight: 600 }}>{nickParaMostrar(inscrito)}</span>
+      <span style={{ color: C.ink4, fontSize: 11.5 }}>#{tagParaMostrar(inscrito)}</span>
     </span>
   );
 }
@@ -335,8 +336,8 @@ function CartaoDoAprovado({
         inicio={<Elo elo={eloDePreco(inscrito)} tamanho={40} />}
         titulo={
           <>
-            <span>{inscrito.nick}</span>
-            <span style={{ color: C.ink4, fontWeight: 400 }}>#{inscrito.tag}</span>
+            <span>{nickParaMostrar(inscrito)}</span>
+            <span style={{ color: C.ink4, fontWeight: 400 }}>#{tagParaMostrar(inscrito)}</span>
           </>
         }
         subtitulo={
@@ -636,7 +637,7 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
 
     // O quadro de elo por rota recebe só nick, elo de preço e rotas: nada de pontos.
     const jogadoresDoQuadro = pool.map((i) => ({
-      nick: i.nick,
+      nick: nickParaMostrar(i),
       elo: eloDePreco(i),
       primaria: i.rota_primaria,
       secundaria: i.rota_secundaria,
@@ -960,7 +961,7 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
             {comTimeDefinido ? (
               <p style={nota}>
                 Time definido pela organização:{" "}
-                {timeDefinido.map((i) => `${i.nick} (${resolveRole(rotaNoTime(i) ?? "").short})`).join(", ")}. Ele já entra
+                {timeDefinido.map((i) => `${nickParaMostrar(i)} (${resolveRole(rotaNoTime(i) ?? "").short})`).join(", ")}. Ele já entra
                 pronto, não vai ao draft e não tem preço — a tabela é calculada só sobre quem vai ser escolhido pelos{" "}
                 {timesNoDraft} {timesNoDraft === 1 ? "time" : "times"} do draft.
               </p>
@@ -1024,7 +1025,7 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
           <Banner tone="danger" title="Elo não reconhecido em algumas fichas">
             {analise.eloIlegivel.length}{" "}
             {analise.eloIlegivel.length === 1 ? "ficha está" : "fichas estão"} com um elo que a
-            tabela do site não resolve ({analise.eloIlegivel.map((i) => i.nick).join(", ")}).
+            tabela do site não resolve ({analise.eloIlegivel.map((i) => nickParaMostrar(i)).join(", ")}).
             Ficam fora da distribuição e da tabela de pontos
             {analise.eloIlegivelAprovado.length > 0
               ? ", e o congelamento não roda enquanto as aprovadas não forem corrigidas na ficha."
@@ -1277,10 +1278,10 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
             >
               <option value="">— escolha um jogador —</option>
               {[...analise.aprovados]
-                .sort((a, b) => a.nick.localeCompare(b.nick, "pt-BR"))
+                .sort((a, b) => nickParaMostrar(a).localeCompare(nickParaMostrar(b), "pt-BR"))
                 .map((i) => (
                   <option key={i.id} value={i.id}>
-                    {i.nick}#{i.tag} — {rotuloElo(i)} · {textoDoPreco(precoNaRegra6(i), true, rotuloSemPreco(precosDaRegra6, i))}
+                    {riotIdParaMostrar(i)} — {rotuloElo(i)} · {textoDoPreco(precoNaRegra6(i), true, rotuloSemPreco(precosDaRegra6, i))}
                   </option>
                 ))}
             </Select>
@@ -1293,17 +1294,17 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
           </p>
         ) : alvoNoTimeDefinido ? (
           <Empty title="Time definido não é substituído pela tabela">
-            {alvo.nick} joga no time definido pela organização, que não passou pelo draft e não tem preço: não há valor
+            {nickParaMostrar(alvo)} joga no time definido pela organização, que não passou pelo draft e não tem preço: não há valor
             para comparar. Se alguém desse time sair, a troca é decisão da organização (regra 6).
           </Empty>
         ) : alvoECapitao ? (
           <Empty title="Capitão não é substituído pela tabela">
-            {alvo.nick} é capitão e não tem preço: não há valor para comparar. Se um capitão sair, a organização
+            {nickParaMostrar(alvo)} é capitão e não tem preço: não há valor para comparar. Se um capitão sair, a organização
             escolhe outro capitão entre os jogadores do time, e a vaga dele vai para um reserva (regra 6).
           </Empty>
         ) : substitutos.length === 0 ? (
           <Empty title="Nenhum aprovado serve">
-            {alvo.nick} é o aprovado mais barato
+            {nickParaMostrar(alvo)} é o aprovado mais barato
             {precoDoAlvo !== null ? ` (${textoDoPreco(precoDoAlvo)} ${ondeOPreco})` : ""}, então não há
             aprovado de valor igual ou menor para substituí-lo. Pendentes não entram nesta lista:
             confira-os primeiro.
@@ -1313,7 +1314,7 @@ export function SecaoTimes({ dados, executar, ocupado, podeConferir }: PropsSeca
             <p style={{ margin: 0, fontSize: 12.5, color: C.ink2, lineHeight: 1.7 }}>
               {substitutos.length}{" "}
               {substitutos.length === 1 ? "aprovado pode" : "aprovados podem"} entrar no lugar de{" "}
-              <strong style={{ color: C.bronzeLit }}>{alvo.nick}</strong> —{" "}
+              <strong style={{ color: C.bronzeLit }}>{nickParaMostrar(alvo)}</strong> —{" "}
               {precoDoAlvo !== null ? `pontos ≤ ${precoDoAlvo} ${ondeOPreco}` : "elo igual ou abaixo"}{" "}
               <Elo elo={eloDePreco(alvo)} tamanho={18} />.
             </p>

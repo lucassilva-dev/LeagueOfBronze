@@ -255,6 +255,7 @@ function mensagemDaRodada(resumo: ResumoDaRodada, promovidos: number): string {
     `${resumo.elosMudados} elo(s) mudaram`,
     `${resumo.itensGravados} requisito(s) atualizados`,
   ];
+  if (resumo.nicksAtualizados) partes.push(`${resumo.nicksAtualizados} nick(s) novo(s) no site`);
   if (resumo.erros > 0) partes.push(`${resumo.erros} com erro`);
   let texto = partes.join(", ") + ".";
   if (resumo.parouPor === "chave_recusada") texto += " A Riot recusou a chave da API — renove a RIOT_API_KEY.";

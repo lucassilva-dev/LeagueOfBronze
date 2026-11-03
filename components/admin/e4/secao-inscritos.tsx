@@ -77,6 +77,7 @@ import { TURNOS, type Turno } from "@/lib/inscricoes/turnos";
 import { getOpGgSummonerUrlFromNick } from "@/lib/opgg";
 import { AUTOR_RIOT, itemEhDoRobo } from "@/lib/riot/decidir";
 import { RATE_LIMIT } from "@/lib/security/rate-limit";
+import { nickParaMostrar, riotIdParaMostrar, tagParaMostrar } from "@/lib/inscricoes/nick-atual";
 
 /**
  * Matriz de conferência + gaveta do inscrito.
@@ -1449,7 +1450,7 @@ function GavetaInscrito({
 
   const fechar = () => tentarSair({ rotulo: "fechar", ir: onFechar });
 
-  const irPara = (alvo: Inscrito) => tentarSair({ rotulo: `abrir ${alvo.nick}`, ir: () => onIr(alvo.id) });
+  const irPara = (alvo: Inscrito) => tentarSair({ rotulo: `abrir ${nickParaMostrar(alvo)}`, ir: () => onIr(alvo.id) });
 
   // "Salvar e próximo" usa o vizinho de AGORA: depois de salvar, quem está aberto pode
   // sumir da lista filtrada (deixou de ter pendência) e o "próximo" mudaria debaixo dela.
@@ -1524,7 +1525,7 @@ function GavetaInscrito({
   const congelado = Boolean(inscrito.elo_congelado);
   /** Recuo lateral: no celular a gaveta é a tela toda, e 18px de cada lado é largura perdida. */
   const lateral = compacto ? 14 : 18;
-  const opgg = getOpGgSummonerUrlFromNick(inscrito.riot_id);
+  const opgg = getOpGgSummonerUrlFromNick(riotIdParaMostrar(inscrito));
 
   const abaRequisitos = (
     <div>
@@ -1873,7 +1874,11 @@ function GavetaInscrito({
   const abaContato = (
     <div>
       <FieldGrid min={170}>
-        <Dado rotulo="Riot ID" valor={inscrito.riot_id} />
+        <Dado rotulo="Riot ID" valor={riotIdParaMostrar(inscrito)} />
+        {riotIdParaMostrar(inscrito) !== inscrito.riot_id ? (
+          // A prova da regra 12: o site mostra o nick de hoje, a inscrição guarda o declarado.
+          <Dado rotulo="Riot ID declarado" valor={inscrito.riot_id} />
+        ) : null}
         <Dado rotulo="Nome e sobrenome" valor={inscrito.nome_real ?? "não informado"} />
         <Dado rotulo="E-mail" valor={inscrito.email} />
         <Dado rotulo="Discord" valor={inscrito.discord} />
@@ -2074,7 +2079,7 @@ function GavetaInscrito({
       </div>
       {situacao === EXCLUIDO && mudouNaFicha.situacao ? (
         <p role="alert" style={{ margin: "-4px 0 10px", fontSize: 11.5, color: C.warnSoft }}>
-          Ao salvar, <b>{inscrito.nick}</b> some da lista de inscritos e sai de times, caixa e robô da Riot. Fica no
+          Ao salvar, <b>{nickParaMostrar(inscrito)}</b> some da lista de inscritos e sai de times, caixa e robô da Riot. Fica no
           filtro «Excluído», e dá para desfazer escolhendo outra situação.
         </p>
       ) : situacao === EXCLUIDO ? (
@@ -2107,7 +2112,7 @@ function GavetaInscrito({
             {proximo ? (
               <Button
                 disabled={ocupado || (totalMudado > 0 && (nomeInvalido || !podeConferir))}
-                title={`Próximo da lista: ${proximo.nick}#${proximo.tag}`}
+                title={`Próximo da lista: ${riotIdParaMostrar(proximo)}`}
                 onClick={salvarEProximo}
               >
                 {totalMudado > 0 ? "Salvar e próximo ›" : "Próximo ›"}
@@ -2174,7 +2179,7 @@ function GavetaInscrito({
             <Button
               small
               disabled={!anterior || ocupado}
-              title={anterior ? `Anterior: ${anterior.nick}#${anterior.tag}` : "Início da lista"}
+              title={anterior ? `Anterior: ${riotIdParaMostrar(anterior)}` : "Início da lista"}
               onClick={() => anterior && irPara(anterior)}
             >
               ‹ Anterior
@@ -2185,7 +2190,7 @@ function GavetaInscrito({
             <Button
               small
               disabled={!proximo || ocupado}
-              title={proximo ? `Próximo: ${proximo.nick}#${proximo.tag}` : "Fim da lista"}
+              title={proximo ? `Próximo: ${riotIdParaMostrar(proximo)}` : "Fim da lista"}
               onClick={() => proximo && irPara(proximo)}
             >
               Próximo ›
@@ -2199,8 +2204,8 @@ function GavetaInscrito({
 
           <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
             <h2 id={tituloId} style={{ fontFamily: display, fontSize: 22, color: C.ink, margin: 0 }}>
-              {inscrito.nick}
-              <span style={{ color: C.ink4 }}>#{inscrito.tag}</span>
+              {nickParaMostrar(inscrito)}
+              <span style={{ color: C.ink4 }}>#{tagParaMostrar(inscrito)}</span>
             </h2>
             <Chip tone={TOM_SITUACAO[inscrito.situacao]} title="Situação gravada">
               {ROTULO_SITUACAO[inscrito.situacao]}
@@ -2470,7 +2475,7 @@ function SenhaProvisoria({ inscrito }: Readonly<{ inscrito: Inscrito }>) {
   const [erro, setErro] = useState<string | null>(null);
   const [copiada, setCopiada] = useState<"ok" | "falhou" | null>(null);
   const contaId = inscrito.jogador_id ?? null;
-  const quem = `${inscrito.nick}#${inscrito.tag}`;
+  const quem = riotIdParaMostrar(inscrito);
 
   const gerar = async () => {
     if (!contaId) return;
@@ -2647,6 +2652,7 @@ function BarraDoRobo({
     const partes = [`última rodada ${quandoCurto(ultima)} (${haQuanto(ultima, agora)})`];
     if (resumo?.processados !== undefined) partes.push(`${resumo.processados} consultados`);
     if (resumo?.elosMudados) partes.push(`${resumo.elosMudados} elo(s) mudaram`);
+    if (resumo?.nicksAtualizados) partes.push(`${resumo.nicksAtualizados} nick(s) novo(s) no site`);
     if (resumo?.erros) partes.push(`${resumo.erros} com erro`);
     texto = partes.join(" · ");
   }
@@ -2839,7 +2845,7 @@ export function SecaoInscritos({
     if (ordem === "inscricao") return inscritos;
     const lista = [...inscritos];
     if (ordem === "nick") {
-      lista.sort((a, b) => a.nick.localeCompare(b.nick, "pt-BR", { sensitivity: "base" }));
+      lista.sort((a, b) => nickParaMostrar(a).localeCompare(nickParaMostrar(b), "pt-BR", { sensitivity: "base" }));
       return lista;
     }
     const forca = new Map(lista.map((i) => [i.id, forcaDoInscrito(i)]));
@@ -2888,7 +2894,7 @@ export function SecaoInscritos({
       if (soFila && comFila && lugarNaFila(fila, i.id).tipo !== "reserva") return false;
       if (filtroElos.size > 0 && !filtroElos.has(resolveElo(eloExibido(i).bruto)?.key ?? "")) return false;
       if (!termo) return true;
-      return [i.nick, i.riot_id, i.discord, i.email, i.nome_real ?? ""].some((campo) =>
+      return [i.nick, i.riot_id, i.riot_id_atual ?? "", i.discord, i.email, i.nome_real ?? ""].some((campo) =>
         campo.toLowerCase().includes(termo),
       );
     });
@@ -3153,13 +3159,13 @@ export function SecaoInscritos({
                     idAlvo={`inscrito-${inscrito.id}`}
                     abreDialogo
                     selecionado={aberto}
-                    rotuloAlvo={`Abrir a conferência de ${inscrito.nick}#${inscrito.tag}`}
+                    rotuloAlvo={`Abrir a conferência de ${riotIdParaMostrar(inscrito)}`}
                     onClick={() => setSelecionadoId(inscrito.id)}
                     inicio={<Elo elo={eloExibido(inscrito).bruto} tamanho={40} />}
                     titulo={
                       <>
-                        {inscrito.nick}
-                        <span style={{ color: C.ink4, fontWeight: 400 }}>#{inscrito.tag}</span>
+                        {nickParaMostrar(inscrito)}
+                        <span style={{ color: C.ink4, fontWeight: 400 }}>#{tagParaMostrar(inscrito)}</span>
                       </>
                     }
                     subtitulo={
@@ -3278,7 +3284,7 @@ export function SecaoInscritos({
                       onClick={() => setSelecionadoId(inscrito.id)}
                       // Hover e foco (globals.css): dizem que a linha inteira abre a gaveta.
                       className="lob-linha-abre"
-                      title={`Abrir a conferência de ${inscrito.nick}`}
+                      title={`Abrir a conferência de ${nickParaMostrar(inscrito)}`}
                       style={{
                         background: aberto ? "rgba(201,138,75,.12)" : undefined,
                         cursor: "pointer",
@@ -3311,8 +3317,8 @@ export function SecaoInscritos({
                             cursor: "pointer",
                           }}
                         >
-                          {inscrito.nick}
-                          <span style={{ color: C.ink4, fontWeight: 400 }}>#{inscrito.tag}</span>
+                          {nickParaMostrar(inscrito)}
+                          <span style={{ color: C.ink4, fontWeight: 400 }}>#{tagParaMostrar(inscrito)}</span>
                         </button>
                         <div
                           style={{
@@ -3323,7 +3329,7 @@ export function SecaoInscritos({
                             marginTop: 3,
                           }}
                         >
-                          <span style={{ fontSize: 11, color: C.ink4 }}>{inscrito.riot_id}</span>
+                          <span style={{ fontSize: 11, color: C.ink4 }}>{riotIdParaMostrar(inscrito)}</span>
                           {inscrito.organizador ? (
                             <Chip tone="gold" title="Organizador desta edição — joga e não paga inscrição">
                               org

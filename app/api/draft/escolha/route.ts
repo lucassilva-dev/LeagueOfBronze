@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 import { alcancarORelogio, aplicarEscolha, podeEscolher, timeDaVez } from "@/lib/draft/motor";
-import { comAsSaidasDoPool, lerDraftCompleto, paraPublico, salvarDraftSeIntacto, timeDoCapitao } from "@/lib/draft/store";
+import { comAsSaidasDoPool, comNicksAtuais, lerDraftCompleto, paraPublico, recusaComNickAtual, salvarDraftSeIntacto, timeDoCapitao } from "@/lib/draft/store";
 import { inscricaoIdDoJogador } from "@/lib/inscricoes/store";
 import { getJogadorIdentity } from "@/lib/jogadores/auth";
 import { respostaDeErro } from "@/lib/security/resposta-erro";
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
     // tela aberta antes desta versão — a tela de hoje sempre manda.
     if (typeof corpo.escolha === "number" && corpo.escolha !== atual.escolhaAtual) {
       return NextResponse.json(
-        { error: VEZ_PASSOU, codigo: "vez_passou", draft: paraPublico(atual, revisao) },
+        { error: VEZ_PASSOU, codigo: "vez_passou", draft: paraPublico(await comNicksAtuais(atual), revisao) },
         { status: 409 },
       );
     }
@@ -97,13 +97,16 @@ export async function POST(request: NextRequest) {
         timeDaVez(estado) === meuTime;
       return NextResponse.json(
         minhaVezVenceu
-          ? { error: VEZ_PASSOU, codigo: "vez_passou", draft: paraPublico(atual, revisao) }
-          : {
-              error: veredito.motivo,
-              codigo: veredito.codigo,
-              params: veredito.params,
-              draft: paraPublico(atual, revisao),
-            },
+          ? { error: VEZ_PASSOU, codigo: "vez_passou", draft: paraPublico(await comNicksAtuais(atual), revisao) }
+          : await (async () => {
+              const recusa = await recusaComNickAtual(veredito, atual, jogadorId);
+              return {
+                error: recusa.motivo,
+                codigo: recusa.codigo,
+                params: recusa.params,
+                draft: paraPublico(await comNicksAtuais(atual), revisao),
+              };
+            })(),
         { status: 409 },
       );
     }
@@ -119,13 +122,13 @@ export async function POST(request: NextRequest) {
         {
           error: "Outra escolha entrou primeiro. Confira o quadro e tente de novo.",
           codigo: "outra_escolha",
-          draft: fresco.estado ? paraPublico(fresco.estado, fresco.revisao) : null,
+          draft: fresco.estado ? paraPublico(await comNicksAtuais(fresco.estado), fresco.revisao) : null,
         },
         { status: 409 },
       );
     }
 
-    return NextResponse.json({ ok: true, draft: paraPublico(novo, revisao + 1) });
+    return NextResponse.json({ ok: true, draft: paraPublico(await comNicksAtuais(novo), revisao + 1) });
   } catch (error) {
     return respostaDeErro("api/draft/escolha", error, "Não foi possível registrar a escolha.");
   }

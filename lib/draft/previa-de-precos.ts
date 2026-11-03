@@ -63,6 +63,14 @@ export type InscricaoDaPrevia = CamposDeElo & {
    */
   organizador?: boolean;
   riot_id?: string;
+  /**
+   * O Riot ID que a conta tem HOJE (o robô da Riot grava; difere de `riot_id` quando a pessoa
+   * trocou de nick). A visão do draft encerrado mostra este nome, então o casamento com ela
+   * aceita os dois (`nomesDaInscricao`).
+   */
+  riot_id_atual?: string | null;
+  /** A conta da Riot, para casar com o jogador do site (`Player.puuid`). */
+  puuid?: string | null;
   /** A ordem de inscrição, que decide quem é titular na fila. Ausente vai para o fim. */
   criado_em?: string | null;
   /**
@@ -287,6 +295,11 @@ export function retratoDaPrevia(previa: PreviaDosPrecos): RetratoDaTabela | null
  * reserva) recebe o preço da reta do sorteio, preso entre as linhas vizinhas — a tabela é
  * reconstruída do retrato gravado no estado (`tabelaDoRetrato`).
  */
+/** Os nomes pelos quais a inscrição aparece no draft: o Riot ID declarado e o atual da conta. */
+export function nomesDaInscricao(i: Pick<InscricaoDaPrevia, "riot_id" | "riot_id_atual">): string[] {
+  return [i.riot_id, i.riot_id_atual].filter((nome): nome is string => typeof nome === "string" && nome !== "");
+}
+
 export function precosDoSorteio(params: {
   retrato: RetratoDaTabela;
   pontosDoDraft: ReadonlyMap<string, number>;
@@ -305,12 +318,16 @@ export function precosDoSorteio(params: {
 }): PreviaDosPrecos {
   const { retrato, pontosDoDraft, inscritos } = params;
   const tabela = tabelaDoRetrato(retrato);
-  const noPool = new Set(inscritos.filter((i) => i.riot_id !== undefined && pontosDoDraft.has(i.riot_id)).map((i) => i.id));
+  // A visão do draft encerrado mostra o Riot ID ATUAL de quem trocou de nick: o casamento
+  // aceita o declarado e o atual.
+  const esta = (conjunto: ReadonlySet<string> | ReadonlyMap<string, unknown>, i: InscricaoDaPrevia) =>
+    nomesDaInscricao(i).some((nome) => conjunto.has(nome));
+  const noPool = new Set(inscritos.filter((i) => esta(pontosDoDraft, i)).map((i) => i.id));
   const capitaoGratis = params.capitaoGratis === true;
   const capitaesDoDraft = params.capitaesDoDraft ?? new Set<string>();
-  const capitaes = new Set(inscritos.filter((i) => i.riot_id !== undefined && capitaesDoDraft.has(i.riot_id)).map((i) => i.id));
+  const capitaes = new Set(inscritos.filter((i) => esta(capitaesDoDraft, i)).map((i) => i.id));
   const doTimeDefinidoDoDraft = params.timeDefinidoDoDraft ?? new Set<string>();
-  const doTime = new Set(inscritos.filter((i) => i.riot_id !== undefined && doTimeDefinidoDoDraft.has(i.riot_id)).map((i) => i.id));
+  const doTime = new Set(inscritos.filter((i) => esta(doTimeDefinidoDoDraft, i)).map((i) => i.id));
   return {
     tabela,
     origem: "sorteio",
@@ -323,7 +340,9 @@ export function precosDoSorteio(params: {
     elegiveis: inscritos.filter((i) => contaParaTimes(i.situacao)).length,
     noPool,
     preco: (i) => {
-      const doDraft = i.riot_id !== undefined ? pontosDoDraft.get(i.riot_id) : undefined;
+      const doDraft = nomesDaInscricao(i)
+        .map((nome) => pontosDoDraft.get(nome))
+        .find((pontos) => pontos !== undefined);
       if (doDraft !== undefined) return doDraft;
       return temEloReconhecido(i) ? precoNaTabela(tabela, eloDoJogadorDaInscricao(i)) : null;
     },

@@ -134,6 +134,8 @@ type AdminTabContentProps = Readonly<{
   podeLados: boolean;
   podeCartas: boolean;
   podeRiot: boolean;
+  /** `players:write`: a importação da Riot só atualiza nick/conta do jogador com ele (sem ele, o salvar recusaria). */
+  podeEditarJogadores: boolean;
   podeImportar: boolean;
   /** Acompanha a versão da linha quando uma rota grava por fora do editor. */
   onVersaoDoServidor: (versaoLida?: number, versaoGravada?: number) => void;
@@ -917,6 +919,7 @@ function AdminTabContent({
   podeLados,
   podeCartas,
   podeRiot,
+  podeEditarJogadores,
   podeImportar,
   onVersaoDoServidor,
   onFormularioSujo,
@@ -985,6 +988,7 @@ function AdminTabContent({
           podeLados={podeLados}
           podeCartas={podeCartas}
           podeRiot={podeRiot}
+          podeEditarJogadores={podeEditarJogadores}
           // Regra 6: os pontos do substituto vêm das inscrições, que só conferir ou
           // financeiro leem. Sem nenhum dos dois, o painel avisa para conferir à mão.
           podeVerPrecos={podeConferir || podeFinanceiro}
@@ -2425,6 +2429,7 @@ function PainelDoAdmin() {
             podeLados={alcanca(["series:sides"])}
             podeCartas={alcanca(["series:cards"])}
             podeRiot={alcanca(["riot:import"])}
+            podeEditarJogadores={alcanca(["players:write"])}
             podeImportar={alcanca(["dataset:import"])}
             onVersaoDoServidor={sincronizarVersaoDoServidor}
             onFormularioSujo={setFormularioSujo}

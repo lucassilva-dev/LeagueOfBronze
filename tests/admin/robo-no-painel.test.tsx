@@ -222,10 +222,18 @@ describe("barra do robô", () => {
 });
 
 describe("pontos de atenção na lista", () => {
-  it("troca de Riot ID vira um ⚠ na linha e um aviso na gaveta", () => {
-    abrir([inscrito({ riot_id_atual: "OutroNome#BR1" })]);
+  it("troca de Riot ID vira um ⚠ na linha e um aviso na gaveta — e a lista já mostra o nick de hoje", () => {
+    render(
+      <SecaoInscritos {...props(vi.fn(async () => true))} dados={dados([inscrito({ riot_id_atual: "OutroNome#BR1" })])} />,
+    );
+    // A linha mostra o nick de HOJE (o site também); o declarado continua na ficha e no aviso.
+    expect(screen.queryAllByRole("button", { name: /Fulano/ })).toEqual([]);
+    fireEvent.click(screen.getAllByRole("button", { name: /OutroNome/ })[0]!);
     expect(within(gaveta()).getByText(/Trocou de Riot ID/)).toBeTruthy();
     expect(screen.getAllByText("⚠ 1").length).toBe(1);
+    aba("Contato");
+    expect(within(gaveta()).getByText("OutroNome#BR1")).toBeTruthy();
+    expect(within(gaveta()).getByText("Riot ID declarado")).toBeTruthy();
   });
 });
 

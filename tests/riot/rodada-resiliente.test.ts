@@ -27,6 +27,11 @@ const estado = vi.hoisted(() => ({
   quebrarEm: new Set<string>(),
 }));
 
+// A etapa dos nicks do site tem teste próprio (sincronizar-nicks.test.ts); aqui ela não lê o dataset.
+vi.mock("@/lib/riot/sincronizar-nicks", () => ({
+  sincronizarNicksDoSite: async () => ({ atualizados: 0, vinculados: 0, consultas: 0 }),
+}));
+
 vi.mock("@/lib/inscricoes/store", async (original) => ({
   ...(await original<Record<string, unknown>>()),
   lerConfig: async () => estado.config,

@@ -629,6 +629,12 @@ export function AdminPlayersPanel({
       elo: form.elo.trim(),
       imageUrl: (form.imageUrl ?? "").trim(),
     };
+    // A conta ligada (`puuid`) não é campo do formulário: vem do rascunho na hora de gravar
+    // (o robô pode tê-la ligado com a ficha aberta). Nick trocado à mão: a conta pode ser de
+    // outra pessoa — com ela, o robô devolveria o nick dessa conta; sem ela, liga de novo pelo
+    // nick digitado.
+    delete limpo.puuid;
+    const nickMudou = editando && carregado.nick.trim() !== limpo.nick;
     // O reserva não tem time — e o schema recusa reserva COM time: as duas marcas não
     // convivem. Nem capitão, que só vale dentro do elenco.
     if (limpo.reserva === true) {
@@ -646,7 +652,8 @@ export function AdminPlayersPanel({
     if (!limpo.captain) delete limpo.captain;
     mutateDraft((next) => {
       const indice = next.players.findIndex((player) => player.id === selectedId);
-      if (indice >= 0) next.players[indice] = { ...limpo };
+      const conta = indice >= 0 && !nickMudou ? next.players[indice]!.puuid : undefined;
+      if (indice >= 0) next.players[indice] = { ...limpo, ...(conta ? { puuid: conta } : {}) };
       else next.players.push({ ...limpo });
       // Um capitão por time: marcar este desmarca quem mais estava marcado no mesmo ELENCO. A
       // marca de quem saiu de vez fica gravada (é histórico) — ela já não vale no site.

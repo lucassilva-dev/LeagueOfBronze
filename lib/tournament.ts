@@ -716,10 +716,11 @@ function pickBestSeriesMvpCandidate(
     return candidate.kda > current.kda ? candidate : current;
   }
 
-  const candidateNick = indexes.playersById.get(candidate.playerId)!.nick;
-  const currentNick = indexes.playersById.get(current.playerId)!.nick;
-
-  return candidateNick.localeCompare(currentNick, "pt-BR") < 0 ? candidate : current;
+  // Empate perfeito: decide o id, que nasce do nick da virada e NUNCA muda. Pelo nick, o
+  // MVP de uma série já encerrada podia trocar de dono quando alguém troca de nick na Riot
+  // (o robô grava o nick novo no site). Medido em 03/11/2026: nenhuma série da 3ª nem da 4ª
+  // chega aqui, então nenhum MVP exibido muda.
+  return candidate.playerId.localeCompare(current.playerId) < 0 ? candidate : current;
 }
 
 export function getSeriesTeamKillTotals(

@@ -444,6 +444,18 @@ export const playerSchema = z.object({
   nick: limitado(LIMITES.nick),
   slug: limitado(LIMITES.slug),
   /**
+   * A conta da Riot do jogador — o vínculo fixo que acompanha a troca de nick. O robô da
+   * Riot (lib/riot/nicks-do-site.ts) grava o nick atual da conta em `nick` e a importação de
+   * partida casa o participante por ela. Nunca aparece em tela; é o identificador que a
+   * própria Riot devolve em qualquer partida. Opcional: jogador ainda não ligado (ou de
+   * temporada antiga sem conta na edição atual) segue só pelo nick.
+   */
+  puuid: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z0-9_-]{1,100}$/)
+    .optional(),
+  /**
    * Time do jogador. Só pode faltar no RESERVA (`reserva: true`) — ver
    * `validatePlayerTeamReferences`. Quem saiu de vez (`saiuEm`) CONTINUA com o time: é por
    * ele que as linhas antigas de K/D/A (sem `teamId` próprio) seguem contando.

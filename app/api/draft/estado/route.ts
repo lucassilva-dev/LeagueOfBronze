@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 import { alcancarORelogio } from "@/lib/draft/motor";
-import { comAsSaidasDoPool, lerDraftCompleto, paraPublico, salvarDraftSeIntacto, timeDoCapitao } from "@/lib/draft/store";
+import { comAsSaidasDoPool, comNicksAtuais, lerDraftCompleto, paraPublico, salvarDraftSeIntacto, timeDoCapitao } from "@/lib/draft/store";
 import { inscricaoIdDoJogador } from "@/lib/inscricoes/store";
 import {
   atributosDoCookie,
@@ -100,7 +100,7 @@ export async function GET(request: NextRequest) {
     // e uma TV ou um celular com 20 s de diferença mostrava 0:00 com tempo sobrando (ou o
     // contrário, e a escolha voltava recusada). Com ela, a tela corrige a própria hora.
     const resposta = NextResponse.json({
-      draft: paraPublico(estadoFinal, revisaoAtual),
+      draft: paraPublico(await comNicksAtuais(estadoFinal), revisaoAtual),
       souCapitaoDe,
       // Só um booleano, sem quem é: o /capitao precisa saber se oferece "entrar" ou se diz
       // "esta conta não capitaneia" — oferecer login a quem já entrou fazia a pessoa voltar

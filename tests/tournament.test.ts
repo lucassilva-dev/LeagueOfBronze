@@ -683,7 +683,7 @@ describe("leaderboards and MVP calculation", () => {
     ).toBe("p2");
   });
 
-  it("desempata MVP da serie por nick quando KDA e MVPs de jogo empatam", () => {
+  it("desempata MVP da serie pelo id (fixo) quando KDA e MVPs de jogo empatam — nao pelo nick, que muda", () => {
     const dataset = baseDataset();
     dataset.players.push({
       id: "a3",
@@ -720,7 +720,8 @@ describe("leaderboards and MVP calculation", () => {
 
     const seriesMvp = getSeriesMvp(dataset.seriesMatches[0]!, dataset);
 
-    expect(seriesMvp?.playerId).toBe("a3");
+    // "a1" < "a3": vale o id, mesmo com o nick do a3 ("A0") vindo antes no alfabeto.
+    expect(seriesMvp?.playerId).toBe("a1");
   });
 
   it("mantem o MVP atual quando o proximo candidato tem menos MVPs, menor KDA ou nick posterior", () => {

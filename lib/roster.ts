@@ -185,13 +185,13 @@ export type RegraDoSubstituto = {
    * O preço do jogador na tabela; nulo sem inscrição casada, sem elo legível ou sem preço (o
    * capitão sem preço e o time definido pela organização).
    */
-  preco: (jogador: Pick<Player, "nick">) => number | null;
+  preco: (jogador: Pick<Player, "nick" | "puuid">) => number | null;
   /**
    * `true`: o substituto vale igual ou menos que o substituído; `false`: vale mais;
    * `null`: não há valor para comparar (um dos dois sem inscrição casada, sem elo legível ou
    * sem preço).
    */
-  comparar: (substituto: Pick<Player, "nick">, substituido: Pick<Player, "nick">) => boolean | null;
+  comparar: (substituto: Pick<Player, "nick" | "puuid">, substituido: Pick<Player, "nick" | "puuid">) => boolean | null;
 };
 
 /** O Riot ID como chave de casamento: a Riot não diferencia maiúsculas, e espaço sobra é digitação. */
@@ -204,8 +204,9 @@ function chaveDoRiotId(riotId: string): string {
  * (`precosDoSorteio`) depois do draft, a prévia (`previaDosPrecos`) antes dele — quem chama
  * escolhe, exatamente como a aba faz. A comparação é a `podeSubstituir` de lá.
  *
- * O jogador do dataset casa com a inscrição pelo Riot ID (o `nick` do dataset É o Riot ID
- * que a virada gravou), sem diferenciar maiúsculas. Sem inscrição casada, ou com elo que o
+ * O jogador do dataset casa com a inscrição pela conta da Riot (`puuid`) e, sem ela, pelo Riot
+ * ID — o declarado na inscrição ou o atual da conta (o robô troca o `nick` do site quando o
+ * jogador troca de nick na Riot: lib/riot/nicks-do-site.ts), sem diferenciar maiúsculas. Sem inscrição casada, ou com elo que o
  * site não reconhece, não há preço: a comparação devolve `null` e o aviso diz isso — a
  * tabela fixa da 3ª (`pontos` do elo) não serve, porque não é o preço que o draft usou.
  *
@@ -223,15 +224,19 @@ export function regraDoSubstitutoPelosPrecos(
   // A mesma pessoa pode ter mais de uma linha (desistiu e se inscreveu de novo): vale a
   // que ainda conta (`contaParaTimes`); entre iguais, a primeira da lista.
   const porRiotId = new Map<string, InscricaoDaPrevia>();
+  const porConta = new Map<string, InscricaoDaPrevia>();
+  const guardar = (mapa: Map<string, InscricaoDaPrevia>, chave: string, inscricao: InscricaoDaPrevia) => {
+    const atual = mapa.get(chave);
+    if (!atual || (!contaParaTimes(atual.situacao) && contaParaTimes(inscricao.situacao))) mapa.set(chave, inscricao);
+  };
   for (const inscricao of inscritos) {
-    if (inscricao.riot_id === undefined) continue;
-    const chave = chaveDoRiotId(inscricao.riot_id);
-    const atual = porRiotId.get(chave);
-    if (!atual || (!contaParaTimes(atual.situacao) && contaParaTimes(inscricao.situacao))) {
-      porRiotId.set(chave, inscricao);
+    for (const nome of [inscricao.riot_id, inscricao.riot_id_atual]) {
+      if (typeof nome === "string" && nome.trim() !== "") guardar(porRiotId, chaveDoRiotId(nome), inscricao);
     }
+    if (inscricao.puuid) guardar(porConta, inscricao.puuid, inscricao);
   }
-  const inscricaoDe = (jogador: Pick<Player, "nick">) => porRiotId.get(chaveDoRiotId(jogador.nick));
+  const inscricaoDe = (jogador: Pick<Player, "nick" | "puuid">) =>
+    (jogador.puuid ? porConta.get(jogador.puuid) : undefined) ?? porRiotId.get(chaveDoRiotId(jogador.nick));
   // `podeSubstituir` compara pelo preço quando há tabela e pela força antes dela; "sem valor"
   // é o mesmo critério dela, olhado antes para separar "vale mais" de "não dá para saber".
   const temValor = (inscricao: InscricaoDaPrevia) =>

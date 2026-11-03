@@ -33,13 +33,17 @@ import {
   comAsSaidasDoPool,
   lerDraftCompleto,
   montarDraftDosAprovados,
+  comNicksAtuais,
   paraPublico,
+  recusaComNickAtual,
   previaDoDraft,
   salvarCapitaesDefinidos,
   salvarDraftSeIntacto,
   type MetodoDeCapitao,
 } from "@/lib/draft/store";
 import { listarInscricoes, registrarAuditoria } from "@/lib/inscricoes/store";
+import { atualizarNicksDosJogadores } from "@/lib/riot/nicks-do-site";
+import { contasDaVirada } from "@/lib/riot/sincronizar-nicks";
 import { embaralhar, novaSemente } from "@/lib/series/sorteio";
 import { requireAdmin } from "@/lib/security/route-guard";
 import { respostaDeErro } from "@/lib/security/resposta-erro";
@@ -91,7 +95,7 @@ export async function GET(request: NextRequest) {
     // que grava condicionado. O painel mostra o que está gravado.
     const semSaida = estado ? vezSemSaida(estado) : null;
     const resposta = NextResponse.json({
-      draft: estado ? paraPublico(estado, revisao) : null,
+      draft: estado ? paraPublico(await comNicksAtuais(estado), revisao) : null,
       sorteio: estado?.sorteio ?? null,
       semSaida,
       previa,
@@ -196,7 +200,7 @@ export async function POST(request: NextRequest) {
               : undefined,
           },
         });
-        return NextResponse.json({ ok: true, draft: paraPublico(novo, revisao + 1) });
+        return NextResponse.json({ ok: true, draft: paraPublico(await comNicksAtuais(novo), revisao + 1) });
       }
 
       case "capitaes": {
@@ -261,7 +265,7 @@ export async function POST(request: NextRequest) {
         if (!gravou) return conflito();
 
         await registrarAuditoria({ autor, acao: `draft_${corpo.acao}` });
-        return NextResponse.json({ ok: true, draft: paraPublico(novo, revisao + 1) });
+        return NextResponse.json({ ok: true, draft: paraPublico(await comNicksAtuais(novo), revisao + 1) });
       }
 
       case "escolher": {
@@ -291,7 +295,7 @@ export async function POST(request: NextRequest) {
           return NextResponse.json(
             {
               error: "A vez mudou enquanto você escolhia. Confira o quadro e escolha de novo.",
-              draft: paraPublico(atual, revisao),
+              draft: paraPublico(await comNicksAtuais(atual), revisao),
             },
             { status: 409 },
           );
@@ -299,7 +303,8 @@ export async function POST(request: NextRequest) {
 
         const veredito = podeEscolher(atual, daVez, jogadorId);
         if (!veredito.ok) {
-          return NextResponse.json({ error: veredito.motivo, draft: paraPublico(atual, revisao) }, { status: 409 });
+          const recusa = await recusaComNickAtual(veredito, atual, jogadorId);
+          return NextResponse.json({ error: recusa.motivo, draft: paraPublico(await comNicksAtuais(atual), revisao) }, { status: 409 });
         }
 
         const novo = aplicarEscolha(atual, daVez, jogadorId, Date.now());
@@ -311,7 +316,7 @@ export async function POST(request: NextRequest) {
           acao: "draft_escolha_pela_organizacao",
           detalhe: { timeId: daVez, jogadorId, escolha: atual.escolhaAtual },
         });
-        return NextResponse.json({ ok: true, draft: paraPublico(novo, revisao + 1) });
+        return NextResponse.json({ ok: true, draft: paraPublico(await comNicksAtuais(novo), revisao + 1) });
       }
 
       case "prever":
@@ -327,7 +332,14 @@ export async function POST(request: NextRequest) {
          */
         const reservas = reservasDaVirada(estado, inscritos);
         const problemas = problemasDaVirada(estado, reservas);
-        const resultado = datasetDoDraft(estado, reservas);
+        // O draft guarda o Riot ID declarado (é dele que nascem id e slug). Quem já trocou de
+        // nick vai para o site com o nick ATUAL e ligado à conta, pela inscrição dele — o id e o
+        // slug ficam os do declarado. A conferência («prever») mostra o mesmo que o «virar» grava.
+        const doDraft = datasetDoDraft(estado, reservas);
+        const resultado = {
+          teams: doDraft.teams,
+          players: atualizarNicksDosJogadores(doDraft.players, contasDaVirada(inscritos)),
+        };
         // O time que vai com vaga aberta porque a ordem perdeu escolhas por falta de jogador
         // (alguém saiu do pool, C1, ou faltava titular apto no sorteio, C4): não trava.
         const avisos = avisosDaVirada(estado);
@@ -341,7 +353,8 @@ export async function POST(request: NextRequest) {
          * true`, booleano, não "sim"); depois, a vaga é reposta pela saída de vez no painel de
          * Jogadores.
          */
-        const foraDoDraft = jogadoresForaDoDraft(estado, inscritos);
+        // Com o nome que a mesa e a transmissão mostram (o atual de quem trocou de nick).
+        const foraDoDraft = jogadoresForaDoDraft(await comNicksAtuais(estado), inscritos);
         const precisamConfirmar = exigemConfirmacaoNaVirada(foraDoDraft);
 
         if (corpo.acao === "prever") {

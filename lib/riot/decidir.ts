@@ -102,7 +102,7 @@ const DIA_MS = 24 * 60 * 60 * 1000;
  * simulação em produção, sem tirar o acento, dois inscritos apareciam como "trocou de nick"
  * sem ter trocado nada.
  */
-function comparavel(s: string): string {
+export function riotIdComparavel(s: string): string {
   return s
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
@@ -111,7 +111,7 @@ function comparavel(s: string): string {
 }
 
 export function mesmoRiotId(a: string, b: string): boolean {
-  return comparavel(a) === comparavel(b);
+  return riotIdComparavel(a) === riotIdComparavel(b);
 }
 
 /** A janela do item (e): dos 10 dias antes do início até o início. `null` sem data. */

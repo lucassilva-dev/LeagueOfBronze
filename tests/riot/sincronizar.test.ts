@@ -17,6 +17,15 @@ const estado = vi.hoisted(() => ({
   liberacoes: [] as (Record<string, unknown> | undefined)[],
 }));
 
+// A etapa dos nicks do site tem teste próprio (sincronizar-nicks.test.ts); aqui ela não lê o dataset.
+const etapaDosNicks = vi.hoisted(() => ({ chamadas: [] as Record<string, unknown>[] }));
+vi.mock("@/lib/riot/sincronizar-nicks", () => ({
+  sincronizarNicksDoSite: async (opcoes: Record<string, unknown>) => {
+    etapaDosNicks.chamadas.push(opcoes);
+    return { atualizados: 2, vinculados: 1, consultas: 0, ...(opcoes.simular ? { mudancas: [] } : {}) };
+  },
+}));
+
 vi.mock("@/lib/inscricoes/store", async (original) => ({
   ...(await original<Record<string, unknown>>()),
   lerConfig: async () => estado.config,
@@ -223,6 +232,28 @@ describe("rodada do robô", () => {
     expect(estado.aplicados).toHaveLength(1);
   });
 
+  it("PUUID que não serve mais e o jogador já trocou de nick: acha pelo último Riot ID, não perde a conta", async () => {
+    estado.inscricoes = [inscrito("a", { puuid: "velho", riot_id_atual: "Novo#BR1" })];
+    const { cliente, log } = clienteFalso({
+      contaPorPuuid: () => ({ tipo: "puuid_invalido" }),
+      contaPorRiotId: (nome) =>
+        nome === "Novo" ? { tipo: "ok", dados: { puuid: "p-novo", gameName: "Novo", tagLine: "BR1" } } : { tipo: "nao_encontrado" },
+    });
+    await sincronizarComRiot({ orcamentoMs: 60_000, cliente });
+    expect(log.slice(0, 2)).toEqual(["puuid:velho", "riotid:Novo"]);
+    const decisao = estado.aplicados[0]!.decisao as { colunasRiot: Record<string, unknown> };
+    expect(decisao.colunasRiot).toMatchObject({ puuid: "p-novo", riot_id_atual: "Novo#BR1" });
+  });
+
+  it("sem PUUID e o último Riot ID também sumiu: ainda tenta o declarado antes de desistir", async () => {
+    estado.inscricoes = [inscrito("a", { riot_id_atual: "Sumiu#BR1" })];
+    const { cliente, log } = clienteFalso({
+      contaPorRiotId: (nome) => (nome === "a" ? { tipo: "ok", dados: { puuid: "p-a", gameName: "a", tagLine: "BR1" } } : { tipo: "nao_encontrado" }),
+    });
+    await sincronizarComRiot({ orcamentoMs: 60_000, cliente });
+    expect(log.slice(0, 2)).toEqual(["riotid:Sumiu", "riotid:a"]);
+  });
+
   it("nível e servidor só uma vez por semana", async () => {
     estado.inscricoes = [
       inscrito("a", { puuid: "p-a", riot_regiao: "br1", riot_nivel_em: new Date(Date.now() - 86_400_000).toISOString() }),
@@ -267,5 +298,32 @@ describe("rodada do robô", () => {
     const decisao = estado.aplicados.find((a) => a.id === "a")!.decisao as { elo: unknown; colunasRiot: Record<string, unknown> };
     expect(decisao.elo).toBeNull();
     expect(decisao.colunasRiot.elo_riot).toBe("Ouro"); // o que a Riot mostra continua registrado
+  });
+});
+
+describe("a etapa dos nicks do site no fim da rodada", () => {
+  beforeEach(() => {
+    etapaDosNicks.chamadas = [];
+  });
+
+  it("rodada completa: roda com consultas à Riot e o resumo traz os números", async () => {
+    estado.inscricoes = [inscrito("a")];
+    const r = await sincronizarComRiot({ orcamentoMs: 60_000, cliente: clienteFalso().cliente });
+    expect(etapaDosNicks.chamadas).toHaveLength(1);
+    expect(etapaDosNicks.chamadas[0]).toMatchObject({ simular: false, consultarRiot: true });
+    expect(r).toMatchObject({ nicksAtualizados: 2, jogadoresVinculados: 1 });
+  });
+
+  it("o «atualizar» de um inscrito só não gasta consulta à Riot com o resto do elenco", async () => {
+    estado.inscricoes = [inscrito("a"), inscrito("bb")];
+    await sincronizarComRiot({ orcamentoMs: 60_000, cliente: clienteFalso().cliente, inscricaoId: "a" });
+    expect(etapaDosNicks.chamadas[0]).toMatchObject({ consultarRiot: false });
+  });
+
+  it("simulação: a etapa também só simula, e a lista do que mudaria não vai para o resumo gravado", async () => {
+    estado.inscricoes = [inscrito("a")];
+    const r = await sincronizarComRiot({ orcamentoMs: 60_000, cliente: clienteFalso().cliente, simular: true });
+    expect(etapaDosNicks.chamadas[0]).toMatchObject({ simular: true });
+    expect(r.nicksMudariam).toEqual([]);
   });
 });
