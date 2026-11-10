@@ -208,6 +208,13 @@ export default async function CalendarioPage() {
           <Pill dot={false}>{textos.calendarioPillVespertino}</Pill>
           <Pill dot={false}>{textos.calendarioPillNoturno}</Pill>
           <Pill dot={false}>{confrontos} {textos.calendarioPillConfrontos}</Pill>
+          {/* O quadro compacto para o print do grupo, com filtro por time. */}
+          <Link
+            href="/calendario/compartilhar"
+            style={{ display: "inline-flex", alignItems: "center", padding: "6px 13px", background: "linear-gradient(180deg,#f0c88a,#b97e40)", color: "#160f06", fontWeight: 700, fontSize: 11, letterSpacing: ".10em", borderRadius: 2, textDecoration: "none" }}
+          >
+            {textos.compartilharBotao}
+          </Link>
         </div>
       </section>
 

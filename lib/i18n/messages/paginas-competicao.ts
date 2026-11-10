@@ -81,6 +81,16 @@ export const paginasCompeticao = definir({
     calendarioFinalSegundo: "VENCEDOR DA SEMI 2",
     calendarioVs: "VS",
 
+    // ---------- /calendario/compartilhar (versão para print) ----------
+    compartilharBotao: "VERSÃO PARA PRINT",
+    compartilharVoltar: "← CALENDÁRIO",
+    compartilharFiltro: "Filtrar por time",
+    compartilharTodos: "TODOS",
+    compartilharDica: "Escolha um time para ver só os jogos dele e tire o print do quadro.",
+    compartilharHorario: "Horários de Brasília",
+    compartilharSemJogos: "Nenhum jogo deste time no calendário.",
+    compartilharSemCalendario: "O calendário desta temporada ainda não foi divulgado.",
+
     // ---------- /partidas ----------
     partidasBadge: "Séries",
     partidasTitulo: "Partidas",
@@ -213,6 +223,16 @@ export const paginasCompeticao = definir({
     calendarioFinalPrimeiro: "SEMI 1 WINNER",
     calendarioFinalSegundo: "SEMI 2 WINNER",
     calendarioVs: "VS",
+
+    // ---------- /calendario/compartilhar (screenshot version) ----------
+    compartilharBotao: "SCREENSHOT VERSION",
+    compartilharVoltar: "← SCHEDULE",
+    compartilharFiltro: "Filter by team",
+    compartilharTodos: "ALL",
+    compartilharDica: "Pick a team to see only its games, then take a screenshot of the board.",
+    compartilharHorario: "Brasília time",
+    compartilharSemJogos: "This team has no games on the schedule.",
+    compartilharSemCalendario: "This season's schedule hasn't been announced yet.",
 
     // ---------- /partidas ----------
     partidasBadge: "Series",

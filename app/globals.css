@@ -932,3 +932,10 @@ body:has([data-tema="desorganizacao"]) #lob-cabecalho {
   background: linear-gradient(180deg, rgba(11, 7, 6, 0.95), rgba(11, 7, 6, 0.84)) !important;
   border-bottom-color: rgba(224, 176, 74, 0.30) !important;
 }
+
+/* O calendário para print (/calendario/compartilhar): só o quadro vai para o print, sem o
+   cabeçalho e o rodapé do site. A página traz o próprio «← Calendário». */
+body:has([data-calendario-print]) #lob-cabecalho,
+body:has([data-calendario-print]) #conteudo + footer {
+  display: none !important;
+}
