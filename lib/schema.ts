@@ -515,6 +515,13 @@ export const seriesGameSchema = z.object({
   winnerTeamId: nonEmpty,
   durationMin: z.number().int().positive().optional(),
   mvpPlayerId: nonEmpty,
+  /**
+   * O MVP do jogo foi ESCOLHIDO pela organização (decisão de 14/11/2026: "vale o nosso"), e
+   * então `mvpPlayerId` vale mais que o maior KDA. Sem a marca, o MVP é o automático — o maior
+   * KDA entre quem jogou — e o `mvpPlayerId` gravado só conta em jogo sem K/D/A. A regra mora
+   * em `mvpEscolhidoDoJogo` (lib/tournament.ts). Opcional: os jogos até aqui não têm o campo.
+   */
+  mvpEscolhido: z.boolean().optional(),
   statsByPlayer: z.array(playerGameStatsSchema).max(20),
   bans: z.array(championBanSchema).max(10).optional(),
 });
@@ -785,6 +792,7 @@ const NOME_DO_CAMPO: Record<string, string> = {
   winnerTeamId: "vencedor",
   durationMin: "duração (min)",
   mvpPlayerId: "MVP",
+  mvpEscolhido: "MVP escolhido",
   statsByPlayer: "K/D/A",
   champion: "campeão",
   championName: "campeão",

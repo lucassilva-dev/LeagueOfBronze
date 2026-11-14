@@ -302,11 +302,13 @@ function removePlayerFromSeriesMatches(
 ) {
   return seriesMatches.map((series) => ({
     ...series,
-    games: series.games.map((game) => ({
-      ...game,
-      mvpPlayerId: game.mvpPlayerId === playerId ? "" : game.mvpPlayerId,
-      statsByPlayer: game.statsByPlayer.filter((row) => row.playerId !== playerId),
-    })),
+    games: series.games.map((game) => {
+      const semEle = { ...game, statsByPlayer: game.statsByPlayer.filter((row) => row.playerId !== playerId) };
+      if (game.mvpPlayerId !== playerId) return semEle;
+      // Era o MVP: sai o MVP e, junto, a escolha da organização (volta a valer o automático).
+      delete semEle.mvpEscolhido;
+      return { ...semEle, mvpPlayerId: "" };
+    }),
   }));
 }
 

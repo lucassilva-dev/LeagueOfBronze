@@ -346,7 +346,7 @@ function timeNoJogo(
 }
 
 /** As linhas do jogo que jogaram por um dos dois times da série (substituto incluso). */
-function linhasDosTimesDaSerie(
+export function linhasDosTimesDaSerie(
   game: SeriesGame,
   series: SeriesMatch,
   playersById: ReadonlyMap<string, Player>,
@@ -360,9 +360,27 @@ function linhasDosTimesDaSerie(
 }
 
 /**
+ * O MVP que a ORGANIZAÇÃO escolheu para o jogo, quando a escolha vale; senão "".
+ *
+ * Decisão do Lucas em 14/11/2026 ("vale o nosso"): quando a organização informa o MVP, ele vale
+ * mais que o maior KDA. Na 4a-jogo-02 o MVP anunciado foi o Razeral (6/2/6), e o automático dava
+ * o nak4y (12/2/9).
+ *
+ * A escolha só vale com `mvpEscolhido` E com o escolhido entre as `linhas` (ele jogou o jogo).
+ * Se a linha dele some depois — jogador trocado, linha apagada, troca de time na série — a
+ * escolha caduca e o MVP volta ao automático: nunca um MVP que não aparece em nenhuma das duas
+ * tabelas do jogo (o mesmo cuidado de `getGameMvpPlayerId`).
+ */
+export function mvpEscolhidoDoJogo(game: SeriesGame, linhas: readonly PlayerGameStats[]): string {
+  if (game.mvpEscolhido !== true || !game.mvpPlayerId) return "";
+  return linhas.some((linha) => linha.playerId === game.mvpPlayerId) ? game.mvpPlayerId : "";
+}
+
+/**
  * O MVP do jogo, contando só quem jogou por um dos dois times — pela LINHA, o que inclui o
- * substituto avulso (ele pode ser MVP). Sem ninguém, vale o `mvpPlayerId` gravado à mão,
- * como sempre para jogo sem estatística.
+ * substituto avulso (ele pode ser MVP). Vale primeiro o MVP escolhido pela organização
+ * (`mvpEscolhidoDoJogo`); sem escolha, o maior KDA; sem ninguém, o `mvpPlayerId` gravado à
+ * mão, como sempre para jogo sem estatística.
  *
  * É o caminho das páginas e das agregações. `getGameMvpPlayerId` (com o elenco por
  * jogador) continua exportado para quem já o usa.
@@ -372,7 +390,8 @@ export function mvpDoJogo(
   series: SeriesMatch,
   playersById: ReadonlyMap<string, Player>,
 ): string {
-  return inferGameMvpPlayerId(linhasDosTimesDaSerie(game, series, playersById)) || game.mvpPlayerId;
+  const linhas = linhasDosTimesDaSerie(game, series, playersById);
+  return mvpEscolhidoDoJogo(game, linhas) || inferGameMvpPlayerId(linhas) || game.mvpPlayerId;
 }
 
 /**
@@ -428,7 +447,7 @@ export function elencoDaSerie(
  */
 export function getGameMvpPlayerId(game: SeriesGame, elenco: ReadonlySet<string>) {
   const doElenco = game.statsByPlayer.filter((linha) => elenco.has(linha.playerId));
-  return inferGameMvpPlayerId(doElenco) || game.mvpPlayerId;
+  return mvpEscolhidoDoJogo(game, doElenco) || inferGameMvpPlayerId(doElenco) || game.mvpPlayerId;
 }
 
 export function getSeriesFormat(series: SeriesMatch, dataset: TournamentDataset): SeriesFormat {
@@ -479,18 +498,32 @@ export function getSeriesStageLabel(series: SeriesMatch) {
  * valem, W.O. completa", 22/10/2026), eles fazem parte do placar. Antes esta função
  * zerava `games` de toda série com W.O. — o que, agora, apagaria os jogos disputados na
  * primeira gravação.
+ *
+ * O MVP ESCOLHIDO pela organização (14/11/2026) não é sobrescrito: ele é justamente o que
+ * vale mais que o automático. A marca que não aponta mais para quem jogou CADUCA aqui — sai
+ * do jogo e o automático é carimbado —, então o banco não guarda uma escolha que o site já
+ * não mostra (e que voltaria sozinha se a linha do jogador reaparecesse).
  */
 export function applyAutoGameMvpsToDataset(dataset: TournamentDataset): TournamentDataset {
   return {
     ...dataset,
     seriesMatches: dataset.seriesMatches.map((series) => ({
       ...series,
-      games: series.games.map((game) => ({
-        ...game,
-        mvpPlayerId: inferGameMvpPlayerId(game.statsByPlayer) || game.mvpPlayerId,
-      })),
+      games: series.games.map(carimbarMvpDoJogo),
     })),
   };
+}
+
+function carimbarMvpDoJogo(game: SeriesGame): SeriesGame {
+  const escolhido = mvpEscolhidoDoJogo(game, game.statsByPlayer);
+  if (escolhido) return { ...game, mvpPlayerId: escolhido };
+
+  const carimbado: SeriesGame = {
+    ...game,
+    mvpPlayerId: inferGameMvpPlayerId(game.statsByPlayer) || game.mvpPlayerId,
+  };
+  delete carimbado.mvpEscolhido;
+  return carimbado;
 }
 
 export function createIndexes(dataset: TournamentDataset): DatasetIndexes {

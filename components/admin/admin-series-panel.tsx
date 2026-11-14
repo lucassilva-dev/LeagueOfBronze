@@ -14,7 +14,6 @@ import {
   Check,
   ChevronDown,
   CloudDownload,
-  Crown,
   Dices,
   Flag,
   Link2,
@@ -56,7 +55,9 @@ import {
   linhaDeSubstituto,
   linhaJaGravada,
   linhaPrecisaDeTime,
+  linhasDosTimesDaSerie,
   mvpDoJogo,
+  mvpEscolhidoDoJogo,
   placarComWalkover,
   reservasDoDataset,
   timeDaLinha,
@@ -812,6 +813,17 @@ export function auditarSerie(
       temProblema = true;
     }
 
+    // MVP escolhido pela organização que não jogou mais este jogo (a linha dele foi trocada ou
+    // apagada): a escolha caduca ao salvar e o site volta ao maior KDA. Só aviso, mas dito,
+    // para a troca de MVP não acontecer em silêncio.
+    if (game.mvpEscolhido === true && game.mvpPlayerId) {
+      const quemJogou = linhasDosTimesDaSerie(game, series, jogadoresPorId);
+      if (quemJogou.length > 0 && !mvpEscolhidoDoJogo(game, quemJogou)) {
+        const nick = jogadoresPorId.get(game.mvpPlayerId)?.nick ?? game.mvpPlayerId;
+        avisos.push(`${jogo}: o MVP escolhido (${nick}) não está entre quem jogou — vale o automático (maior KDA).`);
+      }
+    }
+
     if (temProblema && !jogosComProblema.includes(gameIndex)) jogosComProblema.push(gameIndex);
   });
 
@@ -1077,7 +1089,9 @@ function getAutoMvpDisplay(
   series: SeriesMatch,
   playersById: ReadonlyMap<string, Player>,
 ) {
-  const autoMvpPlayerId = mvpDoJogo({ ...game, mvpPlayerId: "" }, series, playersById);
+  // O AUTOMÁTICO, mesmo quando a organização escolheu outro: é o que o "Automático" do
+  // seletor promete.
+  const autoMvpPlayerId = mvpDoJogo({ ...game, mvpPlayerId: "", mvpEscolhido: undefined }, series, playersById);
   const autoMvpPlayer = playersById.get(autoMvpPlayerId) ?? null;
 
   if (autoMvpPlayer) {
@@ -1089,6 +1103,61 @@ function getAutoMvpDisplay(
   }
 
   return { text: "Preencha K/D/A para calcular", muted: true };
+}
+
+/**
+ * O MVP do jogo no painel: "Automático" (o maior KDA) ou o jogador que a ORGANIZAÇÃO escolheu —
+ * decisão de 14/11/2026 ("vale o nosso"), que grava `mvpEscolhido` junto com o `mvpPlayerId`.
+ *
+ * Só entra na lista quem jogou o jogo por um dos dois times (a mesma regra de onde o site tira
+ * o MVP, `linhasDosTimesDaSerie`), agrupado pelo time em que jogou, com o K/D/A ao lado para a
+ * escolha ser conferível. Escolha que caducou (o escolhido saiu das linhas) aparece como
+ * "Automático", que é o que o site mostra e o que a gravação vai guardar.
+ */
+function SeletorDeMvp({
+  game,
+  gameIndex,
+  series,
+  playersById,
+  nomeDoTime,
+  onChange,
+}: Readonly<{
+  game: SeriesMatch["games"][number];
+  gameIndex: number;
+  series: SeriesMatch;
+  playersById: ReadonlyMap<string, Player>;
+  nomeDoTime: (teamId: string) => string;
+  onChange: (playerId: string) => void;
+}>) {
+  const linhas = linhasDosTimesDaSerie(game, series, playersById);
+  const escolhido = mvpEscolhidoDoJogo(game, linhas);
+  const automatico = getAutoMvpDisplay(game, series, playersById);
+  const vistos = new Set<string>();
+  const grupos = [series.teamAId, series.teamBId].map((teamId) => ({
+    teamId,
+    linhas: linhas.filter((linha) => {
+      if (vistos.has(linha.playerId) || timeDaLinha(linha, playersById.get(linha.playerId)) !== teamId) return false;
+      vistos.add(linha.playerId);
+      return true;
+    }),
+  }));
+
+  return (
+    <Select ariaLabel={`MVP do jogo ${gameIndex + 1}`} value={escolhido} onChange={onChange}>
+      <option value="">{automatico.muted ? "Automático (maior KDA)" : `Automático: ${automatico.text}`}</option>
+      {grupos.map((grupo) =>
+        grupo.linhas.length === 0 ? null : (
+          <optgroup key={grupo.teamId} label={nomeDoTime(grupo.teamId)}>
+            {grupo.linhas.map((linha) => (
+              <option key={linha.playerId} value={linha.playerId}>
+                {`${playersById.get(linha.playerId)?.nick ?? linha.playerId} · ${linha.kills}/${linha.deaths}/${linha.assists}`}
+              </option>
+            ))}
+          </optgroup>
+        ),
+      )}
+    </Select>
+  );
 }
 
 function getNameVariants(value: string | null | undefined) {
@@ -2065,6 +2134,7 @@ export function AdminSeriesPanel({
         const jogaram = new Set(game.statsByPlayer.map((row) => row.playerId));
         if (game.mvpPlayerId && !idsValidos.has(game.mvpPlayerId) && !jogaram.has(game.mvpPlayerId)) {
           game.mvpPlayerId = "";
+          delete game.mvpEscolhido;
         }
         if (game.bans) game.bans = game.bans.filter((ban) => !ban.teamId || times.includes(ban.teamId));
       }
@@ -2268,6 +2338,21 @@ export function AdminSeriesPanel({
       const current = series.games[gameIndex];
       if (!current) return;
       current.durationMin = digitos ? Number(digitos) : undefined;
+    });
+  };
+
+  /** "" = automático (maior KDA); um id = o MVP que a organização escolheu. */
+  const updateGameMvp = (gameIndex: number, playerId: string) => {
+    updateSelectedSeries((series) => {
+      const current = series.games[gameIndex];
+      if (!current) return;
+      if (playerId) {
+        current.mvpPlayerId = playerId;
+        current.mvpEscolhido = true;
+        return;
+      }
+      delete current.mvpEscolhido;
+      current.mvpPlayerId = inferGameMvpPlayerId(current.statsByPlayer) || current.mvpPlayerId;
     });
   };
 
@@ -2515,8 +2600,13 @@ export function AdminSeriesPanel({
 
         game.winnerTeamId = mapped.gamePatch.winnerTeamId;
         game.durationMin = mapped.gamePatch.durationMin;
-        game.mvpPlayerId = mapped.gamePatch.mvpPlayerId;
         game.statsByPlayer = mapped.gamePatch.statsByPlayer;
+        // O MVP escolhido pela organização sobrevive à importação se o escolhido está nas
+        // linhas importadas; senão a escolha cai e vale o maior KDA da partida importada.
+        if (!mvpEscolhidoDoJogo(game, game.statsByPlayer)) {
+          delete game.mvpEscolhido;
+          game.mvpPlayerId = mapped.gamePatch.mvpPlayerId;
+        }
 
         // O nick de hoje e a conta de quem jogou (o robô da Riot faz o mesmo todo dia): vão
         // juntos no próximo «Salvar».
@@ -2995,7 +3085,6 @@ export function AdminSeriesPanel({
     const riotImportStatus = riotImportStatusByGame[riotImportKey];
     const riotMatchId = riotMatchIdsByGame[riotImportKey] ?? "";
     const isImportingRiot = riotImportingGameKey === riotImportKey;
-    const autoMvpDisplay = getAutoMvpDisplay(game, selectedSeries, jogadoresPorId);
     const estados =
       auditoriaSelecionada?.estadosPorJogo[gameIndex] ??
       game.statsByPlayer.map((): EstadoLinha => "ok");
@@ -3100,26 +3189,19 @@ export function AdminSeriesPanel({
             />
           </Field>
 
-          <div>
-            <span
-              style={{
-                display: "block",
-                fontSize: 10,
-                letterSpacing: ".16em",
-                textTransform: "uppercase",
-                color: C.bronze,
-                marginBottom: 6,
-              }}
-            >
-              MVP do jogo (automático)
-            </span>
-            <div style={caixaLeitura}>
-              <span style={{ color: autoMvpDisplay.muted ? C.ink4 : C.ink }}>{autoMvpDisplay.text}</span>
-            </div>
-            <span style={{ display: "block", marginTop: 5, fontSize: 11, color: C.ink4 }}>
-              Maior KDA; desempate por abates, assistências e menos mortes.
-            </span>
-          </div>
+          <Field
+            label="MVP do jogo"
+            hint="Automático = maior KDA (desempate: abates, assistências, menos mortes). Escolha o jogador quando a organização definir o MVP."
+          >
+            <SeletorDeMvp
+              game={game}
+              gameIndex={gameIndex}
+              series={selectedSeries}
+              playersById={jogadoresPorId}
+              nomeDoTime={(teamId) => getTeamName(draft, teamId)}
+              onChange={(playerId) => updateGameMvp(gameIndex, playerId)}
+            />
+          </Field>
         </div>
 
         <BlockTitle
@@ -3419,7 +3501,6 @@ export function AdminSeriesPanel({
     const isImportingRiot = riotImportingGameKey === riotImportKey;
     const importAberto =
       riotAbertos[riotImportKey] ?? Boolean(riotMatchId.trim() || riotImportStatus || isImportingRiot);
-    const autoMvpDisplay = getAutoMvpDisplay(game, selectedSeries, jogadoresPorId);
     const estados =
       auditoriaSelecionada?.estadosPorJogo[gameIndex] ??
       game.statsByPlayer.map((): EstadoLinha => "ok");
@@ -3542,27 +3623,16 @@ export function AdminSeriesPanel({
           <Field label="Duração (min)">
             <Input numeric value={game.durationMin ?? ""} onChange={(value) => updateGameDuration(gameIndex, value)} />
           </Field>
-          <div title="Maior KDA; desempate por abates, assistências e menos mortes.">
-            <span style={rotuloMiudo}>MVP (automático)</span>
-            <div
-              style={{
-                ...caixaLeitura,
-                display: "flex",
-                alignItems: "center",
-                gap: 7,
-                minHeight: 44,
-                wordBreak: "normal",
-                overflowWrap: "anywhere",
-              }}
-            >
-              <Crown
-                size={16}
-                aria-hidden
-                style={{ flexShrink: 0, color: autoMvpDisplay.muted ? C.ink4 : C.bronzeHi }}
-              />
-              <span style={{ minWidth: 0, color: autoMvpDisplay.muted ? C.ink4 : C.ink }}>{autoMvpDisplay.text}</span>
-            </div>
-          </div>
+          <Field label="MVP" hint="Automático = maior KDA.">
+            <SeletorDeMvp
+              game={game}
+              gameIndex={gameIndex}
+              series={selectedSeries}
+              playersById={jogadoresPorId}
+              nomeDoTime={(teamId) => getTeamName(draft, teamId)}
+              onChange={(playerId) => updateGameMvp(gameIndex, playerId)}
+            />
+          </Field>
         </div>
 
         <div
@@ -4588,7 +4658,7 @@ export function AdminSeriesPanel({
       <SectionHead
         eyebrow="Resultados"
         title="Séries"
-        description="Escolha a série na lista e lance jogo a jogo. O placar e o MVP são calculados sozinhos."
+        description="Escolha a série na lista e lance jogo a jogo. O placar sai sozinho; o MVP é o maior KDA, a não ser que a organização escolha outro no jogo."
         actions={
           <>
             <Aviso escopo="topo" />
