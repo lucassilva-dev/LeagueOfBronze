@@ -849,8 +849,14 @@ export function auditarSerie(
     );
     const mvpGravadoValido = Boolean(game.mvpPlayerId) && jogadoresPorId.has(game.mvpPlayerId);
     if (!temLinhaParaMvp && !mvpGravadoValido) {
-      bloqueios.push(`${jogo}: nenhuma linha de K/D/A válida — sem isso o MVP não é calculado.`);
-      temProblema = true;
+      if (!game.mvpPlayerId && game.statsByPlayer.every(isLinhaDescartavel)) {
+        // Resultado provisório (15/11/2026): o jogo vale só com o vencedor, sem K/D/A e sem MVP,
+        // e o servidor aceita. Fica o aviso, para não esquecer de completar.
+        avisos.push(`${jogo}: sem K/D/A e sem MVP — por enquanto só o vencedor conta.`);
+      } else {
+        bloqueios.push(`${jogo}: nenhuma linha de K/D/A válida — sem isso o MVP não é calculado.`);
+        temProblema = true;
+      }
     }
 
     // MVP escolhido pela organização que não jogou mais este jogo (a linha dele foi trocada ou

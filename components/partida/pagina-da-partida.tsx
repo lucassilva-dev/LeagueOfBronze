@@ -549,7 +549,8 @@ export function PaginaDaPartida({
       ) : (
         gameRows.map(({ game, gameIndex, teamARows, teamBRows }) => {
           const gameMvpPlayerId = mvpDoJogo(game, series, indexes.playersById);
-          const gameMvpNick = indexes.playersById.get(gameMvpPlayerId)?.nick ?? gameMvpPlayerId;
+          // Jogo lançado só com o vencedor (sem K/D/A): sem MVP ainda, a página mostra "—".
+          const gameMvpNick = indexes.playersById.get(gameMvpPlayerId)?.nick ?? (gameMvpPlayerId || null);
           const kills = getGameTeamKills(game, series, dataset);
           const vencedorDoJogo =
             timePorId(game.winnerTeamId) ?? { ...timeA, id: game.winnerTeamId, nome: indexes.teamsById.get(game.winnerTeamId)?.name ?? game.winnerTeamId };

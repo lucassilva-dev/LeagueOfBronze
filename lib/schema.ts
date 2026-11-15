@@ -210,7 +210,16 @@ function validateGameReferences(
     );
   }
 
-  if (!playersById.has(game.mvpPlayerId)) {
+  if (game.mvpPlayerId === "") {
+    // Sem MVP só o jogo lançado SEM K/D/A (o resultado provisório, só com o vencedor).
+    if (game.statsByPlayer.length > 0) {
+      addCustomIssue(
+        ctx,
+        ["seriesMatches", seriesIndex, "games", gameIndex, "mvpPlayerId"],
+        `Jogo ${gameIndex + 1} da série ${series.id} tem K/D/A e está sem MVP.`,
+      );
+    }
+  } else if (!playersById.has(game.mvpPlayerId)) {
     addCustomIssue(
       ctx,
       ["seriesMatches", seriesIndex, "games", gameIndex, "mvpPlayerId"],
@@ -564,7 +573,13 @@ export const championBanSchema = z.object({
 export const seriesGameSchema = z.object({
   winnerTeamId: nonEmpty,
   durationMin: z.number().int().positive().optional(),
-  mvpPlayerId: nonEmpty,
+  /**
+   * O MVP do jogo. Vazio ("") só no jogo lançado SEM K/D/A — o resultado provisório, só com o
+   * vencedor (15/11/2026: "já pode dar a vitória por enquanto, depois mando os resultados dos
+   * prints"). O site mostra "—" e ninguém soma MVP. Com K/D/A o MVP é obrigatório e tem de ser
+   * jogador cadastrado (ver `validateGameReferences`).
+   */
+  mvpPlayerId: z.string().trim().max(LIMITES.texto),
   /**
    * O MVP do jogo foi ESCOLHIDO pela organização (decisão de 14/11/2026: "vale o nosso"), e
    * então `mvpPlayerId` vale mais que o maior KDA. Sem a marca, o MVP é o automático — o maior
