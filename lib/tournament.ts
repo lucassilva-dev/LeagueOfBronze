@@ -47,7 +47,8 @@ export function getKda(kills: number, deaths: number, assists: number) {
 }
 
 export function inferGameMvpPlayerId(rows: PlayerGameStats[]) {
-  const eligibleRows = rows.filter((row) => row.playerId.trim().length > 0);
+  // O substituto que não pontua (e o convidado) não é MVP: ele não pontua em nada.
+  const eligibleRows = rows.filter((row) => row.playerId.trim().length > 0 && linhaPontua(row));
   if (eligibleRows.length === 0) return "";
 
   const ranked = eligibleRows
@@ -179,6 +180,19 @@ export function linhaDeSubstituto(
   jogador: Pick<Player, "teamId"> | undefined,
 ): boolean {
   return linha.teamId !== undefined && linha.teamId !== jogador?.teamId;
+}
+
+/**
+ * A linha conta para o JOGADOR — estatísticas, rankings, MVP e ficha?
+ *
+ * Não conta a do substituto que não pontua (`naoPontua`) nem a do convidado (quem jogou sem
+ * estar cadastrado). Decisão de 14/11/2026: "substitutos não pontuam no site, só para
+ * registrar". Essas linhas continuam valendo para o TIME — abates do jogo, números do time —
+ * e para os campeões, porque o jogo aconteceu com elas: sem isso o jogo 1 da 4a-jogo-04
+ * aparecia 21 × 17 na partida, e no print foi 33 × 21.
+ */
+export function linhaPontua(linha: Pick<PlayerGameStats, "naoPontua" | "convidado">): boolean {
+  return linha.naoPontua !== true && linha.convidado === undefined;
 }
 
 /**
@@ -345,13 +359,18 @@ function timeNoJogo(
   return linha ? timeDaLinha(linha, jogador) : jogador?.teamId;
 }
 
-/** As linhas do jogo que jogaram por um dos dois times da série (substituto incluso). */
+/**
+ * As linhas do jogo que PONTUAM e jogaram por um dos dois times da série — o substituto
+ * avulso incluso, o que não pontua (`linhaPontua`) fora. É de onde sai o MVP do jogo e da
+ * série.
+ */
 export function linhasDosTimesDaSerie(
   game: SeriesGame,
   series: SeriesMatch,
   playersById: ReadonlyMap<string, Player>,
 ): PlayerGameStats[] {
   return game.statsByPlayer.filter((linha) => {
+    if (!linhaPontua(linha)) return false;
     const jogador = playersById.get(linha.playerId);
     if (!jogador) return false;
     const time = timeDaLinha(linha, jogador);
@@ -373,7 +392,8 @@ export function linhasDosTimesDaSerie(
  */
 export function mvpEscolhidoDoJogo(game: SeriesGame, linhas: readonly PlayerGameStats[]): string {
   if (game.mvpEscolhido !== true || !game.mvpPlayerId) return "";
-  return linhas.some((linha) => linha.playerId === game.mvpPlayerId) ? game.mvpPlayerId : "";
+  // Quem não pontua não é MVP, nem escolhido.
+  return linhas.some((linha) => linha.playerId === game.mvpPlayerId && linhaPontua(linha)) ? game.mvpPlayerId : "";
 }
 
 /**
@@ -427,6 +447,7 @@ export function elencoDaSerie(
   ]);
   for (const game of series.games) {
     for (const linha of game.statsByPlayer) {
+      if (!linhaPontua(linha)) continue; // o convidado não é jogador, e quem não pontua não é MVP
       if (linha.teamId === series.teamAId || linha.teamId === series.teamBId) elenco.add(linha.playerId);
     }
   }
@@ -446,7 +467,7 @@ export function elencoDaSerie(
  * comportamento de sempre para jogo sem estatística.
  */
 export function getGameMvpPlayerId(game: SeriesGame, elenco: ReadonlySet<string>) {
-  const doElenco = game.statsByPlayer.filter((linha) => elenco.has(linha.playerId));
+  const doElenco = game.statsByPlayer.filter((linha) => elenco.has(linha.playerId) && linhaPontua(linha));
   return mvpEscolhidoDoJogo(game, doElenco) || inferGameMvpPlayerId(doElenco) || game.mvpPlayerId;
 }
 
@@ -767,7 +788,8 @@ export function getSeriesTeamKillTotals(
   for (const game of series.games) {
     for (const stats of game.statsByPlayer) {
       const player = indexes.playersById.get(stats.playerId);
-      if (!player) continue;
+      // Os abates do TIME incluem o substituto que não pontua e o convidado (sem jogador).
+      if (!player && stats.convidado === undefined) continue;
       const time = timeDaLinha(stats, player);
       if (time === series.teamAId) teamAKills += stats.kills;
       if (time === series.teamBId) teamBKills += stats.kills;
@@ -1188,9 +1210,19 @@ function timeNaSerie(
  * que jogou, e não para o dele), o MVP do jogo pelo time em que o MVP jogou aquele jogo,
  * e o MVP da série pelo time em que ele jogou a série. Jogos de W.O. não estão em
  * `series.games` e por isso não somam nada aqui — nem K/D/A, nem MVP, nem jogo disputado.
+ *
+ * A linha que não pontua (`linhaPontua`: o substituto que não pontua e o convidado, que nem
+ * jogador tem) sai daqui marcada (`pontua: false`): ela soma para o TIME, nunca para o jogador.
  */
 type Contribuicao =
-  | { tipo: "linha"; jogador: Player; time: string | undefined; stats: PlayerGameStats; venceu: boolean }
+  | {
+      tipo: "linha";
+      jogador: Player | undefined;
+      pontua: boolean;
+      time: string | undefined;
+      stats: PlayerGameStats;
+      venceu: boolean;
+    }
   | { tipo: "mvpDoJogo"; jogador: Player; time: string | undefined }
   | { tipo: "mvpDaSerie"; jogador: Player; time: string | undefined };
 
@@ -1205,9 +1237,16 @@ function* contribuicoes(
     for (const game of series.games) {
       for (const stats of game.statsByPlayer) {
         const jogador = indexes.playersById.get(stats.playerId);
-        if (!jogador) continue;
+        if (!jogador && stats.convidado === undefined) continue;
         const time = timeDaLinha(stats, jogador);
-        yield { tipo: "linha", jogador, time, stats, venceu: time !== undefined && game.winnerTeamId === time };
+        yield {
+          tipo: "linha",
+          jogador,
+          pontua: jogador !== undefined && linhaPontua(stats),
+          time,
+          stats,
+          venceu: time !== undefined && game.winnerTeamId === time,
+        };
       }
 
       const mvp = indexes.playersById.get(mvpDoJogo(game, series, indexes.playersById));
@@ -1282,7 +1321,11 @@ export function calculatePlayerAggregates(
 
   for (const contribuicao of contribuicoes(dataset, indexes, filters)) {
     if (filters?.teamId && contribuicao.time !== filters.teamId) continue;
-    somarContribuicao(ensurePlayerAccumulator(accumulators, contribuicao.jogador.id), contribuicao);
+    // Do JOGADOR só conta o que pontua: o substituto que não pontua e o convidado ficam fora.
+    if (contribuicao.tipo === "linha" && !contribuicao.pontua) continue;
+    const jogador = contribuicao.jogador;
+    if (!jogador) continue;
+    somarContribuicao(ensurePlayerAccumulator(accumulators, jogador.id), contribuicao);
   }
 
   return dataset.players
@@ -1478,7 +1521,8 @@ export function getPlayerGameHistory(
   for (const series of dataset.seriesMatches) {
     series.games.forEach((game, gameIdx) => {
       const stat = game.statsByPlayer.find((row) => row.playerId === playerId);
-      if (!stat) return;
+      // O jogo em que ele entrou como substituto que não pontua não vai para a ficha.
+      if (!stat || !linhaPontua(stat)) return;
       const teamId = timeDaLinha(stat, player);
       if (teamId !== series.teamAId && teamId !== series.teamBId) return;
       const opponentTeamId = teamId === series.teamAId ? series.teamBId : series.teamAId;
@@ -1544,7 +1588,8 @@ export function getGameTeamKills(
 
   for (const stats of game.statsByPlayer) {
     const player = indexes.playersById.get(stats.playerId);
-    if (!player) continue;
+    // Os abates do TIME incluem o substituto que não pontua e o convidado (sem jogador).
+    if (!player && stats.convidado === undefined) continue;
     const time = timeDaLinha(stats, player);
     if (time === series.teamAId) teamAKills += stats.kills;
     if (time === series.teamBId) teamBKills += stats.kills;
@@ -1555,11 +1600,14 @@ export function getGameTeamKills(
 
 /** Uma linha da tabela de um jogo na página da partida. */
 export type LinhaDoJogo = PlayerGameStats & {
+  /** O nick do jogador ou, na linha do convidado (não cadastrado), o nome dele. */
   playerNick: string;
   /** O time pelo qual jogou este jogo (`timeDaLinha`) — decide a coluna. */
   teamId: string;
-  /** Jogou como substituto avulso: a página marca a linha. */
+  /** Jogou como substituto (avulso, que não pontua ou convidado): a página marca a linha. */
   substituto: boolean;
+  /** Não pontua (`linhaPontua`): a página mostra sem link para ficha e diz que não pontua. */
+  naoPontua: boolean;
 };
 
 /**
@@ -1582,12 +1630,16 @@ export function getSeriesGamesWithTeamRows(
     for (const stats of game.statsByPlayer) {
       const player = indexes.playersById.get(stats.playerId);
       const teamId = timeDaLinha(stats, player);
-      if (!player || teamId === undefined) continue;
+      // O convidado não tem jogador: a linha aparece com o nome dele.
+      const nick = player?.nick ?? stats.convidado;
+      if (nick === undefined || teamId === undefined) continue;
+      const naoPontua = !linhaPontua(stats);
       rows.push({
         ...stats,
-        playerNick: player.nick,
+        playerNick: nick,
         teamId,
-        substituto: linhaDeSubstituto(stats, player),
+        substituto: naoPontua || linhaDeSubstituto(stats, player),
+        naoPontua,
       });
     }
 

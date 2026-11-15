@@ -54,6 +54,7 @@ import {
   jogosDeWalkoverDaSerie,
   linhaDeSubstituto,
   linhaJaGravada,
+  linhaPontua,
   linhaPrecisaDeTime,
   linhasDosTimesDaSerie,
   mvpDoJogo,
@@ -86,6 +87,7 @@ import {
   C,
   Card,
   CartaoLinha,
+  Check as CaixaDeMarcar,
   Chip,
   ChipFiltro,
   Empty,
@@ -424,7 +426,10 @@ type EstadoLinha =
   | "forasteira"
   | "sem-time"
   | "sem-jogou-por"
-  | "time-fora";
+  | "time-fora"
+  // Convidado (substituto de fora, não cadastrado): sem nome ou sem "Jogou por" o servidor recusa.
+  | "convidado-sem-nome"
+  | "convidado-sem-time";
 
 /** Estados que travam o salvamento (o servidor recusa). Os outros só pedem conferência. */
 function linhaTrava(estado: EstadoLinha) {
@@ -433,7 +438,9 @@ function linhaTrava(estado: EstadoLinha) {
     estado === "repetida" ||
     estado === "sem-time" ||
     estado === "sem-jogou-por" ||
-    estado === "time-fora"
+    estado === "time-fora" ||
+    estado === "convidado-sem-nome" ||
+    estado === "convidado-sem-time"
   );
 }
 
@@ -452,6 +459,10 @@ function motivoDaLinha(estado: EstadoLinha): string | null {
       return "Titular de outro time: escolha em “Jogou por” o time que ele cobriu neste jogo.";
     case "time-fora":
       return "“Jogou por” aponta para um time que não disputa esta série.";
+    case "convidado-sem-nome":
+      return "Convidado: falta o nome de quem jogou.";
+    case "convidado-sem-time":
+      return "Convidado: escolha em “Jogou por” o time que ele cobriu neste jogo.";
     case "sem-campeao":
       return "Falta o campeão.";
     case "vazia":
@@ -464,6 +475,22 @@ function motivoDaLinha(estado: EstadoLinha): string | null {
 /** Estados que pedem conferência sem travar. */
 function linhaAvisa(estado: EstadoLinha) {
   return estado === "sem-campeao" || estado === "forasteira";
+}
+
+/**
+ * Valor da opção "Convidado" no select de jogador da linha: quem jogou sem estar cadastrado
+ * (o substituto de fora, 14/11/2026). A linha ganha um id próprio (`novoIdDeConvidado`), o
+ * nome digitado em `convidado` e nunca pontua — aparece na partida e soma para o time.
+ */
+const OPCAO_CONVIDADO = "__convidado__";
+
+/** Um id de linha para o convidado que não colide com outra linha do jogo nem com jogador. */
+function novoIdDeConvidado(game: SeriesGame, jogadoresPorId: ReadonlyMap<string, Player>): string {
+  const usados = new Set(game.statsByPlayer.map((linha) => linha.playerId));
+  for (let n = 1; ; n += 1) {
+    const id = `convidado-${n}`;
+    if (!usados.has(id) && !jogadoresPorId.has(id)) return id;
+  }
 }
 
 /** Linha sem jogador, sem campeão e sem número digitado: sobra de clique no "+ Linha". */
@@ -503,6 +530,11 @@ function getEstadosDasLinhas(
     if (vistos.has(playerId)) return "repetida";
 
     vistos.add(playerId);
+    // O convidado não é jogador cadastrado: o que importa é o nome e o lado em que jogou.
+    if (row.convidado !== undefined) {
+      if (!row.convidado.trim()) return "convidado-sem-nome";
+      if (row.teamId === undefined) return "convidado-sem-time";
+    }
     const jogador = jogadoresPorId.get(playerId);
     // A linha com time próprio (substituto avulso) conta para ESSE time: o que importa é ele
     // estar na série, não onde o jogador está hoje.
@@ -758,9 +790,17 @@ export function auditarSerie(
         );
         temProblema = true;
       } else if (estado === "time-fora") {
-        const nick = (row && jogadoresPorId.get(row.playerId)?.nick) ?? row?.playerId ?? "";
+        const nick = (row && jogadoresPorId.get(row.playerId)?.nick) ?? row?.convidado ?? row?.playerId ?? "";
         bloqueios.push(
           `${linha}: “Jogou por” de ${nick} aponta para ${getTeamName(draft, row?.teamId)}, que não disputa esta série — escolha ${nomeA} ou ${nomeB}.`,
+        );
+        temProblema = true;
+      } else if (estado === "convidado-sem-nome") {
+        bloqueios.push(`${linha}: Convidado: falta o nome de quem jogou.`);
+        temProblema = true;
+      } else if (estado === "convidado-sem-time") {
+        bloqueios.push(
+          `${linha}: Convidado: escolha em “Jogou por” o time que ele cobriu neste jogo (${nomeA} ou ${nomeB}).`,
         );
         temProblema = true;
       } else if (estado === "forasteira") {
@@ -805,7 +845,7 @@ export function auditarSerie(
     // O MVP automático sai da melhor linha com jogador cadastrado (é o que o painel envia);
     // sem nenhuma, vale o MVP gravado. Sem os dois, o servidor recusa.
     const temLinhaParaMvp = game.statsByPlayer.some(
-      (linha) => linha.playerId.trim() !== "" && jogadoresPorId.has(linha.playerId),
+      (linha) => linha.playerId.trim() !== "" && jogadoresPorId.has(linha.playerId) && linhaPontua(linha),
     );
     const mvpGravadoValido = Boolean(game.mvpPlayerId) && jogadoresPorId.has(game.mvpPlayerId);
     if (!temLinhaParaMvp && !mvpGravadoValido) {
@@ -2389,14 +2429,25 @@ export function AdminSeriesPanel({
    * dois incompletos não há palpite — a linha trava até alguém escolher o “Jogou por”.
    */
   const trocarJogadorDaLinha = (gameIndex: number, rowIndex: number, playerId: string) => {
-    const jogador = jogadoresPorId.get(playerId);
+    const ehConvidado = playerId === OPCAO_CONVIDADO;
+    const jogador = ehConvidado ? undefined : jogadoresPorId.get(playerId);
     updateSelectedSeries((series) => {
       const game = series.games[gameIndex];
       const current = game?.statsByPlayer[rowIndex];
       if (!game || !current) return;
-      current.playerId = playerId;
+      if (ehConvidado) {
+        if (current.convidado !== undefined) return;
+        // Quem não é cadastrado: id próprio da linha, nome a digitar, e nunca pontua.
+        current.playerId = novoIdDeConvidado(game, jogadoresPorId);
+        current.convidado = "";
+      } else {
+        current.playerId = playerId;
+        delete current.convidado;
+      }
+      // "Não pontua" é da linha DAQUELE jogador: trocar o jogador não leva a marca escondida.
+      delete current.naoPontua;
       const timeValido = current.teamId === series.teamAId || current.teamId === series.teamBId;
-      if (!jogador || !linhaPrecisaDeTime(jogador, series)) {
+      if (!ehConvidado && (!jogador || !linhaPrecisaDeTime(jogador, series))) {
         delete current.teamId;
         return;
       }
@@ -2422,6 +2473,25 @@ export function AdminSeriesPanel({
     });
   };
 
+  /** O nome de quem jogou sem estar cadastrado (a linha do convidado). */
+  const updateNomeDoConvidado = (gameIndex: number, rowIndex: number, nome: string) => {
+    updateSelectedSeries((series) => {
+      const current = series.games[gameIndex]?.statsByPlayer[rowIndex];
+      if (!current || current.convidado === undefined) return;
+      current.convidado = nome;
+    });
+  };
+
+  /** "Não pontua": a linha aparece na partida e soma para o time, fora das contas do jogador. */
+  const updateNaoPontua = (gameIndex: number, rowIndex: number, marcado: boolean) => {
+    updateSelectedSeries((series) => {
+      const current = series.games[gameIndex]?.statsByPlayer[rowIndex];
+      if (!current) return;
+      if (marcado) current.naoPontua = true;
+      else delete current.naoPontua;
+    });
+  };
+
   /**
    * Linha com algo digitado pede confirmação: no celular a lixeira fica ao lado do nome, e
    * um toque errado apagava campeão e K/D/A sem desfazer (recarregar descarta o rascunho
@@ -2432,7 +2502,7 @@ export function AdminSeriesPanel({
     if (!row) return;
     if (!isLinhaDescartavel(row)) {
       const jogador = draft.players.find((player) => player.id === row.playerId);
-      const quem = jogador?.nick ?? (row.playerId || "sem jogador");
+      const quem = jogador?.nick ?? (row.convidado?.trim() || row.playerId || "sem jogador");
       const campeao = (row.champion ?? "").trim() || "sem campeão";
       const confirmou = confirmBrowserAction(
         `Remover a linha de ${quem} (${campeao}, ${row.kills}/${row.deaths}/${row.assists}) do Jogo ${gameIndex + 1}?`,
@@ -2913,12 +2983,18 @@ export function AdminSeriesPanel({
         {grupo("Reservas (substituto)", currentRosters.reservas)}
         {grupo("Outros times (substituto)", currentRosters.outrosTimes)}
         {grupo("Saíram do time", currentRosters.sairam)}
-        {row.playerId && !currentRosters.todos.some((player) => player.id === row.playerId) ? (
+        {row.convidado === undefined &&
+        row.playerId &&
+        !currentRosters.todos.some((player) => player.id === row.playerId) ? (
           <option value={row.playerId}>{rotuloForaDaSerie(draft, row.playerId)}</option>
         ) : null}
+        <option value={OPCAO_CONVIDADO}>Convidado (não cadastrado, não pontua)…</option>
       </>
     );
   };
+
+  /** O valor do select de jogador: a opção "Convidado" na linha de quem não é cadastrado. */
+  const valorDoJogador = (row: PlayerGameStats) => (row.convidado !== undefined ? OPCAO_CONVIDADO : row.playerId);
 
   /**
    * "Jogou por": aparece na linha do substituto avulso — o reserva (sem time) ou o titular de
@@ -2928,40 +3004,84 @@ export function AdminSeriesPanel({
    */
   const blocoJogouPor = (gameIndex: number, row: PlayerGameStats, rowIndex: number) => {
     if (!selectedSeries) return null;
-    const jogador = jogadoresPorId.get(row.playerId);
-    if (!jogador || (!linhaPrecisaDeTime(jogador, selectedSeries) && row.teamId === undefined)) return null;
-    const aviso = auditoriaSelecionada?.substitutosPorJogo[gameIndex]?.find((item) => item.jogadorId === jogador.id);
+    const convidado = row.convidado !== undefined;
+    const jogador = convidado ? undefined : jogadoresPorId.get(row.playerId);
+    if (!convidado && !jogador) return null;
+    // "Jogou por": o substituto avulso (o reserva ou o titular de outro time) e o convidado,
+    // que não tem time nenhum para a linha herdar.
+    const pedeTime =
+      convidado ||
+      (jogador !== undefined && (linhaPrecisaDeTime(jogador, selectedSeries) || row.teamId !== undefined));
+    // "Não pontua" (14/11/2026): para quem entra como substituto — o avulso, quem já tinha saído
+    // do time quando a série aconteceu — ou para a linha que já está marcada.
+    const saiuAntes =
+      jogador?.saiuEm !== undefined && Date.parse(selectedSeries.date) > Date.parse(jogador.saiuEm);
+    if (!pedeTime && row.naoPontua !== true && !saiuAntes) return null;
+    const naoPontua = convidado || row.naoPontua === true;
+    const aviso = jogador
+      ? auditoriaSelecionada?.substitutosPorJogo[gameIndex]?.find((item) => item.jogadorId === jogador.id)
+      : undefined;
     const semEscolha = row.teamId === undefined;
     // "Pelo próprio time" só vale para a linha JÁ GRAVADA assim (quem trocou de time depois de
     // jogar). Na linha nova de titular de outro time o servidor recusa, e o reserva não tem
     // time próprio: nos dois casos a escolha é obrigatória.
     const proprioTimeVale =
-      jogador.teamId !== undefined &&
+      jogador?.teamId !== undefined &&
       linhaJaGravada({ ...row, teamId: undefined }, gravadasPorId?.get(selectedSeries.id));
     const escolhaObrigatoria = semEscolha && !proprioTimeVale;
     return (
       <div style={{ display: "grid", gap: 6, minWidth: 0 }}>
+        {convidado ? (
+          <Input
+            ariaLabel={`Nome do convidado da linha ${rowIndex + 1}`}
+            placeholder="Nome de quem jogou (não cadastrado)"
+            value={row.convidado ?? ""}
+            onChange={(valor) => updateNomeDoConvidado(gameIndex, rowIndex, valor)}
+          />
+        ) : null}
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <Chip tone="warn" title="Substituto avulso: joga este jogo por outro time">
-            SUB
+          <Chip
+            tone="warn"
+            title={
+              naoPontua
+                ? "Substituto que não pontua: aparece na partida e soma para o time, fora das estatísticas, do MVP e da ficha"
+                : "Substituto avulso: joga este jogo por outro time"
+            }
+          >
+            {naoPontua ? "SUB · NÃO PONTUA" : "SUB"}
           </Chip>
-          <span style={{ fontSize: 12, color: C.ink3 }}>Jogou por</span>
-          <span style={{ flex: compacto ? "1 1 100%" : "0 1 240px", minWidth: 0 }}>
-            <Select
-              ariaLabel={`Time pelo qual a linha ${rowIndex + 1} jogou`}
-              value={row.teamId ?? ""}
-              onChange={(value) => updateTimeDaLinha(gameIndex, rowIndex, value)}
-              style={escolhaObrigatoria ? { borderColor: "rgba(212,87,74,.55)" } : undefined}
+          {pedeTime && selectedSeries ? (
+            <>
+              <span style={{ fontSize: 12, color: C.ink3 }}>Jogou por</span>
+              <span style={{ flex: compacto ? "1 1 100%" : "0 1 240px", minWidth: 0 }}>
+                <Select
+                  ariaLabel={`Time pelo qual a linha ${rowIndex + 1} jogou`}
+                  value={row.teamId ?? ""}
+                  onChange={(value) => updateTimeDaLinha(gameIndex, rowIndex, value)}
+                  style={escolhaObrigatoria ? { borderColor: "rgba(212,87,74,.55)" } : undefined}
+                >
+                  <option value="">
+                    {proprioTimeVale && jogador ? `Pelo próprio time (${ondeEstaHoje(draft, jogador)})` : "Escolha o time…"}
+                  </option>
+                  {selectedSeries.teamAId ? (
+                    <option value={selectedSeries.teamAId}>{getTeamName(draft, selectedSeries.teamAId)}</option>
+                  ) : null}
+                  {selectedSeries.teamBId ? (
+                    <option value={selectedSeries.teamBId}>{getTeamName(draft, selectedSeries.teamBId)}</option>
+                  ) : null}
+                </Select>
+              </span>
+            </>
+          ) : null}
+          {/* O convidado nunca pontua: a caixa é só para o jogador cadastrado. */}
+          {convidado ? null : (
+            <CaixaDeMarcar
+              checked={row.naoPontua === true}
+              onChange={(marcado) => updateNaoPontua(gameIndex, rowIndex, marcado)}
             >
-              <option value="">{proprioTimeVale ? `Pelo próprio time (${ondeEstaHoje(draft, jogador)})` : "Escolha o time…"}</option>
-              {selectedSeries.teamAId ? (
-                <option value={selectedSeries.teamAId}>{getTeamName(draft, selectedSeries.teamAId)}</option>
-              ) : null}
-              {selectedSeries.teamBId ? (
-                <option value={selectedSeries.teamBId}>{getTeamName(draft, selectedSeries.teamBId)}</option>
-              ) : null}
-            </Select>
-          </span>
+              Não pontua
+            </CaixaDeMarcar>
+          )}
         </div>
         {aviso ? (
           <p
@@ -3021,7 +3141,7 @@ export function AdminSeriesPanel({
       >
         <Select
           ariaLabel={`Jogador da linha ${rowIndex + 1}`}
-          value={row.playerId}
+          value={valorDoJogador(row)}
           onChange={(value) => trocarJogadorDaLinha(gameIndex, rowIndex, value)}
         >
           {opcoesDoJogador(row)}
@@ -3360,8 +3480,9 @@ export function AdminSeriesPanel({
     const kda = getKda(row.kills, row.deaths, row.assists);
     const jogador = jogadoresPorId.get(row.playerId) ?? null;
     const rota = jogador ? resolveRole(jogador.role1) : null;
-    // A faixa é a cor do time pelo qual a LINHA jogou: o substituto aparece do lado que cobriu.
-    const timeDaFaixa = jogador ? timeDaLinha(row, jogador) : undefined;
+    // A faixa é a cor do time pelo qual a LINHA jogou: o substituto aparece do lado que cobriu
+    // (o convidado, sem jogador, pelo "Jogou por" da própria linha).
+    const timeDaFaixa = jogador ? timeDaLinha(row, jogador) : row.teamId;
 
     const motivo = motivoDaLinha(estado);
     const jogouPor = blocoJogouPor(gameIndex, row, rowIndex);
@@ -3412,7 +3533,7 @@ export function AdminSeriesPanel({
           <div style={{ flex: 1, minWidth: 0 }}>
             <Select
               ariaLabel={`Jogador da linha ${rowIndex + 1}`}
-              value={row.playerId}
+              value={valorDoJogador(row)}
               onChange={(value) => trocarJogadorDaLinha(gameIndex, rowIndex, value)}
             >
               {opcoesDoJogador(row)}

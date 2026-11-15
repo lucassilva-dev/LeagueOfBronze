@@ -229,7 +229,15 @@ function validateGameReferences(
       `Jogo ${gameIndex + 1} da série ${series.id}`,
     );
 
-    if (!playersById.has(stats.playerId)) {
+    if (stats.convidado !== undefined) {
+      validateLinhaDeConvidado(
+        stats,
+        playersById,
+        ctx,
+        ["seriesMatches", seriesIndex, "games", gameIndex, "statsByPlayer", statIndex],
+        `Jogo ${gameIndex + 1} da série ${series.id}`,
+      );
+    } else if (!playersById.has(stats.playerId)) {
       addCustomIssue(
         ctx,
         [
@@ -263,6 +271,35 @@ function validateGameReferences(
     }
 
     statsPlayerIds.add(stats.playerId);
+  }
+}
+
+/**
+ * A linha do CONVIDADO — quem jogou sem estar cadastrado no campeonato (o substituto de fora,
+ * 14/11/2026). O `playerId` dela é só a chave da linha no jogo e NÃO pode ser o id de um
+ * jogador cadastrado (senão as contas do jogador passariam a enxergar a linha). Como não há
+ * jogador para dizer o lado, o `teamId` da linha é obrigatório.
+ */
+function validateLinhaDeConvidado(
+  stats: PlayerGameStats,
+  playersById: Map<string, Player>,
+  ctx: z.RefinementCtx,
+  path: IssuePath,
+  rotuloDoJogo: string,
+) {
+  if (playersById.has(stats.playerId)) {
+    addCustomIssue(
+      ctx,
+      [...path, "playerId"],
+      `${rotuloDoJogo}: a linha do convidado ${stats.convidado} usa o id de um jogador cadastrado (${stats.playerId}).`,
+    );
+  }
+  if (stats.teamId === undefined) {
+    addCustomIssue(
+      ctx,
+      [...path, "teamId"],
+      `${rotuloDoJogo}: o convidado ${stats.convidado} não está cadastrado, então a linha dele precisa dizer por qual time jogou.`,
+    );
   }
 }
 
@@ -500,6 +537,19 @@ export const playerGameStatsSchema = z.object({
    * obrigado a ter. Toda agregação lê `timeDaLinha` (lib/tournament.ts).
    */
   teamId: limitado(LIMITES.id).optional(),
+  /**
+   * Substituto que NÃO PONTUA (14/11/2026: "substitutos não pontuam no site, só para
+   * registrar"). A linha aparece na partida, marcada, e conta para o TIME — abates do jogo,
+   * números do time, campeões —, mas fica fora de tudo que é do jogador: estatísticas,
+   * rankings, MVP e ficha. A regra mora em `linhaPontua` (lib/tournament.ts).
+   */
+  naoPontua: z.boolean().optional(),
+  /**
+   * Nome de quem jogou SEM estar cadastrado no campeonato (o substituto de fora). Com ele o
+   * `playerId` é só a chave da linha, não um jogador; o `teamId` é obrigatório e a linha
+   * nunca pontua. Ver `validateLinhaDeConvidado`.
+   */
+  convidado: limitado(LIMITES.nick).optional(),
   champion: z.string().trim().max(LIMITES.campeao).optional(),
   kills: z.number().int().min(0).max(999),
   deaths: z.number().int().min(0).max(999),
@@ -793,6 +843,8 @@ const NOME_DO_CAMPO: Record<string, string> = {
   durationMin: "duração (min)",
   mvpPlayerId: "MVP",
   mvpEscolhido: "MVP escolhido",
+  naoPontua: "não pontua",
+  convidado: "convidado",
   statsByPlayer: "K/D/A",
   champion: "campeão",
   championName: "campeão",

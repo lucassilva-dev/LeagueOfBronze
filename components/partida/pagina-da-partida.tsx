@@ -296,12 +296,17 @@ function GameDetailsCard({
                   block.rows.map((row) => (
                     <tr key={`${gameIndex}-${row.playerId}`}>
                       <td>
-                        <Link href={linkDoJogador(playersById.get(row.playerId), row.playerId)} className={p.nick}>
-                          {row.playerNick}
-                        </Link>
+                        {/* Quem não pontua (o substituto de fora) não tem ficha a abrir: a linha é só o registro. */}
+                        {row.naoPontua ? (
+                          <span className={p.nick}>{row.playerNick}</span>
+                        ) : (
+                          <Link href={linkDoJogador(playersById.get(row.playerId), row.playerId)} className={p.nick}>
+                            {row.playerNick}
+                          </Link>
+                        )}
                         {/* Substituto avulso: aparece na coluna do time que cobriu, marcado. */}
                         {row.substituto ? (
-                          <span className={p.sub} title={te.substitutoTitulo}>
+                          <span className={p.sub} title={row.naoPontua ? te.substitutoNaoPontua : te.substitutoTitulo}>
                             {te.substitutoCurto}
                           </span>
                         ) : null}

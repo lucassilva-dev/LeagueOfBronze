@@ -18,6 +18,8 @@ export const textosElenco = definir({
     /** Marca curta da linha de quem jogou como substituto avulso. */
     substitutoCurto: "SUB",
     substitutoTitulo: "Jogou como substituto",
+    /** Linha do substituto que não pontua (ou do convidado, não cadastrado). */
+    substitutoNaoPontua: "Substituto: jogou por este time, mas não pontua nas estatísticas do site",
     /** Volta da ficha de quem não tem time no elenco (reserva). */
     voltarJogadores: "← VOLTAR AOS JOGADORES",
     /** Cartão de um jogo de W.O. na página da partida. */
@@ -28,6 +30,7 @@ export const textosElenco = definir({
     saiuDoTime: "Left the team",
     substitutoCurto: "SUB",
     substitutoTitulo: "Played as a substitute",
+    substitutoNaoPontua: "Substitute: played for this team, but does not count in the site's stats",
     voltarJogadores: "← BACK TO PLAYERS",
     jogoDeWalkoverTexto: "Game not played: it counts for the score, with no K/D/A and no MVP.",
   },
