@@ -1,0 +1,553 @@
+/*
+ * A CAMPANHA na ficha do jogador no cenário "academia" (Fãs de Rosca): «FICHA DE TREINO».
+ * A seção é a parede de equipamentos da academia (enfeite NaCampanha: o painel perfurado entre dois
+ * frisos de alumínio). Os destaques são o QUADRO DE RECORDES (quadro branco com moldura de
+ * alumínio e grade de fita): o pódio circulado a marcador, o melhor jogo com a rosquinha no ícone,
+ * a participação na FITA MÉTRICA e a forma em ANILHAS na barra (glacê de morango é vitória,
+ * borracha é derrota). Série por série é a FICHA na PRANCHETA (série de treino e de MD3: o
+ * trocadilho), cada jogo uma repetição anotada, a vitória com o adesivo ✓ de «tá pago»; o próximo
+ * treino é o CRONÔMETRO de LED da parede, a tabela o crachá de sócio e os campeões, os exercícios:
+ * anilhas de rosca com granulado. Ganchos: `.raiz` + o seletor INTEIRO da base
+ * (campanha.module.css). Nada anima além do ponto do cronômetro ao vivo (escala, em laço).
+ */
+
+/* ------------------------------------------------------------------ o painel perfurado (enfeite) */
+.enfPainel {
+  position: absolute;
+  z-index: -1;
+  inset: clamp(6px, 1vw, 14px) 0 clamp(16px, 2vw, 26px);
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, #eef2f5, #9aa3ad 45%, #5f6770) top / 100% 7px no-repeat,
+    linear-gradient(180deg, #5f6770, #9aa3ad 55%, #eef2f5) bottom / 100% 7px no-repeat,
+    radial-gradient(circle, #0b080a 0 2.4px, rgba(255, 255, 255, 0.07) 2.8px 3.3px, transparent 3.6px) 0 0 / 28px 28px,
+    radial-gradient(70% 40% at 72% 0%, rgba(255, 196, 160, 0.09), transparent 70%),
+    linear-gradient(180deg, #2a2126, #1f191d);
+  box-shadow: inset 0 0 70px rgba(0, 0, 0, 0.55), 0 20px 40px -24px #000;
+}
+
+/* ------------------------------------------------------------------ seção e títulos */
+.raiz .secao {
+  padding-block: clamp(30px, 3.4vw, 50px) clamp(44px, 4.6vw, 64px);
+}
+/* O subtítulo termina numa barrinha com duas anilhas. */
+.raiz .subtitulo {
+  gap: 12px;
+  margin: 0 0 14px;
+  font: italic 900 clamp(17px, 1.5vw, 20px) / 1 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.05em;
+  color: var(--tm-texto); /* 15:1 no painel */
+}
+.raiz .subtitulo::after {
+  height: 14px;
+  background:
+    linear-gradient(var(--tm-primaria), var(--tm-primaria)) right 0 center / 5px 14px no-repeat,
+    linear-gradient(var(--tm-neon), var(--tm-neon)) right 7px center / 5px 10px no-repeat,
+    linear-gradient(90deg, rgba(234, 219, 227, 0.12), rgba(234, 219, 227, 0.6)) center / 100% 2px no-repeat;
+}
+
+/* ------------------------------------------------------------------ destaques: o quadro de recordes */
+/* Moldura de alumínio por fora, grade de fita preta entre as casas (o vão do grid). */
+.raiz .destaques {
+  position: relative;
+  gap: 2px;
+  margin-bottom: 12px; /* a bandeja do marcador */
+  padding: 8px;
+  border-radius: 8px;
+  background:
+    linear-gradient(#3a2a32, #3a2a32) content-box,
+    linear-gradient(135deg, #f4f7fa, #9aa3ad 22%, #e8edf1 45%, #7d8690 70%, #dfe5ea);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6), 0 0 0 1px #1a1418, 0 24px 40px -24px #000;
+}
+/* A bandeja com o marcador rosa. */
+.raiz .destaques::after {
+  content: "";
+  position: absolute;
+  left: 14%;
+  right: 14%;
+  bottom: -11px;
+  height: 9px;
+  border-radius: 0 0 4px 4px;
+  background:
+    linear-gradient(90deg, #ff5ea8 0 74%, #2b1408 74% 100%) 64% 1px / 56px 5px no-repeat,
+    linear-gradient(180deg, #dfe5ea, #7d8690);
+  box-shadow: 0 4px 6px -2px #000;
+  pointer-events: none;
+}
+.raiz .destaque {
+  gap: 8px;
+  padding: 16px 16px 14px;
+  border: 0;
+  border-radius: 0;
+  background: linear-gradient(118deg, #fff 0 34%, #f7f5f8 34% 41%, #fff 41% 66%, #f9f8fa 66% 69%, #fff 69%);
+  color: var(--tm-tinta);
+}
+.raiz .destaque::before {
+  display: none;
+}
+.raiz .destaqueRotulo {
+  font: italic 900 15px / 1 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.05em;
+  color: var(--caneta); /* marcador rosa: 6,3:1 */
+}
+/* O número a marcador preto, com o risco de marca-texto rosa embaixo. */
+.raiz .destaqueValor {
+  justify-self: start;
+  align-self: flex-start;
+  padding: 0 0.12em 0.04em 0;
+  background: linear-gradient(var(--tm-primaria), var(--tm-primaria)) 0 88% / 100% 0.16em no-repeat;
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+  -webkit-text-fill-color: currentColor;
+  color: var(--tm-tinta); /* 17:1 */
+  font-size: clamp(30px, 3vw, 42px);
+}
+/* O cinza-ameixa das anotações (no quadro e na ficha). */
+.raiz .destaqueDetalhe,
+.raiz .rankingMetrica,
+.raiz .serieInfo,
+.raiz .serieSubstituto,
+.raiz .jogoRazao,
+.raiz .jogoDuracao {
+  color: #5a4652; /* 8,6:1 no branco, 7,7:1 no rosa */
+}
+.raiz .destaqueExtra {
+  color: #6b5562; /* 6,8:1 */
+}
+.raiz .destaqueLink {
+  color: var(--caneta);
+  text-decoration: underline 1.5px;
+  text-underline-offset: 3px;
+}
+.raiz .rankingPosicao {
+  font-size: 22px;
+  color: var(--tm-tinta);
+}
+/* O pódio circulado a marcador. */
+.raiz .rankingLinha[data-podio] .rankingPosicao {
+  position: relative;
+  justify-self: start; /* a caixa do tamanho do número: o círculo abraça só ele */
+  color: var(--caneta);
+}
+.raiz .rankingLinha[data-podio] .rankingPosicao::after {
+  content: "";
+  position: absolute;
+  inset: -5px -7px -4px -6px;
+  border: 2px solid var(--tm-neon);
+  border-radius: 50%;
+  rotate: -8deg;
+}
+.raiz .rankingValor {
+  font: italic 900 17px / 1 var(--tm-fonte-titulo), sans-serif;
+  color: var(--tm-tinta);
+}
+/* O ícone do melhor jogo vira rosquinha: glacê, massa e o contorno do escudo. */
+.raiz .melhorJogoCorpo {
+  gap: 16px;
+}
+.raiz .melhorJogoCorpo .campeaoIcone {
+  margin: 7px;
+  border: 0;
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px #ff9fcb, 0 0 0 6px var(--tm-metal-fundo), 0 0 0 7.5px var(--tm-tinta);
+}
+/* A participação na fita métrica: puxada até a porcentagem, com a ponteira de metal. */
+.raiz .medidor {
+  height: 16px;
+  border-radius: 2px;
+  background: rgba(43, 20, 8, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(43, 20, 8, 0.16);
+}
+.raiz .medidorBarra {
+  border-radius: 2px 0 0 2px;
+  background:
+    repeating-linear-gradient(90deg, var(--fita-tinta) 0 1px, transparent 1px 5px) 0 0 / 100% 35% no-repeat,
+    repeating-linear-gradient(90deg, var(--fita-tinta) 0 1.5px, transparent 1.5px 25px) 0 0 / 100% 65% no-repeat,
+    linear-gradient(180deg, #ffe17a, var(--fita) 60%, #e6b300);
+  box-shadow: inset -4px 0 0 #8a9099, inset 0 -1.5px 0 #8a6a00;
+}
+/* A forma em anilhas na barra: rosca glaceada (vitória) e borracha (derrota). */
+.raiz .forma {
+  align-self: flex-start;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 16px;
+  background:
+    linear-gradient(#5f6770, #5f6770) 5px 50% / 4px 14px no-repeat,
+    linear-gradient(#5f6770, #5f6770) calc(100% - 5px) 50% / 4px 14px no-repeat,
+    linear-gradient(180deg, #f4f7fa, #8a9099) 0 50% / 100% 6px no-repeat;
+}
+.raiz .formaJogo {
+  width: 22px;
+  height: 40px;
+  border: 0;
+  border-radius: 5px;
+  font-size: 15px;
+}
+.raiz .formaJogo[data-resultado="vitoria"] {
+  background:
+    radial-gradient(circle at 30% 12%, #fff 0 1.2px, transparent 1.6px),
+    radial-gradient(circle at 72% 22%, #7fd3ff 0 1.2px, transparent 1.6px),
+    radial-gradient(circle at 34% 32%, #ffe45c 0 1.2px, transparent 1.6px),
+    linear-gradient(180deg, #ffb3d6 0, #ff8ec3 58%, var(--tm-metal-fundo) 58% 80%, var(--tm-metal-base));
+  box-shadow: inset 0 0 0 1.5px var(--tm-tinta);
+  color: var(--tm-tinta); /* 8:1 no glacê e na massa */
+}
+.raiz .formaJogo[data-resultado="derrota"] {
+  background: linear-gradient(90deg, #1c181b, #3a3238 45%, #2a2428 55%, #141113);
+  box-shadow: inset 0 0 0 1.5px #0b090a;
+  color: var(--giz); /* 13:1 */
+}
+@media (max-width: 599px) {
+  .raiz .destaque {
+    padding: 13px 12px 12px;
+  }
+  .raiz .forma {
+    padding-inline: 10px;
+  }
+  .raiz .formaJogo {
+    width: 19px;
+    height: 34px;
+    font-size: 13px;
+  }
+}
+
+/* ------------------------------------------------------------------ o próximo treino: o cronômetro */
+.raiz .proximoCartao {
+  gap: 12px;
+  margin: 6px; /* a moldura do cronômetro é sombra: não sai da coluna */
+  padding: 16px 18px 14px;
+  border: 0;
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 9px 9px, #4d545c 0 1.8px, #9aa3ad 2.4px, transparent 3px),
+    radial-gradient(circle at calc(100% - 9px) 9px, #4d545c 0 1.8px, #9aa3ad 2.4px, transparent 3px),
+    radial-gradient(circle at 9px calc(100% - 9px), #4d545c 0 1.8px, #9aa3ad 2.4px, transparent 3px),
+    radial-gradient(circle at calc(100% - 9px) calc(100% - 9px), #4d545c 0 1.8px, #9aa3ad 2.4px, transparent 3px),
+    linear-gradient(180deg, #17121a, #0e0b0d);
+  box-shadow: inset 0 0 0 1px #3a3238, 0 0 0 5px #2a2428, 0 0 0 6px #4a4046, 0 18px 30px -16px #000;
+  transition: translate 0.25s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.2s ease;
+}
+.raiz .proximoCartao:hover {
+  box-shadow: inset 0 0 0 1px #3a3238, 0 0 0 5px #2a2428, 0 0 0 6px var(--tm-neon), 0 0 30px rgba(255, 94, 168, 0.35), 0 18px 30px -16px #000;
+}
+/* O visor de LED: data à esquerda, hora à direita. */
+.raiz .proximoData {
+  gap: 2px 12px;
+  padding: 10px 12px 8px;
+  border-radius: 4px;
+  background: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.03) 0 1px, transparent 1px 3px), #050405;
+  box-shadow: inset 0 0 0 1px #2a2428, inset 0 0 18px rgba(255, 94, 168, 0.12);
+  color: var(--tm-neon); /* 6,9:1 */
+  text-shadow: 0 0 8px rgba(255, 94, 168, 0.6);
+}
+.raiz .proximoDia {
+  font-size: 28px;
+  letter-spacing: 0.04em;
+  color: var(--tm-neon);
+}
+.raiz .proximoHora {
+  margin-left: auto;
+  font: italic 900 28px / 1 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.06em;
+  color: var(--tm-neon);
+}
+.raiz .proximoCartao[data-em-andamento] .proximoData::before {
+  content: "";
+  align-self: center;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff3b4e;
+  box-shadow: 0 0 8px #ff3b4e;
+  animation: academiaCampanhaPulso 1200ms ease-in-out infinite;
+}
+@keyframes academiaCampanhaPulso {
+  0%,
+  100% {
+    transform: scale(0.7);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+}
+.raiz .proximoConfronto .vs {
+  color: var(--tm-acento);
+}
+.raiz .proximoAdversario {
+  font-size: 19px;
+  color: var(--tm-texto);
+}
+.raiz .proximoInfo {
+  color: var(--tm-apoio); /* 8:1 */
+}
+.raiz .proximoVer {
+  color: var(--tm-acento);
+}
+/* A tabela no crachá de sócio (o glacê escorrendo no topo, como os crachás da página). */
+.raiz .tabela {
+  align-self: flex-start;
+  gap: 2px 10px;
+  margin: 18px 0 0 6px;
+  padding: 18px 16px 10px;
+  border-radius: 10px;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 22' preserveAspectRatio='none'%3E%3Cpath fill='%23ff8ec3' d='M0 0H120V10C120 13 117 14 115 12C113 10 111 12 111 15V17C111 20 107 20 107 17V13C107 11 104 10 102 12C99 14 97 11 93 11C89 11 88 15 85 15C82 15 81 11 77 11C73 11 72 16 72 19V20C72 22 68 22 68 20V15C68 12 65 11 62 12C58 13 56 10 52 10C48 10 47 14 44 14C41 14 39 10 35 11C31 12 30 16 30 18C30 21 26 21 26 18V15C26 12 23 11 20 12C16 13 14 10 10 10C6 10 5 13 3 13C1 13 0 12 0 10Z'/%3E%3C/svg%3E") top / 100% 12px no-repeat,
+    var(--cartao);
+  box-shadow: 0 0 0 1px rgba(43, 20, 8, 0.25), 0 10px 20px -10px #000;
+  color: #5a4652;
+  rotate: -2deg;
+}
+.raiz .tabelaPosicao {
+  font: italic 900 18px / 1 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.04em;
+  color: var(--tm-tinta);
+}
+.raiz .tabelaCampanha {
+  font-weight: 700;
+}
+
+/* ------------------------------------------------------------------ série por série: a prancheta */
+/* A folha rosa quadriculada; a prancheta é a sombra cheia em volta, o prendedor fica em cima. */
+.raiz .series,
+.raiz .vazio {
+  position: relative;
+  margin: 26px 12px 12px;
+  border: 0;
+  border-radius: 3px;
+  background:
+    linear-gradient(90deg, rgba(168, 50, 106, 0.07) 1px, transparent 1px) 0 0 / 14px 14px,
+    linear-gradient(rgba(168, 50, 106, 0.07) 1px, transparent 1px) 0 0 / 14px 14px,
+    var(--tm-nucleo);
+  color: var(--tm-tinta);
+  box-shadow: 0 0 0 10px #a8754a, 0 0 0 12px #7a4f2e, 0 0 0 13px #3b2412, 0 22px 34px -16px #000;
+}
+.raiz .series {
+  gap: 0;
+  padding: 26px 18px 6px;
+}
+.raiz .series::before,
+.raiz .vazio::before {
+  content: "";
+  position: absolute;
+  top: -26px;
+  left: 50%;
+  width: 120px;
+  height: 40px;
+  translate: -50% 0;
+  border-radius: 10px 10px 6px 6px;
+  background:
+    radial-gradient(circle at 18px 27px, #5f6770 0 3px, #e8edf1 3.6px, transparent 4.4px),
+    radial-gradient(circle at calc(100% - 18px) 27px, #5f6770 0 3px, #e8edf1 3.6px, transparent 4.4px),
+    linear-gradient(180deg, #f4f7fa, #b9c0c8 30%, #e8edf1 52%, #7d8690);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7), 0 0 0 1px #2a2328, 0 6px 8px -2px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+.raiz .serie {
+  gap: 8px;
+  padding: 14px 0 6px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+.raiz .serie + .serie {
+  border-top: 2px solid rgba(43, 20, 8, 0.7);
+}
+/* A vitória é o adesivo rosa com o ✓ do «tá pago»; a derrota, só o contorno. */
+.raiz .serieResultado {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 11px 4px;
+  border: 2px solid rgba(43, 20, 8, 0.55);
+  border-radius: 999px;
+  font: italic 900 14px / 1 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.06em;
+}
+.raiz .serie[data-resultado="vitoria"] .serieResultado {
+  border-color: var(--tm-tinta);
+  background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.5), transparent 45%), var(--tm-primaria);
+  box-shadow: 0 3px 6px -2px rgba(43, 20, 8, 0.45);
+  color: var(--tm-tinta); /* 8,2:1 */
+  rotate: -3deg;
+}
+.raiz .serie[data-resultado="vitoria"] .serieResultado::before {
+  content: "";
+  width: 5px;
+  height: 10px;
+  margin: -3px 7px 0 1px;
+  border: solid currentColor;
+  border-width: 0 2.5px 2.5px 0;
+  rotate: 42deg;
+}
+.raiz .serie[data-resultado="derrota"] .serieResultado {
+  border-color: rgba(43, 20, 8, 0.55);
+  color: #5a4652;
+}
+.raiz .serie[data-resultado="andamento"] .serieResultado {
+  border-style: dashed;
+  border-color: var(--caneta);
+  color: var(--caneta);
+}
+.raiz .seriePlacar {
+  font-size: 30px;
+  color: var(--tm-tinta);
+}
+.raiz .placarSeparador,
+.raiz .vs {
+  color: var(--caneta);
+}
+.raiz .adversarioNome {
+  font-size: 17px;
+  color: var(--tm-tinta);
+}
+/* O MVP da série num pedaço de fita métrica. */
+.raiz .serieMvp {
+  padding: 6px 9px 3px;
+  border: 0;
+  border-radius: 1px;
+  background:
+    repeating-linear-gradient(90deg, var(--fita-tinta) 0 1px, transparent 1px 5px) 0 0 / 100% 4px no-repeat,
+    linear-gradient(180deg, #ffe17a, var(--fita) 60%, #e6b300);
+  color: var(--fita-tinta); /* 12,8:1 */
+  rotate: -1.5deg;
+}
+/* As repetições: a casinha do jogo, o campeão a caneta, o K/D/A e a caixinha marcada. */
+.raiz .jogos {
+  border-top: 2px solid rgba(43, 20, 8, 0.16);
+}
+.raiz .jogo,
+.raiz .jogo:last-child {
+  border-bottom: 1px dashed rgba(168, 50, 106, 0.32);
+}
+.raiz .jogoNumero {
+  justify-self: start;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 24px;
+  border: 1.5px solid rgba(43, 20, 8, 0.5);
+  border-radius: 3px;
+  font: italic 900 14px / 1 var(--tm-fonte-titulo), sans-serif;
+  color: var(--tm-tinta);
+}
+.raiz .campeaoIcone {
+  border-color: rgba(43, 20, 8, 0.35);
+  border-radius: 8px;
+}
+.raiz .campeaoNome {
+  padding-right: 0.3em; /* a Kaushan e o itálico passam da caixa: sem isto o corte da base come o fim do "i" */
+  font: 400 17px / 1.15 var(--tm-fonte-assinatura), cursive;
+  color: var(--tm-tinta);
+}
+.raiz .jogoKda {
+  font-size: 18px;
+  color: var(--tm-tinta);
+}
+.raiz .jogoMvp {
+  border-radius: 999px;
+  background: var(--tm-primaria);
+  box-shadow: inset 0 0 0 1.5px var(--tm-tinta);
+  color: var(--tm-tinta);
+}
+.raiz .jogoResultado {
+  border-width: 2px;
+  border-radius: 5px;
+  font-size: 13px;
+}
+.raiz .jogo[data-resultado="vitoria"] .jogoResultado {
+  border-color: var(--tm-tinta);
+  background: var(--tm-primaria);
+  color: var(--tm-tinta);
+}
+.raiz .jogo[data-resultado="derrota"] .jogoResultado {
+  border-color: rgba(43, 20, 8, 0.45);
+  color: #5a4652;
+}
+/* A repetição que ele não fez fica hachurada na ficha. */
+.raiz .jogo[data-tipo="ausente"] {
+  background: repeating-linear-gradient(-45deg, rgba(43, 20, 8, 0.07) 0 2px, transparent 2px 8px);
+}
+.raiz .jogoNota {
+  font: 400 16px / 1.2 var(--tm-fonte-assinatura), cursive;
+  font-style: normal;
+  color: var(--caneta); /* 6:1 */
+}
+.raiz .serieLink {
+  font: italic 900 15px / 1 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.06em;
+  color: var(--caneta);
+}
+.raiz .serieLink:hover {
+  color: var(--tm-tinta);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+/* O anel de foco no rosa da caneta (o amarelo da base some no branco). */
+.raiz .serieLink:focus-visible,
+.raiz .destaqueLink:focus-visible {
+  outline-color: var(--caneta);
+}
+/* Quem ainda não jogou: a ficha em branco na prancheta. */
+.raiz .vazio {
+  padding: 30px 22px 22px;
+  font: 400 18px / 1.45 var(--tm-fonte-assinatura), cursive;
+  color: var(--caneta);
+}
+@media (max-width: 599px) {
+  .raiz .series,
+  .raiz .vazio {
+    margin-inline: 10px;
+    box-shadow: 0 0 0 8px #a8754a, 0 0 0 10px #7a4f2e, 0 0 0 11px #3b2412, 0 22px 34px -16px #000;
+  }
+  .raiz .series {
+    padding-inline: 12px;
+  }
+}
+
+/* ------------------------------------------------------------------ os exercícios: anilhas de rosca */
+.raiz .campeoes {
+  gap: 10px;
+}
+.raiz .campeao {
+  position: relative;
+  gap: 14px;
+  padding: 6px 14px 6px 10px;
+  border: 0;
+  border-radius: 999px 12px 12px 999px;
+  background: linear-gradient(180deg, #3a3238, #2a2428 45%, #1e191d);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), inset 0 -2px 0 rgba(0, 0, 0, 0.45), 0 6px 12px -6px #000;
+}
+.raiz .campeao .campeaoIcone {
+  margin: 6px;
+  border: 0;
+  border-radius: 50%;
+  box-shadow: 0 0 0 5px #ff9fcb, 0 0 0 7px var(--tm-metal-fundo), 0 0 0 8px var(--tm-tinta);
+}
+/* O granulado no glacê da rosquinha. */
+.raiz .campeao::before {
+  content: "";
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  width: 50px;
+  height: 50px;
+  translate: 0 -50%;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 8% 35%, #fff 0 1.3px, transparent 1.7px),
+    radial-gradient(circle at 72% 11%, #7fd3ff 0 1.3px, transparent 1.7px),
+    radial-gradient(circle at 92% 65%, #ffe45c 0 1.3px, transparent 1.7px),
+    radial-gradient(circle at 35% 92%, #8be08a 0 1.3px, transparent 1.7px),
+    radial-gradient(circle at 72% 89%, #fff 0 1.3px, transparent 1.7px),
+    radial-gradient(circle at 35% 8%, #ffb067 0 1.3px, transparent 1.7px),
+    radial-gradient(circle at 92% 35%, #fff 0 1.3px, transparent 1.7px);
+}
+/* A fonte inteira aqui: `.raiz .campeaoNome` (o caneta dos jogos) empata com `.campeao .campeaoNome` da base. */
+.raiz .campeao .campeaoNome {
+  font: italic 900 16px / 1.1 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.03em;
+  color: var(--tm-texto); /* 14:1 na borracha */
+}
+.raiz .campeaoNumeros {
+  color: var(--tm-apoio); /* 6,9:1 */
+}
