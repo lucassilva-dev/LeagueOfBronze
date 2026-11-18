@@ -1,4 +1,5 @@
 import p from "@/components/times/cenarios/picadeiro.module.css";
+import xp from "@/components/times/cenarios/picadeiro-campanha.module.css";
 import pf from "@/components/times/cenarios/picadeiro-ficha.module.css";
 import { Cartola, CartolaMini, Fa, Pedestal } from "@/components/times/cenarios/ornamentos-picadeiro";
 import type { CenarioDoTema } from "@/components/times/cenarios/tipos";
@@ -15,6 +16,7 @@ import { cx } from "@/components/times/util";
 export const PICADEIRO: CenarioDoTema = {
   classes: p,
   classesDaFicha: pf,
+  classesDaCampanha: xp,
   Fundo: () => (
     <>
       <div className={p.enfLona} />
@@ -63,4 +65,12 @@ export const PICADEIRO: CenarioDoTema = {
     </div>
   ),
   NaCartela: () => <span className={p.enfEstrelasCartaz} aria-hidden="true" />,
+  // A campanha é o PROGRAMA do espetáculo: atrás da folha, a poça de luz quente e os dois canhões
+  // de luz varrendo o título.
+  NaCampanha: () => (
+    <span className={xp.enfHolofotes} aria-hidden="true">
+      <span className={cx(xp.enfFacho, xp.enfFachoEsq)} />
+      <span className={cx(xp.enfFacho, xp.enfFachoDir)} />
+    </span>
+  ),
 };

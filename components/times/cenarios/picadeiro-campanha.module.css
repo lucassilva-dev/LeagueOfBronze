@@ -1,0 +1,619 @@
+/*
+ * A CAMPANHA na ficha do jogador no cenário "picadeiro" — DESORGANIZAÇÃO, «O Circo da
+ * Desorganização» (components/times/campanha.tsx; a base é campanha.module.css). É o PROGRAMA DO
+ * ESPETÁCULO impresso em papel de cartaz: a `.grade` inteira é a folha marfim, com fio duplo de
+ * tinta, as estrelas carmim dos cartazes e a moldura de ouro e veludo. Dentro dela:
+ *  - os destaques são os quadros do programa, cada um com a sua faixa carmim (o título);
+ *  - o ranking tem as reticências de programa ("12º ABATES ........ 35");
+ *  - a participação é a régua listrada do pedestal (carmim e ouro);
+ *  - a forma são INGRESSINHOS (vitória carmim, derrota no papel pardo), meio tortos — é a
+ *    Desorganização;
+ *  - cada série é um NÚMERO do espetáculo, separado pelo fio com a estrela; o resultado é uma
+ *    bandeirola; cada jogo é uma atração, e o MVP é a grande atração (a estrela de ouro);
+ *  - a próxima sessão é o INGRESSO de veludo com o canhoto da data, picotado;
+ *  - os campeões são o repertório da trupe.
+ * Fontes: a Smokum (letra de cartaz) só em nome grande; os NÚMEROS vão na Playfair itálica (os
+ * algarismos da Smokum não se leem de relance), sempre com `lining-nums` depois do `font:` (a
+ * Playfair vem com algarismos de texto e o 1 vira um "i"; o atalho `font` zera a variante, por isso
+ * ela vem em cada regra); rótulos e números miúdos na fonte do site.
+ * Regras da pasta: `.raiz` + o seletor INTEIRO da base (um nível acima, nunca empate); conteúdo não
+ * anima; os únicos laços são os dois canhões de luz atrás da folha (enfeite, a partir de 600 px).
+ * Tons do .raiz de picadeiro.module.css (--papel*, --tinta-cartaz, --carmim, --veludo, --ouro-fio).
+ */
+
+/* ======================================================================= o palco atrás (NaCampanha) */
+.raiz .secao {
+  --sepia: #574030; /* texto miúdo no papel: ≥ 5,6:1 até no pé mais escuro da folha */
+  --pardo: #cdb68b; /* o papel pardo do ingresso de derrota */
+  --playfair: var(--tm-fonte-assinatura), Georgia, serif;
+  --estrela: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M5 0l1.2 3.6H10L7 5.8l1.1 3.7L5 7.3 1.9 9.5 3 5.8 0 3.6h3.8z' fill='%238C1A2E'/%3E%3C/svg%3E");
+  padding-block: clamp(30px, 3.6vw, 54px) clamp(36px, 4vw, 60px);
+}
+/* A poça de luz quente onde o programa está e os dois canhões de luz varrendo o título. */
+.enfHolofotes {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: radial-gradient(46% 36% at 50% 30%, rgba(255, 214, 140, 0.14), transparent 72%);
+}
+/* O cone de luz: bordas macias pelo degradê de lado a lado e pela máscara de cima a baixo (nada de
+   filter), para não cortar seco na borda da seção. */
+.enfFacho {
+  position: absolute;
+  top: -90px;
+  display: none;
+  width: clamp(190px, 21vw, 320px);
+  height: clamp(400px, 44vw, 640px);
+  background: linear-gradient(90deg, transparent, rgba(255, 236, 196, 0.22) 36%, rgba(255, 236, 196, 0.22) 64%, transparent);
+  clip-path: polygon(44% 0, 56% 0, 100% 100%, 0 100%);
+  -webkit-mask: linear-gradient(180deg, transparent 6%, #000 30%, rgba(0, 0, 0, 0.45) 62%, transparent 94%);
+  mask: linear-gradient(180deg, transparent 6%, #000 30%, rgba(0, 0, 0, 0.45) 62%, transparent 94%);
+  transform-origin: 50% 0;
+  animation: picadeiroCampanhaFacho 11s ease-in-out infinite alternate;
+}
+@media (min-width: 600px) {
+  .enfFacho {
+    display: block;
+  }
+}
+.enfFachoEsq {
+  --ate: -16deg;
+  left: 3%;
+  rotate: -34deg;
+}
+.enfFachoDir {
+  --ate: 18deg;
+  right: 3%;
+  rotate: 34deg;
+  animation-duration: 13s;
+}
+@keyframes picadeiroCampanhaFacho {
+  to {
+    rotate: var(--ate);
+  }
+}
+
+/* ======================================================================= a folha do programa */
+/* Papel marfim (mais claro no meio, como debaixo do canhão), fio duplo de tinta por dentro e a
+   moldura por fora: ouro, veludo, ouro. As estrelas nos cantos (::before, absoluto: fora da grade). */
+.raiz .grade {
+  --m: 3px;
+  --v: 9px;
+  --o: 10.5px;
+  position: relative;
+  padding: clamp(26px, 3.2vw, 44px) clamp(14px, 3vw, 40px) clamp(22px, 2.8vw, 36px);
+  background: radial-gradient(120% 90% at 50% 26%, var(--papel-claro) 0%, var(--papel) 55%, #e4d2ab 100%);
+  box-shadow:
+    inset 0 0 0 1.5px var(--tinta-cartaz),
+    inset 0 0 0 calc(var(--m) + 2px) var(--papel),
+    inset 0 0 0 calc(var(--m) + 3px) var(--tinta-cartaz),
+    0 0 0 var(--m) var(--ouro-fio),
+    0 0 0 var(--v) var(--veludo),
+    0 0 0 var(--o) var(--ouro-fio),
+    0 34px 60px -24px #000;
+  color: var(--tinta-cartaz);
+}
+.raiz .grade::before {
+  content: "";
+  position: absolute;
+  inset: 11px;
+  pointer-events: none;
+  background: var(--estrela) 0 0 / 11px no-repeat, var(--estrela) 100% 0 / 11px no-repeat, var(--estrela) 0 100% / 11px no-repeat,
+    var(--estrela) 100% 100% / 11px no-repeat;
+}
+@media (max-width: 599px) {
+  .raiz .grade {
+    --m: 2px;
+    --v: 6px;
+    --o: 7px;
+  }
+  .raiz .grade::before {
+    display: none; /* sem folga nos cantos: as estrelas ficam para a tela grande */
+  }
+}
+
+/* ======================================================================= títulos (h3) e peças comuns */
+/* Cabeçalho de seção do programa: letra de cartaz carmim entre dois fios de tinta com estrela. */
+.raiz .subtitulo {
+  justify-content: center;
+  margin-bottom: 16px;
+  font: 400 clamp(20px, 2vw, 25px) / 1 var(--tm-fonte-titulo), "Arial Black", sans-serif;
+  letter-spacing: 0.04em;
+  color: var(--carmim); /* 7,3:1 */
+  text-align: center;
+}
+.raiz .subtitulo::before,
+.raiz .subtitulo::after {
+  content: "";
+  flex: 1;
+  height: 10px;
+  background: var(--estrela) var(--lado, 0%) 50% / 9px no-repeat, linear-gradient(var(--tinta-cartaz), var(--tinta-cartaz)) 50% 50% / 100% 1px no-repeat;
+}
+.raiz .subtitulo::before {
+  --lado: 100%;
+}
+/* A janelinha em arco dos cartazes (fio de ouro e fio de tinta). */
+.raiz .campeaoIcone {
+  border-width: 0;
+  border-radius: 50% 50% 2px 2px / 34% 34% 2px 2px;
+  background: #1c0f0c;
+  box-shadow: 0 0 0 1.5px var(--ouro-fio), 0 0 0 2.5px var(--tinta-cartaz);
+  color: var(--tm-icone);
+}
+.raiz .vs {
+  font: italic 700 13px / 1 var(--playfair);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--carmim);
+}
+.raiz .escudo {
+  filter: drop-shadow(0 1px 1px rgba(27, 12, 8, 0.45)); /* estático */
+}
+
+/* ======================================================================= destaques: os quadros do programa */
+.raiz .destaques {
+  gap: 12px;
+}
+.raiz .destaque {
+  align-items: center;
+  padding: 16px 14px 14px;
+  border: 0;
+  border-radius: 1px;
+  background: rgba(255, 250, 238, 0.5);
+  box-shadow: inset 0 0 0 1px var(--tinta-cartaz), inset 0 0 0 3px rgba(242, 229, 200, 0.9), inset 0 0 0 4px var(--tinta-cartaz);
+  text-align: center;
+}
+.raiz .destaque::before {
+  display: none; /* o fio de neon da base */
+}
+@media (max-width: 599px) {
+  .raiz .destaque {
+    padding: 14px 10px 12px;
+  }
+}
+/* A faixa carmim do título de cada quadro (rabo de andorinha nas duas pontas). */
+.raiz .destaqueRotulo {
+  padding: 5px 15px 4px;
+  background: var(--carmim);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 7px) 50%, 100% 100%, 0 100%, 7px 50%);
+  font-size: 9.5px;
+  color: #fff4e0; /* 8,4:1 */
+  text-wrap: balance;
+}
+.raiz .destaqueValor {
+  padding: 0;
+  font: italic 700 clamp(30px, 2.8vw, 40px) / 1 var(--playfair);
+  font-variant-numeric: lining-nums;
+  color: var(--carmim);
+  background: none;
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+  -webkit-text-fill-color: currentColor;
+}
+.raiz .destaqueDetalhe {
+  font: italic 500 13.5px / 1.35 var(--playfair);
+  font-variant-numeric: lining-nums;
+  color: var(--tinta-cartaz);
+}
+.raiz .destaqueExtra {
+  color: var(--sepia);
+}
+.raiz .destaqueLink {
+  align-self: center;
+  color: var(--carmim);
+}
+/* o ranking: as reticências do programa */
+.raiz .ranking {
+  align-self: stretch;
+  gap: 6px;
+}
+.raiz .rankingLinha {
+  grid-template-columns: 2.6em minmax(0, 1fr) auto;
+  text-align: left;
+}
+.raiz .rankingPosicao {
+  font: italic 700 19px / 1 var(--playfair);
+  font-variant-numeric: lining-nums;
+  color: var(--tinta-cartaz);
+}
+.raiz .rankingLinha[data-podio] .rankingPosicao {
+  color: var(--carmim);
+}
+.raiz .rankingMetrica {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--tinta-cartaz);
+}
+/* As reticências: encolhem até sumir antes de quebrar a palavra («ASSISTS» no cartão estreito). */
+.raiz .rankingMetrica::after,
+.raiz .jogoCampeao::after {
+  content: "";
+  flex: 1;
+  border-bottom: 2px dotted rgba(27, 12, 8, 0.42);
+}
+.raiz .rankingValor {
+  font: italic 700 15px / 1 var(--playfair);
+  font-variant-numeric: lining-nums;
+  color: var(--tinta-cartaz);
+}
+/* No quadro de meia largura (360 a 599 px), «ASSISTS» inteiro ao lado do «30th». */
+@media (max-width: 599px) {
+  .raiz .rankingLinha {
+    grid-template-columns: 2.4em minmax(0, 1fr) auto;
+    gap: 6px;
+  }
+  .raiz .rankingPosicao {
+    font-size: 17px;
+  }
+  .raiz .rankingMetrica {
+    gap: 3px;
+    letter-spacing: 0.06em;
+  }
+}
+/* o melhor jogo: o retrato da atração em arco */
+.raiz .melhorJogoCorpo {
+  justify-content: center;
+}
+.raiz .melhorJogoCorpo .campeaoIcone {
+  width: 50px;
+  height: 60px;
+  box-shadow: 0 0 0 2px var(--ouro-fio), 0 0 0 3.5px var(--tinta-cartaz);
+}
+@media (max-width: 599px) {
+  .raiz .melhorJogoCorpo {
+    align-items: center;
+  }
+  .raiz .melhorJogoCorpo .campeaoIcone {
+    width: 42px;
+    height: 50px;
+  }
+}
+/* a participação: a régua listrada do pedestal */
+.raiz .medidor {
+  align-self: stretch;
+  height: 12px;
+  border-radius: 6px;
+  background: rgba(27, 12, 8, 0.08);
+  box-shadow: inset 0 0 0 1px var(--tinta-cartaz);
+}
+.raiz .medidorBarra {
+  background: repeating-linear-gradient(-55deg, var(--carmim) 0 6px, var(--ouro-fio) 6px 10px);
+  box-shadow: inset 0 0 0 1px var(--tinta-cartaz);
+}
+/* a forma: os INGRESSINHOS, meio tortos (o desenho do ingresso fica junto do resultado de cada jogo) */
+.raiz .forma {
+  gap: 6px;
+}
+.raiz .formaJogo {
+  width: 30px;
+  height: 24px;
+  border-width: 0;
+  border-radius: 2px;
+  font: italic 700 14px / 1 var(--playfair);
+  box-shadow: 0 2px 3px -1px rgba(27, 12, 8, 0.4);
+  rotate: -4deg;
+}
+.raiz .formaJogo:nth-child(2n) {
+  rotate: 3deg;
+}
+.raiz .formaJogo:nth-child(3n) {
+  rotate: -1.5deg;
+}
+@media (max-width: 599px) {
+  .raiz .forma {
+    gap: 4px;
+  }
+  .raiz .formaJogo {
+    width: 25px;
+    height: 21px;
+    font-size: 12.5px;
+  }
+}
+
+/* ======================================================================= a próxima sessão: o ingresso */
+/* Veludo carmim, o canhoto da data à esquerda (largura fixa: o picote e os dois semicírculos moram
+   nele) e o resto do ingresso à direita. Inclina de leve ao passar o mouse. */
+.raiz .proximoCartao {
+  --canhoto: 86px;
+  --veludo-ingresso: linear-gradient(180deg, #96203a, var(--veludo) 58%, #5a0f1f);
+  gap: 7px 14px;
+  border-width: 0;
+  border-radius: 5px;
+  background: var(--veludo-ingresso);
+  box-shadow: 0 12px 18px -12px rgba(27, 12, 8, 0.75);
+  color: #fff4e0; /* 7,5:1 no carmim mais claro */
+  transition: translate 0.25s cubic-bezier(0.2, 0.7, 0.2, 1), rotate 0.25s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+/* Só com o canhoto (e o :has) o ingresso vira duas colunas; sem ele, tudo empilha. */
+.raiz .proximoCartao:has(.proximoData) {
+  grid-template-columns: var(--canhoto) minmax(0, 1fr);
+  padding-left: 0;
+  background:
+    radial-gradient(circle at var(--canhoto) 0, var(--papel) 0 7px, transparent 7.5px),
+    radial-gradient(circle at var(--canhoto) 100%, var(--papel) 0 7px, transparent 7.5px),
+    linear-gradient(180deg, rgba(242, 207, 122, 0.75) 50%, transparent 0) var(--canhoto) 0 / 1.5px 7px repeat-y,
+    var(--veludo-ingresso);
+}
+.raiz .proximoCartao:hover {
+  rotate: -0.8deg;
+}
+.raiz .proximoData {
+  grid-column: 1;
+  grid-row: 1 / span 3;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 6px;
+  text-align: center;
+  color: var(--tm-neon); /* 5,4:1 no carmim mais claro */
+}
+.raiz .proximoDia,
+.raiz .proximoHora {
+  font: italic 700 21px / 1 var(--playfair);
+  font-variant-numeric: lining-nums;
+  letter-spacing: 0;
+  color: #fff4e0;
+  white-space: nowrap;
+}
+.raiz .proximoHora {
+  font-size: 13px;
+}
+.raiz .proximoConfronto {
+  gap: 9px;
+}
+.raiz .proximoConfronto .vs,
+.raiz .proximoVer,
+.raiz .proximoCartao[data-em-andamento] .proximoInfo {
+  color: var(--tm-neon);
+}
+.raiz .proximoAdversario {
+  font: 400 19px / 1.05 var(--tm-fonte-titulo), "Arial Black", sans-serif;
+  letter-spacing: 0.03em;
+  color: var(--tm-neon); /* 5,4:1 */
+}
+.raiz .proximoInfo {
+  font: italic 500 13.5px / 1.3 var(--playfair);
+  font-variant-numeric: lining-nums;
+  color: #fff4e0;
+}
+.raiz .proximoCartao[data-em-andamento] .proximoInfo {
+  font-weight: 700;
+}
+.raiz .tabela {
+  justify-content: center;
+  margin-top: 14px;
+  font: italic 500 14px / 1.3 var(--playfair);
+  font-variant-numeric: lining-nums;
+  color: var(--tinta-cartaz);
+}
+.raiz .tabelaCampanha {
+  font-variant-numeric: lining-nums tabular-nums; /* a base pede só tabular: voltariam os de texto */
+}
+.raiz .tabelaPosicao {
+  font: 700 11px / 1.3 var(--font-body), "Chakra Petch", system-ui, sans-serif; /* a fonte do site */
+  letter-spacing: 0.14em;
+  color: var(--carmim);
+}
+
+/* ======================================================================= número a número */
+.raiz .series {
+  gap: 34px;
+}
+.raiz .serie {
+  padding: 0;
+  border-width: 0;
+  background: none;
+}
+/* O fio de tinta com a estrela carmim entre um número e outro. */
+.raiz .serie + .serie::before {
+  content: "";
+  position: absolute;
+  inset: -23px 8% auto;
+  height: 12px;
+  pointer-events: none;
+  background:
+    var(--estrela) 50% 50% / 12px no-repeat,
+    linear-gradient(var(--tinta-cartaz), var(--tinta-cartaz)) 0 50% / calc(50% - 14px) 1px no-repeat,
+    linear-gradient(var(--tinta-cartaz), var(--tinta-cartaz)) 100% 50% / calc(50% - 14px) 1px no-repeat;
+}
+/* O resultado numa bandeirola: carmim (vitória), tinta (derrota), folha de ouro (em andamento). */
+.raiz .serieResultado {
+  padding: 5px 17px 5px 11px;
+  border-width: 0;
+  border-radius: 0;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 8px) 50%, 100% 100%, 0 100%);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+}
+.raiz .serie[data-resultado="vitoria"] .serieResultado {
+  background: var(--carmim);
+  color: #fff4e0;
+}
+.raiz .serie[data-resultado="derrota"] .serieResultado {
+  background: var(--tinta-cartaz);
+  color: var(--papel); /* 14,9:1 */
+}
+.raiz .serie[data-resultado="andamento"] .serieResultado,
+.raiz .serieMvp,
+.raiz .jogoMvp {
+  background: linear-gradient(180deg, var(--tm-metal-luz), var(--tm-metal-placa));
+  color: var(--tinta-cartaz); /* 10,4:1 */
+}
+.raiz .seriePlacar {
+  font: italic 700 28px / 1 var(--playfair);
+  font-variant-numeric: lining-nums;
+  color: var(--tinta-cartaz);
+}
+.raiz .placarSeparador {
+  margin-inline: 0.18em;
+  color: var(--carmim);
+}
+.raiz .adversarioNome {
+  font: 400 20px / 1.05 var(--tm-fonte-titulo), "Arial Black", sans-serif;
+  letter-spacing: 0.03em;
+  color: var(--tinta-cartaz);
+}
+.raiz .serieInfo {
+  font-weight: 600;
+  color: var(--sepia);
+}
+/* «MVP»: a fita de ouro da grande atração, com a estrela. */
+.raiz .serieMvp,
+.raiz .jogoMvp {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px 3px;
+  border-width: 0;
+  border-radius: 0;
+  clip-path: polygon(5px 0, calc(100% - 5px) 0, 100% 50%, calc(100% - 5px) 100%, 5px 100%, 0 50%);
+}
+.raiz .jogoMvp {
+  padding: 3px 9px 3px 8px;
+}
+.raiz .serieMvp::before,
+.raiz .jogoMvp::before {
+  content: "";
+  flex: none;
+  width: 10px;
+  height: 10px;
+  background: var(--estrela) center / contain no-repeat;
+}
+.raiz .serieSubstituto {
+  font: italic 500 13px / 1.3 var(--playfair);
+  font-variant-numeric: lining-nums;
+  text-transform: none;
+}
+
+/* cada jogo, uma atração: o nome e as reticências até o K/D/A */
+.raiz .jogos {
+  border-top: 1px solid var(--tinta-cartaz);
+}
+.raiz .jogo,
+.raiz .jogo:last-child {
+  border-bottom: 1px dotted rgba(27, 12, 8, 0.28);
+}
+.raiz .jogo {
+  grid-template-columns: 2.4em minmax(0, 1fr) auto 30px;
+}
+.raiz .jogoNumero {
+  font: italic 700 14px / 1 var(--playfair);
+  font-variant-numeric: lining-nums;
+  letter-spacing: 0;
+  color: var(--carmim);
+}
+.raiz .campeaoNome {
+  font: italic 700 15px / 1.2 var(--playfair);
+  color: var(--tinta-cartaz);
+}
+.raiz .jogoCampeao::after {
+  margin-top: 8px; /* as reticências descem até perto da linha de base */
+}
+.raiz .jogoKda {
+  font: italic 700 17px / 1 var(--playfair);
+  font-variant-numeric: lining-nums;
+  color: var(--tinta-cartaz);
+}
+.raiz .jogoRazao,
+.raiz .jogoDuracao {
+  color: var(--sepia);
+}
+/* A grande atração do jogo: a janelinha ganha o brilho do canhão de luz. */
+.raiz .jogo[data-mvp] .campeaoIcone {
+  box-shadow: 0 0 0 2px #f2cf7a, 0 0 0 3px var(--tinta-cartaz), 0 0 12px 3px rgba(224, 176, 74, 0.75);
+}
+.raiz .jogoResultado {
+  width: 28px;
+  height: 22px;
+  border-width: 0;
+  border-radius: 2px;
+  font: italic 700 13.5px / 1 var(--playfair);
+}
+/* Os INGRESSOS (a forma e o resultado de cada jogo): papel pardo com os dois furos; carmim quando ganhou. */
+.raiz .formaJogo[data-resultado],
+.raiz .jogo[data-resultado] .jogoResultado {
+  background:
+    radial-gradient(circle at 0 50%, var(--papel) 0 3.5px, transparent 4px),
+    radial-gradient(circle at 100% 50%, var(--papel) 0 3.5px, transparent 4px),
+    var(--ingresso, var(--pardo));
+  color: var(--tinta-cartaz); /* 10,5:1 no pardo */
+}
+.raiz .formaJogo[data-resultado="vitoria"],
+.raiz .jogo[data-resultado="vitoria"] .jogoResultado {
+  --ingresso: linear-gradient(180deg, #a3243f, var(--carmim));
+  color: #fff4e0; /* 8,4:1 */
+}
+/* O jogo em que ele não entrou (ou o W.O.): o ingresso do time fica só no tracejado — não era dele. */
+.raiz .jogo[data-tipo] .jogoResultado {
+  border: 1px dashed rgba(27, 12, 8, 0.55);
+  background: none;
+  color: var(--sepia);
+}
+.raiz .jogoNota {
+  font: italic 500 13.5px / 1.3 var(--playfair);
+  color: var(--sepia);
+}
+@media (max-width: 559px) {
+  .raiz .jogo {
+    grid-template-columns: 2.2em minmax(0, 1fr) 30px;
+  }
+  .raiz .jogoCampeao::after {
+    display: none; /* o K/D/A desce para a 2ª linha: as reticências não apontariam para nada */
+  }
+}
+.raiz .serieLink {
+  color: var(--carmim);
+  text-decoration: underline 1px transparent;
+  text-underline-offset: 4px;
+  transition: color 0.2s ease, text-decoration-color 0.2s ease;
+}
+.raiz .serieLink:hover {
+  color: var(--tinta-cartaz);
+  text-decoration-color: currentColor;
+}
+
+/* ======================================================================= o repertório da trupe */
+.raiz .campeoes {
+  gap: 0 18px;
+}
+.raiz .campeao {
+  padding: 9px 4px;
+  border: 0;
+  border-bottom: 1px dotted rgba(27, 12, 8, 0.4);
+  background: none;
+}
+.raiz .campeao .campeaoIcone {
+  width: 36px;
+  height: 43px;
+}
+.raiz .campeao .campeaoNome {
+  font: 400 18px / 1.05 var(--tm-fonte-titulo), "Arial Black", sans-serif;
+  letter-spacing: 0.03em;
+}
+/* A linha de números miúda vai na fonte do site: no itálico de 13 px o 1 parecia um I. */
+.raiz .campeaoNumeros {
+  font: 500 12px / 1.35 var(--font-body), "Chakra Petch", system-ui, sans-serif;
+  color: var(--sepia);
+}
+
+/* ======================================================================= quem ainda não estreou */
+/* A estreia ainda por vir: a estrela carmim em cima do aviso. */
+.raiz .vazio {
+  border: 1.5px dashed var(--carmim);
+  background: rgba(255, 250, 238, 0.5);
+  font: italic 500 16px / 1.5 var(--playfair);
+  font-variant-numeric: lining-nums;
+  color: var(--tinta-cartaz);
+}
+.raiz .vazio::before {
+  content: "";
+  display: block;
+  width: 16px;
+  height: 16px;
+  margin: 0 auto 10px;
+  background: var(--estrela) center / contain no-repeat;
+}
