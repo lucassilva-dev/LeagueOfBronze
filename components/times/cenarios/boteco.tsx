@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 
 import b from "@/components/times/cenarios/boteco.module.css";
+import xc from "@/components/times/cenarios/boteco-campanha.module.css";
 import bf from "@/components/times/cenarios/boteco-ficha.module.css";
 import {
   BolachaDentada,
@@ -82,6 +83,8 @@ function TelaDeJogo({ className }: Readonly<{ className?: string }>) {
 export const BOTECO: CenarioDoTema = {
   classes: b,
   classesDaFicha: bf,
+  // A campanha na ficha: a lousa do bar com as bolachas, as comandas penduradas, a TV e o cardápio a giz.
+  classesDaCampanha: xc,
   Fundo: () => (
     <>
       <div className={b.enfParede} />
@@ -171,4 +174,5 @@ export const BOTECO: CenarioDoTema = {
     </div>
   ),
   NaCartela: () => <TelaDeJogo className={b.enfTelaCartela} />,
+  NaCampanha: () => <div className={xc.enfLousa} aria-hidden="true" />,
 };
