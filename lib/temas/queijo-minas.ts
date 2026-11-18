@@ -53,6 +53,10 @@ export const TEMA_QUEIJO_MINAS: TemaDoTime = {
     carimbo: "temaQueijoCarimbo",
     fecho: "temaQueijoFecho",
     companheiros: "temaQueijoCompanheiros",
+    campanha: "temaQueijoCampanha",
+    campanhaResultados: "temaQueijoCampanhaResultados",
+    campanhaCampeoes: "temaQueijoCampanhaCampeoes",
+    campanhaProximo: "temaQueijoCampanhaProximo",
   },
   fotos: {
     focoPadrao: "50% 30%",

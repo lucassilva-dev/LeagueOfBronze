@@ -41,7 +41,13 @@ export type PapelDoTexto =
   | "destino"
   | "carimbo"
   | "fecho"
-  | "companheiros";
+  | "companheiros"
+  // A campanha na ficha do jogador (components/times/campanha.tsx): o título da seção e os três
+  // subtítulos (série a série, campeões, próximo desafio).
+  | "campanha"
+  | "campanhaResultados"
+  | "campanhaCampeoes"
+  | "campanhaProximo";
 
 export type CoresDoTema = Readonly<{
   /** Fundo base, letreiro, véu das fotos. */

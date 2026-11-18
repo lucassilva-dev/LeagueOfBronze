@@ -166,7 +166,8 @@ describe("registro: o tema da Desorganização", () => {
       expect(MESSAGES.pt.paginasHome[chave], chave).toBeTruthy();
       expect(MESSAGES.en.paginasHome[chave], chave).toBeTruthy();
     }
-    expect(Object.keys(TEMA_DESORGANIZACAO.textos ?? {})).toHaveLength(9);
+    // Os 9 da página e da ficha + os 4 da campanha na ficha (título e três subtítulos).
+    expect(Object.keys(TEMA_DESORGANIZACAO.textos ?? {})).toHaveLength(13);
   });
 
   it("cada atração tem o rosto enquadrado (foco por slug)", () => {

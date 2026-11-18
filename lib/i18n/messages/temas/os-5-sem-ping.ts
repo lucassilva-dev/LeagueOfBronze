@@ -19,6 +19,11 @@ export const textosOs5SemPing = definir({
     temaSemPingNuncaNemVi: "999 ms? Nunca nem vi.",
     temaSemPingFecho: "Travou? Tira da tomada e conta até dez.",
     temaSemPingMesmaCall: "NA MESMA CALL",
+    // A campanha na ficha do jogador (components/times/campanha.tsx).
+    temaSemPingCampanha: "HISTÓRICO DA CALL",
+    temaSemPingCampanhaResultados: "CALL POR CALL",
+    temaSemPingCampanhaCampeoes: "OS MAINS",
+    temaSemPingCampanhaProximo: "PRÓXIMA CALL",
   },
   en: {
     temaSemPingLema: "Cameras on, mics open, zero ping.",
@@ -30,5 +35,9 @@ export const textosOs5SemPing = definir({
     temaSemPingNuncaNemVi: "999 ms? Nunca nem vi.",
     temaSemPingFecho: "Lagging? Unplug it and count to ten.",
     temaSemPingMesmaCall: "IN THE SAME CALL",
+    temaSemPingCampanha: "CALL HISTORY",
+    temaSemPingCampanhaResultados: "CALL BY CALL",
+    temaSemPingCampanhaCampeoes: "THE MAINS",
+    temaSemPingCampanhaProximo: "NEXT CALL",
   },
 });

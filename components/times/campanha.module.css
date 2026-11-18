@@ -1,0 +1,766 @@
+/*
+ * A CAMPANHA na ficha do jogador (components/times/campanha.tsx): destaques, próximo desafio,
+ * série a série e campeões. Só usa as variáveis do tema (--tm-*), então cada time já sai com as
+ * próprias cores e fontes; a cara única vem dos GANCHOS do cenário
+ * (cenarios/<cenario>-campanha.module.css, `.raiz .peca`).
+ *
+ * Mesmas regras de toda a pasta (tests/times/temas-sem-opacidade.test.ts): a base NÃO anima nada;
+ * transição só com a propriedade nomeada (nunca opacity, filter nem all).
+ */
+
+/* ------------------------------------------------------------------ seção e grade */
+.secao {
+  position: relative;
+  isolation: isolate;
+  padding-block: clamp(20px, 3vw, 44px) clamp(8px, 2vw, 24px);
+}
+.miolo {
+  position: relative;
+}
+
+.grade {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "destaques"
+    "proximo"
+    "resultados"
+    "campeoes";
+  gap: clamp(20px, 2.6vw, 30px);
+}
+.destaques,
+.vazio {
+  grid-area: destaques;
+}
+.proximo {
+  grid-area: proximo;
+}
+.resultados {
+  grid-area: resultados;
+  min-width: 0;
+}
+.campeoesBloco {
+  grid-area: campeoes;
+  min-width: 0;
+}
+@media (min-width: 1100px) {
+  .grade {
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+    grid-template-rows: auto auto 1fr;
+    grid-template-areas:
+      "destaques destaques"
+      "resultados proximo"
+      "resultados campeoes";
+    align-items: start;
+    column-gap: clamp(24px, 2.6vw, 36px);
+  }
+}
+
+.somenteLeitor {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.subtitulo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--tm-acento);
+}
+.subtitulo::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--tm-acento) 50%, transparent), transparent);
+}
+
+.vazio {
+  margin: 0;
+  padding: 22px 20px;
+  border: 1px dashed color-mix(in srgb, var(--tm-acento) 40%, transparent);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--tm-breu) 55%, transparent);
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--tm-prata);
+  text-align: center;
+}
+
+/* ------------------------------------------------------------------ peças comuns */
+.escudo {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+.escudoVazio {
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--tm-abismo);
+  color: var(--tm-texto);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+.campeaoIcone {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: 1px solid color-mix(in srgb, var(--tm-acento) 40%, transparent);
+  border-radius: 2px;
+  object-fit: cover;
+  background: var(--tm-abismo);
+  color: var(--tm-apoio);
+  font-size: 11px;
+  font-weight: 700;
+}
+.vs {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tm-apoio);
+}
+
+/* ------------------------------------------------------------------ destaques */
+.destaques {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+@media (min-width: 1100px) {
+  .destaques {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+  }
+}
+@media (max-width: 359px) {
+  .destaques {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.destaque {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 16px 16px 14px;
+  border: 1px solid color-mix(in srgb, var(--tm-acento) 28%, transparent);
+  border-radius: 2px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tm-royal) 22%, transparent), color-mix(in srgb, var(--tm-breu) 62%, transparent));
+}
+.destaque::before {
+  content: "";
+  position: absolute;
+  left: 16px;
+  right: 40%;
+  top: -1px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--tm-neon), transparent);
+  pointer-events: none;
+}
+@media (max-width: 599px) {
+  .destaque {
+    padding: 13px 12px 12px;
+  }
+}
+.destaqueRotulo {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  line-height: 1.3;
+  color: var(--tm-acento);
+}
+.destaqueValor {
+  font: var(--tm-titulo-estilo, italic) var(--tm-titulo-peso, 900) clamp(26px, 2.6vw, 36px) / 1 var(--tm-fonte-titulo), sans-serif;
+  color: var(--tm-texto);
+  overflow-wrap: anywhere;
+}
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .destaqueValor {
+    padding: 0.04em 0.12em 0.06em 0;
+    background: linear-gradient(180deg, var(--tm-metal-luz) 0%, var(--tm-nick-meio, #e3e9f1) 55%, var(--tm-valor-base, #9fb0c4) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
+.destaqueDetalhe {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--tm-prata);
+}
+.destaqueExtra {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--tm-apoio);
+}
+.destaqueLink {
+  align-self: flex-start;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.35;
+  color: var(--tm-acento);
+  text-decoration: none;
+}
+.destaqueLink:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.destaqueLink:focus-visible,
+.serieLink:focus-visible,
+.proximoCartao:focus-visible {
+  outline: 2px solid var(--tm-arco);
+  outline-offset: 3px;
+}
+
+/* o ranking: quatro linhas "3º ABATES 35" */
+.ranking {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 7px;
+}
+.rankingLinha {
+  display: grid;
+  grid-template-columns: 2.9em minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 8px;
+}
+.rankingPosicao {
+  font: var(--tm-titulo-estilo, italic) var(--tm-titulo-peso, 900) 20px / 1 var(--tm-fonte-titulo), sans-serif;
+  color: var(--tm-texto);
+  white-space: nowrap;
+}
+.rankingLinha[data-podio] .rankingPosicao {
+  color: var(--tm-acento);
+}
+.rankingMetrica {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--tm-apoio);
+  overflow-wrap: anywhere;
+}
+.rankingValor {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tm-prata);
+  font-variant-numeric: tabular-nums;
+}
+
+/* o melhor jogo: o ícone do campeão e o K/D/A grande */
+.melhorJogoCorpo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.melhorJogoTexto {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.melhorJogoCorpo .campeaoIcone {
+  width: 52px;
+  height: 52px;
+  border-color: color-mix(in srgb, var(--tm-neon) 60%, transparent);
+}
+@media (max-width: 599px) {
+  .melhorJogoCorpo {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .melhorJogoCorpo .campeaoIcone {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+/* a participação: o número e a régua */
+.medidor {
+  position: relative;
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--tm-texto) 12%, transparent);
+}
+.medidorBarra {
+  position: absolute;
+  inset: 0 auto 0 0;
+  inline-size: var(--pct, 0%);
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--tm-primaria), var(--tm-neon));
+}
+
+/* a forma: V e D dos últimos jogos */
+.forma {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.formaJogo {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  font: var(--tm-titulo-estilo, italic) var(--tm-titulo-peso, 900) 14px / 1 var(--tm-fonte-titulo), sans-serif;
+}
+.formaJogo[data-resultado="vitoria"] {
+  background: linear-gradient(180deg, var(--tm-placa-topo, #f4f7fb), var(--tm-metal-placa));
+  color: var(--tm-tinta);
+}
+.formaJogo[data-resultado="derrota"] {
+  border-color: color-mix(in srgb, var(--tm-apoio) 55%, transparent);
+  background: color-mix(in srgb, var(--tm-breu) 55%, transparent);
+  color: var(--tm-apoio);
+}
+
+/* ------------------------------------------------------------------ próximo desafio */
+.proximo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.proximoCartao {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  padding: 16px 18px;
+  border: 1px solid color-mix(in srgb, var(--tm-neon) 45%, transparent);
+  border-radius: 2px;
+  background:
+    radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--tm-primaria) 22%, transparent), transparent 60%),
+    linear-gradient(180deg, color-mix(in srgb, var(--tm-royal) 26%, transparent), color-mix(in srgb, var(--tm-breu) 70%, transparent));
+  color: var(--tm-texto);
+  text-decoration: none;
+  transition: border-color 0.2s ease, translate 0.25s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.proximoCartao:hover {
+  border-color: var(--tm-neon);
+  translate: 0 -2px;
+}
+.proximoData {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--tm-acento);
+}
+.proximoDia {
+  font: var(--tm-titulo-estilo, italic) var(--tm-titulo-peso, 900) 24px / 1 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.02em;
+  color: var(--tm-texto);
+}
+.proximoHora {
+  color: var(--tm-prata);
+}
+.proximoConfronto {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.proximoConfronto .escudo {
+  width: 40px;
+  height: 40px;
+}
+.proximoAdversario {
+  min-width: 0;
+  font: var(--tm-titulo-estilo, italic) var(--tm-titulo-peso-medio, 800) 17px / 1.1 var(--tm-fonte-titulo), sans-serif;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+.proximoInfo {
+  font-size: 11.5px;
+  color: var(--tm-apoio);
+}
+.proximoVer {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--tm-acento);
+}
+.tabela {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--tm-prata);
+}
+.tabelaPosicao {
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--tm-texto);
+}
+.tabelaCampanha {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------------ série a série */
+.series {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.serie {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px 16px 10px;
+  border: 1px solid color-mix(in srgb, var(--tm-acento) 26%, transparent);
+  border-left-width: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--tm-royal) 22%, transparent), color-mix(in srgb, var(--tm-breu) 66%, transparent));
+}
+.serie[data-resultado="vitoria"] {
+  border-left-color: var(--tm-neon);
+}
+.serie[data-resultado="derrota"] {
+  border-left-color: color-mix(in srgb, var(--tm-apoio) 70%, transparent);
+}
+@media (max-width: 599px) {
+  .serie {
+    padding: 12px 12px 8px;
+  }
+}
+.serieCabeca {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  min-width: 0;
+}
+.serieResultado {
+  padding: 4px 9px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+.serie[data-resultado="vitoria"] .serieResultado {
+  background: linear-gradient(180deg, var(--tm-placa-topo, #f4f7fb), var(--tm-metal-placa));
+  color: var(--tm-tinta);
+}
+.serie[data-resultado="derrota"] .serieResultado {
+  border-color: color-mix(in srgb, var(--tm-apoio) 60%, transparent);
+  color: var(--tm-prata);
+}
+.serie[data-resultado="andamento"] .serieResultado {
+  border-style: dashed;
+  border-color: var(--tm-neon);
+  color: var(--tm-texto);
+}
+.seriePlacar {
+  font: var(--tm-titulo-estilo, italic) var(--tm-titulo-peso, 900) 24px / 1 var(--tm-fonte-titulo), sans-serif;
+  color: var(--tm-texto);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.placarSeparador {
+  margin-inline: 0.2em;
+  font-size: 0.7em;
+  color: var(--tm-apoio);
+}
+.serieAdversario {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.adversarioNome {
+  min-width: 0;
+  font: var(--tm-titulo-estilo, italic) var(--tm-titulo-peso-medio, 800) 15px / 1.15 var(--tm-fonte-titulo), sans-serif;
+  text-transform: uppercase;
+  color: var(--tm-texto);
+  overflow-wrap: anywhere;
+}
+.serieInfo {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tm-apoio);
+}
+.serieMvp {
+  padding: 3px 8px;
+  border: 1px solid color-mix(in srgb, var(--tm-acento) 60%, transparent);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--tm-acento) 16%, transparent);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--tm-texto);
+}
+.serieSubstituto {
+  text-transform: none;
+  font-style: italic;
+  letter-spacing: 0.02em;
+}
+
+.jogos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid color-mix(in srgb, var(--tm-acento) 16%, transparent);
+}
+.jogo {
+  display: grid;
+  grid-template-columns: 2.4em minmax(0, 1fr) auto 26px;
+  grid-template-areas: "num camp det res";
+  align-items: center;
+  gap: 4px 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--tm-acento) 10%, transparent);
+}
+.jogo:last-child {
+  border-bottom: 0;
+}
+.jogoNumero {
+  grid-area: num;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--tm-apoio);
+}
+.jogoCampeao {
+  grid-area: camp;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.campeaoNome {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tm-texto);
+}
+.jogoDetalhes {
+  grid-area: det;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px 12px;
+  font-variant-numeric: tabular-nums;
+}
+.jogoKda {
+  font: var(--tm-titulo-estilo, italic) var(--tm-titulo-peso-medio, 800) 15px / 1 var(--tm-fonte-titulo), sans-serif;
+  color: var(--tm-texto);
+  white-space: nowrap;
+}
+.jogoRazao,
+.jogoDuracao {
+  font-size: 11px;
+  color: var(--tm-apoio);
+  white-space: nowrap;
+}
+.jogoMvp {
+  padding: 3px 7px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--tm-placa-topo, #f4f7fb), var(--tm-metal-placa));
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: var(--tm-tinta);
+}
+.jogoResultado {
+  grid-area: res;
+  justify-self: end;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  font: var(--tm-titulo-estilo, italic) var(--tm-titulo-peso, 900) 12px / 1 var(--tm-fonte-titulo), sans-serif;
+}
+.jogo[data-resultado="vitoria"] .jogoResultado {
+  border-color: var(--tm-neon);
+  background: color-mix(in srgb, var(--tm-neon) 22%, transparent);
+  color: var(--tm-texto);
+}
+.jogo[data-resultado="derrota"] .jogoResultado {
+  border-color: color-mix(in srgb, var(--tm-apoio) 50%, transparent);
+  color: var(--tm-apoio);
+}
+.jogoNota {
+  grid-column: 2 / 4;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--tm-apoio);
+}
+@media (max-width: 559px) {
+  .jogo {
+    grid-template-columns: 2.2em minmax(0, 1fr) 26px;
+    grid-template-areas:
+      "num camp res"
+      "num det res";
+  }
+  .jogoDetalhes {
+    justify-content: flex-start;
+    padding-left: 42px; /* alinha com o nome do campeão (ícone de 32 + 10) */
+  }
+  .jogoNota {
+    grid-column: 2 / 3;
+  }
+}
+.serieLink {
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--tm-acento);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+.serieLink:hover {
+  color: var(--tm-texto);
+}
+
+/* ------------------------------------------------------------------ campeões */
+.campeoes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr));
+  gap: 8px;
+}
+@media (min-width: 1100px) {
+  .campeoes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.campeao {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 8px 12px 8px 8px;
+  border: 1px solid color-mix(in srgb, var(--tm-acento) 20%, transparent);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--tm-breu) 55%, transparent);
+}
+.campeao .campeaoIcone {
+  width: 40px;
+  height: 40px;
+}
+.campeaoTexto {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.campeao .campeaoNome {
+  font: var(--tm-titulo-estilo, italic) var(--tm-titulo-peso-medio, 800) 14px / 1.1 var(--tm-fonte-titulo), sans-serif;
+  text-transform: uppercase;
+}
+.campeaoNumeros {
+  font-size: 11px;
+  color: var(--tm-apoio);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------------ a ficha sem tema */
+/* O bronze do site (Bronze Hextech): as mesmas variáveis que um tema daria. */
+.padrao {
+  --tm-breu: #0d0a05;
+  --tm-ceu: #1d1710;
+  --tm-abismo: #17110a;
+  --tm-royal: #3d2a14;
+  --tm-primaria: #c98a4b;
+  --tm-neon: #e8b878;
+  --tm-arco: #f0c88a;
+  --tm-nucleo: #fff3dd;
+  --tm-texto: #f7f1e6;
+  --tm-prata: #e6ddcd;
+  --tm-apoio: #a99e8b;
+  --tm-acento: #e6c592;
+  --tm-tinta: #160f06;
+  --tm-icone: #e6c592;
+  --tm-metal-luz: #fff2d9;
+  --tm-metal-alto: #f6d6a2;
+  --tm-metal-meio: #dc9f57;
+  --tm-metal-sombra: #6b4520;
+  --tm-metal-fundo: #a5692f;
+  --tm-metal-volta: #f0c88a;
+  --tm-metal-base: #b97e40;
+  --tm-metal-placa: #b97e40;
+  --tm-placa-topo: #f0c88a;
+  --tm-nick-meio: #f0c88a;
+  --tm-valor-base: #c98a4b;
+  --tm-fonte-titulo: var(--font-display), "Anton";
+  --tm-titulo-estilo: normal;
+  --tm-titulo-peso: 400;
+  --tm-titulo-peso-medio: 400;
+  margin-top: 28px;
+  padding-block: 0;
+  color: var(--tm-prata);
+}
+.tituloPadrao {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 16px;
+  font: 400 20px / 1.1 var(--font-display), "Anton", sans-serif;
+  letter-spacing: 0.02em;
+  color: #f2ebdf;
+}
+.tituloPadrao::before {
+  content: "";
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  background: #c98a4b;
+  transform: rotate(45deg);
+}

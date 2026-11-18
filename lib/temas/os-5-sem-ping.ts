@@ -57,6 +57,10 @@ export const TEMA_OS_5_SEM_PING: TemaDoTime = {
     carimbo: "temaSemPingNuncaNemVi",
     fecho: "temaSemPingFecho",
     companheiros: "temaSemPingMesmaCall",
+    campanha: "temaSemPingCampanha",
+    campanhaResultados: "temaSemPingCampanhaResultados",
+    campanhaCampeoes: "temaSemPingCampanhaCampeoes",
+    campanhaProximo: "temaSemPingCampanhaProximo",
   },
   fotos: {
     // Fotos de celular (selfies e fotos de rolê) que preenchem a moldura: o foco só enquadra o rosto.

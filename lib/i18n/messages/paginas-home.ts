@@ -1,8 +1,12 @@
 import { definir } from "@/lib/i18n/definir";
+import { textosCampanhaDoJogador } from "@/lib/i18n/messages/campanha-do-jogador";
 import { textosDesorganizacao } from "@/lib/i18n/messages/temas/desorganizacao";
+import { textosEquipeRx } from "@/lib/i18n/messages/temas/equipe-rx";
 import { textosFasDeRosca } from "@/lib/i18n/messages/temas/fas-de-rosca-esporte-clube";
+import { textosGalacticosDoBar } from "@/lib/i18n/messages/temas/galacticos-do-bar";
 import { textosOs5Furiosos } from "@/lib/i18n/messages/temas/os-5-furiosos";
 import { textosOs5SemPing } from "@/lib/i18n/messages/temas/os-5-sem-ping";
+import { textosQueijoMinas } from "@/lib/i18n/messages/temas/queijo-minas";
 import { textosSoAdcBronzeClube } from "@/lib/i18n/messages/temas/so-adc-bronze-clube";
 
 /**
@@ -151,6 +155,11 @@ export const paginasHome = definir({
     ...textosSoAdcBronzeClube.pt,
     ...textosOs5SemPing.pt,
     ...textosDesorganizacao.pt,
+    ...textosEquipeRx.pt,
+    ...textosQueijoMinas.pt,
+    ...textosGalacticosDoBar.pt,
+    // A campanha na ficha do jogador (lib/i18n/messages/campanha-do-jogador.ts).
+    ...textosCampanhaDoJogador.pt,
 
     // ---------- jogadores ----------
     jogadoresTitulo: "JOGADORES",
@@ -327,6 +336,11 @@ export const paginasHome = definir({
     ...textosSoAdcBronzeClube.en,
     ...textosOs5SemPing.en,
     ...textosDesorganizacao.en,
+    ...textosEquipeRx.en,
+    ...textosQueijoMinas.en,
+    ...textosGalacticosDoBar.en,
+    // A campanha na ficha do jogador (lib/i18n/messages/campanha-do-jogador.ts).
+    ...textosCampanhaDoJogador.en,
 
     // ---------- jogadores ----------
     jogadoresTitulo: "PLAYERS",

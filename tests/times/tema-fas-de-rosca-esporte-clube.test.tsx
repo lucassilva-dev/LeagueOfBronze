@@ -151,7 +151,7 @@ describe("registro: o tema dos Fãs de Rosca", () => {
     });
   });
 
-  it("os 9 textos do tema saem nos dois idiomas (o TÁ PAGO fica em português)", () => {
+  it("os 13 textos do tema (9 da página, 4 da campanha) saem nos dois idiomas (o TÁ PAGO fica em português)", () => {
     const pt: Record<PapelDoTexto, string> = {
       lema: "Ninguém aqui pula dia de braço.",
       estrelando: "SÓCIOS EM DIA",
@@ -162,6 +162,10 @@ describe("registro: o tema dos Fãs de Rosca", () => {
       carimbo: "TÁ PAGO",
       fecho: "Contém glúten. E braço demais.",
       companheiros: "PARCEIROS DE TREINO",
+      campanha: "FICHA DE TREINO",
+      campanhaResultados: "SÉRIE POR SÉRIE",
+      campanhaCampeoes: "OS EXERCÍCIOS",
+      campanhaProximo: "PRÓXIMO TREINO",
     };
     const en: Record<PapelDoTexto, string> = {
       lema: "Nobody here skips arm day.",
@@ -173,6 +177,10 @@ describe("registro: o tema dos Fãs de Rosca", () => {
       carimbo: "TÁ PAGO",
       fecho: "Contains gluten. And way too much arm.",
       companheiros: "GYM BUDDIES",
+      campanha: "WORKOUT LOG",
+      campanhaResultados: "SET BY SET",
+      campanhaCampeoes: "THE EXERCISES",
+      campanhaProximo: "NEXT WORKOUT",
     };
     for (const papel of Object.keys(pt) as PapelDoTexto[]) {
       expect(textoDoTema(TEMA_FAS_DE_ROSCA, t, papel)).toBe(pt[papel]);

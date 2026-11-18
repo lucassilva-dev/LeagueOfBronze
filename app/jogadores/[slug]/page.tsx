@@ -4,7 +4,10 @@ import { notFound, redirect } from "next/navigation";
 
 import { AvisoConsentimento } from "@/components/aviso-consentimento";
 import { LinkDeVolta } from "@/components/lob/link-de-volta";
+import { CampanhaDoJogador } from "@/components/times/campanha";
+import cm from "@/components/times/campanha.module.css";
 import { FichaDoJogadorComTema } from "@/components/times/ficha-do-jogador-com-tema";
+import { comCenario } from "@/components/times/util";
 import { caminhoNoArquivo } from "@/lib/arquivo";
 import { semTemporadaAoVivo } from "@/lib/fase-do-site";
 import { EloCrest, RoleIcon } from "@/components/lob/ui";
@@ -17,6 +20,7 @@ import { getLocale, getMessages } from "@/lib/i18n/server";
 import { getOpGgSummonerUrlFromNick } from "@/lib/opgg";
 import { buildDesignPlayers, buildDesignTeams } from "@/lib/roster";
 import { segmentoDaRota } from "@/lib/segmento-da-rota";
+import { campanhaDoJogador } from "@/lib/jogadores/campanha";
 import { getServerDataset } from "@/lib/server-data";
 import { temaDoTime } from "@/lib/temas/registro";
 import { calculatePlayerAggregates } from "@/lib/tournament";
@@ -84,6 +88,8 @@ export default async function PlayerFichaPage({ params, searchParams }: PlayerPa
   const opggUrl = getOpGgSummonerUrlFromNick(player.nick);
   // Veio da lista de /jogadores: volta para a lista; senão, para o time (o reserva, para a lista).
   const voltar = voltarDaFicha(player, de, { voltarAoTime: t.jogadorVoltar, voltarAosJogadores: te.voltarJogadores });
+  // A campanha na edição: série a série, destaques, campeões e o próximo desafio do time.
+  const campanha = campanhaDoJogador(dataset, player.id);
 
   // Jogador de um time com página temática (lib/temas): a ficha ganha a cara do time. O
   // reserva (sem time) fica com a ficha padrão.
@@ -103,6 +109,9 @@ export default async function PlayerFichaPage({ params, searchParams }: PlayerPa
           temporada={nomeDaTemporada(dataset.tournament.name, compartilhados.localeTag)}
           voltar={voltar}
           saiu={player.saiu ? te.saiuDoTime : null}
+          campanha={campanha}
+          localeTag={compartilhados.localeTag}
+          semCampeao={compartilhados.campeaoNaoInformado}
         />
         <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 clamp(16px,4vw,24px) 48px" }}>
           <AvisoConsentimento />
@@ -188,6 +197,24 @@ export default async function PlayerFichaPage({ params, searchParams }: PlayerPa
           </div>
         </div>
       </div>
+      {/* A mesma campanha da ficha temática, com o bronze do site (o reserva não tem tema). */}
+      <CampanhaDoJogador
+        campanha={campanha}
+        t={t}
+        localeTag={compartilhados.localeTag}
+        semCampeao={compartilhados.campeaoNaoInformado}
+        nick={player.displayNick}
+        idBase="ficha-campanha"
+        c={comCenario(cm)}
+        tituloClasse={cm.tituloPadrao}
+        titulos={{
+          campanha: t.campanhaTitulo,
+          resultados: t.campanhaResultados,
+          campeoes: t.campanhaCampeoes,
+          proximo: t.campanhaProximo,
+        }}
+        padrao
+      />
       <AvisoConsentimento />
     </div>
   );

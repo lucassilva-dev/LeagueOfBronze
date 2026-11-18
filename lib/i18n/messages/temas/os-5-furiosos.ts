@@ -19,6 +19,11 @@ export const textosOs5Furiosos = definir({
     temaFuriososSabor: "SABOR MEIO ROXO",
     temaFuriososFecho: "Troco repetida por vitória.",
     temaFuriososCompleteOTime: "COMPLETE O TIME",
+    // A campanha na ficha do jogador (components/times/campanha.tsx).
+    temaFuriososCampanha: "O ÁLBUM DA CAMPANHA",
+    temaFuriososCampanhaResultados: "PÁGINA POR PÁGINA",
+    temaFuriososCampanhaCampeoes: "FIGURINHAS COLADAS",
+    temaFuriososCampanhaProximo: "PRÓXIMO PACOTINHO",
   },
   en: {
     temaFuriososLema: "It tastes kinda purple!",
@@ -31,5 +36,9 @@ export const textosOs5Furiosos = definir({
     temaFuriososSabor: "SABOR MEIO ROXO",
     temaFuriososFecho: "Will trade duplicates for wins.",
     temaFuriososCompleteOTime: "COMPLETE THE TEAM",
+    temaFuriososCampanha: "THE CAMPAIGN ALBUM",
+    temaFuriososCampanhaResultados: "PAGE BY PAGE",
+    temaFuriososCampanhaCampeoes: "STICKERS COLLECTED",
+    temaFuriososCampanhaProximo: "NEXT PACK",
   },
 });

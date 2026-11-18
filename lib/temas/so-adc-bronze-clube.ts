@@ -59,6 +59,10 @@ export const TEMA_SO_ADC_BRONZE_CLUBE: TemaDoTime = {
     carimbo: "temaSoAdcMmr",
     fecho: "temaSoAdcFecho",
     companheiros: "temaSoAdcFlechas",
+    campanha: "temaSoAdcCampanha",
+    campanhaResultados: "temaSoAdcCampanhaResultados",
+    campanhaCampeoes: "temaSoAdcCampanhaCampeoes",
+    campanhaProximo: "temaSoAdcCampanhaProximo",
   },
   fotos: {
     focoPadrao: "50% 30%",

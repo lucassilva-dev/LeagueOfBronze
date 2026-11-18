@@ -56,6 +56,10 @@ export const TEMA_GALACTICOS_DO_BAR: TemaDoTime = {
     carimbo: "temaGalacticosFiado",
     fecho: "temaGalacticosFecho",
     companheiros: "temaGalacticosMesa",
+    campanha: "temaGalacticosCampanha",
+    campanhaResultados: "temaGalacticosCampanhaResultados",
+    campanhaCampeoes: "temaGalacticosCampanhaCampeoes",
+    campanhaProximo: "temaGalacticosCampanhaProximo",
   },
   // Avatares redondos com fundo transparente: o círculo inteiro, sem enquadramento por jogador.
   fotos: { focoPadrao: "50% 50%", formato: "medalhao" },

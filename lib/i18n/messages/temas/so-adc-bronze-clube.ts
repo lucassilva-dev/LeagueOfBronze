@@ -21,6 +21,11 @@ export const textosSoAdcBronzeClube = definir({
     temaSoAdcMmr: "MMR: ???",
     temaSoAdcFecho: "A mosca segue intacta desde 2024.",
     temaSoAdcFlechas: "AS OUTRAS FLECHAS",
+    // A campanha na ficha do jogador (components/times/campanha.tsx).
+    temaSoAdcCampanha: "A CADERNETA DE TIRO",
+    temaSoAdcCampanhaResultados: "SÉRIE DE FLECHAS",
+    temaSoAdcCampanhaCampeoes: "FLECHAS DISPARADAS",
+    temaSoAdcCampanhaProximo: "PRÓXIMO ALVO",
   },
   en: {
     temaSoAdcLema: "3 improvised ADCs · trying to win",
@@ -32,5 +37,9 @@ export const textosSoAdcBronzeClube = definir({
     temaSoAdcMmr: "MMR: ???",
     temaSoAdcFecho: "The bullseye has been untouched since 2024.",
     temaSoAdcFlechas: "THE OTHER ARROWS",
+    temaSoAdcCampanha: "THE SCORECARD",
+    temaSoAdcCampanhaResultados: "END BY END",
+    temaSoAdcCampanhaCampeoes: "ARROWS FIRED",
+    temaSoAdcCampanhaProximo: "NEXT TARGET",
   },
 });

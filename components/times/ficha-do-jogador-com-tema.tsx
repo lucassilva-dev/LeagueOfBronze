@@ -3,6 +3,8 @@ import type { CSSProperties } from "react";
 
 import { LinkDeVolta } from "@/components/lob/link-de-volta";
 import { EloCrest, RoleIcon } from "@/components/lob/ui";
+import { CampanhaDoJogador } from "@/components/times/campanha";
+import cm from "@/components/times/campanha.module.css";
 import { CENARIOS } from "@/components/times/cenarios";
 import f from "@/components/times/ficha.module.css";
 import { FONTES_DOS_TEMAS } from "@/components/times/fontes-dos-temas";
@@ -11,6 +13,7 @@ import { RotuloDoCapitao } from "@/components/times/pagina-do-time-com-tema";
 import s from "@/components/times/tema.module.css";
 import { comCenario, cx } from "@/components/times/util";
 import { eloLabel, rotaCurto, rotaLabel, type PaginasHomeTextos } from "@/lib/i18n/messages/paginas-home";
+import type { CampanhaDoJogador as Campanha } from "@/lib/jogadores/campanha";
 import type { DesignPlayer, DesignTeam } from "@/lib/roster";
 import { METRICAS, larguraDoNickEm } from "@/lib/temas/metricas";
 import { textoDoTema, varsDoTema } from "@/lib/temas/registro";
@@ -36,9 +39,29 @@ type Props = Readonly<{
   voltar: { href: string; texto: string };
   /** "Saiu do time", ao lado do time, para quem saiu de vez. */
   saiu?: string | null;
+  /** A campanha na edição (lib/jogadores/campanha.ts): a seção entre o herói e os companheiros. */
+  campanha?: Campanha | null;
+  /** Idioma das datas e números da campanha. */
+  localeTag?: string;
+  /** O quadradinho do jogo sem campeão (compartilhados.campeaoNaoInformado). */
+  semCampeao?: string;
 }>;
 
-export function FichaDoJogadorComTema({ player, team, tema, t, elos, tiles, opggUrl, temporada, voltar, saiu }: Props) {
+export function FichaDoJogadorComTema({
+  player,
+  team,
+  tema,
+  t,
+  elos,
+  tiles,
+  opggUrl,
+  temporada,
+  voltar,
+  saiu,
+  campanha,
+  localeTag = "pt-BR",
+  semCampeao = "—",
+}: Props) {
   const fonteTitulo = FONTES_DOS_TEMAS[tema.fontes.titulo].variable;
   const fonteAssinatura = tema.fontes.assinatura ? FONTES_DOS_TEMAS[tema.fontes.assinatura].variable : "";
   const foco = tema.fotos.foco?.[player.slug] ?? tema.fotos.focoPadrao;
@@ -47,6 +70,7 @@ export function FichaDoJogadorComTema({ player, team, tema, t, elos, tiles, opgg
   const cenario = CENARIOS[tema.cenario];
   const c = comCenario(s, cenario.classes);
   const cf = comCenario(f, cenario.classesDaFicha);
+  const cc = comCenario(cm, cenario.classesDaCampanha);
   const { Insignia, InsigniaMini, Moldura, AtrasDoRetrato } = cenario;
   const capitao = textoDoTema(tema, t, "capitao") ?? t.timeCapitaoTema;
   // O nick pelo tamanho da MAIOR PALAVRA (quem quebra entre palavras cabe maior).
@@ -56,7 +80,7 @@ export function FichaDoJogadorComTema({ player, team, tema, t, elos, tiles, opgg
 
   return (
     <div
-      className={cx(c("raiz"), cenario.classesDaFicha?.raiz, fonteTitulo, fonteAssinatura)}
+      className={cx(c("raiz"), cenario.classesDaFicha?.raiz, cenario.classesDaCampanha?.raiz, fonteTitulo, fonteAssinatura)}
       style={varsDoTema(tema)}
       data-tema={tema.slug}
       data-fotos={tema.fotos.formato}
@@ -179,6 +203,27 @@ export function FichaDoJogadorComTema({ player, team, tema, t, elos, tiles, opgg
             </div>
           </div>
         </section>
+
+        {campanha ? (
+          <CampanhaDoJogador
+            campanha={campanha}
+            t={t}
+            localeTag={localeTag}
+            semCampeao={semCampeao}
+            nick={player.displayNick}
+            idBase="tm-campanha"
+            c={cc}
+            tituloClasse={c("estrelando")}
+            conteinerClasse={c("conteiner")}
+            titulos={{
+              campanha: textoDoTema(tema, t, "campanha") ?? t.campanhaTitulo,
+              resultados: textoDoTema(tema, t, "campanhaResultados") ?? t.campanhaResultados,
+              campeoes: textoDoTema(tema, t, "campanhaCampeoes") ?? t.campanhaCampeoes,
+              proximo: textoDoTema(tema, t, "campanhaProximo") ?? t.campanhaProximo,
+            }}
+            NaCampanha={cenario.NaCampanha}
+          />
+        ) : null}
 
         {companheiros.length > 0 && team ? (
           <section className={cf("companheirosSecao")} aria-labelledby="tm-companheiros">

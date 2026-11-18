@@ -20,6 +20,11 @@ export const textosFasDeRosca = definir({
     temaRoscaTaPago: "TÁ PAGO",
     temaRoscaFecho: "Contém glúten. E braço demais.",
     temaRoscaParceiros: "PARCEIROS DE TREINO",
+    // A campanha na ficha do jogador (components/times/campanha.tsx).
+    temaRoscaCampanha: "FICHA DE TREINO",
+    temaRoscaCampanhaResultados: "SÉRIE POR SÉRIE",
+    temaRoscaCampanhaCampeoes: "OS EXERCÍCIOS",
+    temaRoscaCampanhaProximo: "PRÓXIMO TREINO",
   },
   en: {
     temaRoscaLema: "Nobody here skips arm day.",
@@ -32,5 +37,9 @@ export const textosFasDeRosca = definir({
     temaRoscaTaPago: "TÁ PAGO",
     temaRoscaFecho: "Contains gluten. And way too much arm.",
     temaRoscaParceiros: "GYM BUDDIES",
+    temaRoscaCampanha: "WORKOUT LOG",
+    temaRoscaCampanhaResultados: "SET BY SET",
+    temaRoscaCampanhaCampeoes: "THE EXERCISES",
+    temaRoscaCampanhaProximo: "NEXT WORKOUT",
   },
 });

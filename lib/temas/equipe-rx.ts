@@ -41,5 +41,12 @@ export const TEMA_EQUIPE_RX: TemaDoTime = {
   // O azul do neon do escudo (o id `carmesim` dava o vermelho #d9455f do nome do draft).
   cor: "#4DA3FF",
   cenario: "tempestade",
+  // Só a campanha da ficha (components/times/campanha.tsx): o resto da página usa os textos padrão.
+  textos: {
+    campanha: "temaRxCampanha",
+    campanhaResultados: "temaRxCampanhaResultados",
+    campanhaCampeoes: "temaRxCampanhaCampeoes",
+    campanhaProximo: "temaRxCampanhaProximo",
+  },
   fotos: { focoPadrao: "50% 32%", foco: { ironclaw: "42% 28%" } },
 };

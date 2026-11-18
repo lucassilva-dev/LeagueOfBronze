@@ -60,6 +60,10 @@ export const TEMA_FAS_DE_ROSCA: TemaDoTime = {
     carimbo: "temaRoscaTaPago",
     fecho: "temaRoscaFecho",
     companheiros: "temaRoscaParceiros",
+    campanha: "temaRoscaCampanha",
+    campanhaResultados: "temaRoscaCampanhaResultados",
+    campanhaCampeoes: "temaRoscaCampanhaCampeoes",
+    campanhaProximo: "temaRoscaCampanhaProximo",
   },
   // Selfies de celular (retrato que preenche a moldura, sem medalhão). Enquadramento conferido em
   // 4:5 (carta e ficha), 1:1 (companheiros) e 3:2 em cada foto.

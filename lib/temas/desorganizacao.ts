@@ -60,6 +60,10 @@ export const TEMA_DESORGANIZACAO: TemaDoTime = {
     carimbo: "temaDesorgTarja",
     fecho: "temaDesorgFecho",
     companheiros: "temaDesorgTrupe",
+    campanha: "temaDesorgCampanha",
+    campanhaResultados: "temaDesorgCampanhaResultados",
+    campanhaCampeoes: "temaDesorgCampanhaCampeoes",
+    campanhaProximo: "temaDesorgCampanhaProximo",
   },
   fotos: {
     focoPadrao: "50% 30%",

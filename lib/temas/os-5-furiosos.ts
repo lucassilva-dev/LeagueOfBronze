@@ -58,6 +58,10 @@ export const TEMA_OS_5_FURIOSOS: TemaDoTime = {
     carimbo: "temaFuriososSabor",
     fecho: "temaFuriososFecho",
     companheiros: "temaFuriososCompleteOTime",
+    campanha: "temaFuriososCampanha",
+    campanhaResultados: "temaFuriososCampanhaResultados",
+    campanhaCampeoes: "temaFuriososCampanhaCampeoes",
+    campanhaProximo: "temaFuriososCampanhaProximo",
   },
   // Retratos (artes de skin), não avatares: o foco acerta o rosto na carta 5:7, na ficha 4:5 e no
   // quadrado do companheiro.

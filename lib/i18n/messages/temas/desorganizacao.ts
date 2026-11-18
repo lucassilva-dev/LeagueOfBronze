@@ -20,6 +20,11 @@ export const textosDesorganizacao = definir({
     temaDesorgTarja: "SUJEITO A ATRASO",
     temaDesorgFecho: "Reclamações: falar com a organização. (Somos nós.)",
     temaDesorgTrupe: "O RESTO DA TRUPE",
+    // A campanha na ficha do jogador (components/times/campanha.tsx).
+    temaDesorgCampanha: "O PROGRAMA DO ESPETÁCULO",
+    temaDesorgCampanhaResultados: "NÚMERO A NÚMERO",
+    temaDesorgCampanhaCampeoes: "O REPERTÓRIO",
+    temaDesorgCampanhaProximo: "PRÓXIMA SESSÃO",
   },
   en: {
     temaDesorgLema: "Ladies and gentlemen: the show is about to begin (40 minutes late).",
@@ -32,5 +37,9 @@ export const textosDesorganizacao = definir({
     temaDesorgTarja: "SUJEITO A ATRASO",
     temaDesorgFecho: "Complaints? Talk to the organizers. (That's us.)",
     temaDesorgTrupe: "THE REST OF THE TROUPE",
+    temaDesorgCampanha: "TONIGHT'S PROGRAM",
+    temaDesorgCampanhaResultados: "ACT BY ACT",
+    temaDesorgCampanhaCampeoes: "THE REPERTOIRE",
+    temaDesorgCampanhaProximo: "NEXT SHOW",
   },
 });
