@@ -1,0 +1,528 @@
+/*
+ * A CAMPANHA na ficha no cenário "album" (Os 5 Furiosos): «O ÁLBUM DA CAMPANHA». Os destaques são
+ * adesivos de número (os da performance do herói); cada série é uma PÁGINA do álbum, de orelha dobrada;
+ * cada jogo, uma FIGURINHA colada torta, de cantinho descolado (o de MVP é a BRILHANTE, de aro
+ * holográfico; o que ele não jogou, a VAGA pontilhada); o próximo desafio, o PACOTINHO lacrado; os
+ * campeões, a CARTELA com o pontilhado do recorte.
+ *
+ * `.raiz` + o seletor da base INTEIRO (um nível acima, nunca empate). Nada anima (abaixo da dobra; o
+ * orçamento de laços da ficha está cheio): só a transição do hover, com a propriedade nomeada. Sem
+ * `border` nas figurinhas (a base zera a do último jogo com a mesma especificidade): o papel é um anel
+ * de box-shadow, a vaga um outline. Papel, vaga e holográfico: as variáveis de album.module.css.
+ */
+
+/* ------------------------------------------------------------------ peças repetidas */
+/* O miúdo no impresso do álbum (Baloo 2); os tamanhos e as cores são os da base. */
+.raiz .destaqueDetalhe,
+.raiz .destaqueExtra,
+.raiz .rankingMetrica,
+.raiz .proximoInfo,
+.raiz .tabela,
+.raiz .vs,
+.raiz .serieInfo,
+.raiz .jogoRazao,
+.raiz .jogoDuracao,
+.raiz .jogoNota,
+.raiz .campeaoNumeros,
+.raiz .vazio {
+  font-family: var(--tm-fonte-assinatura), Arial, sans-serif;
+  font-weight: 700;
+}
+/* As pílulas de vinil. */
+.raiz .serieResultado,
+.raiz .serieMvp,
+.raiz .jogoMvp,
+.raiz .proximoVer {
+  justify-self: start;
+  padding: 4px 9px 3px;
+  border: 0;
+  border-radius: 999px;
+  font: 400 12px / 1 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.06em;
+}
+.raiz .rankingLinha[data-podio] .rankingPosicao,
+.raiz .serie[data-resultado="vitoria"] .serieResultado,
+.raiz .proximoVer {
+  background: var(--tm-acento);
+  color: var(--tm-tinta); /* 14:1 no lima */
+  box-shadow: 0 0 0 2px var(--creme);
+}
+.raiz .serieMvp,
+.raiz .jogoMvp {
+  background: var(--holo-claro);
+  color: var(--tm-tinta);
+}
+/* O código impresso da figurinha (o «5F n» creme). */
+.raiz .jogoNumero,
+.raiz .tabelaPosicao {
+  justify-self: start;
+  padding: 4px 6px 3px;
+  border-radius: 5px;
+  background: var(--creme);
+  color: var(--tm-tinta);
+  font: 400 11px / 1 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.04em;
+}
+/* V e D: a bolinha lima e a roxa (na forma e em cada figurinha). */
+.raiz .formaJogo,
+.raiz .jogoResultado {
+  border: 0;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--creme);
+}
+.raiz .formaJogo[data-resultado="vitoria"],
+.raiz .jogo[data-resultado="vitoria"] .jogoResultado {
+  background: var(--tm-acento);
+  color: var(--tm-tinta);
+}
+.raiz .formaJogo[data-resultado="derrota"],
+.raiz .jogo[data-resultado="derrota"] .jogoResultado {
+  background: var(--tm-royal);
+  color: var(--creme); /* 7:1 */
+}
+
+/* ------------------------------------------------------------------ títulos de dentro */
+.raiz .subtitulo {
+  margin-bottom: 16px;
+  font: 400 16px / 1.1 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.05em;
+  color: var(--creme);
+}
+.raiz .subtitulo::before {
+  content: "✦" / "";
+  color: var(--tm-acento);
+}
+.raiz .subtitulo::after {
+  height: 2px;
+  background: repeating-linear-gradient(90deg, rgba(255, 246, 230, 0.45) 0 8px, transparent 8px 14px);
+}
+
+/* ------------------------------------------------------------------ destaques: adesivos de número */
+.raiz .destaques {
+  gap: 16px 12px;
+}
+.raiz .destaque {
+  border: 0;
+  border-radius: 16px;
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.035) 0 6px, transparent 6px 12px),
+    linear-gradient(180deg, #3a1a80, var(--tm-abismo));
+  box-shadow: 0 0 0 2.5px var(--creme), 0 14px 22px -14px #000;
+}
+/* O reflexo do vinil (o traço das estatísticas do herói). */
+.raiz .destaque::before {
+  left: 22%;
+  right: 22%;
+  top: 6px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.22);
+}
+/* O rótulo é uma etiqueta lima colada torta: gira só o papel dela (::before), a letra fica reta. */
+.raiz .destaqueRotulo {
+  position: relative;
+  isolation: isolate;
+  align-self: flex-start;
+  padding: 5px 9px 4px;
+  font: 400 11.5px / 1.15 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.05em;
+  text-wrap: balance;
+  color: var(--tm-tinta);
+}
+.raiz .destaqueRotulo::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 8px;
+  rotate: -2deg;
+  background: var(--tm-acento);
+  box-shadow: 0 0 0 2px var(--creme);
+}
+.raiz .destaqueValor {
+  padding: 0;
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  color: var(--creme);
+  text-shadow: 0 3px 0 rgba(27, 11, 58, 0.6);
+}
+.raiz .destaqueLink {
+  font: 400 12.5px / 1.3 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.03em;
+}
+/* O ranking: a lista de conferência do fim do álbum; o pódio vem na pílula lima. */
+.raiz .ranking {
+  gap: 0;
+}
+.raiz .rankingLinha {
+  grid-template-columns: 3.4em minmax(0, 1fr) auto;
+  align-items: center;
+  padding: 5px 0;
+  border-bottom: 1.5px dashed rgba(255, 246, 230, 0.16);
+}
+.raiz .rankingPosicao {
+  justify-self: start;
+  color: var(--creme);
+}
+.raiz .rankingLinha[data-podio] .rankingPosicao {
+  padding: 3px 7px 2px;
+  border-radius: 999px;
+  font-size: 15px;
+}
+.raiz .rankingValor {
+  font: 400 15px / 1 var(--tm-fonte-titulo), sans-serif;
+  color: var(--tm-prata);
+}
+/* O melhor jogo: o campeão numa figurinha pequena, torta. */
+.raiz .melhorJogoCorpo .campeaoIcone {
+  width: 52px;
+  height: 52px;
+  border: 3px solid var(--papel);
+  border-radius: 10px;
+  rotate: -4deg;
+}
+/* A participação: a fita holográfica do pé do herói, num trilho. */
+.raiz .medidor {
+  height: 12px;
+  border-radius: 6px;
+  background: rgba(18, 8, 31, 0.75);
+  box-shadow: inset 0 0 0 1.5px rgba(255, 246, 230, 0.3);
+}
+.raiz .medidorBarra {
+  background: var(--holo-claro);
+}
+/* A forma: as bolinhas coladas no bafo, tortas. */
+.raiz .formaJogo {
+  rotate: -7deg;
+}
+.raiz .formaJogo:nth-child(even) {
+  rotate: 6deg;
+}
+
+/* ------------------------------------------------------------------ o próximo: o PACOTINHO lacrado */
+/* Laminado com o serrilhado em cima e embaixo (a máscara ESTÁTICA do pacotinho da página, dentes de
+   8 px; o texto mora no padding), o picote de abrir, o rótulo escuro (::before) e o selo lima (::after). */
+.raiz .proximoCartao {
+  isolation: isolate;
+  width: min(100%, 480px); /* no tablet a coluna é a tela toda: pacote, não faixa */
+  padding: 36px 26px 32px;
+  border: 0;
+  border-radius: 0;
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 246, 230, 0.55) 0 6px, transparent 6px 10px) 50% 16px / calc(100% - 24px) 2px no-repeat,
+    linear-gradient(112deg, transparent 30%, rgba(255, 122, 217, 0.2) 42%, rgba(255, 211, 110, 0.18) 48%, rgba(106, 242, 255, 0.2) 54%, transparent 66%),
+    linear-gradient(160deg, #4a1fa8, #24104f 45%, #3a1888 70%, #1e0c40);
+  -webkit-mask:
+    conic-gradient(from 135deg at 50% 0, #000 0 90deg, #0000 0) 50% 0 / 16px 8px repeat-x,
+    linear-gradient(#000, #000) 0 8px / 100% calc(100% - 16px) no-repeat,
+    conic-gradient(from -45deg at 50% 100%, #000 0 90deg, #0000 0) 50% 100% / 16px 8px repeat-x;
+  mask:
+    conic-gradient(from 135deg at 50% 0, #000 0 90deg, #0000 0) 50% 0 / 16px 8px repeat-x,
+    linear-gradient(#000, #000) 0 8px / 100% calc(100% - 16px) no-repeat,
+    conic-gradient(from -45deg at 50% 100%, #000 0 90deg, #0000 0) 50% 100% / 16px 8px repeat-x;
+  transition: translate 0.25s cubic-bezier(0.2, 0.7, 0.2, 1), rotate 0.25s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.raiz .proximoCartao:hover {
+  translate: 0 -3px;
+  rotate: -0.8deg;
+}
+/* A máscara corta o anel de foco de fora: ele vem para dentro do pacote. */
+.raiz .proximoCartao:focus-visible {
+  outline: 2px solid var(--tm-acento);
+  outline-offset: -14px;
+}
+.raiz .proximoCartao::before {
+  content: "";
+  position: absolute;
+  inset: 24px 12px 18px;
+  z-index: -1;
+  border-radius: 12px;
+  background: #1a0b33;
+  box-shadow: inset 0 0 0 2px rgba(200, 245, 74, 0.5);
+}
+.raiz .proximoCartao::after {
+  content: "✦" / "";
+  position: absolute;
+  top: 32px;
+  right: 22px;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  rotate: 12deg;
+  background: var(--tm-acento);
+  color: var(--tm-tinta);
+  font: 22px / 1 sans-serif;
+  box-shadow: 0 0 0 3px var(--creme);
+}
+/* Série rolando: o pacotinho está sendo aberto — o aro do rótulo e o placar acendem em lima. */
+.raiz .proximoCartao[data-em-andamento]::before {
+  box-shadow: inset 0 0 0 2px var(--tm-acento), 0 0 18px rgba(200, 245, 74, 0.25);
+}
+.raiz .proximoCartao[data-em-andamento] .proximoInfo {
+  color: var(--tm-acento);
+}
+.raiz .proximoData {
+  padding-right: 46px; /* o selo */
+  font: 400 12px / 1 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.08em;
+}
+.raiz .tabela {
+  margin-top: 16px;
+}
+.raiz .tabelaPosicao {
+  padding-inline: 9px;
+  font-size: 13px;
+}
+
+/* ------------------------------------------------------------------ série a série: as páginas */
+/* O roxo impresso com a retícula; o canto de baixo à direita DOBRADO (a orelha, ::after). */
+.raiz .series {
+  gap: 22px;
+}
+.raiz .serie {
+  gap: 14px;
+  border: 0;
+  border-radius: 16px 16px 0 16px;
+  background:
+    radial-gradient(circle, rgba(233, 210, 255, 0.07) 0 1px, transparent 1.6px) 0 0 / 10px 10px,
+    linear-gradient(180deg, #26104f, #1a0a37);
+  box-shadow: inset 0 0 0 1.5px rgba(255, 246, 230, 0.14), 0 18px 28px -20px #000;
+}
+.raiz .serie::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 30px;
+  height: 30px;
+  border-top-left-radius: 8px;
+  background: linear-gradient(315deg, #12081f 0 50%, rgba(5, 0, 12, 0.6) 50% 53%, #8a63e8 53%, #4b22a6);
+}
+.raiz .serie[data-resultado="derrota"] .serieResultado {
+  background: var(--tm-tinta);
+  color: var(--tm-prata);
+  box-shadow: inset 0 0 0 2px rgba(187, 169, 224, 0.6);
+}
+.raiz .serie[data-resultado="andamento"] .serieResultado {
+  background: none;
+  color: var(--creme);
+  outline: 2px dashed var(--tm-acento);
+  outline-offset: -2px;
+}
+.raiz .seriePlacar {
+  font-size: 30px;
+  color: var(--creme);
+  text-shadow: 0 3px 0 rgba(27, 11, 58, 0.7);
+}
+.raiz .escudo {
+  border-radius: 7px;
+  background: var(--tm-abismo);
+  box-shadow: 0 0 0 2px var(--creme);
+}
+/* «VER PARTIDA →» antes da orelha. */
+.raiz .serieLink {
+  margin-right: 22px;
+  font: 400 12.5px / 1 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.06em;
+}
+
+/* As FIGURINHAS: três vagas por linha (a MD3 inteira; numa 2 × 0 a 3ª fica livre; a MD5 desce), cada
+   uma com o código «J1», a bolinha do V/D, o campeão de foto, a faixa do nome e o K/D/A. Foto, nome e
+   K/D/A acompanham a figurinha: ~80 px em 320, ~100 no celular, 115–175 da coluna da página. */
+.raiz .jogos {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px 12px;
+  padding: 4px 2px 2px;
+  border-top: 0;
+}
+.raiz .jogo {
+  position: relative;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas:
+    "num . res"
+    "camp camp camp"
+    "det det det";
+  gap: 8px 2px;
+  padding: 7px 6px 9px;
+  border: 0;
+  border-radius: 12px;
+  text-align: center;
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0 5px, transparent 5px 10px),
+    linear-gradient(180deg, #4b22a6, var(--tm-abismo));
+  box-shadow: 0 0 0 3px var(--papel), 0 12px 18px -10px #000;
+}
+.raiz .jogo:not([data-tipo]):nth-child(odd) {
+  rotate: -1.1deg;
+}
+.raiz .jogo:not([data-tipo]):nth-child(even) {
+  rotate: 0.8deg;
+}
+/* O cantinho que descolou: a ponta dobrada mostra o verso branco; o triângulo de fora repete a página. */
+.raiz .jogo:not([data-tipo]):not([data-mvp])::after {
+  content: "";
+  position: absolute;
+  left: -3px;
+  bottom: -3px;
+  width: 17px;
+  height: 17px;
+  border-top-right-radius: 5px;
+  background: linear-gradient(45deg, #1d0c3f 0 50%, rgba(5, 0, 12, 0.45) 50% 56%, #e9dfcc 56%, #fffdf8);
+}
+.raiz .jogoCampeao {
+  flex-direction: column;
+  gap: 7px;
+}
+.raiz .campeaoIcone {
+  border: 0;
+  border-radius: 8px;
+}
+.raiz .jogoCampeao .campeaoIcone {
+  width: clamp(38px, 12vw, 54px);
+  height: clamp(38px, 12vw, 54px);
+  box-shadow: 0 0 0 2px var(--creme);
+}
+/* A faixa do nome, de ponta a ponta da figurinha (a das figurinhas do elenco). */
+.raiz .campeaoNome {
+  align-self: stretch;
+  margin-inline: -6px;
+  padding: 5px 5px 4px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  background: linear-gradient(90deg, var(--tm-royal), #3a1a90);
+  color: var(--creme);
+  font: 400 clamp(11px, 3.3vw, 13px) / 1.1 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.raiz .jogoDetalhes {
+  justify-content: center;
+  gap: 3px 8px;
+  padding-left: 0;
+}
+.raiz .jogoKda {
+  flex: 1 1 100%;
+  font-size: clamp(15px, 4.6vw, 20px);
+  color: var(--creme);
+}
+.raiz .jogoMvp {
+  padding: 3px 7px 2px;
+  font-size: 10.5px;
+}
+/* A BRILHANTE: o papel vira o aro holográfico (border + background-clip) e o brilho fica no canto. */
+.raiz .jogo[data-mvp] {
+  border: 3px solid transparent;
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0 5px, transparent 5px 10px) padding-box,
+    linear-gradient(180deg, #6a2fd0, #2e1170) padding-box,
+    var(--holo) border-box;
+  box-shadow: 0 0 0 1.5px var(--papel), 0 14px 22px -10px rgba(199, 125, 255, 0.55);
+}
+/* No roxo mais claro da brilhante o miúdo vai para o prata (o lilás dava 3,4:1 no topo dela). */
+.raiz .jogo[data-mvp] .jogoRazao,
+.raiz .jogo[data-mvp] .jogoDuracao {
+  color: var(--tm-prata);
+}
+.raiz .jogo[data-mvp]::after {
+  content: "✦" / "";
+  position: absolute;
+  right: -10px;
+  bottom: -14px;
+  color: #fff;
+  font: 26px / 1 sans-serif;
+  text-shadow: 0 0 2px var(--tm-tinta), 0 0 2px var(--tm-tinta);
+}
+/* O que ele não jogou: a VAGA vazia, pontilhada e reta. */
+.raiz .jogoAusente,
+.raiz .jogoWo {
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "num . res"
+    "nota nota nota";
+  background: var(--vaga);
+  box-shadow: inset 0 0 0 4px rgba(18, 8, 31, 0.35);
+  outline: 2px dashed rgba(255, 246, 230, 0.42);
+  outline-offset: -6px;
+}
+.raiz .jogoNota {
+  grid-area: nota;
+  align-self: center;
+  padding: 10px 4px;
+  font-size: 13px;
+  font-style: normal;
+  color: var(--tm-prata); /* 11:1 na vaga */
+}
+.raiz .jogoWo .jogoNota {
+  font: 400 15px / 1 var(--tm-fonte-titulo), sans-serif;
+  color: var(--tm-acento);
+}
+
+/* Computador e tablet: o cabeçalho da página numa coluna à esquerda, as figurinhas à direita. */
+@media (min-width: 680px) {
+  .raiz .serie {
+    grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
+    grid-template-areas:
+      "cabeca jogos"
+      "cabeca link";
+    column-gap: 24px;
+    padding: 18px 20px 12px;
+  }
+  .raiz .serieCabeca {
+    grid-area: cabeca;
+    align-self: start;
+    padding-top: 4px;
+  }
+  .raiz .seriePlacar {
+    font-size: 36px;
+  }
+  .raiz .jogos {
+    grid-area: jogos;
+    padding-top: 6px;
+  }
+  .raiz .serieLink {
+    grid-area: link;
+  }
+}
+
+/* ------------------------------------------------------------------ campeões: a cartela */
+.raiz .campeoes {
+  gap: 12px;
+  padding: 14px;
+  border-radius: 16px;
+  background: linear-gradient(160deg, var(--papel), var(--papel-sombra));
+  box-shadow: 0 18px 28px -16px #000;
+}
+/* Cada figurinha da cartela, com o pontilhado do recorte em volta. */
+.raiz .campeao {
+  padding: 7px 10px 7px 7px;
+  border: 0;
+  border-radius: 12px;
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0 5px, transparent 5px 10px),
+    linear-gradient(90deg, #4b22a6, var(--tm-abismo));
+  outline: 1.5px dashed rgba(27, 11, 58, 0.42);
+  outline-offset: 3px;
+}
+.raiz .campeao .campeaoIcone {
+  box-shadow: 0 0 0 2px var(--creme);
+}
+.raiz .campeao .campeaoNome {
+  align-self: auto;
+  margin-inline: 0;
+  padding: 0;
+  background: none;
+  font: 400 15px / 1.1 var(--tm-fonte-titulo), sans-serif;
+}
+
+/* ------------------------------------------------------------------ quem ainda não jogou: a vaga */
+.raiz .vazio {
+  border: 0;
+  border-radius: 16px;
+  background: var(--vaga);
+  outline: 2px dashed rgba(255, 246, 230, 0.42);
+  outline-offset: -8px;
+  font-size: 15px;
+}
