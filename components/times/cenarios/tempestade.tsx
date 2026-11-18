@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 
+import xc from "@/components/times/cenarios/tempestade-campanha.module.css";
 import type { CenarioDoTema } from "@/components/times/cenarios/tipos";
 import c from "@/components/times/cenarios/tempestade.module.css";
 import { Coroa, CoroaMini, Lascas, Raio, TracoDePincel } from "@/components/times/ornamentos";
@@ -83,4 +84,13 @@ export const TEMPESTADE: CenarioDoTema = {
   Insignia: ({ className, id }) => <Coroa className={className} id={id} />,
   InsigniaMini: ({ className }) => <CoroaMini className={className} />,
   TracoDoNome: ({ className }) => <TracoDePincel className={className} />,
+  // A campanha na ficha: o filme em cartaz (claquete, película, letreiro); ver o módulo.
+  classesDaCampanha: xc,
+  // Atrás dela, duas tiras de película correndo nas bordas (só nas telas largas).
+  NaCampanha: () => (
+    <div className={xc.enfPeliculas} aria-hidden="true">
+      <span className={cx(xc.enfPelicula, xc.enfPeliculaEsq)} />
+      <span className={cx(xc.enfPelicula, xc.enfPeliculaDir)} />
+    </div>
+  ),
 };

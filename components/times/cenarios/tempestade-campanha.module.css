@@ -1,0 +1,597 @@
+/*
+ * A CAMPANHA da Equipe RX na ficha (components/times/campanha.tsx), cenário "tempestade":
+ * «O RASTRO DO RAIO» — a campanha é um filme em cartaz no meio da tempestade elétrica.
+ *  - destaques: cartazes de saguão em moldura de cromo, com os cantos cortados do retrato;
+ *  - a forma: um pedaço de película, cada jogo um fotograma (vitória acesa, derrota apagada);
+ *  - série a série: cada série é uma CENA com a claquete listrada em cima; a vitória leva o raio,
+ *    o MVP a coroa de cromo, e um raio liga uma cena à outra (o rastro);
+ *  - a próxima estreia: o letreiro do cinema, com as lâmpadas correndo;
+ *  - o elenco de campeões: os créditos em placas inclinadas, como os chips do herói.
+ * Ganchos: sempre `.raiz` + o seletor INTEIRO da base. Conteúdo não anima entrada; os laços são
+ * as lâmpadas do letreiro e a corrente da régua (background-position) e a película do fundo.
+ */
+
+.raiz {
+  /* a moldura de cromo do retrato (ficha.module.css, .retrato) */
+  --rx-moldura: linear-gradient(160deg, var(--tm-metal-luz), var(--tm-metal-base) 22%, var(--tm-primaria) 50%, var(--tm-metal-sombra) 74%, var(--tm-metal-volta));
+  /* o cromo do nick, com o bisel no meio (tema.module.css, .cromo) */
+  --rx-cromo: linear-gradient(180deg, var(--tm-metal-luz) 0%, var(--tm-metal-alto) 24%, var(--tm-metal-meio) 44%, var(--tm-metal-sombra) 50%, var(--tm-metal-fundo) 53%, var(--tm-metal-volta) 70%, var(--tm-metal-luz) 82%, var(--tm-metal-base) 100%);
+  /* o cromo liso das letras pequenas (o bisel some em 14 px) */
+  --rx-cromo-liso: linear-gradient(180deg, var(--tm-metal-luz), var(--tm-metal-alto) 52%, var(--tm-metal-placa));
+  /* a tela escura dos cartões: quase opaca, para os números lerem por cima da tempestade */
+  --rx-tela: linear-gradient(168deg, color-mix(in srgb, var(--tm-royal) 34%, #050914), #04070f 58%, var(--tm-breu));
+  --rx-raio: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 20'%3E%3Cpath d='M7.6 0 1 11.2h4.4L3.4 20 11 8.4H6.6L9 0z'/%3E%3C/svg%3E");
+  --rx-coroa: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 150'%3E%3Cpath d='M24 118 10 40l60 40 50-68 50 68 60-40-14 78zM24 126h192v20H24z'/%3E%3C/svg%3E");
+}
+
+/* ------------------------------------------------------------------ títulos de bloco */
+.raiz .subtitulo {
+  font: var(--tm-titulo-estilo, italic) 800 13px / 1.2 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.14em;
+  color: var(--tm-arco);
+}
+.raiz .subtitulo::after {
+  background: linear-gradient(90deg, var(--tm-neon), color-mix(in srgb, var(--tm-primaria) 45%, transparent) 35%, transparent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--tm-primaria) 80%, transparent);
+}
+
+/* ------------------------------------------------------------------ cartazes (destaques e vazio) */
+.raiz .destaque,
+.raiz .vazio {
+  --rx-corte: 16px;
+  position: relative;
+  isolation: isolate;
+  border: 0;
+  background: none;
+}
+.raiz .destaque {
+  padding: 18px 18px 16px;
+}
+/* A moldura: cromo em volta, os dois cantos cortados com o fio de luz na diagonal. */
+.raiz .destaque::before,
+.raiz .vazio::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  height: auto;
+  border: 1px solid transparent;
+  background:
+    linear-gradient(to bottom left, transparent 50%, var(--tm-metal-volta) 50% calc(50% + 1.3px), transparent calc(50% + 1.3px)) right top / var(--rx-corte) var(--rx-corte) no-repeat border-box,
+    linear-gradient(to top right, transparent 50%, var(--tm-metal-base) 50% calc(50% + 1.3px), transparent calc(50% + 1.3px)) left bottom / var(--rx-corte) var(--rx-corte) no-repeat border-box,
+    var(--rx-tela) padding-box,
+    var(--rx-moldura) border-box;
+  clip-path: polygon(0 0, calc(100% - var(--rx-corte)) 0, 100% var(--rx-corte), 100% 100%, var(--rx-corte) 100%, 0 calc(100% - var(--rx-corte)));
+}
+/* o fio de neon no alto do cartaz */
+.raiz .destaque::after {
+  content: "";
+  position: absolute;
+  left: 18px;
+  top: 0;
+  width: 40%;
+  height: 2px;
+  background: linear-gradient(90deg, var(--tm-nucleo), var(--tm-neon) 30%, transparent);
+  pointer-events: none;
+}
+.raiz .destaqueRotulo {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+/* o raio: no rótulo dos cartazes e na placa da vitória */
+.raiz .destaqueRotulo::before,
+.raiz .serie[data-resultado="vitoria"] .serieResultado::before {
+  content: "";
+  flex-shrink: 0;
+  width: 8px;
+  height: 13px;
+  background: linear-gradient(180deg, var(--tm-nucleo), var(--tm-neon));
+  -webkit-mask: var(--rx-raio) center / contain no-repeat;
+  mask: var(--rx-raio) center / contain no-repeat;
+}
+.raiz .rankingLinha[data-podio] .rankingPosicao {
+  color: var(--tm-arco);
+  text-shadow: 0 0 14px color-mix(in srgb, var(--tm-neon) 75%, transparent);
+}
+
+/* Os ícones de campeão em moldura de cromo com os cantos cortados (o retrato em miniatura). */
+.raiz .campeaoIcone {
+  --rx-corte-icone: 7px;
+  padding: 1.5px;
+  border: 0;
+  border-radius: 0;
+  background: var(--rx-moldura);
+  clip-path: polygon(0 0, calc(100% - var(--rx-corte-icone)) 0, 100% var(--rx-corte-icone), 100% 100%, var(--rx-corte-icone) 100%, 0 calc(100% - var(--rx-corte-icone)));
+}
+.raiz .campeaoIconeVazio {
+  color: var(--tm-tinta);
+}
+.raiz .melhorJogoCorpo .campeaoIcone {
+  --rx-corte-icone: 12px;
+  padding: 2px;
+}
+.raiz .campeao .campeaoIcone {
+  --rx-corte-icone: 9px;
+}
+
+/* A participação: a carga do raio, em gomos inclinados, com a corrente passando. */
+.raiz .medidor {
+  height: 10px;
+  border-radius: 0;
+  transform: skewX(-14deg);
+  background: repeating-linear-gradient(90deg, color-mix(in srgb, var(--tm-arco) 14%, transparent) 0 9px, transparent 9px 11px);
+}
+.raiz .medidorBarra {
+  border-radius: 0;
+  background:
+    linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.75) 50%, transparent 70%) -60% 0 / 40% 100% no-repeat,
+    linear-gradient(90deg, var(--tm-primaria), var(--tm-neon) 70%, var(--tm-nucleo));
+  -webkit-mask: repeating-linear-gradient(90deg, #000 0 9px, transparent 9px 11px);
+  mask: repeating-linear-gradient(90deg, #000 0 9px, transparent 9px 11px);
+  animation: tempestadeCampanhaCorrente 3.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@keyframes tempestadeCampanhaCorrente {
+  0%,
+  35% {
+    background-position: -60% 0, 0 0;
+  }
+  100% {
+    background-position: 160% 0, 0 0;
+  }
+}
+
+/* A forma: um pedaço de película atravessando o cartaz; cada jogo é um fotograma. */
+.raiz .forma {
+  flex-wrap: nowrap;
+  gap: 5px;
+  margin-inline: -17px;
+  padding: 10px 17px;
+  background:
+    radial-gradient(2.4px 1.7px, color-mix(in srgb, var(--tm-arco) 60%, transparent) 92%, transparent) 0 0 / 9px 6px repeat-x,
+    radial-gradient(2.4px 1.7px, color-mix(in srgb, var(--tm-arco) 60%, transparent) 92%, transparent) 0 100% / 9px 6px repeat-x,
+    #020409;
+}
+.raiz .formaJogo {
+  flex: 0 1 34px;
+  min-width: 0;
+  width: auto;
+  height: 26px;
+  border-radius: 1px;
+}
+.raiz .formaJogo[data-resultado="vitoria"] {
+  border-color: var(--tm-nucleo);
+  background: radial-gradient(120% 90% at 50% 35%, #fff, #d3e6ff 45%, #74adff);
+  color: var(--tm-tinta);
+  box-shadow: 0 0 10px -1px var(--tm-neon);
+}
+.raiz .formaJogo[data-resultado="derrota"] {
+  border-color: color-mix(in srgb, var(--tm-apoio) 38%, transparent);
+  background: linear-gradient(180deg, #0d1527, #060a14);
+  color: var(--tm-apoio);
+}
+@media (max-width: 599px) {
+  .raiz .destaque,
+  .raiz .vazio {
+    --rx-corte: 12px;
+  }
+  .raiz .destaque {
+    padding: 14px 12px 12px;
+  }
+  .raiz .destaque::after {
+    left: 12px;
+  }
+  .raiz .forma {
+    gap: 4px;
+    margin-inline: -11px;
+    padding: 9px 10px;
+  }
+  .raiz .formaJogo {
+    flex-basis: 26px;
+    height: 23px;
+  }
+}
+
+/* O vazio: a tela antes da sessão, com a contagem da ponta do filme (o círculo e a mira). */
+.raiz .vazio {
+  padding: 26px 24px 26px 108px;
+  text-align: left;
+  color: var(--tm-prata);
+}
+.raiz .vazio::after {
+  content: "";
+  position: absolute;
+  left: 28px;
+  top: 50%;
+  width: 56px;
+  height: 56px;
+  margin-top: -28px;
+  border-radius: 50%;
+  pointer-events: none;
+  background:
+    radial-gradient(circle, transparent 0 38%, color-mix(in srgb, var(--tm-arco) 55%, transparent) 39% 42%, transparent 43% 64%, color-mix(in srgb, var(--tm-arco) 35%, transparent) 65% 68%, transparent 69%),
+    linear-gradient(color-mix(in srgb, var(--tm-arco) 30%, transparent), color-mix(in srgb, var(--tm-arco) 30%, transparent)) center / 1px 100% no-repeat,
+    linear-gradient(color-mix(in srgb, var(--tm-arco) 30%, transparent), color-mix(in srgb, var(--tm-arco) 30%, transparent)) center / 100% 1px no-repeat,
+    conic-gradient(from 0deg, color-mix(in srgb, var(--tm-primaria) 45%, transparent) 0 25%, transparent 25%);
+}
+@media (max-width: 599px) {
+  .raiz .vazio {
+    padding: 84px 18px 22px;
+    text-align: center;
+  }
+  .raiz .vazio::after {
+    left: 50%;
+    top: 18px;
+    margin: 0 0 0 -24px;
+    width: 48px;
+    height: 48px;
+  }
+}
+
+/* ------------------------------------------------------------------ a próxima estreia: o letreiro */
+.raiz .proximoCartao {
+  isolation: isolate;
+  justify-items: center;
+  gap: 12px;
+  padding: 26px 20px 24px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  text-align: center;
+}
+/* A moldura de cromo e as lâmpadas em cima e embaixo, acesas uma sim, uma não (e trocam). */
+.raiz .proximoCartao::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border: 2px solid transparent;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle, var(--tm-nucleo) 0 1.5px, color-mix(in srgb, var(--tm-neon) 80%, transparent) 2.2px, transparent 3.6px) 0 3px / 20px 9px repeat-x padding-box,
+    radial-gradient(circle, color-mix(in srgb, var(--tm-arco) 40%, transparent) 0 1.4px, transparent 2.6px) 10px 3px / 20px 9px repeat-x padding-box,
+    radial-gradient(circle, var(--tm-nucleo) 0 1.5px, color-mix(in srgb, var(--tm-neon) 80%, transparent) 2.2px, transparent 3.6px) 10px calc(100% - 3px) / 20px 9px repeat-x padding-box,
+    radial-gradient(circle, color-mix(in srgb, var(--tm-arco) 40%, transparent) 0 1.4px, transparent 2.6px) 0 calc(100% - 3px) / 20px 9px repeat-x padding-box,
+    radial-gradient(110% 70% at 50% 0%, color-mix(in srgb, var(--tm-primaria) 40%, transparent), transparent 70%) padding-box,
+    linear-gradient(180deg, #0b1636, #04070f 72%) padding-box,
+    var(--rx-moldura) border-box;
+  box-shadow: 0 0 0 1px var(--tm-breu), 0 20px 44px -26px var(--tm-primaria);
+  animation: tempestadeCampanhaLetreiro 1.6s linear infinite;
+}
+@keyframes tempestadeCampanhaLetreiro {
+  0%,
+  49.9% {
+    background-position: 0 3px, 10px 3px, 10px calc(100% - 3px), 0 calc(100% - 3px), 0 0, 0 0, 0 0;
+  }
+  50%,
+  100% {
+    background-position: 10px 3px, 0 3px, 0 calc(100% - 3px), 10px calc(100% - 3px), 0 0, 0 0, 0 0;
+  }
+}
+.raiz .proximoCartao[data-em-andamento]::before {
+  box-shadow: 0 0 0 1px var(--tm-breu), 0 0 30px -4px var(--tm-neon);
+}
+.raiz .proximoData {
+  justify-content: center;
+  gap: 4px 12px;
+  color: var(--tm-arco);
+}
+.raiz .proximoDia {
+  font-size: 32px;
+}
+.raiz .proximoConfronto {
+  justify-content: center;
+}
+.raiz .proximoAdversario {
+  font-size: 19px;
+  text-shadow: 0 0 18px color-mix(in srgb, var(--tm-primaria) 75%, transparent);
+}
+/* "VER PARTIDA →" (no letreiro e no pé de cada cena) é o chip inclinado do herói. */
+.raiz .proximoVer,
+.raiz .serieLink {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 16px;
+  color: var(--tm-texto);
+}
+.raiz .proximoVer::before,
+.raiz .serieLink::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  transform: skewX(-14deg);
+  border: 1px solid var(--tm-neon);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--tm-breu) 40%, transparent);
+  transition: background-color 0.2s ease;
+}
+.raiz .proximoCartao:hover .proximoVer::before,
+.raiz .serieLink:hover::before {
+  background: var(--tm-royal);
+}
+/* centrada embaixo do letreiro (sozinha, sem próximo jogo, fica à esquerda como a base) */
+.raiz .proximoCartao + .tabela {
+  justify-content: center;
+}
+.raiz .tabelaPosicao {
+  font: var(--tm-titulo-estilo, italic) 800 15px / 1 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.06em;
+}
+
+/* ------------------------------------------------------------------ série a série: cena a cena */
+.raiz .series {
+  --rx-claquete: min(280px, 64%);
+  gap: 38px;
+  padding-top: 26px; /* a régua aberta da 1ª claquete sobe acima do cartão */
+}
+.raiz .serie {
+  padding: 26px 18px 12px;
+  border: 1px solid color-mix(in srgb, var(--tm-metal-base) 30%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tm-royal) 26%, #050914), #04070f 40%, color-mix(in srgb, var(--tm-breu) 94%, transparent));
+}
+.raiz .serie[data-resultado="vitoria"],
+.raiz .serie[data-resultado="derrota"] {
+  border-left-color: color-mix(in srgb, var(--tm-metal-base) 30%, transparent);
+}
+/* A claquete de cada cena: a régua de baixo presa no cartão (com a dobradiça) e a de cima
+   aberta, listrada ao contrário. Apagada na derrota. */
+.raiz .serie::before,
+.raiz .serieCabeca::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  width: var(--rx-claquete);
+  height: 10px;
+  pointer-events: none;
+}
+.raiz .serie::before {
+  top: -1px;
+  background:
+    radial-gradient(circle at 6px 50%, var(--tm-metal-luz) 0 1.6px, var(--tm-metal-sombra) 2.2px 3px, transparent 3.4px),
+    repeating-linear-gradient(56deg, var(--tm-metal-alto) 0 9px, var(--tm-tinta) 9px 18px);
+  box-shadow: 0 1px 0 var(--tm-breu);
+}
+.raiz .serieCabeca::before {
+  top: -12px;
+  transform-origin: 0 100%;
+  transform: rotate(-4deg);
+  background: repeating-linear-gradient(-56deg, var(--tm-metal-alto) 0 9px, var(--tm-tinta) 9px 18px);
+  box-shadow: 0 0 0 1px var(--tm-breu), 0 -2px 10px -2px color-mix(in srgb, var(--tm-neon) 70%, transparent);
+}
+.raiz .serie[data-resultado="derrota"]::before {
+  background:
+    radial-gradient(circle at 6px 50%, var(--tm-metal-meio) 0 1.6px, var(--tm-metal-sombra) 2.2px 3px, transparent 3.4px),
+    repeating-linear-gradient(56deg, var(--tm-metal-fundo) 0 9px, #05070d 9px 18px);
+}
+.raiz .serie[data-resultado="derrota"] .serieCabeca::before {
+  background: repeating-linear-gradient(-56deg, var(--tm-metal-fundo) 0 9px, #05070d 9px 18px);
+  box-shadow: 0 0 0 1px var(--tm-breu);
+}
+/* O rastro: um raio desce de uma cena para a seguinte, do lado oposto da claquete. */
+.raiz .serie + .serie::after {
+  content: "";
+  position: absolute;
+  right: 48px;
+  bottom: calc(100% - 2px);
+  width: 22px;
+  height: 42px;
+  pointer-events: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-3 -2 22 44'%3E%3Cpath d='M10 0 3 18h5L4 40l10-24H9l3-16z' fill='%23EAF6FF' stroke='%234DA3FF' stroke-opacity='.5' stroke-width='3' stroke-linejoin='round' paint-order='stroke'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+@media (max-width: 599px) {
+  .raiz .series {
+    gap: 34px;
+    padding-top: 22px;
+  }
+  .raiz .serie {
+    padding: 24px 12px 10px;
+  }
+  .raiz .serie + .serie::after {
+    right: 36px;
+    height: 38px;
+  }
+}
+
+/* O resultado numa placa inclinada; a vitória vem com o raio. */
+.raiz .serieResultado {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border: 0;
+}
+.raiz .serieResultado::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  transform: skewX(-14deg);
+  border: 1px solid transparent;
+  border-radius: 2px;
+}
+.raiz .serie[data-resultado="vitoria"] .serieResultado {
+  background: none;
+}
+.raiz .serie[data-resultado="vitoria"] .serieResultado::after {
+  background: linear-gradient(180deg, var(--tm-placa-topo, #f4f7fb), var(--tm-metal-placa));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6), 0 6px 18px -6px var(--tm-primaria);
+}
+.raiz .serie[data-resultado="vitoria"] .serieResultado::before {
+  background: var(--tm-primaria);
+}
+.raiz .serie[data-resultado="derrota"] .serieResultado::after {
+  border-color: color-mix(in srgb, var(--tm-apoio) 55%, transparent);
+  background: color-mix(in srgb, var(--tm-breu) 60%, transparent);
+}
+.raiz .serie[data-resultado="andamento"] .serieResultado::after {
+  border: 1px dashed var(--tm-neon);
+}
+.raiz .seriePlacar {
+  font-size: 30px;
+}
+/* A data do letreiro, o placar e os créditos em cromo; o número de quem perdeu fica apagado. */
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .raiz .proximoDia,
+  .raiz .seriePlacar,
+  .raiz .campeao .campeaoNome {
+    padding: 0.06em 0.14em 0.08em 0.02em;
+    background: var(--rx-cromo);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  /* background-image, não o atalho: `background` zeraria o clip de texto (vira um bloco branco) */
+  .raiz .campeao .campeaoNome {
+    background-image: var(--rx-cromo-liso);
+  }
+  .raiz .placarSeparador {
+    -webkit-text-fill-color: var(--tm-neon);
+  }
+  .raiz .serie[data-resultado="vitoria"] .placarAdversario,
+  .raiz .serie[data-resultado="derrota"] .placarTime {
+    -webkit-text-fill-color: var(--tm-metal-fundo);
+  }
+}
+/* Alto contraste e cores forçadas: o cromo vira tinta lisa (o gradiente some, a letra não). */
+@media (forced-colors: active), (prefers-contrast: more) {
+  .raiz .proximoDia,
+  .raiz .seriePlacar,
+  .raiz .campeao .campeaoNome {
+    background: none;
+    -webkit-text-fill-color: currentColor;
+  }
+}
+.raiz .adversarioNome {
+  font-size: 17px;
+}
+.raiz .serieMvp {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-color: color-mix(in srgb, var(--tm-metal-alto) 50%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tm-metal-luz) 14%, transparent), color-mix(in srgb, var(--tm-primaria) 16%, transparent));
+}
+/* a coroa de cromo do MVP */
+.raiz .serieMvp::before,
+.raiz .jogoMvp::before {
+  content: "";
+  flex-shrink: 0;
+  width: 14px;
+  height: 9px;
+  background: var(--rx-cromo-liso);
+  -webkit-mask: var(--rx-coroa) center / contain no-repeat;
+  mask: var(--rx-coroa) center / contain no-repeat;
+}
+
+/* Os jogos: fotogramas da cena. */
+.raiz .jogo {
+  margin-inline: -8px;
+  padding: 8px;
+}
+.raiz .jogo[data-mvp] {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--tm-primaria) 18%, transparent), transparent 75%);
+}
+.raiz .jogo[data-tipo] {
+  background: repeating-linear-gradient(-56deg, color-mix(in srgb, var(--tm-apoio) 9%, transparent) 0 6px, transparent 6px 12px);
+}
+.raiz .jogoNumero {
+  font: var(--tm-titulo-estilo, italic) 800 12px / 1 var(--tm-fonte-titulo), sans-serif;
+  color: var(--tm-acento);
+}
+.raiz .jogoMvp {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.raiz .jogoMvp::before {
+  width: 11px;
+  height: 7px;
+  background: currentColor;
+}
+.raiz .jogo[data-resultado="vitoria"] .jogoResultado {
+  border-color: var(--tm-nucleo);
+  background: linear-gradient(180deg, var(--tm-metal-luz), var(--tm-metal-placa));
+  color: var(--tm-tinta);
+  box-shadow: 0 0 9px -2px var(--tm-neon);
+}
+.raiz .jogo[data-resultado="derrota"] .jogoResultado {
+  border-color: color-mix(in srgb, var(--tm-apoio) 40%, transparent);
+  background: #060a14;
+  color: var(--tm-apoio);
+}
+
+/* ------------------------------------------------------------------ elenco de campeões: os créditos */
+.raiz .campeao {
+  position: relative;
+  isolation: isolate;
+  padding: 8px 18px 8px 14px;
+  border: 0;
+  background: none;
+}
+.raiz .campeao::before {
+  content: "";
+  position: absolute;
+  inset: 0 5px;
+  z-index: -1;
+  transform: skewX(-14deg);
+  border: 1px solid color-mix(in srgb, var(--tm-acento) 30%, transparent);
+  border-radius: 2px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--tm-royal) 38%, transparent), color-mix(in srgb, var(--tm-breu) 84%, transparent));
+}
+.raiz .campeao .campeaoNome {
+  font-size: 15px;
+}
+
+/* ------------------------------------------------------------------ atrás da campanha: a película */
+/* Duas tiras de filme correndo nas bordas, só onde sobra margem (telas largas). Enfeite. */
+.enfPeliculas {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  display: none;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 120px, #000 calc(100% - 120px), transparent);
+  mask-image: linear-gradient(180deg, transparent, #000 120px, #000 calc(100% - 120px), transparent);
+}
+@media (min-width: 1360px) {
+  .enfPeliculas {
+    display: block;
+  }
+}
+.enfPelicula {
+  position: absolute;
+  top: -48px;
+  bottom: 0;
+  width: 34px;
+  opacity: 0.55;
+  border-inline: 1px solid color-mix(in srgb, var(--tm-metal-base) 35%, transparent);
+  background:
+    radial-gradient(2.6px 2px, color-mix(in srgb, var(--tm-arco) 70%, transparent) 92%, transparent) 0 0 / 9px 12px repeat-y,
+    radial-gradient(2.6px 2px, color-mix(in srgb, var(--tm-arco) 70%, transparent) 92%, transparent) 100% 0 / 9px 12px repeat-y,
+    repeating-linear-gradient(180deg, color-mix(in srgb, var(--tm-primaria) 22%, transparent) 0 44px, color-mix(in srgb, var(--tm-arco) 35%, transparent) 44px 46px, transparent 46px 48px) 50% 0 / 14px 100% no-repeat,
+    color-mix(in srgb, var(--tm-tinta) 88%, transparent);
+  animation: tempestadeCampanhaFilme 5s linear infinite;
+}
+.enfPeliculaEsq {
+  left: 24px;
+}
+.enfPeliculaDir {
+  right: 24px;
+}
+@keyframes tempestadeCampanhaFilme {
+  to {
+    transform: translate3d(0, 48px, 0);
+  }
+}
+@media (forced-colors: active) {
+  .enfPeliculas {
+    display: none;
+  }
+}
