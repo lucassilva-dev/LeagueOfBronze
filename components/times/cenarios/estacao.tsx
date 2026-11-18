@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 
+import ec from "@/components/times/cenarios/estacao-campanha.module.css";
 import e from "@/components/times/cenarios/estacao.module.css";
 import ef from "@/components/times/cenarios/estacao-ficha.module.css";
 import {
@@ -48,6 +49,16 @@ const FAISCAS_DE_FREIO: readonly (readonly [number, number, number, string])[] =
 export const ESTACAO: CenarioDoTema = {
   classes: e,
   classesDaFicha: ef,
+  // A campanha na ficha: o diário de bordo (bilhetes na linha férrea, placas, etiquetas de mala).
+  classesDaCampanha: ec,
+  // Atrás dela, a lua de queijo nascendo por trás das placas.
+  NaCampanha: () => (
+    <div className={ec.enfCeuDaCampanha} aria-hidden="true">
+      <span className={ec.enfLuaDaCampanha}>
+        <LuaDeQueijo id="qm-lua-campanha" />
+      </span>
+    </div>
+  ),
   Fundo: () => (
     <>
       <div className={e.enfCeu} />

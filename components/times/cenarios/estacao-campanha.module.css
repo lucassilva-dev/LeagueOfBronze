@@ -1,0 +1,682 @@
+/*
+ * A CAMPANHA do Queijo Minas na ficha (components/times/campanha.tsx), cenário "estacao":
+ * «DIÁRIO DE BORDO» — a campanha é a viagem do expresso pela serra.
+ *  - destaques: placas esmaltadas da estação, com a tabuleta de latão em cima (o nome da placa);
+ *  - a forma: um trem de vagões engatados (vagão de ouro na vitória, vazio na derrota);
+ *  - a participação: o trem andando no trilho, com o farol ciano na frente;
+ *  - estação por estação: cada série é um BILHETE de papel na linha férrea — canhoto picotado,
+ *    dados datilografados, e o resultado carimbado como o «Ô TREM BÃO!» da cartela;
+ *  - a próxima parada: o quadro de partidas, com a data em plaquinhas de virar;
+ *  - na bagagem: os campeões em etiquetas de mala de papel pardo, com o ilhós de latão.
+ * Ganchos: sempre `.raiz` + o seletor INTEIRO da base. Nada aqui anima (o trem é o da página).
+ */
+
+.raiz {
+  --qm-papel: repeating-linear-gradient(0deg, rgba(58, 42, 18, 0.05) 0 1px, transparent 1px 4px), linear-gradient(180deg, #f6ecd0, #efdfb6);
+  --qm-tinta-parda: #5a4526; /* 7,3:1 no papel */
+  --qm-carimbo: #9a2f0e; /* 6,1:1 no papel (o «Ô TREM BÃO!») */
+  --qm-rebite: #ffe7a0 0 1.3px, #5a3a0e 1.8px 2.3px, transparent 2.7px;
+  --qm-esmalte: linear-gradient(180deg, #13304e, var(--tm-abismo) 65%, #06101d);
+  --qm-trilhos: linear-gradient(var(--tm-primaria), var(--tm-primaria)) 0 1px / 100% 2px no-repeat, linear-gradient(var(--tm-primaria), var(--tm-primaria)) 0 6px / 100% 2px no-repeat, repeating-linear-gradient(90deg, #5a3a12 0 4px, transparent 4px 16px);
+}
+
+/* ------------------------------------------------------------------ títulos de bloco: um trilho */
+.raiz .subtitulo {
+  font: 400 13px / 1.2 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.08em;
+}
+.raiz .subtitulo::after {
+  height: 9px;
+  background: var(--qm-trilhos);
+  -webkit-mask-image: linear-gradient(90deg, #000 40%, transparent);
+  mask-image: linear-gradient(90deg, #000 40%, transparent);
+}
+
+/* ------------------------------------------------------------------ destaques: placas esmaltadas */
+.raiz .destaque {
+  padding: 0 16px 16px;
+  border: 1px solid var(--tm-primaria);
+  border-radius: 6px;
+  background:
+    radial-gradient(circle at 8px calc(100% - 8px), var(--qm-rebite)),
+    radial-gradient(circle at calc(100% - 8px) calc(100% - 8px), var(--qm-rebite)),
+    var(--qm-esmalte);
+  box-shadow: inset 0 0 0 2px var(--tm-abismo), inset 0 0 0 3px color-mix(in srgb, var(--tm-neon) 22%, transparent), 0 16px 30px -20px rgba(0, 0, 0, 0.9);
+}
+.raiz .destaque::before {
+  display: none;
+}
+/* A tabuleta de latão com o nome da placa, rebitada nas pontas. */
+.raiz .destaqueRotulo {
+  margin: 0 -16px 4px;
+  padding: 8px 24px 7px;
+  border-bottom: 1px solid var(--tm-metal-sombra);
+  border-radius: 5px 5px 0 0;
+  background:
+    radial-gradient(circle at 10px 50%, #fff6cf 0 1.5px, #6b4a14 2px 2.6px, transparent 3px),
+    radial-gradient(circle at calc(100% - 10px) 50%, #fff6cf 0 1.5px, #6b4a14 2px 2.6px, transparent 3px),
+    linear-gradient(180deg, var(--tm-metal-volta), var(--tm-metal-placa));
+  font: 400 11px / 1.25 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.08em;
+  color: var(--tm-tinta);
+}
+.raiz .destaqueDetalhe,
+.raiz .destaqueExtra {
+  font-family: var(--tm-fonte-assinatura), "Courier New", monospace;
+}
+/* A Bungee é larga: "29TH" não cabe nas 2,9em da base. */
+.raiz .rankingLinha {
+  grid-template-columns: 3.9em minmax(0, 1fr) auto;
+}
+@media (max-width: 599px) {
+  .raiz .destaque {
+    padding: 0 12px 14px;
+  }
+  .raiz .destaqueRotulo {
+    margin-inline: -12px;
+    padding-inline: 20px;
+  }
+}
+
+/* O melhor jogo na janela redonda do vagão (como os medalhões dos companheiros). */
+.raiz .melhorJogoCorpo .campeaoIcone {
+  border: 0;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--tm-primaria), 0 0 0 4px var(--tm-abismo), 0 0 16px 2px color-mix(in srgb, var(--tm-neon) 35%, transparent);
+}
+
+/* A participação: o trem no trilho, até onde ele chegou, com o farol aceso na frente. */
+.raiz .medidor {
+  height: 10px;
+  overflow: visible;
+  border-radius: 0;
+  background:
+    linear-gradient(#f6d27a, #8a5f18) 0 1px / 100% 2px no-repeat,
+    linear-gradient(#f6d27a, #8a5f18) 0 7px / 100% 2px no-repeat,
+    repeating-linear-gradient(90deg, #3a2a18 0 4px, transparent 4px 12px);
+}
+.raiz .medidorBarra {
+  inset: 1px auto 1px 0;
+  border-radius: 2px 5px 5px 2px;
+  background: linear-gradient(180deg, var(--tm-metal-alto), var(--tm-metal-meio) 50%, var(--tm-metal-sombra));
+}
+.raiz .medidorBarra::after {
+  content: "";
+  position: absolute;
+  right: -5px;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--tm-nucleo) 0 2px, var(--tm-neon) 3px, color-mix(in srgb, var(--tm-neon) 30%, transparent) 4.5px, transparent 6px);
+}
+
+/* A forma: vagões engatados — de ouro na vitória, vazios na derrota — com as rodinhas. */
+.raiz .forma {
+  --qm-engate: 8px;
+  flex-wrap: nowrap;
+  gap: var(--qm-engate);
+  padding-bottom: 6px;
+}
+.raiz .formaJogo {
+  position: relative;
+  flex: 0 1 34px;
+  min-width: 0;
+  width: auto;
+  height: 24px;
+  border-radius: 4px 4px 2px 2px;
+  font-size: 13px;
+}
+/* o engate até o vagão seguinte */
+.raiz .formaJogo:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: calc(100% + 1px);
+  top: 55%;
+  width: var(--qm-engate);
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #f2b632, #8a5f18);
+}
+.raiz .formaJogo::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  bottom: -7px;
+  height: 7px;
+  background:
+    radial-gradient(circle at 24% 50%, #1a120a 0 1.6px, var(--tm-primaria) 2px 3px, transparent 3.4px),
+    radial-gradient(circle at 76% 50%, #1a120a 0 1.6px, var(--tm-primaria) 2px 3px, transparent 3.4px);
+}
+.raiz .formaJogo[data-resultado="vitoria"] {
+  border-color: var(--tm-metal-sombra);
+  background: linear-gradient(180deg, var(--tm-metal-luz), var(--tm-metal-meio) 60%, var(--tm-metal-fundo));
+  color: var(--tm-tinta);
+}
+.raiz .formaJogo[data-resultado="derrota"] {
+  border-color: color-mix(in srgb, var(--tm-primaria) 45%, transparent);
+  background: linear-gradient(180deg, #14304f, var(--tm-abismo));
+  color: var(--tm-apoio);
+}
+@media (max-width: 599px) {
+  .raiz .forma {
+    --qm-engate: 5px;
+  }
+  .raiz .formaJogo {
+    flex-basis: 26px;
+    height: 22px;
+    font-size: 12px;
+  }
+}
+
+/* ------------------------------------------------------------------ o papel (bilhetes e o vazio) */
+/* O papel do bilhete fica num pseudo atrás (o picote é máscara, e máscara no cartão cortaria a
+   estação da linha férrea, que mora fora dele). */
+.raiz .serie::after,
+.raiz .vazio::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 6px;
+  background: var(--qm-papel);
+  /* o picote: furos de 5 px a cada 16 px na borda esquerda */
+  -webkit-mask:
+    radial-gradient(circle 5px at 0 50%, #0000 95%, #000) 0 0 / 16px 16px repeat-y,
+    linear-gradient(#000, #000) 16px 0 / calc(100% - 16px) 100% no-repeat;
+  mask:
+    radial-gradient(circle 5px at 0 50%, #0000 95%, #000) 0 0 / 16px 16px repeat-y,
+    linear-gradient(#000, #000) 16px 0 / calc(100% - 16px) 100% no-repeat;
+}
+
+/* O vazio: o bilhete ainda sem viagem, datilografado. */
+.raiz .vazio {
+  position: relative;
+  isolation: isolate;
+  padding: 22px 26px 22px 34px;
+  border: 0;
+  background: none;
+  font: 400 14px / 1.55 var(--tm-fonte-assinatura), "Courier New", monospace;
+  color: var(--tm-tinta);
+  text-align: left;
+  rotate: -0.6deg;
+}
+
+/* ------------------------------------------------------------------ a próxima parada: quadro de partidas */
+.raiz .proximoCartao {
+  isolation: isolate;
+  gap: 12px;
+  padding: 0 18px 16px;
+  border: 1px solid var(--tm-primaria);
+  border-radius: 6px;
+  background:
+    radial-gradient(circle at 8px calc(100% - 8px), var(--qm-rebite)),
+    radial-gradient(circle at calc(100% - 8px) calc(100% - 8px), var(--qm-rebite)),
+    var(--qm-esmalte);
+  box-shadow: inset 0 0 0 2px var(--tm-abismo), inset 0 0 0 3px color-mix(in srgb, var(--tm-neon) 25%, transparent), 0 18px 36px -20px rgba(0, 0, 0, 0.9);
+}
+/* (o hover da base acende a borda; aqui ele é dito de novo, um nível acima da borda de latão) */
+.raiz .proximoCartao:hover {
+  border-color: var(--tm-neon);
+}
+.raiz .proximoCartao[data-em-andamento] {
+  border-color: var(--tm-neon);
+  box-shadow: inset 0 0 0 2px var(--tm-abismo), inset 0 0 0 3px color-mix(in srgb, var(--tm-neon) 45%, transparent), 0 0 28px -6px var(--tm-neon);
+}
+/* A faixa preta do quadro, com a data em plaquinhas de virar (a costura no meio de cada uma). */
+.raiz .proximoData {
+  margin: 0 -18px;
+  padding: 12px 18px 11px;
+  border-bottom: 1px solid var(--tm-primaria);
+  border-radius: 5px 5px 0 0;
+  background: linear-gradient(180deg, #0a0d12, #05070a);
+  gap: 6px;
+  letter-spacing: 0.08em;
+}
+.raiz .proximoSemana,
+.raiz .proximoDia,
+.raiz .proximoHora {
+  padding: 5px 7px 4px;
+  border-radius: 3px;
+  background:
+    linear-gradient(180deg, transparent calc(50% - 0.5px), rgba(0, 0, 0, 0.85) calc(50% - 0.5px) calc(50% + 0.5px), transparent calc(50% + 0.5px)),
+    linear-gradient(180deg, #1b2330, #10161f 50%, #161d28 50%, #0d1219);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  font-family: var(--tm-fonte-titulo), sans-serif;
+  font-weight: 400;
+}
+.raiz .proximoDia {
+  font-size: 26px;
+  color: var(--tm-acento);
+}
+.raiz .proximoHora {
+  color: var(--tm-neon);
+}
+.raiz .proximoAdversario {
+  font-size: 18px;
+}
+.raiz .proximoInfo {
+  font-family: var(--tm-fonte-assinatura), "Courier New", monospace;
+  font-size: 12.5px;
+}
+/* "VER PARTIDA →" é o bilhete dos chips do herói, com os entalhes nas pontas. */
+.raiz .proximoVer {
+  position: relative;
+  isolation: isolate;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 16px;
+  color: var(--tm-texto);
+}
+.raiz .proximoVer::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border: 1px solid var(--tm-neon);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--tm-abismo) 55%, transparent);
+  -webkit-mask:
+    radial-gradient(circle 6px at 0 50%, #0000 95%, #000) 0 0 / 51% 100% no-repeat,
+    radial-gradient(circle 6px at 100% 50%, #0000 95%, #000) 100% 0 / 51% 100% no-repeat;
+  mask:
+    radial-gradient(circle 6px at 0 50%, #0000 95%, #000) 0 0 / 51% 100% no-repeat,
+    radial-gradient(circle 6px at 100% 50%, #0000 95%, #000) 100% 0 / 51% 100% no-repeat;
+  transition: background-color 0.2s ease;
+}
+.raiz .proximoCartao:hover .proximoVer::before {
+  background: var(--tm-royal);
+}
+.raiz .tabela {
+  font-family: var(--tm-fonte-assinatura), "Courier New", monospace;
+}
+.raiz .tabelaPosicao {
+  font: 400 13px / 1.2 var(--tm-fonte-titulo), sans-serif;
+  color: var(--tm-acento);
+}
+
+/* ------------------------------------------------------------------ estação por estação */
+/* O bilhete troca de forma pela largura da coluna (não da tela): a coluna é o contêiner. */
+.raiz .resultados {
+  container: estacaoCampanhaLinha / inline-size;
+}
+/* A linha férrea descendo pela esquerda; cada série é uma estação nela. */
+.raiz .series {
+  position: relative;
+  gap: 22px;
+  padding-left: 32px;
+}
+.raiz .series::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, #f6d27a, #8a5f18) 1px 0 / 2px 100% no-repeat,
+    linear-gradient(90deg, #f6d27a, #8a5f18) 11px 0 / 2px 100% no-repeat,
+    repeating-linear-gradient(180deg, #3a2a18 0 4px, transparent 4px 14px);
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 28px, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(180deg, transparent, #000 28px, #000 calc(100% - 28px), transparent);
+}
+/* O bilhete: papel com o picote na esquerda, tinta marinho e parda. */
+.raiz .serie {
+  isolation: isolate;
+  padding: 16px 16px 10px 26px;
+  border: 0;
+  background: none;
+  color: var(--tm-tinta);
+}
+/* a estação: anel de latão na linha; acesa (o farol ciano) na vitória */
+.raiz .serie::before {
+  content: "";
+  position: absolute;
+  left: -25px;
+  top: 20px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--tm-abismo) 0 3px, var(--tm-primaria) 3.6px 5.6px, var(--tm-abismo) 6.2px);
+  box-shadow: 0 0 0 2px var(--tm-primaria);
+}
+.raiz .serie[data-resultado="vitoria"]::before {
+  background: radial-gradient(circle, var(--tm-nucleo) 0 2px, var(--tm-neon) 3px 4px, var(--tm-abismo) 4.8px);
+  box-shadow: 0 0 0 2px var(--tm-primaria), 0 0 14px 2px color-mix(in srgb, var(--tm-neon) 60%, transparent);
+}
+.raiz .serieCabeca {
+  gap: 8px 14px;
+}
+/* o furo do bilheteiro no canto, em forma de furo de queijo (o da cartela) */
+.raiz .serieCabeca::after,
+.raiz .vazio::after {
+  content: "";
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  width: 14px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--tm-breu);
+  box-shadow: inset 1px 1px 0 rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+/* O resultado CARIMBADO: tinta vermelha na vitória (o «Ô TREM BÃO!»), marinho na derrota. */
+.raiz .serieResultado {
+  padding: 6px 10px 4px;
+  border: 3px double currentColor;
+  border-radius: 6px;
+  background: none;
+  font: 400 14px / 1 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.06em;
+  rotate: -5deg;
+}
+.raiz .serie[data-resultado="vitoria"] .serieResultado {
+  border-color: currentColor;
+  background: none;
+  color: var(--qm-carimbo);
+}
+.raiz .serie[data-resultado="derrota"] .serieResultado {
+  border-color: currentColor;
+  color: #33465f;
+  rotate: 3deg;
+}
+.raiz .serie[data-resultado="andamento"] .serieResultado {
+  border-style: dashed;
+  border-color: currentColor;
+  color: var(--tm-tinta);
+}
+.raiz .seriePlacar {
+  font-size: 30px;
+  color: var(--tm-tinta);
+}
+.raiz .placarSeparador {
+  color: var(--qm-tinta-parda);
+}
+/* o número de quem perdeu em tinta gasta (3,6:1 no papel; é texto grande) */
+.raiz .serie[data-resultado="vitoria"] .placarAdversario,
+.raiz .serie[data-resultado="derrota"] .placarTime {
+  color: #857046;
+}
+.raiz .serieAdversario .vs,
+.raiz .serieInfo {
+  font-family: var(--tm-fonte-assinatura), "Courier New", monospace;
+  color: var(--qm-tinta-parda);
+}
+.raiz .adversarioNome {
+  color: var(--tm-tinta);
+}
+.raiz .serieInfo {
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+}
+.raiz .serieMvp,
+.raiz .jogoMvp {
+  border: 1px solid var(--tm-metal-sombra);
+  background: linear-gradient(180deg, var(--tm-metal-volta), var(--tm-metal-placa));
+  color: var(--tm-tinta);
+  font: 400 10px / 1 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.08em;
+}
+.raiz .serieMvp {
+  padding: 5px 8px 4px;
+}
+
+/* Os jogos: as linhas datilografadas do bilhete. */
+.raiz .jogos {
+  border-top: 2px dashed color-mix(in srgb, var(--qm-tinta-parda) 45%, transparent);
+}
+/* (o último também: a base tira a linha dele com `.jogo:last-child`, e empatar seria loteria) */
+.raiz .jogo,
+.raiz .jogo:last-child {
+  border-bottom: 1px dashed color-mix(in srgb, var(--qm-tinta-parda) 28%, transparent);
+}
+.raiz .jogoNumero,
+.raiz .jogoRazao,
+.raiz .jogoDuracao,
+.raiz .jogoNota {
+  font-family: var(--tm-fonte-assinatura), "Courier New", monospace;
+  color: var(--qm-tinta-parda);
+}
+.raiz .jogoNumero {
+  font-size: 13px;
+  font-weight: 400;
+}
+.raiz .jogoRazao,
+.raiz .jogoDuracao {
+  font-size: 12px;
+}
+.raiz .campeaoIcone {
+  border-color: color-mix(in srgb, var(--tm-tinta) 70%, transparent);
+  border-radius: 3px;
+}
+.raiz .campeaoNome {
+  font-weight: 700;
+  color: var(--tm-tinta);
+}
+.raiz .jogoKda {
+  color: var(--tm-tinta);
+}
+.raiz .jogoMvp {
+  padding: 4px 6px 3px;
+}
+.raiz .jogo[data-resultado="vitoria"] .jogoResultado {
+  border-color: var(--tm-tinta);
+  background: var(--tm-tinta);
+  color: var(--tm-acento);
+}
+.raiz .jogo[data-resultado="derrota"] .jogoResultado {
+  border-color: color-mix(in srgb, var(--qm-tinta-parda) 60%, transparent);
+  background: none;
+  color: var(--qm-tinta-parda);
+}
+/* "VER PARTIDA →" carimbado em marinho no pé do bilhete. */
+.raiz .serieLink {
+  padding: 0 12px;
+  border: 1px solid var(--tm-tinta);
+  border-radius: 4px;
+  color: var(--tm-tinta);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+.raiz .serieLink:hover {
+  background: var(--tm-tinta);
+  color: var(--tm-acento);
+}
+/* o anel de foco da base é ciano claro: no papel ele some */
+.raiz .serieLink:focus-visible {
+  outline-color: var(--tm-tinta);
+}
+@media (max-width: 599px) {
+  .raiz .series {
+    gap: 18px;
+    padding-left: 26px;
+  }
+  .raiz .series::before {
+    left: 5px;
+  }
+  .raiz .serie {
+    padding: 14px 12px 8px 24px;
+  }
+  .raiz .serie::before {
+    left: -22px;
+  }
+}
+/* Celular estreito: a linha mais junto, para o K/D/A e o KDA caberem numa linha. */
+@media (max-width: 379px) {
+  .raiz .series {
+    padding-left: 22px;
+  }
+  .raiz .series::before {
+    left: 3px;
+  }
+  .raiz .serie {
+    padding-left: 22px;
+  }
+  .raiz .serie::before {
+    left: -20px;
+  }
+  .raiz .jogo {
+    column-gap: 8px;
+  }
+  .raiz .jogoDetalhes {
+    column-gap: 8px;
+  }
+  .raiz .jogoRazao,
+  .raiz .jogoDuracao {
+    font-size: 11px;
+  }
+}
+/* Coluna larga: o canhoto à esquerda (o resultado, o placar, o adversário) e a viagem à direita,
+   com o picote no meio e os dois entalhes do bilhete em cima e embaixo dele. */
+@container estacaoCampanhaLinha (min-width: 780px) {
+  .raiz .serie {
+    --qm-canhoto: 210px;
+    grid-template-columns: var(--qm-canhoto) minmax(0, 1fr);
+    column-gap: 30px;
+    align-items: start;
+    padding: 18px 18px 12px 26px;
+  }
+  .raiz .serieCabeca {
+    grid-row: 1 / span 2;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .raiz .serieAdversario,
+  .raiz .serieInfo {
+    flex: none;
+  }
+  .raiz .serieCabeca::after {
+    right: auto;
+    left: calc(var(--qm-canhoto) + 4px); /* no canto do canhoto */
+  }
+  .raiz .jogos {
+    grid-column: 2;
+    border-top: 0;
+  }
+  .raiz .serieLink {
+    grid-column: 2;
+  }
+  .raiz .serie::after {
+    --qm-picote: calc(26px + var(--qm-canhoto) + 15px);
+    background:
+      linear-gradient(color-mix(in srgb, var(--qm-tinta-parda) 50%, transparent) 50%, transparent 50%) calc(var(--qm-picote) - 1px) 0 / 2px 10px repeat-y,
+      var(--qm-papel);
+    -webkit-mask:
+      radial-gradient(circle 5px at 0 50%, #0000 95%, #000) 0 0 / 16px 16px repeat-y,
+      radial-gradient(circle 9px at calc(var(--qm-picote) - 16px) 0, #0000 95%, #000) 16px 0 / calc(100% - 16px) 51% no-repeat,
+      radial-gradient(circle 9px at calc(var(--qm-picote) - 16px) 100%, #0000 95%, #000) 16px 100% / calc(100% - 16px) 51% no-repeat;
+    mask:
+      radial-gradient(circle 5px at 0 50%, #0000 95%, #000) 0 0 / 16px 16px repeat-y,
+      radial-gradient(circle 9px at calc(var(--qm-picote) - 16px) 0, #0000 95%, #000) 16px 0 / calc(100% - 16px) 51% no-repeat,
+      radial-gradient(circle 9px at calc(var(--qm-picote) - 16px) 100%, #0000 95%, #000) 16px 100% / calc(100% - 16px) 51% no-repeat;
+  }
+}
+
+/* ------------------------------------------------------------------ na bagagem: etiquetas de mala */
+/* A máquina de escrever é larga: etiquetas de 250 px no mínimo (os números numa linha só). */
+.raiz .campeoes {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+  gap: 10px;
+}
+@media (min-width: 1100px) {
+  .raiz .campeoes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.raiz .campeao {
+  position: relative;
+  isolation: isolate;
+  padding: 9px 14px 9px 32px;
+  border: 0;
+  background: none;
+}
+.raiz .campeao:nth-child(odd) {
+  rotate: -0.8deg;
+}
+.raiz .campeao:nth-child(even) {
+  rotate: 0.6deg;
+}
+/* a etiqueta de papel pardo, com a ponta chanfrada e o furo do ilhós */
+.raiz .campeao::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 0 5px 5px 0;
+  background:
+    repeating-linear-gradient(0deg, rgba(58, 42, 18, 0.05) 0 1px, transparent 1px 4px),
+    linear-gradient(180deg, #ecd8a4, #dfc48a);
+  clip-path: polygon(14px 0, 100% 0, 100% 100%, 14px 100%, 0 calc(100% - 14px), 0 14px);
+  -webkit-mask: radial-gradient(circle 4px at 13px 50%, #0000 95%, #000);
+  mask: radial-gradient(circle 4px at 13px 50%, #0000 95%, #000);
+}
+/* o ilhós de latão */
+.raiz .campeao::after {
+  content: "";
+  position: absolute;
+  left: 7px;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin-top: -6px;
+  border: 2px solid var(--tm-metal-base);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(58, 42, 18, 0.35);
+}
+.raiz .campeao .campeaoNome {
+  font: 400 14px / 1.1 var(--tm-fonte-titulo), sans-serif;
+}
+.raiz .campeaoNumeros {
+  font-family: var(--tm-fonte-assinatura), "Courier New", monospace;
+  font-size: 12px;
+  color: var(--qm-tinta-parda);
+}
+
+/* ------------------------------------------------------------------ atrás da campanha: a lua */
+/* A lua de queijo nascendo por trás das placas, cortada pela linha do título. Enfeite parado. */
+.enfCeuDaCampanha {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.enfLuaDaCampanha {
+  position: absolute;
+  top: clamp(-150px, calc(4vw - 160px), -60px);
+  right: 9%;
+  width: clamp(190px, 24vw, 340px);
+  aspect-ratio: 1;
+}
+/* o halo da lua (o do herói, mais fraco) */
+.enfLuaDaCampanha::before {
+  content: "";
+  position: absolute;
+  inset: -35%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 214, 110, 0.16), rgba(232, 169, 42, 0.06) 55%, transparent 76%);
+}
+.enfLuaDaCampanha svg {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0.24;
+}
+@media (max-width: 599px) {
+  .enfLuaDaCampanha {
+    right: -64px;
+  }
+}
+@media (forced-colors: active) {
+  .enfCeuDaCampanha {
+    display: none;
+  }
+}
