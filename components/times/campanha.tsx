@@ -303,7 +303,7 @@ export function CampanhaDoJogador({
           {titulos.campanha}
         </h2>
 
-        <div className={c("grade")}>
+        <div className={c("grade")} data-sem-jogos={campanha.jogos === 0 ? "" : undefined}>
           {campanha.jogos > 0 ? (
             <ul className={c("destaques")} aria-label={t.campanhaDestaques}>
               {campanha.ranking.length > 0 ? (
