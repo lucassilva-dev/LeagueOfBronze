@@ -16,6 +16,14 @@ export const textosCampanhaDoJogador = definir({
     campanhaProximo: "PRÓXIMO DESAFIO",
     campanhaDestaques: "Destaques da campanha",
     campanhaSemJogos: "{nick} ainda não entrou em quadra nesta edição. Os números aparecem aqui depois do primeiro jogo.",
+    // Os outros avisos de quem está sem números (components/times/campanha.tsx, avisoSemNumeros).
+    campanhaSoProvisorio:
+      "Os jogos do time de {nick} ainda estão só com o resultado. Os números aparecem aqui quando o K/D/A for lançado.",
+    campanhaSoSubstituto:
+      "{nick} entrou em {n} jogos como substituto, que não pontuam no site: os números estão nas páginas das partidas.",
+    campanhaSoSubstituto1:
+      "{nick} entrou em 1 jogo como substituto, que não pontua no site: os números estão na página da partida.",
+    campanhaSaiuSemJogar: "{nick} saiu do time sem jogar nesta edição.",
 
     // ---------- destaques
     campanhaRanking: "NO RANKING GERAL",
@@ -46,6 +54,7 @@ export const textosCampanhaDoJogador = definir({
     campanhaJogoCurto: "J{n}",
     campanhaJogoLongo: "Jogo {n}",
     campanhaNaoJogou: "não jogou",
+    campanhaProvisorio: "sem K/D/A ainda",
     campanhaWo: "W.O.",
     campanhaVs: "vs",
     campanhaMvp: "MVP",
@@ -63,6 +72,8 @@ export const textosCampanhaDoJogador = definir({
     campanhaJogo: "1 jogo",
     campanhaVd: "{v}V {d}D",
     campanhaKda: "KDA {kda}",
+    // O K/D/A para o leitor de tela ("19/1/8" é lido como data); sem plural para escolher.
+    campanhaKdaLeitor: "abates {k}, mortes {d}, assistências {a}",
 
     // ---------- o time
     campanhaNaTabela: "O TIME NA TABELA",
@@ -77,6 +88,10 @@ export const textosCampanhaDoJogador = definir({
     campanhaProximo: "NEXT UP",
     campanhaDestaques: "Campaign highlights",
     campanhaSemJogos: "{nick} hasn't played yet this season. The numbers show up here after the first game.",
+    campanhaSoProvisorio: "{nick}'s team games only have the result so far. The numbers show up here once the stats are in.",
+    campanhaSoSubstituto: "{nick} played {n} games as a non-scoring sub: the numbers are on the match pages.",
+    campanhaSoSubstituto1: "{nick} played 1 game as a non-scoring sub: the numbers are on the match page.",
+    campanhaSaiuSemJogar: "{nick} left the team without playing this season.",
 
     campanhaRanking: "OVERALL RANKING",
     campanhaRankingEntre: "among {n} players who have played",
@@ -105,7 +120,9 @@ export const textosCampanhaDoJogador = definir({
     campanhaJogoCurto: "G{n}",
     campanhaJogoLongo: "Game {n}",
     campanhaNaoJogou: "did not play",
-    campanhaWo: "W/O",
+    campanhaProvisorio: "no stats yet",
+    // O resto do site em inglês diz "Walkover" (paginas-competicao.ts) e "Bo3" / "Group stage".
+    campanhaWo: "Walkover",
     campanhaVs: "vs",
     campanhaMvp: "MVP",
     campanhaMvpDaSerie: "SERIES MVP",
@@ -113,7 +130,7 @@ export const textosCampanhaDoJogador = definir({
     campanhaMinutos: "{n} min",
     campanhaVerPartida: "MATCH PAGE →",
     campanhaPlacar: "Series score: {time} {a}–{b} {adversario}",
-    campanhaFaseRegular: "Regular season",
+    campanhaFaseRegular: "Group stage",
     campanhaSemifinal: "Semifinal",
     campanhaFinal: "Final",
 
@@ -121,6 +138,7 @@ export const textosCampanhaDoJogador = definir({
     campanhaJogo: "1 game",
     campanhaVd: "{v}W {d}L",
     campanhaKda: "KDA {kda}",
+    campanhaKdaLeitor: "kills {k}, deaths {d}, assists {a}",
 
     campanhaNaTabela: "THE TEAM IN THE STANDINGS",
     campanhaTabela: "{posicao} in the standings",

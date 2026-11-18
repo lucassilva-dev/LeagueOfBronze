@@ -119,6 +119,11 @@
   text-decoration: underline 1.5px;
   text-underline-offset: 3px;
 }
+/* O link já vem sublinhado: no hover, a tinta escurece e o traço engrossa. */
+.raiz .destaqueLink:hover {
+  color: var(--tm-tinta);
+  text-decoration-thickness: 2.5px;
+}
 .raiz .rankingPosicao {
   font-size: 22px;
   color: var(--tm-tinta);

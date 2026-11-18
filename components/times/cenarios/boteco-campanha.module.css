@@ -142,6 +142,11 @@
   text-decoration: underline 1.5px;
   text-underline-offset: 3px;
 }
+/* O link já vem sublinhado: no hover, a tinta escurece e o traço engrossa. */
+.raiz .destaqueLink:hover {
+  color: var(--tm-tinta);
+  text-decoration-thickness: 2.5px;
+}
 /* No pódio, a coroinha do dono do caneco em cima do número. */
 .raiz .rankingPosicao,
 .raiz .rankingLinha[data-podio] .rankingPosicao {
@@ -341,8 +346,11 @@
   letter-spacing: 0.04em;
   color: #c8102e; /* 5,6:1 no esmalte */
 }
+/* Números na letra do título (Knewave): na Kalam o «1» é um traço igual ao «I» e à barra — «1V 1D» se
+   lia «IV ID», «1/3/1» virava um pente. A Kalam fica nas palavras (data, campeão, «min»). */
 .raiz .tabelaCampanha {
-  font: 700 13px / 1.2 var(--tm-fonte-assinatura), "Comic Sans MS", cursive;
+  font: 400 13px / 1.2 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.03em;
   color: var(--tm-tinta);
 }
 
@@ -429,7 +437,7 @@
 .raiz .seriePlacar {
   padding: 0 4px 1px;
   border-bottom: 4px double var(--tm-tinta);
-  font: 700 30px / 1 var(--tm-fonte-assinatura), "Comic Sans MS", cursive;
+  font: 400 30px / 1 var(--tm-fonte-titulo), sans-serif; /* número: Knewave (ver .tabelaCampanha) */
   color: var(--tm-tinta);
 }
 .raiz .placarSeparador,
@@ -472,10 +480,15 @@
   padding: 9px 0;
   border-bottom: 1px solid rgba(30, 79, 216, 0.22); /* o pautado também embaixo do último item */
 }
-.raiz .jogoNumero,
 .raiz .serieLink {
   font: 700 15px / 1 var(--tm-fonte-assinatura), "Comic Sans MS", cursive;
   letter-spacing: 0.03em;
+  color: var(--caneta);
+}
+/* «J1» na Kalam se lia «JI»: o número do item na letra do título. */
+.raiz .jogoNumero {
+  font: 400 14px / 1 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.04em;
   color: var(--caneta);
 }
 .raiz .campeaoIcone {
@@ -495,7 +508,8 @@
   border-bottom: 2px dotted rgba(11, 20, 48, 0.32);
 }
 .raiz .jogoKda {
-  font: 700 18px / 1 var(--tm-fonte-assinatura), "Comic Sans MS", cursive;
+  font: 400 17px / 1 var(--tm-fonte-titulo), sans-serif; /* «1/3/1» na Kalam virava um pente de traços */
+  letter-spacing: 0.02em;
   color: var(--tm-tinta);
 }
 .raiz .jogoMvp {
@@ -587,9 +601,11 @@
   letter-spacing: 0.02em;
   color: var(--giz);
 }
+/* Os números na letra do título: na Kalam o «1» parece um «I» e «1V 1D» se lia «IV ID». */
 .raiz .campeaoNumeros {
   order: 2;
   margin-left: auto;
-  font: 400 14px / 1.25 var(--tm-fonte-assinatura), "Comic Sans MS", cursive;
+  font: 400 13px / 1.3 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.03em;
   color: #ffd45e; /* o giz amarelo: 11,5:1 */
 }

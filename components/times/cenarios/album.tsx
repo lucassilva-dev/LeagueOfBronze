@@ -1,7 +1,6 @@
 import type { CSSProperties } from "react";
 
 import a from "@/components/times/cenarios/album.module.css";
-import xc from "@/components/times/cenarios/album-campanha.module.css";
 import af from "@/components/times/cenarios/album-ficha.module.css";
 import {
   Brilho4,
@@ -47,7 +46,6 @@ const BRILHOS: readonly (readonly [string, string, number, number])[] = [
 export const ALBUM: CenarioDoTema = {
   classes: a,
   classesDaFicha: af,
-  classesDaCampanha: xc,
   Fundo: () => (
     <>
       <div className={a.enfPagina} />

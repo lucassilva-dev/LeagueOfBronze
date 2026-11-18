@@ -38,18 +38,10 @@ export type CenarioDoTema = Readonly<{
   AtrasDoElenco?: () => ReactNode;
   /** Dentro do miolo da cartela, antes do texto (a tela da TV na Galácticos). */
   NaCartela?: () => ReactNode;
-  /**
-   * Atrás da CAMPANHA da ficha (components/times/campanha.tsx), primeiro filho da seção: o
-   * cenário por trás do série a série. Enfeite: aria-hidden, sem texto.
-   */
-  NaCampanha?: () => ReactNode;
   /** O módulo CSS do cenário: ganchos com o nome das peças de tema.module.css. */
   classes?: Readonly<Record<string, string>>;
   /** O mesmo para as peças de ficha.module.css (outro módulo: há nomes repetidos, `topo`…). */
   classesDaFicha?: Readonly<Record<string, string>>;
-  /**
-   * O mesmo para as peças de campanha.module.css (a campanha na ficha). O `.raiz` deste módulo
-   * vai na raiz da ficha, como o de `classesDaFicha`: os ganchos são `.raiz .peca`.
-   */
-  classesDaCampanha?: Readonly<Record<string, string>>;
+  // A CAMPANHA da ficha (ganchos e enfeite) mora em cenarios/campanha-dos-cenarios.tsx, fora daqui:
+  // este objeto também vai para a página do time, que não mostra a campanha.
 }>;

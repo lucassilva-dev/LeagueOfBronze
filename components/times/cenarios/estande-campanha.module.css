@@ -156,12 +156,22 @@
     border-left: 1px solid rgba(22, 35, 61, 0.22);
   }
 }
-@media (min-width: 360px) and (max-width: 1099px) {
+@media (min-width: 600px) and (max-width: 1099px) {
   .raiz .destaque:nth-child(even) {
     border-left: 1px solid rgba(22, 35, 61, 0.22);
   }
   .raiz .destaque:nth-child(n + 3) {
     border-top: 1px solid rgba(22, 35, 61, 0.22);
+  }
+}
+/* No celular o ranking e o melhor jogo ocupam a linha inteira (ver a base): linha entre as três faixas e,
+   na última, entre participação e forma. */
+@media (min-width: 360px) and (max-width: 599px) {
+  .raiz .destaque + .destaque {
+    border-top: 1px solid rgba(22, 35, 61, 0.22);
+  }
+  .raiz .destaque:nth-child(4) {
+    border-left: 1px solid rgba(22, 35, 61, 0.22);
   }
 }
 @media (max-width: 359px) {
@@ -406,7 +416,8 @@
   padding-left: 8px;
   font-style: normal;
 }
-.raiz .jogoWo .jogoNota {
+.raiz .jogoWo .jogoNota,
+.raiz .jogoProvisorio .jogoNota {
   font: 400 13px / 1 var(--tm-fonte-titulo), "Alfa Slab Caixa Alta", serif;
   letter-spacing: 0.1em;
 }

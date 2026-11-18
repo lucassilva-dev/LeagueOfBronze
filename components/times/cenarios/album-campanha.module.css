@@ -339,6 +339,7 @@
 }
 .raiz .jogo {
   position: relative;
+  container-type: inline-size; /* o nome longo encolhe pela largura da figurinha (cqi) */
   grid-template-columns: auto minmax(0, 1fr) auto;
   grid-template-rows: auto 1fr auto;
   grid-template-areas:
@@ -398,6 +399,12 @@
   letter-spacing: 0.03em;
   text-transform: uppercase;
 }
+/* Nome de uma palavra de 10+ letras (data-longo): «MORDEKAI/SER» partia no meio no celular. Encolhe
+   pela largura da figurinha (o overflow-wrap acima fica só de último recurso). */
+.raiz .jogo .campeaoNome[data-longo] {
+  font-size: min(clamp(11px, 3.3vw, 13px), 13cqi);
+  letter-spacing: 0.01em;
+}
 .raiz .jogoDetalhes {
   justify-content: center;
   gap: 3px 8px;
@@ -435,8 +442,9 @@
   font: 26px / 1 sans-serif;
   text-shadow: 0 0 2px var(--tm-tinta), 0 0 2px var(--tm-tinta);
 }
-/* O que ele não jogou: a VAGA vazia, pontilhada e reta. */
+/* O que ele não jogou (e o jogo ainda sem K/D/A): a VAGA vazia, pontilhada e reta. */
 .raiz .jogoAusente,
+.raiz .jogoProvisorio,
 .raiz .jogoWo {
   grid-template-rows: auto 1fr;
   grid-template-areas:

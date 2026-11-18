@@ -204,6 +204,13 @@
   align-self: center;
   color: var(--carmim);
 }
+/* O foco do teclado em TINTA: o anel da base (--tm-arco, #FFE3A3) sumia no papel marfim (1,0:1).
+   Tinta no papel dá 15:1; o anel do ingresso cai no papel, fora do veludo. */
+.raiz .destaqueLink:focus-visible,
+.raiz .serieLink:focus-visible,
+.raiz .proximoCartao:focus-visible {
+  outline-color: var(--tinta-cartaz);
+}
 /* o ranking: as reticências do programa */
 .raiz .ranking {
   align-self: stretch;

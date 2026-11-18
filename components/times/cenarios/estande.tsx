@@ -1,6 +1,5 @@
 import type { CSSProperties } from "react";
 
-import xc from "@/components/times/cenarios/estande-campanha.module.css";
 import ef from "@/components/times/cenarios/estande-ficha.module.css";
 import e from "@/components/times/cenarios/estande.module.css";
 import {
@@ -55,7 +54,6 @@ function Flecha({ classe, id }: Readonly<{ classe: string; id: string }>) {
 export const ESTANDE: CenarioDoTema = {
   classes: e,
   classesDaFicha: ef,
-  classesDaCampanha: xc,
   Fundo: () => (
     <>
       <div className={e.enfCeu} />

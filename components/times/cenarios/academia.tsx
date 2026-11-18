@@ -1,7 +1,6 @@
 import type { CSSProperties } from "react";
 
 import a from "@/components/times/cenarios/academia.module.css";
-import xc from "@/components/times/cenarios/academia-campanha.module.css";
 import af from "@/components/times/cenarios/academia-ficha.module.css";
 import {
   ArcosDaRosca,
@@ -69,8 +68,6 @@ const SUOR: readonly (readonly [string, string, string, string, string])[] = [
 export const ACADEMIA: CenarioDoTema = {
   classes: a,
   classesDaFicha: af,
-  // A campanha na ficha: o quadro de recordes, a ficha na prancheta, o cronômetro e as anilhas de rosca.
-  classesDaCampanha: xc,
   Fundo: () => (
     <>
       <div className={a.enfParede} />
@@ -174,6 +171,4 @@ export const ACADEMIA: CenarioDoTema = {
   ),
   // A mancha de gordura da rosca no papel do saco (o resto do saco é o .cartelaCorpo).
   NaCartela: () => <span className={a.enfMancha} aria-hidden="true" />,
-  // O painel perfurado da parede de equipamentos, atrás da campanha.
-  NaCampanha: () => <div className={xc.enfPainel} aria-hidden="true" />,
 };

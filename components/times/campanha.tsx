@@ -5,7 +5,8 @@ import cm from "@/components/times/campanha.module.css";
 import { cx, type ClassesDaPeca } from "@/components/times/util";
 import { championIconUrl } from "@/lib/champions";
 import { formatKda, partesDaDataDaSerie } from "@/lib/format";
-import type { PaginasHomeTextos } from "@/lib/i18n/messages/paginas-home";
+import { formatoLabel } from "@/lib/i18n/messages/compartilhados";
+import { rotaCurto, type PaginasHomeTextos } from "@/lib/i18n/messages/paginas-home";
 import type {
   CampanhaDoJogador,
   CampeaoDoJogo,
@@ -26,8 +27,9 @@ import type { SeriesStage } from "@/lib/schema";
  * raiz da ficha) e dos GANCHOS do cenário: cada peça leva a classe da base (campanha.module.css)
  * e, se o cenário tiver uma classe com o mesmo nome em `classesDaCampanha`, essa também (`c`,
  * montado com `comCenario`). Estados para o CSS: `data-resultado` (vitoria | derrota |
- * andamento) na série, no jogo e na forma; `data-mvp` no jogo; `data-tipo` (ausente | wo) no
- * jogo que ele não jogou. Nada aqui anima: as entradas, se houver, são do cenário (só transform).
+ * andamento) na série, no jogo e na forma; `data-mvp` no jogo; `data-tipo` (ausente | wo |
+ * provisorio) no jogo sem K/D/A dele. Nada aqui anima: as entradas, se houver, são do cenário
+ * (só transform).
  *
  * A ficha padrão (reserva, time sem tema) usa a mesma peça com `padrao`: as variáveis do bronze
  * do site (campanha.module.css, `.padrao`).
@@ -40,6 +42,8 @@ type Props = Readonly<{
   localeTag: string;
   /** O texto do quadradinho sem campeão (compartilhados.campeaoNaoInformado). */
   semCampeao: string;
+  /** "MD3" → "Bo3" no inglês (compartilhados.formatos); sem o mapa, o rótulo sai como veio. */
+  formatos?: Readonly<Record<string, string>>;
   /** O nick como aparece no site: as frases usam o nick, nunca pronome. */
   nick: string;
   /** Prefixo dos ids (títulos e aria-labelledby). */
@@ -148,13 +152,50 @@ function LetraDoResultado({ t, resultado, c }: Readonly<{ t: PaginasHomeTextos; 
   );
 }
 
+/** "J2" à vista; "Jogo 2" para o leitor de tela. */
+function RotuloDoJogo({ t, numero, c }: Readonly<{ t: PaginasHomeTextos; numero: number; c: ClassesDaPeca }>) {
+  return (
+    <>
+      <span aria-hidden="true">{preencher(t.campanhaJogoCurto, { n: numero })}</span>
+      <span className={c("somenteLeitor")}>{preencher(t.campanhaJogoLongo, { n: numero })}</span>
+    </>
+  );
+}
+
 function NumeroDoJogo({ t, numero, c }: Readonly<{ t: PaginasHomeTextos; numero: number; c: ClassesDaPeca }>) {
   return (
     <span className={c("jogoNumero")}>
-      <span aria-hidden="true">{preencher(t.campanhaJogoCurto, { n: numero })}</span>
-      <span className={c("somenteLeitor")}>{preencher(t.campanhaJogoLongo, { n: numero })}</span>
+      <RotuloDoJogo t={t} numero={numero} c={c} />
     </span>
   );
+}
+
+/** "19/1/8" à vista; por extenso para o leitor de tela (que lê as barras como data). */
+function KdaDoJogo({
+  t,
+  c,
+  abates,
+  mortes,
+  assistencias,
+}: Readonly<{ t: PaginasHomeTextos; c: ClassesDaPeca; abates: number; mortes: number; assistencias: number }>) {
+  return (
+    <>
+      <span aria-hidden="true">
+        {abates}/{mortes}/{assistencias}
+      </span>
+      <span className={c("somenteLeitor")}>{preencher(t.campanhaKdaLeitor, { k: abates, d: mortes, a: assistencias })}</span>
+    </>
+  );
+}
+
+const CLASSE_DO_JOGO_SEM_KDA = { ausente: "jogoAusente", wo: "jogoWo", provisorio: "jogoProvisorio" } as const;
+
+/**
+ * Nome com uma palavra de 10+ letras (Mordekaiser, Heimerdinger, Fiddlesticks): o cenário de
+ * coluna estreita (a figurinha do álbum) encolhe só esses, em vez de partir a palavra no meio.
+ */
+function nomeLongo(nome: string): boolean {
+  return nome.split(/\s+/).some((palavra) => palavra.length >= 10);
 }
 
 function Jogo({
@@ -165,14 +206,15 @@ function Jogo({
   semCampeao,
 }: Readonly<{ jogo: JogoDaCampanha; t: PaginasHomeTextos; c: ClassesDaPeca; localeTag: string; semCampeao: string }>) {
   if (jogo.tipo !== "jogou") {
+    const nota = jogo.tipo === "wo" ? t.campanhaWo : jogo.tipo === "provisorio" ? t.campanhaProvisorio : t.campanhaNaoJogou;
     return (
       <li
-        className={c("jogo", jogo.tipo === "wo" ? "jogoWo" : "jogoAusente")}
+        className={c("jogo", CLASSE_DO_JOGO_SEM_KDA[jogo.tipo])}
         data-tipo={jogo.tipo}
         data-resultado={jogo.resultado ?? undefined}
       >
         <NumeroDoJogo t={t} numero={jogo.numero} c={c} />
-        <span className={c("jogoNota")}>{jogo.tipo === "wo" ? t.campanhaWo : t.campanhaNaoJogou}</span>
+        <span className={c("jogoNota")}>{nota}</span>
         {jogo.resultado ? (
           <span className={c("jogoResultado")}>
             <LetraDoResultado t={t} resultado={jogo.resultado} c={c} />
@@ -186,11 +228,13 @@ function Jogo({
       <NumeroDoJogo t={t} numero={jogo.numero} c={c} />
       <span className={c("jogoCampeao")}>
         <IconeDoCampeao campeao={jogo.campeao} c={c} tamanho={32} semCampeao={semCampeao} />
-        <span className={c("campeaoNome")}>{jogo.campeao?.nome ?? semCampeao}</span>
+        <span className={c("campeaoNome")} data-longo={nomeLongo(jogo.campeao?.nome ?? semCampeao) ? "" : undefined}>
+          {jogo.campeao?.nome ?? semCampeao}
+        </span>
       </span>
       <span className={c("jogoDetalhes")}>
         <span className={c("jogoKda")}>
-          {jogo.abates}/{jogo.mortes}/{jogo.assistencias}
+          <KdaDoJogo t={t} c={c} abates={jogo.abates} mortes={jogo.mortes} assistencias={jogo.assistencias} />
         </span>
         <span className={c("jogoRazao")}>{preencher(t.campanhaKda, { kda: formatKda(jogo.kda, localeTag) })}</span>
         {jogo.mvp ? <span className={c("jogoMvp")}>{t.campanhaMvp}</span> : null}
@@ -209,7 +253,15 @@ function Serie({
   c,
   localeTag,
   semCampeao,
-}: Readonly<{ serie: SerieDaCampanha; t: PaginasHomeTextos; c: ClassesDaPeca; localeTag: string; semCampeao: string }>) {
+  formatos,
+}: Readonly<{
+  serie: SerieDaCampanha;
+  t: PaginasHomeTextos;
+  c: ClassesDaPeca;
+  localeTag: string;
+  semCampeao: string;
+  formatos: Readonly<Record<string, string>>;
+}>) {
   const data = partesDaDataDaSerie(serie.data, localeTag);
   return (
     <li className={c("serie")} data-resultado={serie.resultado}>
@@ -242,7 +294,7 @@ function Serie({
             </span>
           ) : null}
           <span className={c("serieFase")}>
-            {serie.formato}
+            {formatoLabel({ formatos }, serie.formato)}
             {serie.fase === "REGULAR_SEASON" ? "" : ` · ${rotuloDaFase(t, serie.fase)}`}
           </span>
           {serie.mvpDaSerie ? <span className={c("serieMvp")}>{t.campanhaMvpDaSerie}</span> : null}
@@ -258,9 +310,30 @@ function Serie({
       </ol>
       <Link className={c("serieLink")} href={hrefDaPartida(serie.id)}>
         {t.campanhaVerPartida}
+        {/* Na lista de links do leitor de tela, cada "VER PARTIDA" diz qual é. */}
+        <span className={c("somenteLeitor")}>
+          {" "}
+          {t.campanhaVs} {serie.adversario.nome}
+        </span>
       </Link>
     </li>
   );
+}
+
+/**
+ * O aviso no lugar dos destaques de quem está sem números: nunca nega que ele entrou em quadra
+ * (substituto que não pontua, jogo só com o resultado) nem promete números a quem saiu do time.
+ */
+function avisoSemNumeros(t: PaginasHomeTextos, campanha: CampanhaDoJogador, nick: string): string {
+  if (campanha.series.length > 0) return preencher(t.campanhaSoProvisorio, { nick });
+  if (campanha.jogosSemPontuar > 0) {
+    return preencher(campanha.jogosSemPontuar === 1 ? t.campanhaSoSubstituto1 : t.campanhaSoSubstituto, {
+      nick,
+      n: campanha.jogosSemPontuar,
+    });
+  }
+  if (campanha.saiu) return preencher(t.campanhaSaiuSemJogar, { nick });
+  return preencher(t.campanhaSemJogos, { nick });
 }
 
 export function CampanhaDoJogador({
@@ -268,6 +341,7 @@ export function CampanhaDoJogador({
   t,
   localeTag,
   semCampeao,
+  formatos = {},
   nick,
   idBase,
   c,
@@ -278,6 +352,10 @@ export function CampanhaDoJogador({
   padrao,
 }: Props) {
   const { melhorJogo, recordeDeAbates, participacao, proximaSerie, tabela, rankingNaRota } = campanha;
+  const semNumeros = campanha.jogos === 0;
+  // Sem números e sem série nenhuma: o aviso e (se houver) o próximo desafio lado a lado.
+  const vazia = semNumeros && campanha.series.length === 0;
+  const temLado = Boolean(proximaSerie || tabela);
   const dataDaProxima = proximaSerie ? partesDaDataDaSerie(proximaSerie.data, localeTag) : null;
   const ultimos =
     campanha.forma.length === 1 ? t.campanhaFormaUltimo : preencher(t.campanhaFormaUltimos, { n: campanha.forma.length });
@@ -303,8 +381,8 @@ export function CampanhaDoJogador({
           {titulos.campanha}
         </h2>
 
-        <div className={c("grade")} data-sem-jogos={campanha.jogos === 0 ? "" : undefined}>
-          {campanha.jogos > 0 ? (
+        <div className={c("grade")} data-sem-jogos={vazia ? "" : undefined} data-sem-lado={temLado ? undefined : ""}>
+          {!semNumeros ? (
             <ul className={c("destaques")} aria-label={t.campanhaDestaques}>
               {campanha.ranking.length > 0 ? (
                 <li className={c("destaque", "destaqueRanking")}>
@@ -329,7 +407,7 @@ export function CampanhaDoJogador({
                   {rankingNaRota ? (
                     <span className={c("destaqueExtra")}>
                       {preencher(t.campanhaRankingRota, {
-                        rota: rankingNaRota.rota,
+                        rota: rotaCurto(t, rankingNaRota.rota),
                         posicao: ordinal(rankingNaRota.posicao, localeTag),
                         n: rankingNaRota.total,
                       })}
@@ -345,7 +423,13 @@ export function CampanhaDoJogador({
                     <IconeDoCampeao campeao={melhorJogo.campeao} c={c} tamanho={52} semCampeao={semCampeao} />
                     <span className={c("melhorJogoTexto")}>
                       <span className={c("destaqueValor")}>
-                        {melhorJogo.abates}/{melhorJogo.mortes}/{melhorJogo.assistencias}
+                        <KdaDoJogo
+                          t={t}
+                          c={c}
+                          abates={melhorJogo.abates}
+                          mortes={melhorJogo.mortes}
+                          assistencias={melhorJogo.assistencias}
+                        />
                       </span>
                       <span className={c("destaqueDetalhe")}>
                         {melhorJogo.campeao?.nome ?? semCampeao} · {preencher(t.campanhaKda, { kda: formatKda(melhorJogo.kda, localeTag) })}
@@ -353,7 +437,7 @@ export function CampanhaDoJogador({
                     </span>
                   </span>
                   <Link className={c("destaqueLink")} href={hrefDaPartida(melhorJogo.serieId)}>
-                    {t.campanhaVs} {melhorJogo.adversario.nome} · {preencher(t.campanhaJogoCurto, { n: melhorJogo.numero })} ·{" "}
+                    {t.campanhaVs} {melhorJogo.adversario.nome} · <RotuloDoJogo t={t} numero={melhorJogo.numero} c={c} /> ·{" "}
                     {melhorJogo.resultado === "vitoria" ? t.campanhaVitoria : t.campanhaDerrota} →
                   </Link>
                   {recordeDeAbates ? (
@@ -392,11 +476,13 @@ export function CampanhaDoJogador({
               ) : null}
             </ul>
           ) : (
-            <p className={c("vazio")}>{preencher(t.campanhaSemJogos, { nick })}</p>
+            <p className={c("vazio")}>{avisoSemNumeros(t, campanha, nick)}</p>
           )}
 
-          {proximaSerie || tabela ? (
-            <aside className={c("proximo")} aria-labelledby={`${idBase}-proximo`}>
+          {temLado ? (
+            // Um bloco com título (h3), não um <aside>: dentro da região da seção, o complementary
+            // aninhado é a violação "landmark-complementary-is-top-level" do axe.
+            <div className={c("proximo")}>
               <h3 id={`${idBase}-proximo`} className={c("subtitulo")}>
                 {proximaSerie ? titulos.proximo : t.campanhaNaTabela}
               </h3>
@@ -421,7 +507,7 @@ export function CampanhaDoJogador({
                   <span className={c("proximoInfo")}>
                     {proximaSerie.emAndamento
                       ? preencher(t.campanhaAoVivo, { a: proximaSerie.placar.time, b: proximaSerie.placar.adversario })
-                      : `${proximaSerie.formato} · ${rotuloDaFase(t, proximaSerie.fase)}`}
+                      : `${formatoLabel({ formatos }, proximaSerie.formato)} · ${rotuloDaFase(t, proximaSerie.fase)}`}
                   </span>
                   <span className={c("proximoVer")}>{t.campanhaVerPartida}</span>
                 </Link>
@@ -436,7 +522,7 @@ export function CampanhaDoJogador({
                   </span>
                 </p>
               ) : null}
-            </aside>
+            </div>
           ) : null}
 
           {campanha.series.length > 0 ? (
@@ -446,7 +532,15 @@ export function CampanhaDoJogador({
               </h3>
               <ol className={c("series")} aria-labelledby={`${idBase}-resultados`}>
                 {campanha.series.map((serie) => (
-                  <Serie key={serie.id} serie={serie} t={t} c={c} localeTag={localeTag} semCampeao={semCampeao} />
+                  <Serie
+                    key={serie.id}
+                    serie={serie}
+                    t={t}
+                    c={c}
+                    localeTag={localeTag}
+                    semCampeao={semCampeao}
+                    formatos={formatos}
+                  />
                 ))}
               </ol>
             </div>

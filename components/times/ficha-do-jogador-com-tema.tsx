@@ -6,6 +6,7 @@ import { EloCrest, RoleIcon } from "@/components/lob/ui";
 import { CampanhaDoJogador } from "@/components/times/campanha";
 import cm from "@/components/times/campanha.module.css";
 import { CENARIOS } from "@/components/times/cenarios";
+import { CAMPANHA_DOS_CENARIOS } from "@/components/times/cenarios/campanha-dos-cenarios";
 import f from "@/components/times/ficha.module.css";
 import { FONTES_DOS_TEMAS } from "@/components/times/fontes-dos-temas";
 import { Palco } from "@/components/times/palco";
@@ -45,6 +46,8 @@ type Props = Readonly<{
   localeTag?: string;
   /** O quadradinho do jogo sem campeão (compartilhados.campeaoNaoInformado). */
   semCampeao?: string;
+  /** "MD3" → "Bo3" no inglês (compartilhados.formatos). */
+  formatos?: Readonly<Record<string, string>>;
 }>;
 
 export function FichaDoJogadorComTema({
@@ -61,6 +64,7 @@ export function FichaDoJogadorComTema({
   campanha,
   localeTag = "pt-BR",
   semCampeao = "—",
+  formatos,
 }: Props) {
   const fonteTitulo = FONTES_DOS_TEMAS[tema.fontes.titulo].variable;
   const fonteAssinatura = tema.fontes.assinatura ? FONTES_DOS_TEMAS[tema.fontes.assinatura].variable : "";
@@ -70,7 +74,9 @@ export function FichaDoJogadorComTema({
   const cenario = CENARIOS[tema.cenario];
   const c = comCenario(s, cenario.classes);
   const cf = comCenario(f, cenario.classesDaFicha);
-  const cc = comCenario(cm, cenario.classesDaCampanha);
+  // A campanha tem registro próprio (só a ficha o importa: a página do time não baixa esse CSS).
+  const campanhaDoCenario = CAMPANHA_DOS_CENARIOS[tema.cenario];
+  const cc = comCenario(cm, campanhaDoCenario.classes);
   const { Insignia, InsigniaMini, Moldura, AtrasDoRetrato } = cenario;
   const capitao = textoDoTema(tema, t, "capitao") ?? t.timeCapitaoTema;
   // O nick pelo tamanho da MAIOR PALAVRA (quem quebra entre palavras cabe maior).
@@ -80,7 +86,7 @@ export function FichaDoJogadorComTema({
 
   return (
     <div
-      className={cx(c("raiz"), cenario.classesDaFicha?.raiz, cenario.classesDaCampanha?.raiz, fonteTitulo, fonteAssinatura)}
+      className={cx(c("raiz"), cenario.classesDaFicha?.raiz, campanhaDoCenario.classes.raiz, fonteTitulo, fonteAssinatura)}
       style={varsDoTema(tema)}
       data-tema={tema.slug}
       data-fotos={tema.fotos.formato}
@@ -210,6 +216,7 @@ export function FichaDoJogadorComTema({
             t={t}
             localeTag={localeTag}
             semCampeao={semCampeao}
+            formatos={formatos}
             nick={player.displayNick}
             idBase="tm-campanha"
             c={cc}
@@ -221,7 +228,7 @@ export function FichaDoJogadorComTema({
               campeoes: textoDoTema(tema, t, "campanhaCampeoes") ?? t.campanhaCampeoes,
               proximo: textoDoTema(tema, t, "campanhaProximo") ?? t.campanhaProximo,
             }}
-            NaCampanha={cenario.NaCampanha}
+            NaCampanha={campanhaDoCenario.NaCampanha}
           />
         ) : null}
 

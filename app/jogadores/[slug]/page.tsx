@@ -112,6 +112,7 @@ export default async function PlayerFichaPage({ params, searchParams }: PlayerPa
           campanha={campanha}
           localeTag={compartilhados.localeTag}
           semCampeao={compartilhados.campeaoNaoInformado}
+          formatos={compartilhados.formatos}
         />
         <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 clamp(16px,4vw,24px) 48px" }}>
           <AvisoConsentimento />
@@ -203,6 +204,7 @@ export default async function PlayerFichaPage({ params, searchParams }: PlayerPa
         t={t}
         localeTag={compartilhados.localeTag}
         semCampeao={compartilhados.campeaoNaoInformado}
+        formatos={compartilhados.formatos}
         nick={player.displayNick}
         idBase="ficha-campanha"
         c={comCenario(cm)}

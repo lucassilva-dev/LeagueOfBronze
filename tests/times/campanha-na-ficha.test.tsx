@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { CampanhaDoJogador } from "@/components/times/campanha";
 import cm from "@/components/times/campanha.module.css";
-import { CENARIOS } from "@/components/times/cenarios";
+import { CAMPANHA_DOS_CENARIOS } from "@/components/times/cenarios/campanha-dos-cenarios";
 import { FichaDoJogadorComTema } from "@/components/times/ficha-do-jogador-com-tema";
 import { comCenario } from "@/components/times/util";
 import { resolveElo, resolveRole } from "@/lib/design";
@@ -70,7 +70,7 @@ function jogador(slug: string, tema: TemaDoTime): DesignPlayer {
   } as DesignPlayer;
 }
 
-function ficha(tema: TemaDoTime, campanha: Campanha, textos = t, localeTag = "pt-BR") {
+function ficha(tema: TemaDoTime, campanha: Campanha, textos = t, localeTag = "pt-BR", formatos = MESSAGES.pt.compartilhados.formatos) {
   const time: DesignTeam = { id: "alfa", name: "ALFA", slug: tema.slug, color: tema.cor, roster: [], captain: null, total: 30 };
   const html = renderToStaticMarkup(
     <FichaDoJogadorComTema
@@ -85,6 +85,7 @@ function ficha(tema: TemaDoTime, campanha: Campanha, textos = t, localeTag = "pt
       campanha={campanha}
       localeTag={localeTag}
       semCampeao="Campeão não informado"
+      formatos={formatos}
     />,
   );
   return new DOMParser().parseFromString(html, "text/html");
@@ -119,8 +120,9 @@ describe.each(SLUGS)("a campanha na ficha temática — %s", (slug) => {
   });
 
   it("o gancho do cenário chega às peças (e o .raiz dele à raiz da ficha)", () => {
-    const ganchos = CENARIOS[tema.cenario].classesDaCampanha;
-    if (!ganchos) return; // tema ainda sem gancho: só a base
+    // Os 8 cenários têm ganchos, num registro só da ficha (fora de CENARIOS: a página do time não
+    // baixa o CSS da campanha).
+    const ganchos = CAMPANHA_DOS_CENARIOS[tema.cenario].classes;
     const raiz = doc.querySelector(`[data-tema="${slug}"]`)!;
     if (ganchos.raiz) expect(raiz.classList.contains(ganchos.raiz)).toBe(true);
     if (ganchos.serie) expect(secao.getElementsByClassName(ganchos.serie).length).toBeGreaterThan(0);
@@ -163,6 +165,81 @@ describe("a campanha — casos", () => {
     expect(secao.textContent).toContain("1st");
     expect(lido(secao)).toContain("WIN");
     expect(secao.textContent).not.toContain("1º");
+  });
+
+  it("em inglês, os rótulos do resto do site: Bo3, JG e Group stage (nada de MD3, SEL, Regular season)", () => {
+    // O caçador da ALFA: a rota no ranking por rota, a série (MD3) e o próximo desafio (MD3 · fase).
+    const campanha = campanhaDoJogador(dataset(), id("alfa", "JUNGLE"));
+    const doc = ficha(tema, campanha, en, "en-US", MESSAGES.en.compartilhados.formatos);
+    const texto = doc.querySelector("section[data-campanha]")!.textContent ?? "";
+    expect(texto).toContain("KDA among JG players");
+    expect(texto).toContain("Bo3 · Group stage");
+    expect(texto).not.toMatch(/MD[35]|SEL|Regular season/);
+  });
+
+  it("sem <aside> dentro da seção (o complementary aninhado que o axe acusava)", () => {
+    const doc = ficha(tema, campanhaDoJogador(dataset(), id("alfa", "MID")));
+    const secao = doc.querySelector("section[data-campanha]")!;
+    expect(secao.querySelector("aside")).toBeNull();
+    expect(doc.getElementById("tm-campanha-proximo")!.textContent).toBe(textoDoTema(tema, t, "campanhaProximo"));
+  });
+
+  it("o leitor de tela: o K/D/A por extenso e cada «VER PARTIDA» com o adversário", () => {
+    const doc = ficha(tema, campanhaDoJogador(dataset(), id("alfa", "MID")));
+    const serie = doc.querySelector(`ol[aria-labelledby="tm-campanha-resultados"] > li`)!;
+    expect(lido(serie)).toContain("abates 9, mortes 2, assistências 6");
+    expect(lido(serie)).not.toContain("9/2/6");
+    expect(lido(serie.querySelector('a[href="/partidas/s1"]')!)).toContain("vs BETA");
+    // O link do melhor jogo diz "Jogo 1" (o "J1" fica só à vista).
+    const melhor = doc.querySelector('section[data-campanha] ul a[href="/partidas/s1"]')!;
+    expect(lido(melhor)).toContain("Jogo 1");
+    expect(lido(melhor)).not.toMatch(/J1/);
+  });
+
+  it("jogo lançado só com o vencedor: «sem K/D/A ainda», nunca «não jogou»", () => {
+    const d = dataset();
+    d.seriesMatches.find((s) => s.id === "s1")!.games.push({ winnerTeamId: "beta", mvpPlayerId: "", statsByPlayer: [] });
+    const doc = ficha(tema, campanhaDoJogador(d, id("alfa", "MID")));
+    const j3 = doc.querySelector('section[data-campanha] li[data-tipo="provisorio"]')!;
+    expect(j3).not.toBeNull();
+    expect(j3.textContent).toContain(t.campanhaProvisorio);
+    expect(j3.textContent).not.toContain(t.campanhaNaoJogou);
+  });
+
+  it("série toda provisória: o aviso de K/D/A pendente, com a série na lista", () => {
+    const d = copia(cenario());
+    d.seriesMatches.find((s) => s.id === "s1")!.games = [
+      { winnerTeamId: "alfa", mvpPlayerId: "", statsByPlayer: [] },
+      { winnerTeamId: "alfa", mvpPlayerId: "", statsByPlayer: [] },
+    ];
+    const doc = ficha(tema, campanhaDoJogador(d, id("alfa", "MID")));
+    const secao = doc.querySelector("section[data-campanha]")!;
+    expect(secao.textContent).toContain("Os jogos do time de Fulano ainda estão só com o resultado.");
+    expect(secao.textContent).not.toContain("ainda não entrou em quadra");
+    expect(secao.querySelectorAll('li[data-tipo="provisorio"]')).toHaveLength(2);
+    expect(secao.querySelector("[data-sem-jogos]")).toBeNull();
+  });
+
+  it("quem só entrou como substituto que não pontua não lê «ainda não entrou em quadra»", () => {
+    const d = dataset();
+    d.seriesMatches.find((s) => s.id === "s1")!.games[1]!.statsByPlayer.push(
+      linha("r1", 2, 1, 3, { naoPontua: true, teamId: "beta", champion: "Lux" }),
+    );
+    const doc = ficha(tema, campanhaDoJogador(d, "r1"));
+    const texto = doc.querySelector("section[data-campanha]")!.textContent ?? "";
+    expect(texto).toContain("Fulano entrou em 1 jogo como substituto, que não pontua no site");
+    expect(texto).not.toContain("ainda não entrou em quadra");
+  });
+
+  it("quem saiu sem jogar: sem promessa de números, e o aviso na largura toda", () => {
+    const d = dataset();
+    d.players.find((p) => p.id === id("gama", "TOP"))!.saiuEm = "2026-11-19T00:00:00.000Z";
+    const doc = ficha(tema, campanhaDoJogador(d, id("gama", "TOP")));
+    const secao = doc.querySelector("section[data-campanha]")!;
+    expect(secao.textContent).toContain("Fulano saiu do time sem jogar nesta edição.");
+    expect(secao.textContent).not.toContain("depois do primeiro jogo");
+    const grade = secao.querySelector("[data-sem-jogos]")!;
+    expect(grade.hasAttribute("data-sem-lado")).toBe(true);
   });
 
   it("a ficha sem tema usa a mesma peça com o bronze do site", () => {

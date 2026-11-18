@@ -1,6 +1,5 @@
 import type { CSSProperties } from "react";
 
-import xc from "@/components/times/cenarios/chamada-campanha.module.css";
 import chf from "@/components/times/cenarios/chamada-ficha.module.css";
 import ch from "@/components/times/cenarios/chamada.module.css";
 import {
@@ -42,7 +41,6 @@ const TELAS: readonly (readonly [string, string, number, boolean])[] = [
 export const CHAMADA: CenarioDoTema = {
   classes: ch,
   classesDaFicha: chf,
-  classesDaCampanha: xc,
   Fundo: () => (
     <>
       <div className={ch.enfParede} />
@@ -124,17 +122,6 @@ export const CHAMADA: CenarioDoTema = {
     </span>
   ),
   AtrasDoElenco: () => <span className={ch.enfMalha} aria-hidden="true" />,
-  // A campanha é a segunda janela da call, o histórico: a janela de vidro e a pílula de gravação
-  // (a bolinha vermelha e as barras de sinal), no prumo do status do herói.
-  NaCampanha: () => (
-    <>
-      <span className={xc.enfHistorico} aria-hidden="true" />
-      <span className={xc.enfGravando} aria-hidden="true">
-        <span className={xc.enfRec} />
-        <BarrasDeSinal className={xc.enfBarrasHistorico} />
-      </span>
-    </>
-  ),
   // A chamada encerrada: o botão de desligar e a avaliação (cinco estrelas, cinco jogadores).
   NaCartela: () => (
     <span className={ch.enfEncerrada} aria-hidden="true">

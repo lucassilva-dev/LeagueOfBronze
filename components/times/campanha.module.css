@@ -6,6 +6,13 @@
  *
  * Mesmas regras de toda a pasta (tests/times/temas-sem-opacidade.test.ts): a base NÃO anima nada;
  * transição só com a propriedade nomeada (nunca opacity, filter nem all).
+ *
+ * Os ESTADOS e contextos da base (`:hover`, `[data-resultado]`, `:last-child`, `.campeao .x`…) vão
+ * dentro de `:where()`, que não soma especificidade: a base fica em (0,1,0) e qualquer gancho
+ * `.raiz .peca` (0,2,0) vence por especificidade, nunca pela ordem em que os CSS chegam
+ * (tests/times/campanha-especificidade.test.ts). Exceção de propósito: os estados que pintam um
+ * DESCENDENTE (`.serie[data-resultado] .serieResultado`, o pódio do ranking) ficam em (0,3,0), e o
+ * gancho que quiser mudá-los escreve o mesmo estado.
  */
 
 /* ------------------------------------------------------------------ seção e grade */
@@ -58,6 +65,11 @@
   .grade[data-sem-jogos] {
     grid-template-rows: auto;
     grid-template-areas: "destaques proximo";
+  }
+  /* ...e quem não tem próximo nem tabela (saiu do time): o aviso na largura toda. */
+  .grade[data-sem-jogos][data-sem-lado] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "destaques";
   }
 }
 
@@ -187,6 +199,15 @@
     padding: 13px 12px 12px;
   }
 }
+/* No celular (360 a 599 px), as duas casas largas, o ranking e o melhor jogo, ocupam a linha inteira: em meia
+   largura, «ABATES» e «ASSIST.» quebravam no meio (360 px é a tela de muito Android). Participação e forma
+   seguem lado a lado. */
+@media (min-width: 360px) and (max-width: 599px) {
+  .destaqueRanking,
+  .destaqueMelhorJogo {
+    grid-column: 1 / -1;
+  }
+}
 .destaqueRotulo {
   font-size: 10px;
   font-weight: 700;
@@ -227,13 +248,13 @@
   color: var(--tm-acento);
   text-decoration: none;
 }
-.destaqueLink:hover {
+.destaqueLink:where(:hover) {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
-.destaqueLink:focus-visible,
-.serieLink:focus-visible,
-.proximoCartao:focus-visible {
+.destaqueLink:where(:focus-visible),
+.serieLink:where(:focus-visible),
+.proximoCartao:where(:focus-visible) {
   outline: 2px solid var(--tm-arco);
   outline-offset: 3px;
 }
@@ -287,7 +308,7 @@
   gap: 5px;
   min-width: 0;
 }
-.melhorJogoCorpo .campeaoIcone {
+:where(.melhorJogoCorpo) .campeaoIcone {
   width: 52px;
   height: 52px;
   border-color: color-mix(in srgb, var(--tm-neon) 60%, transparent);
@@ -297,7 +318,7 @@
     flex-direction: column;
     align-items: flex-start;
   }
-  .melhorJogoCorpo .campeaoIcone {
+  :where(.melhorJogoCorpo) .campeaoIcone {
     width: 44px;
     height: 44px;
   }
@@ -338,11 +359,11 @@
   border-radius: 2px;
   font: var(--tm-titulo-estilo, italic) var(--tm-titulo-peso, 900) 14px / 1 var(--tm-fonte-titulo), sans-serif;
 }
-.formaJogo[data-resultado="vitoria"] {
+.formaJogo:where([data-resultado="vitoria"]) {
   background: linear-gradient(180deg, var(--tm-placa-topo, #f4f7fb), var(--tm-metal-placa));
   color: var(--tm-tinta);
 }
-.formaJogo[data-resultado="derrota"] {
+.formaJogo:where([data-resultado="derrota"]) {
   border-color: color-mix(in srgb, var(--tm-apoio) 55%, transparent);
   background: color-mix(in srgb, var(--tm-breu) 55%, transparent);
   color: var(--tm-apoio);
@@ -379,7 +400,7 @@
   text-decoration: none;
   transition: border-color 0.2s ease, translate 0.25s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
-.proximoCartao:hover {
+.proximoCartao:where(:hover) {
   border-color: var(--tm-neon);
   translate: 0 -2px;
 }
@@ -408,7 +429,7 @@
   gap: 10px;
   min-width: 0;
 }
-.proximoConfronto .escudo {
+:where(.proximoConfronto) .escudo {
   width: 40px;
   height: 40px;
 }
@@ -466,10 +487,10 @@
   border-radius: 2px;
   background: linear-gradient(90deg, color-mix(in srgb, var(--tm-royal) 22%, transparent), color-mix(in srgb, var(--tm-breu) 66%, transparent));
 }
-.serie[data-resultado="vitoria"] {
+.serie:where([data-resultado="vitoria"]) {
   border-left-color: var(--tm-neon);
 }
-.serie[data-resultado="derrota"] {
+.serie:where([data-resultado="derrota"]) {
   border-left-color: color-mix(in srgb, var(--tm-apoio) 70%, transparent);
 }
 @media (max-width: 599px) {
@@ -571,7 +592,7 @@
   padding: 8px 0;
   border-bottom: 1px solid color-mix(in srgb, var(--tm-acento) 10%, transparent);
 }
-.jogo:last-child {
+.jogo:where(:last-child) {
   border-bottom: 0;
 }
 .jogoNumero {
@@ -679,7 +700,7 @@
   text-decoration: none;
   transition: color 0.2s ease;
 }
-.serieLink:hover {
+.serieLink:where(:hover) {
   color: var(--tm-texto);
 }
 
@@ -707,7 +728,7 @@
   border-radius: 2px;
   background: color-mix(in srgb, var(--tm-breu) 55%, transparent);
 }
-.campeao .campeaoIcone {
+:where(.campeao) .campeaoIcone {
   width: 40px;
   height: 40px;
 }
@@ -717,7 +738,7 @@
   gap: 3px;
   min-width: 0;
 }
-.campeao .campeaoNome {
+:where(.campeao) .campeaoNome {
   font: var(--tm-titulo-estilo, italic) var(--tm-titulo-peso-medio, 800) 14px / 1.1 var(--tm-fonte-titulo), sans-serif;
   text-transform: uppercase;
 }

@@ -5,6 +5,7 @@ import { campanhaDoJogador } from "@/lib/jogadores/campanha";
 import type { SeriesGame, TournamentDataset } from "@/lib/schema";
 
 import { cenario, copia, id, jogo, linha, linhasDoTime, validar } from "../torneio/_cenario-regra-6";
+// (cenario e copia: os testes do jogo provisório e de quem saiu partem do campeonato sem jogo.)
 
 /**
  * A CAMPANHA da ficha do jogador (lib/jogadores/campanha.ts), pedida em 18/11/2026: série a série,
@@ -210,6 +211,92 @@ describe("campanhaDoJogador — quem não pontua e o substituto", () => {
     d.seriesMatches.find((s) => s.id === "s1")!.games[1]!.statsByPlayer[0]!.champion = "Campeão Inventado";
     const jogo2 = campanhaDoJogador(d, MID).series.find((s) => s.id === "s1")!.jogos[1]!;
     expect(jogo2).toMatchObject({ tipo: "jogou", campeao: { id: null, nome: "Campeão Inventado" } });
+  });
+});
+
+/** O jogo lançado só com o vencedor (efb7493): sem K/D/A de ninguém e sem MVP. */
+function provisorio(vencedor: string): SeriesGame {
+  return { winnerTeamId: vencedor, mvpPlayerId: "", statsByPlayer: [] };
+}
+
+describe("campanhaDoJogador — jogo provisório (só o vencedor, sem K/D/A)", () => {
+  it("no meio da série é 'provisório' (nunca 'não jogou') e fica fora dos números dele", () => {
+    const d = campeonato();
+    d.seriesMatches.find((s) => s.id === "s1")!.games[1] = provisorio("beta");
+    expect(validar(d).success).toBe(true);
+    const campanha = campanhaDoJogador(d, MID);
+    const s1 = campanha.series.find((s) => s.id === "s1")!;
+    expect(s1.jogos.map((j) => [j.tipo, j.numero, j.resultado])).toEqual([
+      ["jogou", 1, "vitoria"],
+      ["provisorio", 2, "derrota"],
+      ["ausente", 3, "vitoria"],
+    ]);
+    expect(s1.placar).toEqual({ time: 2, adversario: 1 });
+    expect(campanha.jogos).toBe(2); // o J1 da s1 e o J1 da s3
+    expect(campanha.forma).toEqual(["vitoria", "vitoria"]);
+  });
+
+  it("a série toda provisória entra pelo time do ELENCO (antes sumia da ficha)", () => {
+    const d = copia(cenario());
+    d.seriesMatches.find((s) => s.id === "s1")!.games = [provisorio("alfa"), provisorio("alfa")];
+    expect(validar(d).success).toBe(true);
+    const campanha = campanhaDoJogador(d, MID);
+    expect(campanha.series.map((s) => [s.id, s.time.id, s.resultado, s.placar.time, s.placar.adversario])).toEqual([
+      ["s1", "alfa", "vitoria", 2, 0],
+    ]);
+    expect(campanha.series[0]!.jogos.map((j) => j.tipo)).toEqual(["provisorio", "provisorio"]);
+    expect(campanha).toMatchObject({ jogos: 0, forma: [], melhorJogo: null, participacao: null, ranking: [] });
+    expect(campanha.tabela).toMatchObject({ vitorias: 1, derrotas: 0 });
+    // Do outro lado, a mesma série pela BETA.
+    expect(campanhaDoJogador(d, id("beta", "MID")).series[0]).toMatchObject({ time: { id: "beta" }, resultado: "derrota" });
+  });
+
+  it("quem não está no elenco (reserva, quem saiu) não ganha a série provisória de ninguém", () => {
+    const d = copia(cenario());
+    d.seriesMatches.find((s) => s.id === "s1")!.games = [provisorio("alfa"), provisorio("alfa")];
+    d.players.find((p) => p.id === id("alfa", "TOP"))!.saiuEm = "2026-11-19T00:00:00.000Z";
+    expect(validar(d).success).toBe(true);
+    expect(campanhaDoJogador(d, "r1").series).toEqual([]);
+    expect(campanhaDoJogador(d, id("alfa", "TOP")).series).toEqual([]);
+  });
+});
+
+describe("campanhaDoJogador — quem está sem números", () => {
+  it("conta os jogos em que ele entrou sem pontuar (o substituto que não pontua)", () => {
+    const d = campeonato();
+    const j3 = d.seriesMatches.find((s) => s.id === "s1")!.games[2]!;
+    j3.statsByPlayer = j3.statsByPlayer.map((l) => (l.convidado ? linha("r1", 5, 0, 5, { naoPontua: true, teamId: "alfa", champion: "Morgana" }) : l));
+    expect(validar(d).success).toBe(true);
+    expect(campanhaDoJogador(d, "r1")).toMatchObject({ jogos: 0, jogosSemPontuar: 1, series: [], saiu: false });
+    expect(campanhaDoJogador(d, MID).jogosSemPontuar).toBe(0);
+  });
+
+  it("marca quem saiu do time", () => {
+    const d = copia(cenario());
+    d.players.find((p) => p.id === id("alfa", "TOP"))!.saiuEm = "2026-11-19T00:00:00.000Z";
+    expect(campanhaDoJogador(d, id("alfa", "TOP"))).toMatchObject({ jogos: 0, jogosSemPontuar: 0, saiu: true });
+    expect(campanhaDoJogador(d, MID).saiu).toBe(false);
+  });
+});
+
+describe("campanhaDoJogador — ordem pelo calendário (Brasília)", () => {
+  it("série gravada só com a data não passa na frente da série das 22:00 da véspera", () => {
+    // Date.parse("2026-11-28") é meia-noite UTC = 21:00 de 27/11 em Brasília: antes das 22:00.
+    const d = campeonato();
+    d.seriesMatches.find((s) => s.id === "s4")!.date = "2026-11-28";
+    d.seriesMatches.find((s) => s.id === "s5")!.date = "2026-11-27T22:00:00-03:00";
+    expect(validar(d).success).toBe(true);
+    expect(campanhaDoJogador(d, MID).proximaSerie?.id).toBe("s5");
+  });
+
+  it("e a série a série segue a mesma ordem", () => {
+    const d = campeonato();
+    // s1 às 22:30 de 20/11 e a s3 gravada só com a data de 21/11: a s3 é a mais recente (com
+    // Date.parse cru, 21/11 00:00 UTC é 20/11 21:00 em Brasília, e ela ia para antes da s1).
+    d.seriesMatches.find((s) => s.id === "s1")!.date = "2026-11-20T22:30:00-03:00";
+    d.seriesMatches.find((s) => s.id === "s3")!.date = "2026-11-21";
+    expect(validar(d).success).toBe(true);
+    expect(campanhaDoJogador(d, MID).series.map((s) => s.id)).toEqual(["s3", "s1"]);
   });
 });
 

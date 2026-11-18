@@ -1,3 +1,4 @@
+import { compararDatasDeSerie } from "@/lib/calendar";
 import { resolveChampion } from "@/lib/champions";
 import { resolveRole } from "@/lib/design";
 import type { Player, PlayerGameStats, SeriesGame, SeriesMatch, SeriesStage, TournamentDataset } from "@/lib/schema";
@@ -35,7 +36,11 @@ import type { PlayerAggregate } from "@/types/domain";
  *  - MVP do jogo = `mvpDoJogo` (escolha da organização > maior KDA); MVP da série =
  *    `getSeriesMvp`; placar com W.O. = `getSeriesScore`;
  *  - os abates do TIME (a base da participação) incluem o substituto que não pontua e o
- *    convidado, como o placar de abates da partida (`getGameTeamKills`).
+ *    convidado, como o placar de abates da partida (`getGameTeamKills`);
+ *  - o jogo lançado só com o vencedor (sem K/D/A, efb7493) é PROVISÓRIO: ninguém tem linha, então
+ *    não se diz que ele "não jogou"; a série toda provisória entra pelo time do elenco dele;
+ *  - a ordem das séries é a do calendário (`compararDatasDeSerie`: a data sem hora vale o dia em
+ *    Brasília, não a meia-noite UTC).
  */
 
 export type ResultadoDoJogo = "vitoria" | "derrota";
@@ -67,6 +72,11 @@ export type JogoDaCampanha =
     }>
   /** O time jogou sem ele (outro entrou no lugar). */
   | Readonly<{ tipo: "ausente"; numero: number; resultado: ResultadoDoJogo | null }>
+  /**
+   * Jogo lançado só com o vencedor, sem K/D/A (os prints não chegaram, efb7493): ninguém tem linha,
+   * então não dá para dizer que ele não jogou. Não entra nos números dele (jogos, forma, destaques).
+   */
+  | Readonly<{ tipo: "provisorio"; numero: number; resultado: ResultadoDoJogo | null }>
   /** Jogo que não aconteceu: o W.O. completou a série (lib/tournament.ts, `placarComWalkover`). */
   | Readonly<{ tipo: "wo"; numero: number; resultado: ResultadoDoJogo }>;
 
@@ -138,6 +148,13 @@ export type ProximaSerie = Readonly<{
 export type CampanhaDoJogador = Readonly<{
   /** Jogos que ele jogou e que pontuam. */
   jogos: number;
+  /**
+   * Jogos em que ele entrou com uma linha que NÃO pontua (substituto que não pontua): ficam fora
+   * dos números, mas ele entrou em quadra — o aviso de quem não jogou não pode negar isso.
+   */
+  jogosSemPontuar: number;
+  /** Saiu do time de vez (`saiuEm`): a ficha não promete números "depois do primeiro jogo". */
+  saiu: boolean;
   vitorias: number;
   derrotas: number;
   /** Da mais recente para a mais antiga. */
@@ -166,14 +183,19 @@ export type CampanhaDoJogador = Readonly<{
 
 // ------------------------------------------------------------------ ajudantes
 
-function tempoDa(data: string): number {
-  const t = Date.parse(data);
-  return Number.isNaN(t) ? 0 : t;
+/**
+ * Ordem cronológica das séries: a do calendário (`compararDatasDeSerie`, em Brasília), depois o id
+ * (4a-jogo-01 antes do 02 no mesmo horário). `Date.parse` cru lia a data sem hora ("2026-11-28",
+ * como o painel grava com a hora em branco) como meia-noite UTC — 21:00 da véspera em Brasília —,
+ * e ela passava na frente da série das 22:00 da véspera, virando o "próximo desafio".
+ */
+function compararSeries(a: Pick<SeriesMatch, "date" | "id">, b: Pick<SeriesMatch, "date" | "id">): number {
+  return compararDatasDeSerie(a.date, b.date) || a.id.localeCompare(b.id, "pt-BR", { numeric: true });
 }
 
-/** Ordem cronológica das séries: data, depois o id (4a-jogo-01 antes do 02 no mesmo horário). */
-function compararSeries(a: Pick<SeriesMatch, "date" | "id">, b: Pick<SeriesMatch, "date" | "id">): number {
-  return tempoDa(a.date) - tempoDa(b.date) || a.id.localeCompare(b.id, "pt-BR", { numeric: true });
+/** O jogo lançado só com o vencedor (sem K/D/A): o resultado provisório (efb7493). */
+function jogoProvisorio(game: SeriesGame): boolean {
+  return game.statsByPlayer.length === 0;
 }
 
 function campeaoDa(texto: string | undefined): CampeaoDoJogo | null {
@@ -240,6 +262,18 @@ export function campanhaDoJogador(dataset: TournamentDataset, playerId: string):
       substituto = linhaDeSubstituto(linha, jogador);
       break;
     }
+    // Jogo lançado só com o vencedor não tem linha de ninguém: sem linha dele que pontue, a série com
+    // jogo provisório entra pelo time do ELENCO dele (o time jogou; o resultado é do time). Sem isso,
+    // a série toda provisória sumia da ficha, que dizia "ainda não entrou em quadra" ao lado da
+    // vitória na tabela.
+    if (
+      timeId === undefined &&
+      estaNoElenco(jogador) &&
+      (serie.teamAId === jogador.teamId || serie.teamBId === jogador.teamId) &&
+      serie.games.some(jogoProvisorio)
+    ) {
+      timeId = jogador.teamId;
+    }
     if (timeId === undefined) continue;
 
     const adversarioId = timeId === serie.teamAId ? serie.teamBId : serie.teamAId;
@@ -249,8 +283,10 @@ export function campanhaDoJogador(dataset: TournamentDataset, playerId: string):
 
     const jogos: JogoDaCampanha[] = serie.games.map((game, i) => {
       const numero = i + 1;
-      const linha: PlayerGameStats | undefined = game.statsByPlayer.find((l) => l.playerId === playerId);
       const resultado = resultadoDoJogo(game.winnerTeamId);
+      // Sem K/D/A de ninguém, não se sabe quem jogou: provisório, nunca "não jogou".
+      if (jogoProvisorio(game)) return { tipo: "provisorio", numero, resultado };
+      const linha: PlayerGameStats | undefined = game.statsByPlayer.find((l) => l.playerId === playerId);
       if (!linha || !linhaPontua(linha) || timeDaLinha(linha, jogador) !== timeId || resultado === null) {
         return { tipo: "ausente", numero, resultado };
       }
@@ -308,6 +344,16 @@ export function campanhaDoJogador(dataset: TournamentDataset, playerId: string):
       substituto,
       jogos,
     });
+  }
+
+  // Os jogos em que ele entrou com linha que NÃO pontua (substituto que não pontua): fora dos números,
+  // mas contam para o aviso de quem "não jogou" não negar que ele entrou em quadra.
+  let jogosSemPontuar = 0;
+  for (const serie of dataset.seriesMatches) {
+    for (const game of serie.games) {
+      const linha = game.statsByPlayer.find((l) => l.playerId === playerId);
+      if (linha && !linhaPontua(linha)) jogosSemPontuar++;
+    }
   }
 
   // ---------------- números do jogador (a mesma conta de /stats)
@@ -441,6 +487,8 @@ export function campanhaDoJogador(dataset: TournamentDataset, playerId: string):
 
   return {
     jogos: jogosEmOrdem.length,
+    jogosSemPontuar,
+    saiu: Boolean(jogador?.saiuEm),
     vitorias: jogosEmOrdem.filter((j) => j.resultado === "vitoria").length,
     derrotas: jogosEmOrdem.filter((j) => j.resultado === "derrota").length,
     series: series.reverse(),
