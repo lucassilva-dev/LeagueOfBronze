@@ -1,0 +1,476 @@
+/*
+ * A CAMPANHA na ficha no cenário "estande" (So ADC Bronze Clube): «A CADERNETA DE TIRO». Os destaques
+ * são a folha de resumo presa no prendedor (a súmula pautada do herói: quatro casas em tinta marinho,
+ * a anotação à mão em vermelho); cada série é uma folha da caderneta, com a margem vermelha, o carimbo
+ * do resultado e uma linha por flecha (jogo): a casa do V/D pintada como no alvo (V no ouro, D no
+ * branco) e o MVP NA MOSCA — a piada vira elogio. A participação é a flecha que voou pela raia até o
+ * alvo; o próximo desafio, a placa do PRÓXIMO ALVO, com o escudo do adversário no lugar da mosca; os
+ * campeões, as flechas disparadas.
+ *
+ * `.raiz` + o seletor da base INTEIRO (um nível acima, nunca empate). Nada anima (abaixo da dobra; o
+ * orçamento de laços da ficha está cheio): só as transições do hover, com a propriedade nomeada.
+ * Tintas no papel (#f6ecd6 → #ecdcba): marinho #16233d 11,6:1 · sépia #4a3a22 8:1 · vermelho #a3271f
+ * 5,4:1. A Yellowtail só em frase minúscula (não aceita caixa alta: o I de MID vira uma barra).
+ */
+
+/* ------------------------------------------------------------------ peças repetidas */
+/* O letreiro do clube (Alfa Slab) onde a base usa a letra de forma; os tamanhos são os da base. */
+.raiz .subtitulo,
+.raiz .destaqueRotulo,
+.raiz .rankingValor,
+.raiz .proximoData,
+.raiz .proximoVer,
+.raiz .tabelaPosicao,
+.raiz .serieResultado,
+.raiz .jogoNumero,
+.raiz .jogoResultado,
+.raiz .serieMvp,
+.raiz .jogoMvp {
+  font-family: var(--tm-fonte-titulo), "Alfa Slab Caixa Alta", serif;
+  font-weight: 400;
+}
+/* As tintas da caderneta. */
+.raiz .destaqueValor,
+.raiz .rankingPosicao,
+.raiz .rankingValor,
+.raiz .seriePlacar,
+.raiz .adversarioNome,
+.raiz .jogoNumero,
+.raiz .campeaoNome,
+.raiz .jogoKda,
+.raiz .vazio {
+  color: #16233d;
+}
+.raiz .destaqueRotulo,
+.raiz .destaqueDetalhe,
+.raiz .destaqueExtra,
+.raiz .rankingMetrica,
+.raiz .placarSeparador,
+.raiz .vs,
+.raiz .serieInfo,
+.raiz .jogoRazao,
+.raiz .jogoDuracao {
+  color: #4a3a22;
+}
+.raiz .destaqueLink,
+.raiz .serieLink,
+.raiz .serieSubstituto {
+  font-weight: 700;
+  color: #a3271f;
+}
+/* O anel de foco da base (pêssego) some no papel: no papel ele é marinho. */
+.raiz .destaqueLink:focus-visible,
+.raiz .serieLink:focus-visible {
+  outline-color: #16233d;
+}
+/* A anotação à mão, em vermelho (a Yellowtail pede corpo: abaixo de 17 px o traço some). */
+.raiz .destaqueForma .destaqueExtra,
+.raiz .jogoNota {
+  font: 400 19px / 1.1 var(--tm-fonte-assinatura), cursive;
+  color: #a3271f;
+}
+/* O papel pautado (a súmula do herói) e o prendedor. */
+.raiz .destaques,
+.raiz .serie,
+.raiz .vazio {
+  border: 0;
+  border-radius: 4px;
+  background:
+    repeating-linear-gradient(180deg, transparent 0 23px, rgba(22, 35, 61, 0.08) 23px 24px),
+    linear-gradient(180deg, #f6ecd6, #ecdcba);
+  box-shadow: inset 0 0 0 1px #c9b48c, 0 18px 30px -18px #000;
+}
+.raiz .destaques::before,
+.raiz .vazio::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  top: -12px;
+  width: 92px;
+  height: 24px;
+  translate: -50% 0;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #d8dde6, #8f97a6);
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.25), 0 3px 6px rgba(0, 0, 0, 0.4);
+}
+/* As casas da pontuação (a forma e o V/D de cada flecha): V no ouro, D no branco, grade marinho. */
+.raiz .formaJogo,
+.raiz .jogoResultado {
+  border: 1.5px solid #16233d;
+  border-radius: 0;
+}
+.raiz .formaJogo[data-resultado="vitoria"],
+.raiz .jogo[data-resultado="vitoria"] .jogoResultado {
+  border-color: #16233d;
+  background: #e0a83f;
+  color: #16233d; /* 7,3:1 no ouro */
+}
+.raiz .formaJogo[data-resultado="derrota"],
+.raiz .jogo[data-resultado="derrota"] .jogoResultado {
+  border-color: #16233d;
+  background: #fbf6ea;
+  color: #16233d;
+}
+/* A mosca: ouro com o anel vermelho (o pódio do ranking e o MVP da série). */
+.raiz .rankingLinha[data-podio] .rankingPosicao,
+.raiz .serieMvp {
+  border: 0;
+  background: #e0a83f;
+  color: #16233d;
+  box-shadow: 0 0 0 2px #d4463e;
+}
+
+/* ------------------------------------------------------------------ títulos de dentro */
+/* O fio vira a flecha da súmula do herói (haste de madeira e ponta de bronze). */
+.raiz .subtitulo {
+  font-size: 15px;
+  letter-spacing: 0.08em;
+}
+.raiz .subtitulo::after {
+  height: 12px;
+  background:
+    url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 12'%3E%3Cpath d='M0 1L16 6L0 11L3 6Z' fill='%23d9a066'/%3E%3C/svg%3E") 100% 50% / 16px 12px no-repeat,
+    linear-gradient(90deg, #efe4cc, #cfa56c) 0 50% / calc(100% - 12px) 2px no-repeat;
+}
+
+/* ------------------------------------------------------------------ destaques: a folha de resumo */
+/* Levemente torta (estático), como a súmula; as casas não têm fundo: as linhas entre elas são bordas,
+   por largura (4 · 2 × 2 · 1 coluna). */
+.raiz .destaques {
+  position: relative;
+  gap: 0;
+  padding: 6px 4px 4px;
+  rotate: -0.5deg;
+}
+.raiz .destaque {
+  padding: 20px 16px 14px;
+  border: 0;
+  background: none;
+}
+.raiz .destaque::before {
+  content: none;
+}
+@media (min-width: 1100px) {
+  .raiz .destaque + .destaque {
+    border-left: 1px solid rgba(22, 35, 61, 0.22);
+  }
+}
+@media (min-width: 360px) and (max-width: 1099px) {
+  .raiz .destaque:nth-child(even) {
+    border-left: 1px solid rgba(22, 35, 61, 0.22);
+  }
+  .raiz .destaque:nth-child(n + 3) {
+    border-top: 1px solid rgba(22, 35, 61, 0.22);
+  }
+}
+@media (max-width: 359px) {
+  .raiz .destaque + .destaque {
+    border-top: 1px solid rgba(22, 35, 61, 0.22);
+  }
+}
+.raiz .destaqueRotulo {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+}
+.raiz .destaqueValor {
+  padding: 0;
+  background: none;
+  -webkit-text-fill-color: currentColor;
+}
+/* O ranking: as casas da súmula; o pódio leva a mosca. */
+.raiz .ranking {
+  gap: 0;
+}
+.raiz .rankingLinha {
+  grid-template-columns: 3.3em minmax(0, 1fr) auto; /* «33rd» na Alfa Slab */
+  align-items: center;
+  min-height: 30px;
+  border-bottom: 1px solid rgba(22, 35, 61, 0.16);
+}
+.raiz .rankingPosicao {
+  font-size: 18px;
+}
+.raiz .rankingLinha[data-podio] .rankingPosicao {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin-block: 2px;
+  border-radius: 50%;
+  font-size: 13px;
+}
+.raiz .rankingValor {
+  font-size: 15px;
+}
+.raiz .campeaoIcone {
+  border: 1.5px solid #16233d;
+  border-radius: 3px;
+}
+.raiz .melhorJogoCorpo .campeaoIcone {
+  border: 2px solid #16233d;
+}
+/* A participação: a flecha voou X% da raia (a régua de 10 em 10) até o alvo, lá no fim. */
+.raiz .medidor {
+  height: 18px;
+  overflow: visible;
+  border-radius: 0;
+  background:
+    radial-gradient(circle at calc(100% - 9px) 50%, #e0a83f 0 2.5px, #d4463e 2.5px 4.5px, #386aa3 4.5px 6.5px, #1d212a 6.5px 8px, #ede3ca 8px 9px, transparent 9.5px),
+    repeating-linear-gradient(90deg, rgba(22, 35, 61, 0.4) 0 1px, transparent 1px 10%) 0 50% / calc(100% - 18px) 8px no-repeat,
+    linear-gradient(rgba(22, 35, 61, 0.3), rgba(22, 35, 61, 0.3)) 0 50% / calc(100% - 18px) 1px no-repeat;
+}
+.raiz .medidorBarra {
+  border-radius: 0;
+  background:
+    url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 14'%3E%3Cpath d='M0 0L16 7L0 14L4 7Z' fill='%23c98a3e'/%3E%3Cpath d='M0 0L16 7H4Z' fill='%23f6d3a0'/%3E%3C/svg%3E") 100% 50% / 14px 12px no-repeat,
+    url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 14'%3E%3Cpath d='M20 6L8 0H0L8 6Z' fill='%23ff6b7a'/%3E%3Cpath d='M20 8L8 14H0L8 8Z' fill='%23e2505f'/%3E%3C/svg%3E") 0 50% / 18px 13px no-repeat,
+    linear-gradient(180deg, #e8c48e, #8e6337) 4px 50% / calc(100% - 12px) 3px no-repeat;
+}
+/* A forma: as casas lado a lado, grade colada. */
+.raiz .forma {
+  gap: 0;
+}
+.raiz .formaJogo {
+  margin-left: -1.5px;
+}
+
+/* ------------------------------------------------------------------ o próximo: a placa do PRÓXIMO ALVO */
+/* Esmalte marinho com moldura e parafusos de bronze; o escudo do adversário é a MOSCA de um alvo (os
+   anéis são o fundo do próprio escudo). A placa avança como as flechas dos companheiros. */
+.raiz .proximoCartao {
+  gap: 12px;
+  padding: 18px 20px 16px;
+  border: 0;
+  border-radius: 6px;
+  background:
+    radial-gradient(circle at 12px 12px, #f6d3a0 0 1.5px, #8e5426 2px 3.2px, transparent 3.7px),
+    radial-gradient(circle at calc(100% - 12px) 12px, #f6d3a0 0 1.5px, #8e5426 2px 3.2px, transparent 3.7px),
+    radial-gradient(circle at 12px calc(100% - 12px), #f6d3a0 0 1.5px, #8e5426 2px 3.2px, transparent 3.7px),
+    radial-gradient(circle at calc(100% - 12px) calc(100% - 12px), #f6d3a0 0 1.5px, #8e5426 2px 3.2px, transparent 3.7px),
+    linear-gradient(180deg, #1b2a47, #121d33);
+  box-shadow: inset 0 0 0 2px #c98a3e, inset 0 0 0 4px #10131a, inset 0 0 0 5px rgba(246, 211, 160, 0.3), 0 18px 30px -16px #000;
+  transition: translate 0.25s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.raiz .proximoCartao:hover {
+  translate: 4px 0;
+}
+.raiz .proximoCartao[data-em-andamento] {
+  box-shadow: inset 0 0 0 2px var(--coral), inset 0 0 0 4px #10131a, inset 0 0 0 5px rgba(255, 107, 122, 0.4), 0 18px 30px -16px #000;
+}
+.raiz .proximoCartao[data-em-andamento] .proximoInfo {
+  color: var(--coral); /* 5,2:1 na placa */
+}
+.raiz .proximoData {
+  color: #f2c38b;
+}
+.raiz .proximoConfronto {
+  gap: 12px;
+}
+.raiz .proximoConfronto .vs {
+  color: var(--tm-apoio); /* 8:1 na placa */
+}
+.raiz .proximoConfronto .escudo {
+  width: 64px;
+  height: 64px;
+  padding: 12px;
+  border-radius: 50%;
+  background: radial-gradient(circle closest-side, #e0a83f 0 66%, #d4463e 66% 78%, #386aa3 78% 90%, #ede3ca 90%);
+  box-shadow: 0 0 0 1.5px #10131a, 0 6px 12px -6px #000;
+}
+.raiz .proximoConfronto .escudoVazio {
+  color: #16233d;
+}
+/* A posição numa plaquinha de bronze. */
+.raiz .tabelaPosicao {
+  padding: 5px 10px 4px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #f2c38b, #c98642);
+  color: var(--tm-tinta); /* 6,2:1 */
+  box-shadow: inset 0 0 0 1px rgba(90, 46, 18, 0.5);
+}
+
+/* ------------------------------------------------------------------ série a série: as folhas da caderneta */
+.raiz .series {
+  gap: 18px;
+}
+.raiz .serie {
+  gap: 0;
+  padding: 0 0 4px;
+  color: #16233d;
+}
+.raiz .serie:nth-child(odd) {
+  rotate: -0.35deg;
+}
+.raiz .serie:nth-child(even) {
+  rotate: 0.3deg;
+}
+/* O cabeçalho impresso da folha, com o fio duplo embaixo. */
+.raiz .serieCabeca {
+  padding: 14px 16px 12px;
+  border-bottom: 2px solid #16233d;
+  box-shadow: 0 2px 0 #f3e7cd, 0 3.5px 0 #16233d;
+}
+/* O resultado é um CARIMBO: vermelho na vitória, marinho na derrota, tracejado no que está rolando. */
+.raiz .serieResultado {
+  padding: 4px 8px 3px;
+  border: 2px solid;
+  border-radius: 3px;
+  rotate: -3deg;
+}
+.raiz .serie[data-resultado="vitoria"] .serieResultado {
+  border-color: currentColor;
+  background: rgba(163, 39, 31, 0.08);
+  color: #a3271f;
+}
+.raiz .serie[data-resultado="derrota"] .serieResultado,
+.raiz .serie[data-resultado="andamento"] .serieResultado {
+  border-color: currentColor;
+  color: #16233d;
+}
+.raiz .serie[data-resultado="andamento"] .serieResultado {
+  border-style: dashed;
+}
+.raiz .seriePlacar {
+  font-size: 28px;
+}
+.raiz .escudoVazio {
+  background: #16233d;
+  color: #f6ecd6;
+}
+.raiz .serieMvp {
+  padding: 4px 9px 3px;
+  border-radius: 999px;
+}
+
+/* As flechas: uma linha por jogo, na pauta. A margem vermelha passa a 50 px da folha: entre o número
+   (16 + 26 px) e o campeão (que começa em 58). */
+.raiz .jogos {
+  padding: 2px 16px 0;
+  border-top: 0;
+  background: linear-gradient(90deg, transparent 50px, rgba(212, 70, 62, 0.55) 50px 51.5px, transparent 51.5px);
+}
+.raiz .jogo {
+  grid-template-columns: 26px minmax(0, 1fr) auto 26px;
+  gap: 4px 16px;
+  border-bottom: 1px solid rgba(22, 35, 61, 0.2);
+}
+.raiz .jogo:last-child {
+  border-bottom: 0;
+}
+@media (max-width: 559px) {
+  .raiz .jogo {
+    grid-template-columns: 26px minmax(0, 1fr) 26px;
+  }
+}
+/* O número da flecha, no círculo. */
+.raiz .jogoNumero {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1.5px solid #16233d;
+  border-radius: 50%;
+  font-size: 10px;
+  letter-spacing: 0;
+}
+.raiz .campeaoNome {
+  font-weight: 700;
+}
+/* O pontilhado da caderneta, do campeão até os números. */
+.raiz .jogoCampeao::after {
+  content: "";
+  flex: 1 1 0;
+  min-width: 12px;
+  margin-top: 6px;
+  border-bottom: 2px dotted rgba(22, 35, 61, 0.28);
+}
+.raiz .jogoKda {
+  font-size: 16px;
+}
+/* NA MOSCA: a linha grifada de marca-texto e o selo de ouro com o alvinho. */
+.raiz .jogo[data-mvp] {
+  background: linear-gradient(90deg, transparent 36px, rgba(224, 168, 63, 0.34) 36px, rgba(224, 168, 63, 0.12) 85%, transparent);
+}
+.raiz .jogoMvp {
+  padding: 3px 8px 3px 21px;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 10.5px 50%, #fff4e0 0 1.4px, #d4463e 1.4px 2.8px, #386aa3 2.8px 4.2px, #1d212a 4.2px 5.6px, #ede3ca 5.6px 6.8px, transparent 7.2px),
+    #e0a83f;
+  box-shadow: 0 0 0 1.5px #a3271f;
+  color: #16233d;
+}
+/* A flecha que ele não atirou: anotada à mão. */
+.raiz .jogoNota {
+  padding-left: 8px;
+  font-style: normal;
+}
+.raiz .jogoWo .jogoNota {
+  font: 400 13px / 1 var(--tm-fonte-titulo), "Alfa Slab Caixa Alta", serif;
+  letter-spacing: 0.1em;
+}
+.raiz .serieLink {
+  margin-right: 16px;
+}
+.raiz .serieLink:hover {
+  color: #16233d;
+}
+
+/* ------------------------------------------------------------------ campeões: as flechas disparadas */
+/* Cada campeão é uma flecha (as penas à esquerda, a ponta de bronze à direita, nas margens
+   reservadas), como os companheiros da ficha, mais fina. */
+.raiz .campeoes {
+  gap: 10px 8px;
+}
+/* As penas e a ponta comem 46 px da casa: com 3 colunas no tablet, MORDEKAISER saía cortado. */
+@media (max-width: 1099px) {
+  .raiz .campeoes {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  }
+}
+.raiz .campeao {
+  position: relative;
+  margin: 0 18px 0 28px;
+  padding: 7px 12px 7px 7px;
+  border: 0;
+  border-radius: 4px 0 0 4px;
+  background: linear-gradient(180deg, #1b2a47, #121d33);
+  box-shadow: 0 10px 18px -12px #000, inset 0 0 0 1px rgba(255, 211, 168, 0.12);
+}
+.raiz .campeao::before {
+  content: "";
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  width: 28px;
+  height: 34px;
+  translate: 0 -50%;
+  background: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 40'%3E%3Cpath d='M30 17L8 2H0L14 17Z' fill='%23ff6b7a'/%3E%3Cpath d='M30 23L8 38H0L14 23Z' fill='%23e2505f'/%3E%3Crect x='6' y='18' width='24' height='4' fill='%23f1e5cb'/%3E%3C/svg%3E") 0 50% / 100% 100% no-repeat;
+}
+.raiz .campeao::after {
+  content: "";
+  position: absolute;
+  left: 100%;
+  top: 0;
+  bottom: 0;
+  width: 18px;
+  background: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 70' preserveAspectRatio='none'%3E%3Cpath d='M0 0L22 35L0 70Z' fill='%23d9a066'/%3E%3Cpath d='M0 0L22 35L0 35Z' fill='%23f6d3a0'/%3E%3C/svg%3E") 0 0 / 100% 100% no-repeat;
+}
+.raiz .campeao .campeaoIcone {
+  border-color: rgba(255, 211, 168, 0.35);
+}
+.raiz .campeao .campeaoNome {
+  font: 400 14px / 1.1 var(--tm-fonte-titulo), "Alfa Slab Caixa Alta", serif;
+  letter-spacing: 0.02em;
+  color: var(--tm-texto);
+}
+
+/* ------------------------------------------------------------------ quem ainda não jogou: a folha em branco */
+.raiz .vazio {
+  position: relative;
+  padding: 34px 24px 28px;
+  rotate: -0.5deg;
+  font-size: 15px;
+  font-weight: 600;
+}
