@@ -28,6 +28,9 @@ export const textosCampanhaDoJogador = definir({
     // ---------- destaques
     campanhaRanking: "NO RANKING GERAL",
     campanhaRankingEntre: "entre {n} jogadores que já jogaram",
+    // Com empate: a ficha divide o lugar (o /stats lista um por linha, desempatando pelo nick).
+    campanhaRankingEntreEmpate: "entre {n} jogadores que já jogaram · empate divide a posição",
+    campanhaEmpate: ", empate com mais {n}",
     campanhaRankingRota: "KDA entre os {rota}: {posicao} de {n}",
     campanhaMetricaAbates: "ABATES",
     campanhaMetricaKda: "KDA",
@@ -95,6 +98,8 @@ export const textosCampanhaDoJogador = definir({
 
     campanhaRanking: "OVERALL RANKING",
     campanhaRankingEntre: "among {n} players who have played",
+    campanhaRankingEntreEmpate: "among {n} players who have played · ties share the spot",
+    campanhaEmpate: ", tied with {n} more",
     campanhaRankingRota: "KDA among {rota} players: {posicao} of {n}",
     campanhaMetricaAbates: "KILLS",
     campanhaMetricaKda: "KDA",

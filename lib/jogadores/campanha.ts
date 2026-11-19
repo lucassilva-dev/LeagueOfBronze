@@ -132,6 +132,12 @@ export type PosicaoNoRanking = Readonly<{
   /** Posição em "competição" (1, 2, 2, 4): empatados dividem o lugar. */
   posicao: number;
   valor: number;
+  /**
+   * Quantos OUTROS jogadores têm o mesmo valor. O /stats lista um por linha e desempata pelo nick
+   * (o 5º com 1 MVP lá é o #17); a ficha divide o lugar e AVISA o empate, para os dois não parecerem
+   * se contradizer.
+   */
+  empatados: number;
 }>;
 
 export type ProximaSerie = Readonly<{
@@ -364,14 +370,16 @@ export function campanhaDoJogador(dataset: TournamentDataset, playerId: string):
   const valorDa = (a: PlayerAggregate, metrica: MetricaDoRanking) =>
     metrica === "abates" ? a.kills : metrica === "kda" ? a.kda : metrica === "mvps" ? a.gameMvps : a.assists;
   const ranking: PosicaoNoRanking[] = meu
-    ? (["abates", "kda", "mvps", "assistencias"] as const).map((metrica) => ({
-        metrica,
-        valor: valorDa(meu, metrica),
-        posicao: posicaoDeCompeticao(
-          comJogos.map((a) => valorDa(a, metrica)),
-          valorDa(meu, metrica),
-        ),
-      }))
+    ? (["abates", "kda", "mvps", "assistencias"] as const).map((metrica) => {
+        const valores = comJogos.map((a) => valorDa(a, metrica));
+        const valor = valorDa(meu, metrica);
+        return {
+          metrica,
+          valor,
+          posicao: posicaoDeCompeticao(valores, valor),
+          empatados: valores.filter((v) => v === valor).length - 1,
+        };
+      })
     : [];
 
   let rankingNaRota: CampanhaDoJogador["rankingNaRota"] = null;

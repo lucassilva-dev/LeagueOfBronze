@@ -353,6 +353,9 @@ export function CampanhaDoJogador({
 }: Props) {
   const { melhorJogo, recordeDeAbates, participacao, proximaSerie, tabela, rankingNaRota } = campanha;
   const semNumeros = campanha.jogos === 0;
+  // MVP zerado sai como "—": não é posição, então também não é empate.
+  const semPosicao = (r: CampanhaDoJogador["ranking"][number]) => r.metrica === "mvps" && r.valor === 0;
+  const temEmpate = campanha.ranking.some((r) => r.empatados > 0 && !semPosicao(r));
   // Sem números e sem série nenhuma: o aviso e (se houver) o próximo desafio lado a lado.
   const vazia = semNumeros && campanha.series.length === 0;
   const temLado = Boolean(proximaSerie || tabela);
@@ -393,17 +396,21 @@ export function CampanhaDoJogador({
                         key={r.metrica}
                         className={c("rankingLinha")}
                         data-metrica={r.metrica}
-                        data-podio={r.posicao <= 3 && !(r.metrica === "mvps" && r.valor === 0) ? "" : undefined}
+                        data-podio={r.posicao <= 3 && !semPosicao(r) ? "" : undefined}
+                        data-empate={r.empatados > 0 && !semPosicao(r) ? "" : undefined}
                       >
-                        <span className={c("rankingPosicao")}>
-                          {r.metrica === "mvps" && r.valor === 0 ? "—" : ordinal(r.posicao, localeTag)}
-                        </span>
+                        <span className={c("rankingPosicao")}>{semPosicao(r) ? "—" : ordinal(r.posicao, localeTag)}</span>
                         <span className={c("rankingMetrica")}>{rotuloDaMetrica(t, r.metrica)}</span>
                         <span className={c("rankingValor")}>{r.metrica === "kda" ? formatKda(r.valor, localeTag) : r.valor}</span>
+                        {r.empatados > 0 && !semPosicao(r) ? (
+                          <span className={c("somenteLeitor")}>{preencher(t.campanhaEmpate, { n: r.empatados })}</span>
+                        ) : null}
                       </li>
                     ))}
                   </ol>
-                  <span className={c("destaqueDetalhe")}>{preencher(t.campanhaRankingEntre, { n: campanha.totalNoRanking })}</span>
+                  <span className={c("destaqueDetalhe")}>
+                    {preencher(temEmpate ? t.campanhaRankingEntreEmpate : t.campanhaRankingEntre, { n: campanha.totalNoRanking })}
+                  </span>
                   {rankingNaRota ? (
                     <span className={c("destaqueExtra")}>
                       {preencher(t.campanhaRankingRota, {

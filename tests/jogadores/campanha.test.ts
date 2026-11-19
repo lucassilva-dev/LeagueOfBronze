@@ -137,11 +137,15 @@ describe("campanhaDoJogador — destaques", () => {
     expect(campanha.rankingNaRota).toEqual({ rota: "MID", posicao: 1, total: 3 });
   });
 
-  it("empatados dividem o lugar", () => {
+  it("empatados dividem o lugar, e a campanha sabe com quantos", () => {
     const top = campanhaDoJogador(campeonato(), id("alfa", "TOP"));
     const sup = campanhaDoJogador(campeonato(), id("alfa", "SUP"));
     expect(top.ranking.find((r) => r.metrica === "abates")!.posicao).toBe(2);
     expect(sup.ranking.find((r) => r.metrica === "abates")!.posicao).toBe(2);
+    // TOP, JUNGLE, ADC e SUP da ALFA têm as mesmas linhas: cada um empata com os outros 3.
+    expect(top.ranking.find((r) => r.metrica === "abates")!.empatados).toBe(3);
+    // A MID está sozinha no topo das 4 métricas.
+    expect(campanhaDoJogador(campeonato(), MID).ranking.map((r) => r.empatados)).toEqual([0, 0, 0, 0]);
   });
 });
 

@@ -177,6 +177,20 @@ describe("a campanha — casos", () => {
     expect(texto).not.toMatch(/MD[35]|SEL|Regular season/);
   });
 
+  it("empate no ranking: a nota «empate divide a posição» e, no leitor de tela, com quantos", () => {
+    // O caçador da ALFA empata em abates (2) com TOP, ADC e SUP da ALFA e os 5 da BETA (as mesmas
+    // linhas nos dois jogos): mais 8. A MID está sozinha no topo das 4 métricas.
+    const comEmpate = ficha(tema, campanhaDoJogador(dataset(), id("alfa", "JUNGLE")));
+    const ranking = comEmpate.querySelector("section[data-campanha] ol li[data-metrica]")!.closest("li:not([data-metrica])")!;
+    expect(ranking.textContent).toContain("empate divide a posição");
+    const abates = comEmpate.querySelector('section[data-campanha] li[data-metrica="abates"]')!;
+    expect(abates.hasAttribute("data-empate")).toBe(true);
+    expect(lido(abates)).toContain("empate com mais 8");
+    const semEmpate = ficha(tema, campanhaDoJogador(dataset(), id("alfa", "MID")));
+    expect(semEmpate.querySelector("section[data-campanha]")!.textContent).not.toContain("empate divide a posição");
+    expect(semEmpate.querySelector("section[data-campanha] [data-empate]")).toBeNull();
+  });
+
   it("sem <aside> dentro da seção (o complementary aninhado que o axe acusava)", () => {
     const doc = ficha(tema, campanhaDoJogador(dataset(), id("alfa", "MID")));
     const secao = doc.querySelector("section[data-campanha]")!;
