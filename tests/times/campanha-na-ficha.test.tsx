@@ -220,7 +220,7 @@ describe("a campanha — casos", () => {
     expect(j3.textContent).not.toContain(t.campanhaNaoJogou);
   });
 
-  it("série toda provisória: o aviso de K/D/A pendente, com a série na lista", () => {
+  it("série toda provisória: o aviso não afirma nada (pode ter jogado ali) e a série não vira dele", () => {
     const d = copia(cenario());
     d.seriesMatches.find((s) => s.id === "s1")!.games = [
       { winnerTeamId: "alfa", mvpPlayerId: "", statsByPlayer: [] },
@@ -228,10 +228,11 @@ describe("a campanha — casos", () => {
     ];
     const doc = ficha(tema, campanhaDoJogador(d, id("alfa", "MID")));
     const secao = doc.querySelector("section[data-campanha]")!;
-    expect(secao.textContent).toContain("Os jogos do time de Fulano ainda estão só com o resultado.");
+    expect(secao.textContent).toContain("Fulano ainda não tem jogo com K/D/A nesta edição.");
     expect(secao.textContent).not.toContain("ainda não entrou em quadra");
-    expect(secao.querySelectorAll('li[data-tipo="provisorio"]')).toHaveLength(2);
-    expect(secao.querySelector("[data-sem-jogos]")).toBeNull();
+    expect(secao.textContent).not.toContain("depois do primeiro jogo");
+    expect(secao.querySelectorAll('li[data-tipo="provisorio"]')).toHaveLength(0);
+    expect(secao.querySelector("[data-sem-jogos]")).not.toBeNull();
   });
 
   it("quem só entrou como substituto que não pontua não lê «ainda não entrou em quadra»", () => {

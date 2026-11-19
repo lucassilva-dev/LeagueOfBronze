@@ -18,7 +18,7 @@ export const textosCampanhaDoJogador = definir({
     campanhaSemJogos: "{nick} ainda não entrou em quadra nesta edição. Os números aparecem aqui depois do primeiro jogo.",
     // Os outros avisos de quem está sem números (components/times/campanha.tsx, avisoSemNumeros).
     campanhaSoProvisorio:
-      "Os jogos do time de {nick} ainda estão só com o resultado. Os números aparecem aqui quando o K/D/A for lançado.",
+      "{nick} ainda não tem jogo com K/D/A nesta edição. O time tem jogo lançado só com o resultado, à espera dos prints.",
     campanhaSoSubstituto:
       "{nick} entrou em {n} jogos como substituto, que não pontuam no site: os números estão nas páginas das partidas.",
     campanhaSoSubstituto1:
@@ -91,7 +91,7 @@ export const textosCampanhaDoJogador = definir({
     campanhaProximo: "NEXT UP",
     campanhaDestaques: "Campaign highlights",
     campanhaSemJogos: "{nick} hasn't played yet this season. The numbers show up here after the first game.",
-    campanhaSoProvisorio: "{nick}'s team games only have the result so far. The numbers show up here once the stats are in.",
+    campanhaSoProvisorio: "{nick} has no game with stats yet this season. The team has a game posted with only the result, waiting for the screenshots.",
     campanhaSoSubstituto: "{nick} played {n} games as a non-scoring sub: the numbers are on the match pages.",
     campanhaSoSubstituto1: "{nick} played 1 game as a non-scoring sub: the numbers are on the match page.",
     campanhaSaiuSemJogar: "{nick} left the team without playing this season.",

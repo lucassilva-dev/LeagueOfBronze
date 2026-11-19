@@ -303,8 +303,9 @@
   border-top: 2px solid var(--tm-primaria);
   background: linear-gradient(90deg, #12308f, #0f3a86 60%, #0d2f6e);
   color: var(--tm-texto); /* 10:1 */
-  font: 700 13px / 1.3 var(--tm-fonte-assinatura), "Comic Sans MS", cursive;
-  letter-spacing: 0.02em;
+  /* Knewave: a tarja leva número (o placar ao vivo saía «EM ANDAMENTO · I × 0» na Kalam). */
+  font: 400 13px / 1.3 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.03em;
 }
 .raiz .proximoVer {
   padding: 8px 14px 10px;
@@ -449,13 +450,18 @@
   letter-spacing: 0.01em;
   color: var(--tm-tinta);
 }
-/* A caneta azul das anotações: data, fase, KDA e minutos. */
+/* A caneta azul das anotações: data, fase, KDA e minutos — números, então na letra do título (na
+   Kalam o «1» é um traço: «KDA I,9I», «3I min», «II nov»). */
 .raiz .serieInfo,
 .raiz .jogoRazao,
 .raiz .jogoDuracao {
-  font: 400 14px / 1.3 var(--tm-fonte-assinatura), "Comic Sans MS", cursive;
-  letter-spacing: 0.03em;
+  font: 400 13px / 1.3 var(--tm-fonte-titulo), sans-serif;
+  letter-spacing: 0.04em;
   color: var(--caneta); /* 5,8:1 */
+}
+/* «como substituto em …» é frase: fica na caneta (Kalam). */
+.raiz .serieSubstituto {
+  font: 400 14px / 1.3 var(--tm-fonte-assinatura), "Comic Sans MS", cursive;
 }
 .raiz .serieMvp,
 .raiz .jogoMvp {

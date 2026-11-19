@@ -240,28 +240,47 @@ describe("campanhaDoJogador — jogo provisório (só o vencedor, sem K/D/A)", (
     expect(campanha.forma).toEqual(["vitoria", "vitoria"]);
   });
 
-  it("a série toda provisória entra pelo time do ELENCO (antes sumia da ficha)", () => {
+  it("a série toda provisória NÃO entra pelo elenco (não se sabe quem jogou), mas marca o time", () => {
     const d = copia(cenario());
     d.seriesMatches.find((s) => s.id === "s1")!.games = [provisorio("alfa"), provisorio("alfa")];
     expect(validar(d).success).toBe(true);
     const campanha = campanhaDoJogador(d, MID);
-    expect(campanha.series.map((s) => [s.id, s.time.id, s.resultado, s.placar.time, s.placar.adversario])).toEqual([
-      ["s1", "alfa", "vitoria", 2, 0],
-    ]);
-    expect(campanha.series[0]!.jogos.map((j) => j.tipo)).toEqual(["provisorio", "provisorio"]);
-    expect(campanha).toMatchObject({ jogos: 0, forma: [], melhorJogo: null, participacao: null, ranking: [] });
+    expect(campanha).toMatchObject({ series: [], jogos: 0, forma: [], melhorJogo: null, timeComJogoProvisorio: true });
     expect(campanha.tabela).toMatchObject({ vitorias: 1, derrotas: 0 });
-    // Do outro lado, a mesma série pela BETA.
-    expect(campanhaDoJogador(d, id("beta", "MID")).series[0]).toMatchObject({ time: { id: "beta" }, resultado: "derrota" });
+    expect(campanhaDoJogador(d, id("beta", "MID"))).toMatchObject({ series: [], timeComJogoProvisorio: true });
+    // O GAMA não jogou a s1.
+    expect(campanhaDoJogador(d, id("gama", "MID")).timeComJogoProvisorio).toBe(false);
   });
 
-  it("quem não está no elenco (reserva, quem saiu) não ganha a série provisória de ninguém", () => {
+  it("quem herdou a vaga depois e quem nunca jogou não ganham a série provisória de ninguém", () => {
+    // O caso da Lelei: no elenco, 0 jogos, o time com séries de K/D/A sem ela e uma provisória.
+    const d = campeonato();
+    d.seriesMatches.find((s) => s.id === "s4")!.games = [provisorio("alfa"), provisorio("alfa")];
+    const herdeiro = d.players.find((p) => p.id === "r1")!;
+    delete herdeiro.reserva;
+    herdeiro.teamId = "alfa";
+    d.players.find((p) => p.id === id("alfa", "TOP"))!.saiuEm = "2026-11-26T00:00:00.000Z";
+    expect(validar(d).success).toBe(true);
+    // r1 herdou a vaga (nenhuma linha dele): nada na série a série, e o aviso não afirma nada.
+    expect(campanhaDoJogador(d, "r1")).toMatchObject({ series: [], jogos: 0, timeComJogoProvisorio: true });
+    // A MID tem as séries dela com K/D/A, mas a s4 provisória não entra (não se sabe se jogou).
+    expect(campanhaDoJogador(d, MID).series.map((s) => s.id)).toEqual(["s3", "s1"]);
+  });
+
+  it("quem saiu: a série provisória só conta se for de ANTES da saída", () => {
+    const d = copia(cenario());
+    d.seriesMatches.find((s) => s.id === "s1")!.games = [provisorio("alfa"), provisorio("alfa")]; // 20/11
+    const top = d.players.find((p) => p.id === id("alfa", "TOP"))!;
+    top.saiuEm = "2026-11-19T00:00:00.000Z"; // saiu antes da s1
+    expect(campanhaDoJogador(d, id("alfa", "TOP"))).toMatchObject({ saiu: true, timeComJogoProvisorio: false });
+    top.saiuEm = "2026-11-21T00:00:00.000Z"; // saiu depois: pode ter jogado a s1
+    expect(campanhaDoJogador(d, id("alfa", "TOP"))).toMatchObject({ saiu: true, timeComJogoProvisorio: true });
+  });
+
+  it("o reserva sem time não tem série provisória de time nenhum", () => {
     const d = copia(cenario());
     d.seriesMatches.find((s) => s.id === "s1")!.games = [provisorio("alfa"), provisorio("alfa")];
-    d.players.find((p) => p.id === id("alfa", "TOP"))!.saiuEm = "2026-11-19T00:00:00.000Z";
-    expect(validar(d).success).toBe(true);
-    expect(campanhaDoJogador(d, "r1").series).toEqual([]);
-    expect(campanhaDoJogador(d, id("alfa", "TOP")).series).toEqual([]);
+    expect(campanhaDoJogador(d, "r1")).toMatchObject({ series: [], timeComJogoProvisorio: false });
   });
 });
 

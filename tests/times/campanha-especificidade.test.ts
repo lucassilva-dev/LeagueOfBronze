@@ -198,6 +198,36 @@ function seExcluem(x: Regra, y: Regra): boolean {
 
 const igual = (x: Especificidade, y: Especificidade) => x[0] === y[0] && x[1] === y[1] && x[2] === y[2];
 
+describe("a base vence as regras de elemento do site (app/globals.css)", () => {
+  /*
+   * `a:hover` (0,1,1) pinta todo link de ciano e `*:focus-visible` (0,1,0) desenha o anel do site. Os
+   * estados da base que disputam a mesma propriedade têm de pesar MAIS. A auditoria de 19/11/2026 pegou o
+   * hover do «VER PARTIDA» rebaixado para (0,1,0) com o :where(): o ciano vencia no álbum e na ficha
+   * padrão; e o foco em (0,1,0) empatava com o do site (vencia só pela ordem dos chunks).
+   */
+  const GLOBAIS = regrasDe(path.join(process.cwd(), "app", "globals.css")).filter((r) =>
+    /^(a:hover|\*:focus-visible)$/.test(r.seletor.trim()),
+  );
+
+  it("achou as duas regras globais", () => {
+    expect(GLOBAIS.map((r) => r.seletor.trim()).sort()).toEqual(["*:focus-visible", "a:hover"]);
+  });
+
+  it("cada estado da base que disputa propriedade com elas pesa mais", () => {
+    const perdendo: string[] = [];
+    for (const b of regrasDe(BASE)) {
+      for (const g of GLOBAIS) {
+        const estado = g.seletor.includes(":hover") ? ":hover" : ":focus-visible";
+        if (!b.seletor.includes(estado)) continue;
+        if (![...g.props].some((p) => b.props.has(p))) continue;
+        const maior = b.esp[0] - g.esp[0] || b.esp[1] - g.esp[1] || b.esp[2] - g.esp[2];
+        if (maior <= 0) perdendo.push(`base:${b.linha} "${b.seletor}" (${b.esp.join(",")}) × "${g.seletor}" (${g.esp.join(",")})`);
+      }
+    }
+    expect(perdendo).toEqual([]);
+  });
+});
+
 describe("foco do teclado: no papel claro, o anel da base some", () => {
   /*
    * O anel da base é `--tm-arco` (claro: cromo, pêssego, ciano, creme), feito para o fundo escuro.

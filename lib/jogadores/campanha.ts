@@ -38,7 +38,8 @@ import type { PlayerAggregate } from "@/types/domain";
  *  - os abates do TIME (a base da participação) incluem o substituto que não pontua e o
  *    convidado, como o placar de abates da partida (`getGameTeamKills`);
  *  - o jogo lançado só com o vencedor (sem K/D/A, efb7493) é PROVISÓRIO: ninguém tem linha, então
- *    não se diz que ele "não jogou"; a série toda provisória entra pelo time do elenco dele;
+ *    não se diz que ele "não jogou"; a série toda provisória fica fora da série a série (não se sabe
+ *    quem jogou) e só muda o aviso de quem está sem números;
  *  - a ordem das séries é a do calendário (`compararDatasDeSerie`: a data sem hora vale o dia em
  *    Brasília, não a meia-noite UTC).
  */
@@ -161,6 +162,11 @@ export type CampanhaDoJogador = Readonly<{
   jogosSemPontuar: number;
   /** Saiu do time de vez (`saiuEm`): a ficha não promete números "depois do primeiro jogo". */
   saiu: boolean;
+  /**
+   * O time dele tem jogo lançado só com o vencedor (sem K/D/A de ninguém) — para quem saiu, antes da
+   * saída. Sem números, a ficha então não afirma que ele "não entrou em quadra": pode ter jogado ali.
+   */
+  timeComJogoProvisorio: boolean;
   vitorias: number;
   derrotas: number;
   /** Da mais recente para a mais antiga. */
@@ -268,18 +274,9 @@ export function campanhaDoJogador(dataset: TournamentDataset, playerId: string):
       substituto = linhaDeSubstituto(linha, jogador);
       break;
     }
-    // Jogo lançado só com o vencedor não tem linha de ninguém: sem linha dele que pontue, a série com
-    // jogo provisório entra pelo time do ELENCO dele (o time jogou; o resultado é do time). Sem isso,
-    // a série toda provisória sumia da ficha, que dizia "ainda não entrou em quadra" ao lado da
-    // vitória na tabela.
-    if (
-      timeId === undefined &&
-      estaNoElenco(jogador) &&
-      (serie.teamAId === jogador.teamId || serie.teamBId === jogador.teamId) &&
-      serie.games.some(jogoProvisorio)
-    ) {
-      timeId = jogador.teamId;
-    }
+    // A série toda provisória (só o vencedor, sem linha de ninguém) NÃO entra pelo elenco: não se sabe
+    // quem jogou (o elenco de hoje pode ter herdado a vaga depois, ou ficado no banco). Ela fica fora da
+    // série a série e muda só o aviso de quem está sem números (`timeComJogoProvisorio`).
     if (timeId === undefined) continue;
 
     const adversarioId = timeId === serie.teamAId ? serie.teamBId : serie.teamAId;
@@ -361,6 +358,16 @@ export function campanhaDoJogador(dataset: TournamentDataset, playerId: string):
       if (linha && !linhaPontua(linha)) jogosSemPontuar++;
     }
   }
+
+  // O time dele com jogo provisório (para quem saiu, só as séries de antes da saída).
+  const timeComJogoProvisorio =
+    jogador?.teamId !== undefined &&
+    dataset.seriesMatches.some(
+      (s) =>
+        (s.teamAId === jogador.teamId || s.teamBId === jogador.teamId) &&
+        s.games.some(jogoProvisorio) &&
+        (!jogador.saiuEm || compararDatasDeSerie(s.date, jogador.saiuEm) < 0),
+    );
 
   // ---------------- números do jogador (a mesma conta de /stats)
   const agregados = calculatePlayerAggregates(dataset);
@@ -497,6 +504,7 @@ export function campanhaDoJogador(dataset: TournamentDataset, playerId: string):
     jogos: jogosEmOrdem.length,
     jogosSemPontuar,
     saiu: Boolean(jogador?.saiuEm),
+    timeComJogoProvisorio,
     vitorias: jogosEmOrdem.filter((j) => j.resultado === "vitoria").length,
     derrotas: jogosEmOrdem.filter((j) => j.resultado === "derrota").length,
     series: series.reverse(),

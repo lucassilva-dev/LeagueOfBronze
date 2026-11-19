@@ -10,9 +10,10 @@
  * Os ESTADOS e contextos da base (`:hover`, `[data-resultado]`, `:last-child`, `.campeao .x`…) vão
  * dentro de `:where()`, que não soma especificidade: a base fica em (0,1,0) e qualquer gancho
  * `.raiz .peca` (0,2,0) vence por especificidade, nunca pela ordem em que os CSS chegam
- * (tests/times/campanha-especificidade.test.ts). Exceção de propósito: os estados que pintam um
+ * (tests/times/campanha-especificidade.test.ts). Exceções de propósito: os estados que pintam um
  * DESCENDENTE (`.serie[data-resultado] .serieResultado`, o pódio do ranking) ficam em (0,3,0), e o
- * gancho que quiser mudá-los escreve o mesmo estado.
+ * gancho que quiser mudá-los escreve o mesmo estado; o foco (0,2,0) e o hover do link (0,1,2) têm de
+ * vencer as regras de elemento de app/globals.css (`*:focus-visible`, `a:hover`).
  */
 
 /* ------------------------------------------------------------------ seção e grade */
@@ -252,9 +253,11 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
-.destaqueLink:where(:focus-visible),
-.serieLink:where(:focus-visible),
-.proximoCartao:where(:focus-visible) {
+/* O foco fica em (0,2,0): acima do `*:focus-visible` global (0,1,0) de app/globals.css, e abaixo dos
+   ganchos, que trocam a cor com `.raiz .x:focus-visible` (0,3,0). */
+.destaqueLink:focus-visible,
+.serieLink:focus-visible,
+.proximoCartao:focus-visible {
   outline: 2px solid var(--tm-arco);
   outline-offset: 3px;
 }
@@ -700,7 +703,9 @@
   text-decoration: none;
   transition: color 0.2s ease;
 }
-.serieLink:where(:hover) {
+/* (0,1,2): acima do `a:hover` global (0,1,1, o ciano do site) e abaixo do gancho `.raiz .serieLink`
+   (0,2,0). Com `.serieLink:where(:hover)` (0,1,0) o ciano vencia no álbum e na ficha padrão. */
+li > a.serieLink:where(:hover) {
   color: var(--tm-texto);
 }
 

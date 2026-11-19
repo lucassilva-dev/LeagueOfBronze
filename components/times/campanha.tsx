@@ -25,8 +25,8 @@ import type { SeriesStage } from "@/lib/schema";
  *
  * Uma estrutura para todos os times; a CARA de cada time vem do tema (as variáveis `--tm-*` da
  * raiz da ficha) e dos GANCHOS do cenário: cada peça leva a classe da base (campanha.module.css)
- * e, se o cenário tiver uma classe com o mesmo nome em `classesDaCampanha`, essa também (`c`,
- * montado com `comCenario`). Estados para o CSS: `data-resultado` (vitoria | derrota |
+ * e, se o cenário tiver uma classe com o mesmo nome no registro da campanha
+ * (cenarios/campanha-dos-cenarios.tsx, `classes`), essa também (`c`, montado com `comCenario`). Estados para o CSS: `data-resultado` (vitoria | derrota |
  * andamento) na série, no jogo e na forma; `data-mvp` no jogo; `data-tipo` (ausente | wo |
  * provisorio) no jogo sem K/D/A dele. Nada aqui anima: as entradas, se houver, são do cenário
  * (só transform).
@@ -325,13 +325,15 @@ function Serie({
  * (substituto que não pontua, jogo só com o resultado) nem promete números a quem saiu do time.
  */
 function avisoSemNumeros(t: PaginasHomeTextos, campanha: CampanhaDoJogador, nick: string): string {
-  if (campanha.series.length > 0) return preencher(t.campanhaSoProvisorio, { nick });
+  // Entrou como substituto que não pontua: a única certeza é essa.
   if (campanha.jogosSemPontuar > 0) {
     return preencher(campanha.jogosSemPontuar === 1 ? t.campanhaSoSubstituto1 : t.campanhaSoSubstituto, {
       nick,
       n: campanha.jogosSemPontuar,
     });
   }
+  // O time tem jogo só com o resultado: ele pode ter jogado ali — nem "não entrou", nem "saiu sem jogar".
+  if (campanha.timeComJogoProvisorio) return preencher(t.campanhaSoProvisorio, { nick });
   if (campanha.saiu) return preencher(t.campanhaSaiuSemJogar, { nick });
   return preencher(t.campanhaSemJogos, { nick });
 }
