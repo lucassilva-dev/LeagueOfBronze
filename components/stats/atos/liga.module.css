@@ -196,6 +196,68 @@
   }
 }
 
+/* No celular a liga DEITA: uma faixa por elo (emblema, nome e conta) e os jogadores por extenso
+   embaixo — oito pilhas lado a lado em 390px viravam blocos sem nome. */
+@media (max-width: 700px) {
+  .bancada {
+    --lingote-h: 34px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .coluna {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "emblema nome conta"
+      "pilha pilha pilha";
+    align-items: center;
+    gap: 8px 12px;
+    padding: 12px 0;
+    border-bottom: 3px solid var(--ferro-escuro);
+  }
+  .topo {
+    display: contents;
+  }
+  .conta {
+    grid-area: conta;
+    font-size: 40px;
+  }
+  .emblema {
+    grid-area: emblema;
+    width: 52px;
+  }
+  .nomeDoElo {
+    grid-area: nome;
+    padding: 0;
+    font-size: 17px;
+    letter-spacing: 0.12em;
+    text-align: left;
+  }
+  .pilha {
+    grid-area: pilha;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0;
+    border-bottom: 0;
+  }
+  .lingote {
+    max-width: 100%;
+  }
+  .lingoteLink {
+    padding: 0 12px 0 0;
+    border-radius: 3px;
+    clip-path: none;
+  }
+  .lingoteNick {
+    display: block;
+    font-size: 15px;
+  }
+  .enfTime {
+    width: 8px;
+    margin-left: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .lingote,
   .topo {

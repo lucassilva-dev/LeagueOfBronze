@@ -64,6 +64,12 @@ export function PortaDaFornalha({ edicao }: Readonly<{ edicao: string }>) {
       data-saindo={saindo ? "" : undefined}
       data-nosnippet=""
       onKeyDown={(ev) => {
+        // Esc dispensa a porta do jeito discreto: entra sem som.
+        if (ev.key === "Escape") {
+          ev.preventDefault();
+          entrar(false);
+          return;
+        }
         // O foco fica entre os dois botões enquanto a porta está fechada.
         if (ev.key !== "Tab") return;
         ev.preventDefault();

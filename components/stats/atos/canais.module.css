@@ -226,9 +226,13 @@
   color: var(--cor);
 }
 .time {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   font-size: clamp(15px, 1vw, 18px);
   font-weight: 700;
   letter-spacing: 0.06em;
+  text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
   color: var(--cor);

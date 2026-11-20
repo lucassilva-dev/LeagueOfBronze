@@ -15,6 +15,10 @@
 
 /* ------------------------------------------------------------------ a régua */
 
+/* o invólucro da régua: no computador não existe (a régua é filha direta da cena) */
+.trilhoDaRegua {
+  display: contents;
+}
 .regua {
   --jogo: 40px;
   --vao: 6px;
@@ -378,12 +382,31 @@
   }
   .media {
     justify-items: start;
+    justify-content: start;
     grid-auto-flow: column;
     align-items: baseline;
     gap: 10px;
   }
   .listas {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* No celular um minuto da régua teria 10px e os jogos se empilhavam uns sobre os outros: a
+   régua fica com a largura que precisa e corre de lado. */
+@media (max-width: 700px) {
+  .trilhoDaRegua {
+    display: block;
+    margin: 0 calc(var(--margem) * -1);
+    padding: 0 var(--margem) 8px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(201, 138, 75, 0.4) transparent;
+  }
+  .regua {
+    --jogo: 32px;
+    width: max(100%, calc(var(--faixa, 30) * 30px));
+    margin: 0 18px;
   }
 }
 

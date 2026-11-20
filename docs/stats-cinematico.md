@@ -211,4 +211,67 @@ som continua disponível.
 
 ## 7. Onde está cada coisa
 
-Preenchido ao fim da implementação — ver «O que mudou na implementação».
+| O quê | Onde |
+| --- | --- |
+| A página (servidor): dados, textos, cookie da porta, `?vs=`, `?modo=tabela` | `app/stats/page.tsx` |
+| O retrato dos dados (um objeto só, das mesmas funções do resto do site) | `lib/stats/forja.ts` |
+| Textos novos, PT e EN | `lib/i18n/messages/forja.ts` |
+| O diretor da rolagem (`--p`, marcas, pinos, viagem entre atos, vigia) | `components/stats/diretor.ts` |
+| O provedor (som, faíscas, atalhos, holofote, VS, trava de rolagem) | `components/stats/provedor.tsx` |
+| Os atos | `components/stats/atos/*.tsx` + `*.module.css` |
+| Peças comuns (cartão do ato, odômetro, medalhão, rosto, nome do time) | `components/stats/pecas.tsx`, `forja.module.css` |
+| A carta holográfica do jogador | `components/stats/carta-do-jogador.tsx`, `carta.module.css` |
+| O motor de inclinação das cartas (também da cartinha de /cartas) | `components/lob/inclinacao.ts` |
+| A cena 3D (three.js, um canvas) | `components/stats/cena/` |
+| Painel de bordo e porta da fornalha | `components/stats/painel.tsx`, `porta.tsx`, `camadas.module.css` |
+| Holofote e modo VS (telas cheias em `<dialog>`) | `components/stats/holofote.tsx`, `versus.tsx`, `tela-cheia.tsx` |
+| A visão em tabela | `components/stats/planilha.tsx` |
+| Os sons (todos sintetizados) | `lib/stats/som-da-forja.ts` |
+| Testes | `tests/stats/` (dados, regras de CSS, página como o servidor a entrega) |
+
+### Onde ajustar
+
+- **Cores, metal e fonte de um time**: `lib/temas/<slug>.ts` (vale para o site todo: página do
+  time, show do sorteio e /stats). No modo VS, o par de cores sai de `candidatasDePalco`
+  (`lib/series/identidade-do-time.ts`) pela distância perceptual (`coresDoConfronto`).
+- **Cores da Forja** (ouro, bronze, brasa, teal) e **tamanhos de transmissão** (`--num-g`,
+  `--rotulo`, `--texto`, `--traco`): o topo de `components/stats/forja.module.css`.
+- **Volume**: `VOLUME_PADRAO` em `lib/stats/som-da-forja.ts` (0,55 de propósito: a narração vem
+  por cima). Cada efeito tem o seu ganho no mesmo arquivo. O volume escolhido pela pessoa fica
+  no `localStorage` (`lob-stats-volume`); ligado/desligado, no cookie `lob_stats_som`.
+- **Intensidade do 3D**: `components/stats/cena/cena-da-forja.ts` — `NIVEIS` (DPR, bloom,
+  brasas por degrau), `POSES` (onde e de que tamanho a peça fica em cada ato), o bloom em
+  `aplicarNivel` (força, raio, limiar) e `CALOR_POR_GOLPE`/`RELEVO_POR_GOLPE` (o quanto cada
+  martelada esfria e marca). Para travar um degrau num teste: `/stats?3d=alta|media|baixa`;
+  `/stats?3d=0` desliga.
+- **Faíscas de tela**: `provedor.tsx` (quantidade, força, espessura, `vida` e `apagaEm`).
+- **Ritmo de cada ato**: os `data-marca` nos atos (em que ponto da rolagem cada peça bate) e o
+  `--trilho` do ato no CSS (quantas telas de rolagem ele dura).
+- **O que cada ato toca**: `data-som` no próprio elemento (`"estalo carta@180"`: o `@` é o
+  atraso em ms).
+
+## 8. O que mudou na implementação
+
+- **O protagonista 3D é o próprio emblema**, recortado e fundido em relevo (altura e normal
+  tiradas da imagem), e não uma moeda com o emblema cunhado. Sem bigorna, martelo nem chão na
+  cena: viravam polígono solto. O canvas é transparente e compõe sobre o fundo da página.
+- **As Peças Raras** saem do molde numa esteira horizontal que corre com a rolagem.
+- **Holofote e modo VS são `<dialog>` modais** (camada de cima do navegador): cobrem o cabeçalho
+  do site, prendem o foco e fecham no Esc sem código próprio. A porta da fornalha é uma camada
+  comum, porque precisa vir no HTML do servidor.
+- **O monitor de desempenho mede por tempo de relógio** (janelas de 1,5 s), não por quadros.
+- **No celular**: a Liga deita (uma faixa por elo, com os nicks), a régua da Têmpera corre de
+  lado, e os comandos viram uma barrinha no pé da tela. Sem trilho de atos e sem 3D.
+- **A cartinha de /cartas** passou a usar o motor de inclinação compartilhado e ganhou foil.
+
+### Verificação — onde parou (20/11/2026)
+
+Feito: typecheck e lint limpos (o lint só acusa os scripts locais de `.sim/`, fora do
+repositório); `tests/stats` com 157 testes passando; prints ato a ato em 1920×1080, 1280×720 e
+390×844, com movimento reduzido e em inglês, sem erro de console; primeira rodada de crítica de
+direção de arte, com as correções aplicadas.
+
+Falta: conferir o `next build`; medir quadros por segundo no build de produção
+(`.sim/stats/fps.cjs`); a segunda rodada de crítica, por um agente que só vê os prints; rodar a
+suíte inteira com a máquina livre (em duas rodadas completas, testes pesados do painel
+administrativo estouraram os 20 s; isolados, passam).

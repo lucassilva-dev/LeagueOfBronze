@@ -4,7 +4,7 @@ import { LayoutGroup, MotionConfig, motion } from "framer-motion";
 import { useState, type CSSProperties } from "react";
 
 import { formatKda } from "@/lib/format";
-import { METRICAS_DE_JOGADOR, type LinhaDoRanking, type MetricaDeJogador, type TimeDaForja } from "@/lib/stats/forja";
+import { METRICAS_DE_JOGADOR, valorDoJogador, type LinhaDoRanking, type MetricaDeJogador, type TimeDaForja } from "@/lib/stats/forja";
 
 import b from "../forja.module.css";
 import { CartaoDoAto, Medalhao, Odometro, Rosto, coresDoTime, preencher } from "../pecas";
@@ -146,6 +146,20 @@ export function AtoDaBigorna() {
                       <Odometro texto={texto(linha)} className={s.numeroDoPodio} />
                       <span>{info.head}</span>
                     </p>
+                    {/* os outros números de quem está no pódio (as outras réguas do ranking) */}
+                    <dl className={s.outros}>
+                      {METRICAS_DE_JOGADOR.filter((chave) => chave !== metrica)
+                        .slice(0, 3)
+                        .map((chave) => {
+                          const valor = valorDoJogador(jogador, chave);
+                          return (
+                            <div key={chave}>
+                              <dt>{st.metricasJogador[chave].head}</dt>
+                              <dd>{chave === "kda" ? formatKda(valor, localeTag) : valor}</dd>
+                            </div>
+                          );
+                        })}
+                    </dl>
                   </li>
                 );
               })}

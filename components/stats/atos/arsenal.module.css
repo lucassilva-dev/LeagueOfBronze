@@ -457,7 +457,11 @@
     grid-template-columns: minmax(0, 1fr);
   }
   .orbita {
-    aspect-ratio: 1 / 0.94;
+    aspect-ratio: 1 / 1.2;
+  }
+  .anel,
+  .centro {
+    top: 25%;
   }
   .foco {
     grid-template-columns: minmax(0, 1fr);

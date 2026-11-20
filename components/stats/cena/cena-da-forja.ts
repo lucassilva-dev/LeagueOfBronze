@@ -513,7 +513,14 @@ export class CenaDaForja {
 
     const ato = this.dados.atos[estado.atoAtual] ?? "fornalha";
     const p = estado.progresso[estado.atoAtual] ?? 0;
-    const pose = POSES[ato] ?? FORA;
+    let pose = POSES[ato] ?? FORA;
+    if (ato === "fornalha") {
+      // Na abertura a peça é grande, ao lado do título; quando as placas do resumo sobem, ela
+      // recolhe para o alto — senão a ponta do emblema fica atrás do último número.
+      const t0 = limitar((p - 0.07) / 0.16);
+      const t = t0 * t0 * (3 - 2 * t0);
+      pose = { x: misturar(pose.x, 0.67, t), y: misturar(pose.y, 0.43, t), tam: misturar(pose.tam, 0.37, t), presenca: 1, fornalha: 1 };
+    }
 
     // ---- o que o roteiro pede agora (tudo sai do `p`: recarregar no meio dá o estado certo)
     let golpes: number = GOLPES.length;

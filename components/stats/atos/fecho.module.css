@@ -44,6 +44,13 @@
   color: var(--tinta);
   transition: color 1.2s ease;
 }
+/* No computador o emblema 3D fica à direita do título: a frase quebra antes de chegar nele
+   (em inglês ela é mais comprida — «THE BRONZE HAS / COOLED.»). */
+@media (min-width: 1024px) {
+  .titulo {
+    max-width: 7.7em;
+  }
+}
 .texto {
   margin: 6px 0 0;
   font-size: clamp(18px, 1.6vw, 30px);

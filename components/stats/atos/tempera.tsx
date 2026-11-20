@@ -114,48 +114,51 @@ export function AtoDaTempera({ dados, t }: Readonly<{ dados: DadosDaForja; t: Te
           <CartaoDoAto numero={f.atos.tempera.numero} nome={f.atos.tempera.nome} sub={f.atos.tempera.sub} id="titulo-da-tempera" />
 
           <div className={`${b.cena} ${s.cena}`}>
-            <div className={s.regua} data-cena="" style={{ "--pilha": pilha, "--faixa": fim - inicio } as CSSProperties}>
-              <ul className={s.jogos}>
-                {[...porMinuto.entries()].flatMap(([min, lista]) =>
-                  lista.map((jogo, k) => {
-                    const n = nomes(jogo);
-                    const vencedor = timePorId.get(jogo.vencedor) ?? null;
-                    const x = naRegua(min);
-                    return (
-                      <li key={`${jogo.serieId}-${jogo.jogo}`} className={s.vaga} style={{ "--x": x.toFixed(2), "--k": k } as CSSProperties}>
-                        <a
-                          href={`/partidas/${encodeURIComponent(jogo.serieId)}`}
-                          className={`${s.jogo} ${b.dica}`}
-                          style={coresDoTime(vencedor)}
-                          data-dica={`${n.a} × ${n.b} · ${st.duracaoJogo} ${jogo.jogo} · ${jogo.min} ${f.temperaMin}`}
-                          aria-label={`${n.a} × ${n.b}, ${st.duracaoJogo} ${jogo.jogo}: ${jogo.min} ${f.temperaMin}, ${st.duracaoVitoria} ${n.vencedor}`}
-                          data-marca={(0.2 + (x / 100) * 0.58).toFixed(3)}
-                          data-som="tique"
-                        >
-                          {vencedor?.escudo ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={vencedor.escudo} alt="" loading="lazy" decoding="async" draggable={false} />
-                          ) : (
-                            <span aria-hidden>{vencedor?.sigla ?? "?"}</span>
-                          )}
-                        </a>
-                      </li>
-                    );
-                  }),
-                )}
-              </ul>
-              <div className={s.barra} aria-hidden>
-                <span className={s.enfCalor} />
-                <span className={s.enfFrente} />
+            {/* no celular a régua não cabe na largura: corre de lado, com o dedo */}
+            <div className={s.trilhoDaRegua}>
+              <div className={s.regua} data-cena="" style={{ "--pilha": pilha, "--faixa": fim - inicio } as CSSProperties}>
+                <ul className={s.jogos}>
+                  {[...porMinuto.entries()].flatMap(([min, lista]) =>
+                    lista.map((jogo, k) => {
+                      const n = nomes(jogo);
+                      const vencedor = timePorId.get(jogo.vencedor) ?? null;
+                      const x = naRegua(min);
+                      return (
+                        <li key={`${jogo.serieId}-${jogo.jogo}`} className={s.vaga} style={{ "--x": x.toFixed(2), "--k": k } as CSSProperties}>
+                          <a
+                            href={`/partidas/${encodeURIComponent(jogo.serieId)}`}
+                            className={`${s.jogo} ${b.dica}`}
+                            style={coresDoTime(vencedor)}
+                            data-dica={`${n.a} × ${n.b} · ${st.duracaoJogo} ${jogo.jogo} · ${jogo.min} ${f.temperaMin}`}
+                            aria-label={`${n.a} × ${n.b}, ${st.duracaoJogo} ${jogo.jogo}: ${jogo.min} ${f.temperaMin}, ${st.duracaoVitoria} ${n.vencedor}`}
+                            data-marca={(0.2 + (x / 100) * 0.58).toFixed(3)}
+                            data-som="tique"
+                          >
+                            {vencedor?.escudo ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={vencedor.escudo} alt="" loading="lazy" decoding="async" draggable={false} />
+                            ) : (
+                              <span aria-hidden>{vencedor?.sigla ?? "?"}</span>
+                            )}
+                          </a>
+                        </li>
+                      );
+                    }),
+                  )}
+                </ul>
+                <div className={s.barra} aria-hidden>
+                  <span className={s.enfCalor} />
+                  <span className={s.enfFrente} />
+                </div>
+                <ol className={s.minutos} aria-hidden>
+                  {marcas.map((m) => (
+                    <li key={m} style={{ "--x": naRegua(m).toFixed(2) } as CSSProperties}>
+                      {m}
+                      <span>{f.temperaMin}</span>
+                    </li>
+                  ))}
+                </ol>
               </div>
-              <ol className={s.minutos} aria-hidden>
-                {marcas.map((m) => (
-                  <li key={m} style={{ "--x": naRegua(m).toFixed(2) } as CSSProperties}>
-                    {m}
-                    <span>{f.temperaMin}</span>
-                  </li>
-                ))}
-              </ol>
             </div>
 
             <div className={s.pontas}>

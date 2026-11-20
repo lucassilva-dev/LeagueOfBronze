@@ -53,6 +53,13 @@
   /* a âncora `#forja` (os botões da porta, sem JavaScript) para sob o cabeçalho */
   scroll-margin-top: var(--cab);
 }
+/* No computador as margens guardam o painel de bordo (o trilho dos atos à direita, os comandos à
+   esquerda): nunca menos de 60px, para os botões de 44px não encostarem no conteúdo. */
+@media (min-width: 1024px) {
+  .raiz {
+    --margem: clamp(60px, 4vw, 72px);
+  }
+}
 /* Com a porta da fornalha fechada, a página passa por cima do rodapé do site (que é posicionado
    e vem depois no documento): a porta cobre tudo, menos o cabeçalho. */
 .raiz[data-porta="1"] {
@@ -62,6 +69,13 @@
 .conteudo {
   position: relative;
   z-index: 1;
+}
+
+/* No celular os comandos flutuam no pé da tela: o fim da página ganha folga para subir acima deles. */
+@media (max-width: 1023px) {
+  .conteudo {
+    padding-bottom: 76px;
+  }
 }
 
 /* O fundo da página: cobre as listras e o ruído do site (que viram bloco na compressão do
