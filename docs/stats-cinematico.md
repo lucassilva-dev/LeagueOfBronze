@@ -280,14 +280,20 @@ som continua disponível.
 - **No modo VS**, valor de draft e pontos de elenco ficam fora da luta (moeda de draft não é
   quesito), e nos times a metade direita da tela é o rota a rota.
 - **A cartinha de /cartas** passou a usar o motor de inclinação compartilhado e ganhou foil.
+- **O trilho dos atos, a barra do celular e a cena 3D contam os atos que existem na página.** Um
+  ato sem dado não é renderizado (sem jogo com duração não há Têmpera; sem ninguém em jogo não
+  há Canais — é o começo de toda edição, e é o ambiente de teste): o diretor entrega os ids dos
+  atos presentes (`retrato().ids`) e todos contam por eles, nunca pela lista fixa dos nove. No
+  HTML do servidor, antes de o diretor montar, valem os nove, cada um com a sua âncora.
 
 ### Verificação (20/11/2026)
 
 - **Build, lint e typecheck**: `next build` passa; `tsc --noEmit` limpo; `eslint` limpo no
   repositório (o `npm run lint` local só acusa os scripts de `.sim/`, que não são versionados).
-- **Testes**: a suíte inteira passa (274 arquivos, 3389 testes), 168 deles da /stats: dados,
-  regras de CSS (nada de opacidade animada em conteúdo, nada de `translate:` solto, nenhum texto
-  abaixo de 15px fora das telas pequenas) e a página como o servidor a entrega, em PT e em EN.
+- **Testes**: a suíte inteira passa (275 arquivos, 3396 testes), 158 deles em `tests/stats`:
+  dados, regras de CSS (nada de opacidade animada em conteúdo, nada de `translate:` solto, nenhum
+  texto abaixo de 15px fora das telas pequenas), a página como o servidor a entrega, em PT e em
+  EN, e o trilho numa página com atos a menos.
 - **Console**: nenhum erro e nenhum aviso (de hidratação inclusive) no build de produção, em
   todos os percursos — página, porta, holofote, VS, tabela, celular, inglês. Com movimento
   reduzido, só no modo de desenvolvimento, o framer-motion escreve um aviso informativo.
@@ -318,6 +324,9 @@ som continua disponível.
   barra encaixada no pé da tela com botões de 44px, as setas de ato, o som, o holofote abrindo
   no topo, a luta do VS cabendo na largura sem nome cortado, a porta com os dois botões à vista,
   a barra acima do rodapé no fim da página, e nenhuma rolagem lateral.
+- **Página com atos a menos** (`.sim/stats/_oito-atos.cjs`): no ambiente de teste (7 atos, sem
+  Canais nem Têmpera) e num build local sem durações (8 atos), o trilho tem um rebite por ato
+  que existe e as setas passam por todos, na ordem, com o console limpo.
 - **Texto cortado** (`.sim/stats/cortes.cjs` e `celular.cjs`): nenhuma reticência e nenhum
   elemento fora da tela em 320, 360, 390, 820, 1024, 1100, 1280, 1366, 1536, 1920 e 2560 px.
 - **Prints** ato a ato em 1920×1080, 1280×720 e 390×844, com movimento reduzido e em inglês.
