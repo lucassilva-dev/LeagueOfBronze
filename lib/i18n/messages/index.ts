@@ -5,6 +5,7 @@ import { compartilhados } from "@/lib/i18n/messages/compartilhados";
 import { conformidade } from "@/lib/i18n/messages/conformidade";
 import { draft } from "@/lib/i18n/messages/draft";
 import { erro } from "@/lib/i18n/messages/erro";
+import { forja } from "@/lib/i18n/messages/forja";
 import { inscricao } from "@/lib/i18n/messages/inscricao";
 import { legal } from "@/lib/i18n/messages/legal";
 import { metadados } from "@/lib/i18n/messages/metadados";
@@ -29,6 +30,7 @@ export const MESSAGES = {
     conformidade: conformidade.pt,
     draft: draft.pt,
     erro: erro.pt,
+    forja: forja.pt,
     inscricao: inscricao.pt,
     legal: legal.pt,
     metadados: metadados.pt,
@@ -45,6 +47,7 @@ export const MESSAGES = {
     conformidade: conformidade.en,
     draft: draft.en,
     erro: erro.en,
+    forja: forja.en,
     inscricao: inscricao.en,
     legal: legal.en,
     metadados: metadados.en,
