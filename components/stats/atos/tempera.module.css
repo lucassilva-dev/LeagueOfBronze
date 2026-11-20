@@ -369,6 +369,9 @@
   .regua {
     --jogo: 30px;
   }
+}
+/* só no celular as pontas empilham (no tablet o atropelo, a média e o épico cabem lado a lado) */
+@media (max-width: 700px) {
   .pontas {
     grid-template-columns: minmax(0, 1fr);
     align-items: stretch;
@@ -395,18 +398,25 @@
 /* No celular um minuto da régua teria 10px e os jogos se empilhavam uns sobre os outros: a
    régua fica com a largura que precisa e corre de lado. */
 @media (max-width: 700px) {
+  /* as duas bordas esfumadas dizem que a faixa continua para os lados */
   .trilhoDaRegua {
     display: block;
     margin: 0 calc(var(--margem) * -1);
     padding: 0 var(--margem) 8px;
     overflow-x: auto;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(201, 138, 75, 0.4) transparent;
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 22px, #000 calc(100% - 44px), transparent 100%);
+    mask-image: linear-gradient(90deg, transparent 0, #000 22px, #000 calc(100% - 44px), transparent 100%);
   }
   .regua {
     --jogo: 32px;
     width: max(100%, calc(var(--faixa, 30) * 30px));
     margin: 0 18px;
+  }
+  .pontaJogo,
+  .linhaJogo,
+  .linhaJogo > span:last-child {
+    white-space: normal;
   }
 }
 

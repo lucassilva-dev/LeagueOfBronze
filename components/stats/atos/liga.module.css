@@ -176,29 +176,10 @@
 
 /* ------------------------------------------------------------------ telas menores */
 
+/* No celular e no tablet a liga DEITA: uma faixa por elo (emblema, nome e conta) e os jogadores
+   por extenso embaixo — oito pilhas lado a lado viravam blocos sem nome (390px) ou com o nick
+   cortado (820px). */
 @media (max-width: 1023px) {
-  .bancada {
-    --lingote-h: 30px;
-    gap: 6px;
-  }
-  .lingoteNick {
-    display: none;
-  }
-  .enfTime {
-    width: 7px;
-  }
-  .lingoteLink {
-    padding: 0;
-  }
-  .nomeDoElo {
-    font-size: 11px;
-    letter-spacing: 0.04em;
-  }
-}
-
-/* No celular a liga DEITA: uma faixa por elo (emblema, nome e conta) e os jogadores por extenso
-   embaixo — oito pilhas lado a lado em 390px viravam blocos sem nome. */
-@media (max-width: 700px) {
   .bancada {
     --lingote-h: 34px;
     grid-template-columns: minmax(0, 1fr);

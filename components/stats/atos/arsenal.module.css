@@ -453,6 +453,24 @@
 /* ------------------------------------------------------------------ telas menores */
 
 @media (max-width: 1023px) {
+  .ato {
+    padding-top: 0;
+  }
+  .topo {
+    display: grid;
+    gap: 14px;
+  }
+  /* as cinco abas numa fileira só, que corre de lado */
+  .abas {
+    flex-wrap: nowrap;
+    margin: 0 calc(var(--margem) * -1);
+    padding: 0 var(--margem) 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .aba {
+    flex-shrink: 0;
+  }
   .cena {
     grid-template-columns: minmax(0, 1fr);
   }

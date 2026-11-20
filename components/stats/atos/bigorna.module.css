@@ -302,11 +302,10 @@
   text-transform: uppercase;
   color: var(--cor);
 }
+/* o nome do time quebra em duas linhas em vez de ser cortado */
 .timeDoPodio > span:last-child {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.15;
 }
 .medalhaDoPodio {
   --tam: clamp(26px, 2vw, 36px);
@@ -478,15 +477,35 @@
 
 /* ------------------------------------------------------------------ telas menores */
 
-@media (max-width: 860px) {
-  .podio {
-    grid-template-columns: minmax(0, 1fr);
+@media (max-width: 1023px) {
+  .ato {
+    padding-top: 0;
   }
-  .degrau[data-lugar] {
-    order: 0;
-    padding-bottom: clamp(14px, 1.5vw, 26px);
+  /* o aviso de «ao vivo» vira uma linha, sem caixa; os critérios, uma fileira que corre de lado */
+  .aoVivo {
+    padding: 0;
+    border: 0;
+    font-size: 15px;
+    letter-spacing: 0.08em;
   }
-  /* empilhado, o degrau é estreito: os outros números descem para uma linha própria */
+  .controles {
+    display: grid;
+    gap: 10px;
+  }
+  .criterios {
+    flex-wrap: nowrap;
+    margin: 0 calc(var(--margem) * -1);
+    padding: 0 var(--margem) 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .criterio {
+    flex-shrink: 0;
+  }
+  .inverter {
+    justify-self: start;
+  }
+  /* no degrau estreito os outros números descem para uma linha própria */
   .degrau[data-lugar] .outros {
     position: static;
     grid-column: 1 / -1;
@@ -502,6 +521,33 @@
   }
   .timeDaLinha {
     display: none;
+  }
+}
+/* tablet: três degraus estreitos — a foto sobe para cima do nick, que pode quebrar */
+@media (min-width: 701px) and (max-width: 1023px) {
+  .degrau {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "rosto"
+      "quem"
+      "valor";
+    justify-items: start;
+  }
+  .nickDoPodio {
+    overflow: visible;
+    font-size: clamp(24px, 3.6vw, 34px);
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+/* só no celular o pódio empilha (no tablet os três degraus cabem lado a lado) */
+@media (max-width: 700px) {
+  .podio {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .degrau[data-lugar] {
+    order: 0;
+    padding-bottom: clamp(14px, 1.5vw, 26px);
   }
 }
 

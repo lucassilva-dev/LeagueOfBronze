@@ -53,6 +53,7 @@ export function PainelDeBordo() {
   const { f } = t;
   const retrato = useRetratoDoDiretor();
   const total = Math.max(1, retrato.total || ATOS_DA_FORJA.length);
+  const atoDaVez = ATOS_DA_FORJA[Math.min(ATOS_DA_FORJA.length - 1, Math.max(0, retrato.atoAtual))]!;
   const viajar = (delta: 1 | -1) => {
     if (diretor.viajar(delta)) som.tocar((x) => x.sopro(delta === 1));
   };
@@ -152,6 +153,21 @@ export function PainelDeBordo() {
           <span className={s.botaoNome} aria-hidden>
             {f.fechoTabela}
           </span>
+        </div>
+
+        {/* Só no celular (o CSS decide): em que ato a pessoa está e as setas de ato — no
+            computador isso é o trilho da direita. */}
+        <div className={s.atoMovel}>
+          <p className={s.atoMovelNome}>
+            <span>{f.atos[atoDaVez].numero}</span>
+            <b>{f.atos[atoDaVez].nome}</b>
+          </p>
+          <button type="button" className={s.passo} onClick={() => viajar(-1)} disabled={retrato.atoAtual <= 0} aria-label={f.hudAnterior}>
+            <Seta para="cima" />
+          </button>
+          <button type="button" className={s.passo} onClick={() => viajar(1)} disabled={retrato.atoAtual >= total - 1} aria-label={f.hudProximo}>
+            <Seta para="baixo" />
+          </button>
         </div>
       </div>
     </div>

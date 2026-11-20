@@ -21,9 +21,17 @@
 
 /* ================================================================== PAINEL DE BORDO */
 
-/* O painel não ocupa lugar: cada grupo é fixo por conta própria, nas margens da página. */
+/*
+ * O painel é uma ÂNCORA no fim da página, grudada no pé da tela (`sticky`), sem altura: o trilho
+ * e os comandos se penduram nela. Enquanto a /stats está na tela, a âncora acompanha o pé da
+ * janela — como se fosse fixa. Quando a página acaba e o rodapé do site chega, ela vai embora
+ * junto com o conteúdo: o painel nunca fica por cima do aviso legal do rodapé.
+ */
 .painel {
-  display: contents;
+  position: sticky;
+  bottom: 0;
+  z-index: 30;
+  height: 0;
 }
 /* Com uma tela cheia aberta (porta, holofote, VS) o painel sai de cena — e do Tab. */
 .painel[data-escondido] > * {
@@ -33,14 +41,14 @@
 /* ------------------------------------------------------------------ o trilho dos atos */
 
 .trilho {
-  position: fixed;
-  top: calc(var(--cab) + (100vh - var(--cab)) / 2);
+  position: absolute;
+  /* no meio da altura útil (da base do cabeçalho ao pé da tela), contado a partir da âncora */
+  bottom: calc((100vh - var(--cab)) / 2);
   right: max(4px, calc((var(--margem) - 44px) / 2));
-  z-index: 30;
   display: grid;
   justify-items: center;
   gap: 2px;
-  transform: translateY(-50%);
+  transform: translateY(50%);
 }
 .trilho ol {
   position: relative;
@@ -176,10 +184,9 @@
 /* ------------------------------------------------------------------ os comandos (som, VS, tabela) */
 
 .bordo {
-  position: fixed;
+  position: absolute;
   left: max(4px, calc((var(--margem) - 44px) / 2));
   bottom: clamp(10px, 2.4vh, 26px);
-  z-index: 30;
   display: grid;
   gap: 8px;
 }
@@ -294,29 +301,81 @@
   transform: translateY(-50%) scaleX(0);
 }
 
-/* No celular e no tablet a página é rolagem comum: sem trilho, e os comandos deitam no rodapé. */
+/* o ato atual e as setas, só na barra do celular */
+.atoMovel {
+  display: none;
+}
+
+/*
+ * No celular e no tablet a página é rolagem comum: sem trilho, e os comandos viram uma BARRA
+ * encaixada no pé da tela (como a barra de um aplicativo). Flutuando num canto, os botões
+ * ficavam por cima do texto; encaixada e opaca, a barra é chão. E como a âncora fica no fim da
+ * página e aqui tem altura, a barra ocupa o próprio lugar: nada termina embaixo dela.
+ */
 @media (max-width: 1023px) {
+  /* aqui a âncora TEM altura: a barra ocupa o próprio lugar no fim da página */
+  .painel {
+    height: auto;
+  }
   .trilho {
     display: none;
   }
   .bordo {
-    left: 10px;
-    bottom: 10px;
-    grid-auto-flow: column;
+    position: static;
+    display: flex;
+    align-items: center;
     gap: 6px;
-    padding: 5px;
-    border-radius: 6px;
-    background: rgba(11, 8, 5, 0.92);
-    box-shadow: 0 0 0 2px rgba(124, 78, 34, 0.7);
+    box-sizing: border-box;
+    min-height: 60px;
+    padding: 6px 10px calc(6px + env(safe-area-inset-bottom, 0px));
+    border-top: 3px solid var(--bronze-escuro);
+    background: #0b0805;
   }
   .botaoNome,
   .avisoDeSom {
     display: none;
   }
+  .atoMovel {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+    margin-left: auto;
+  }
+  .atoMovelNome {
+    display: grid;
+    min-width: 0;
+    margin: 0 4px 0 0;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    line-height: 1.12;
+    text-align: right;
+    color: var(--tinta);
+  }
+  .atoMovelNome span {
+    font-size: 13px;
+    letter-spacing: 0.2em;
+    color: var(--bronze);
+  }
+  .atoMovelNome b {
+    overflow: hidden;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .atoMovel .passo {
+    width: 40px;
+    height: 44px;
+    color: var(--ouro);
+  }
+  .atoMovel .passo:disabled {
+    color: #3a3024;
+  }
   .volume {
     left: 0;
     top: auto;
-    bottom: calc(100% + 10px);
+    bottom: calc(100% + 12px);
     transform: scaleY(0);
     transform-origin: 50% 100%;
   }
@@ -514,6 +573,14 @@
   font-weight: 600;
   letter-spacing: 0.06em;
   color: var(--ferro-claro);
+}
+
+/* no toque não há teclado: as dicas de atalho somem (o botão de som fica no pé da tela) */
+@media (hover: none), (pointer: coarse) {
+  .portaDica,
+  .fecharTecla {
+    display: none;
+  }
 }
 
 /* ================================================================== TELA CHEIA (holofote, VS) */

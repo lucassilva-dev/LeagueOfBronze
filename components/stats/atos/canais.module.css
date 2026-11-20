@@ -331,20 +331,55 @@
 
 /* ------------------------------------------------------------------ telas menores */
 
-@media (max-width: 1023px) {
+/* tablet: o mapa do Rift fica ao lado das linhas, menor */
+@media (min-width: 701px) and (max-width: 1023px) {
+  .cena {
+    grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr);
+    align-items: start;
+    gap: 22px;
+  }
+  .mapa {
+    position: sticky;
+    top: calc(var(--cab) + 16px);
+    width: 100%;
+  }
+}
+@media (max-width: 700px) {
   .cena {
     grid-template-columns: minmax(0, 1fr);
   }
   .mapa {
     width: min(100%, 440px);
   }
+}
+@media (max-width: 1023px) {
+  /* o rótulo da rota ganha a linha inteira (ao lado do KDA ele batia no número) e o nome do
+     time quebra em duas linhas em vez de ser cortado */
   .linha {
     grid-template-areas:
-      "rosto rotulo kda"
+      "rotulo rotulo kda"
       "rosto quem kda"
       "detalhe detalhe detalhe"
       "vices vices vices";
-    row-gap: 2px;
+    row-gap: 5px;
+    padding: 12px 12px 12px 14px;
+  }
+  /* em tela bem estreita o rótulo quebra em vez de entrar por baixo do KDA */
+  .rotulo {
+    letter-spacing: 0.1em;
+    line-height: 1.15;
+    white-space: normal;
+  }
+  .kda {
+    align-self: start;
+  }
+  .kdaNumero {
+    font-size: clamp(34px, 10.5vw, 52px);
+  }
+  .time {
+    overflow: visible;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
   .vices {
     justify-content: flex-start;

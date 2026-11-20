@@ -71,13 +71,6 @@
   z-index: 1;
 }
 
-/* No celular os comandos flutuam no pé da tela: o fim da página ganha folga para subir acima deles. */
-@media (max-width: 1023px) {
-  .conteudo {
-    padding-bottom: 76px;
-  }
-}
-
 /* O fundo da página: cobre as listras e o ruído do site (que viram bloco na compressão do
    vídeo). É o fundo de reserva — a cena 3D, quando carrega, pinta por cima dele. */
 .enfFundo {
@@ -509,6 +502,21 @@
 .raiz[data-viajando="1"] .enfFaixaDeCima,
 .raiz[data-viajando="1"] .enfFaixaDeBaixo {
   transform: none;
+}
+
+/* ------------------------------------------------------------------ celular e tablet (sem pinos) */
+
+/* Sem pinos a página é rolagem comum: cada ato abraça o próprio conteúdo (um palco de tela inteira
+   deixava vazios entre o título, a cena e a legenda) e o título ganha corpo de capítulo. */
+@media (max-width: 1023px) {
+  .palco {
+    min-height: 0;
+    gap: 18px;
+    padding: clamp(44px, 11vw, 72px) var(--margem) clamp(18px, 5vw, 32px);
+  }
+  .cartaoNome {
+    font-size: clamp(40px, 11.4vw, 76px);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

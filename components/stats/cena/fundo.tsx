@@ -14,7 +14,8 @@ import type { CenaDaForja, Qualidade } from "./cena-da-forja";
  * A cena só entra onde faz sentido. Fica o fundo 2D (o gradiente da página e o emblema em
  * imagem) quando:
  *  - a pessoa pediu movimento reduzido;
- *  - a tela é de celular (largura < 768): bateria e GPU pequena;
+ *  - a tela é de celular ou tablet (menor que 1024×560, onde a página não tem o roteiro de
+ *    rolagem): bateria e GPU pequena, e a peça não teria cena para contar;
  *  - o navegador avisou economia de dados;
  *  - não há WebGL, ou ele cai (contexto perdido);
  *  - o monitor de desempenho desiste (nem no degrau mais baixo fecha 30 quadros por segundo).
@@ -48,7 +49,10 @@ export function FundoDaForja() {
     const travado = DEGRAUS.find((q) => q === pedido) ?? null;
     const reduzido = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
     const economia = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData === true;
-    if (pedido === "0" || (!travado && (reduzido || economia || window.innerWidth < 768))) return;
+    // Só onde a página tem o roteiro de rolagem (os pinos: 1024×560 para cima): sem ele a peça
+    // 3D não tem cena para contar, e em tablet ela só gastava bateria atrás de uma página comum.
+    const semRoteiro = window.innerWidth < 1024 || window.innerHeight < 560;
+    if (pedido === "0" || (!travado && (reduzido || economia || semRoteiro))) return;
 
     let cena: CenaDaForja | null = null;
     let tela: HTMLCanvasElement | null = null;

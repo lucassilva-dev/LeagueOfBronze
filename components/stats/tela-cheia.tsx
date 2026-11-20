@@ -47,6 +47,10 @@ export function TelaCheia({
       // Navegador sem <dialog> modal: abre como caixa comum (o CSS já a deixa de tela cheia).
       el.setAttribute("open", "");
     }
+    // O foco inicial fica na PRÓPRIA tela, no topo. Deixado por conta do navegador, ele ia para
+    // o primeiro link — e no celular a tela abria rolada até lá embaixo.
+    el.focus({ preventScroll: true });
+    el.scrollTop = 0;
     return () => {
       try {
         // Fechar ANTES de sair do documento é o que faz o navegador devolver o foco.
@@ -63,6 +67,7 @@ export function TelaCheia({
       className={`${s.tela} ${className ?? ""}`}
       style={estilo}
       aria-label={rotulo}
+      tabIndex={-1}
       inert={inerte}
       onCancel={(ev) => {
         // O Esc pede para fechar: quem fecha é o estado da página (a tela sai do documento).

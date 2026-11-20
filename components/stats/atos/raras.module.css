@@ -230,6 +230,20 @@
   transition: none;
 }
 
+/* No celular a esteira vai de borda a borda e a carta ocupa quase a tela: é a peça do ato. */
+@media (max-width: 700px) {
+  .esteira {
+    margin: 0 calc(var(--margem) * -1);
+    padding: 8px var(--margem) 16px;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: var(--margem);
+    scrollbar-width: none;
+  }
+  .carta {
+    --carta-l: min(78vw, 340px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .vaga .carta,
   .metade {
