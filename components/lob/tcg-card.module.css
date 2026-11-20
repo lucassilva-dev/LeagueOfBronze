@@ -1,0 +1,75 @@
+/*
+ * A CARTINHA DE REGRA (/cartas) — a parte que se mexe. A inclinação vem do motor compartilhado
+ * (components/lob/inclinacao.ts), o mesmo das cartas de jogador da /stats: ele escreve as
+ * variáveis (--rx/--ry, --px/--py, --bx/--by) e liga `data-inclinando`; aqui o CSS decide o que
+ * fazer com elas. O visual parado da carta continua nos estilos do próprio componente.
+ *
+ * Brilho e foil são enfeite (aria-hidden, sem texto): só eles animam opacidade.
+ */
+
+.carta {
+  transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transform-style: preserve-3d;
+  /* volta devagar ao repouso; enquanto o ponteiro está em cima, acompanha rápido */
+  transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+  will-change: transform;
+}
+.carta[data-inclinando] {
+  transition: transform 0.1s ease-out;
+}
+
+/* a arte desliza um pouco contra o ponteiro: profundidade */
+.arte {
+  transform: translate(calc(var(--px, 0) * -16px), calc(var(--py, 0) * -16px)) scale(1);
+  transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+  will-change: transform;
+}
+.carta[data-inclinando] .arte {
+  transform: translate(calc(var(--px, 0) * -16px), calc(var(--py, 0) * -16px)) scale(1.06);
+  transition: transform 0.1s ease-out;
+}
+
+/* o brilho segue o ponteiro */
+.enfBrilho {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at var(--bx, 50%) var(--by, 50%), rgba(255, 244, 224, 0.28), transparent 46%);
+  mix-blend-mode: overlay;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+/* o foil: uma faixa larga na cor da própria carta, que corre com a inclinação */
+.enfFoil {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 22%,
+    color-mix(in srgb, var(--tcg-cor, #c98a4b) 50%, transparent) 38%,
+    rgba(255, 244, 224, 0.42) 48%,
+    color-mix(in srgb, var(--tcg-borda, #f0c88a) 50%, transparent) 58%,
+    transparent 76%
+  );
+  background-size: 260% 260%;
+  background-position: var(--bx, 50%) var(--by, 50%);
+  mix-blend-mode: color-dodge;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+.carta[data-inclinando] .enfBrilho {
+  opacity: 1;
+}
+.carta[data-inclinando] .enfFoil {
+  opacity: 0.45;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .carta,
+  .arte,
+  .enfBrilho,
+  .enfFoil {
+    transition: none;
+  }
+}

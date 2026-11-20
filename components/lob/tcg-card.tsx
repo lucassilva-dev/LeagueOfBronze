@@ -1,18 +1,19 @@
 "use client";
 
-import { useRef } from "react";
+import type { CSSProperties } from "react";
 
 import type { CardDef } from "@/lib/cards";
 
-const ROT = 22; // amplitude da rotação (graus de ponta a ponta ~ ±11)
-const PARALLAX = 16; // deslocamento (px) da arte para dar profundidade
-const REST = "perspective(900px) rotateX(0deg) rotateY(0deg)";
-const EASE_RETURN = "transform .6s cubic-bezier(.23,1,.32,1)";
-const EASE_TRACK = "transform .1s ease-out";
+import { useInclinacao } from "./inclinacao";
+import s from "./tcg-card.module.css";
 
-function prefersReducedMotion() {
-  return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-}
+/**
+ * A cartinha de regra de /cartas. A inclinação 3D, o parallax da arte e o brilho vêm do motor
+ * compartilhado (./inclinacao.ts) — o mesmo das cartas de jogador da /stats. Ele escreve
+ * variáveis CSS na carta e o tcg-card.module.css faz o resto: nada de `style` mexido a cada
+ * movimento do mouse. De quebra, a carta ganhou o foil na cor dela.
+ */
+const ROT = 22; // amplitude da rotação (graus de ponta a ponta ~ ±11)
 
 /** Selos da carta. Opcional: sem eles a carta fica em português (padrão do site). */
 export type TextosTcgCard = {
@@ -30,70 +31,32 @@ const TEXTOS_PT: TextosTcgCard = {
 };
 
 export function TcgCard({ card, t = TEXTOS_PT }: Readonly<{ card: CardDef; t?: TextosTcgCard }>) {
-  const cardRef = useRef<HTMLDivElement>(null);
-  const artRef = useRef<HTMLSpanElement>(null);
-  const glareRef = useRef<HTMLDivElement>(null);
+  const inclinacao = useInclinacao<HTMLDivElement>();
 
   const chip = card.dupla ? t.chipDupla : t.chipSurpresa;
   const chipBg = card.dupla ? card.color : "rgba(10,8,4,.55)";
   const chipColor = card.dupla ? "#140d05" : "#cdbfa8";
   const foot = card.dupla ? t.rodapeDupla : t.rodapeIndividual;
 
-  function handleMove(event: React.MouseEvent<HTMLDivElement>) {
-    if (prefersReducedMotion()) return;
-    const el = cardRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    if (!r.width || !r.height) return;
-    const px = (event.clientX - r.left) / r.width - 0.5; // -0.5 .. 0.5
-    const py = (event.clientY - r.top) / r.height - 0.5;
-    el.style.transform = `perspective(900px) rotateY(${px * ROT}deg) rotateX(${-py * ROT}deg)`;
-    if (artRef.current) artRef.current.style.transform = `translate(${-px * PARALLAX}px, ${-py * PARALLAX}px) scale(1.06)`;
-    if (glareRef.current) {
-      glareRef.current.style.background = `radial-gradient(circle at ${(px + 0.5) * 100}% ${(py + 0.5) * 100}%, rgba(255,244,224,.28), transparent 46%)`;
-    }
-  }
-
-  function handleEnter() {
-    if (prefersReducedMotion()) return;
-    if (cardRef.current) cardRef.current.style.transition = EASE_TRACK;
-    if (artRef.current) artRef.current.style.transition = EASE_TRACK;
-    if (glareRef.current) glareRef.current.style.opacity = "1";
-  }
-
-  function handleLeave() {
-    if (cardRef.current) {
-      cardRef.current.style.transition = EASE_RETURN;
-      cardRef.current.style.transform = REST;
-    }
-    if (artRef.current) {
-      artRef.current.style.transition = EASE_RETURN;
-      artRef.current.style.transform = "translate(0,0) scale(1)";
-    }
-    if (glareRef.current) glareRef.current.style.opacity = "0";
-  }
-
   return (
     <div
-      ref={cardRef}
-      className="lob-tcg"
-      onMouseMove={handleMove}
-      onMouseEnter={handleEnter}
-      onMouseLeave={handleLeave}
-      style={{
-        position: "relative",
-        display: "flex",
-        flexDirection: "column",
-        border: `2px solid ${card.border}`,
-        borderRadius: 11,
-        overflow: "hidden",
-        background: "linear-gradient(180deg,#221a10,#0e0a05)",
-        boxShadow: "0 18px 40px -20px rgba(0,0,0,.85)",
-        transform: REST,
-        transformStyle: "preserve-3d",
-        transition: EASE_RETURN,
-        willChange: "transform",
-      }}
+      ref={inclinacao}
+      className={`lob-tcg ${s.carta}`}
+      data-inclina={ROT}
+      style={
+        {
+          position: "relative",
+          display: "flex",
+          flexDirection: "column",
+          border: `2px solid ${card.border}`,
+          borderRadius: 11,
+          overflow: "hidden",
+          background: "linear-gradient(180deg,#221a10,#0e0a05)",
+          boxShadow: "0 18px 40px -20px rgba(0,0,0,.85)",
+          "--tcg-cor": card.color,
+          "--tcg-borda": card.border,
+        } as CSSProperties
+      }
     >
       <div style={{ position: "relative", padding: "13px 15px 12px", textAlign: "center", background: "linear-gradient(180deg,rgba(0,0,0,.55),transparent)" }}>
         <div style={{ display: "inline-block", margin: "0 auto 8px", padding: "3px 10px", borderRadius: 2, fontSize: 8.5, fontWeight: 700, letterSpacing: ".14em", background: chipBg, color: chipColor, border: `1px solid ${card.border}` }}>{chip}</div>
@@ -102,11 +65,7 @@ export function TcgCard({ card, t = TEXTOS_PT }: Readonly<{ card: CardDef; t?: T
       </div>
       <div style={{ position: "relative", margin: "0 12px", aspectRatio: "1 / 1", borderRadius: 4, overflow: "hidden", background: `linear-gradient(160deg,${card.from}33,#0b0804 70%)`, border: "1px solid rgba(201,138,75,.20)", display: "flex", alignItems: "center", justifyContent: "center" }}>
         {card.imageUrl ? (
-          <span
-            ref={artRef}
-            style={{ position: "absolute", inset: 0, display: "block", transition: EASE_RETURN, willChange: "transform" }}
-            aria-hidden
-          >
+          <span className={s.arte} style={{ position: "absolute", inset: 0, display: "block" }} aria-hidden>
             {/* a arte é maior que a moldura para o parallax nunca revelar as bordas */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -117,7 +76,7 @@ export function TcgCard({ card, t = TEXTOS_PT }: Readonly<{ card: CardDef; t?: T
             />
           </span>
         ) : (
-          <span ref={artRef} style={{ display: "inline-block", fontSize: 64, filter: "drop-shadow(0 4px 10px rgba(0,0,0,.5))", transition: EASE_RETURN, willChange: "transform" }} aria-hidden>{card.emoji}</span>
+          <span className={s.arte} style={{ display: "inline-block", fontSize: 64, filter: "drop-shadow(0 4px 10px rgba(0,0,0,.5))" }} aria-hidden>{card.emoji}</span>
         )}
         <div style={{ position: "absolute", inset: 0, pointerEvents: "none", boxShadow: "inset 0 -30px 40px -20px rgba(11,8,4,.9)" }} />
       </div>
@@ -128,7 +87,8 @@ export function TcgCard({ card, t = TEXTOS_PT }: Readonly<{ card: CardDef; t?: T
           <span style={{ fontSize: 8.5, letterSpacing: ".12em", color: "#8f8472" }}>{foot}</span>
         </div>
       </div>
-      <div ref={glareRef} aria-hidden style={{ position: "absolute", inset: 0, pointerEvents: "none", opacity: 0, transition: "opacity .35s ease", mixBlendMode: "overlay" }} />
+      <div className={s.enfFoil} aria-hidden />
+      <div className={s.enfBrilho} aria-hidden />
     </div>
   );
 }
