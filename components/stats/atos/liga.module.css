@@ -1,0 +1,204 @@
+/*
+ * ATO II — A LIGA. Uma pilha de lingotes por elo; cada lingote é um jogador.
+ * Regras da casa em ../forja.module.css.
+ */
+
+.ato {
+  --trilho: 2.6;
+}
+
+.cena {
+  display: grid;
+  align-items: end;
+}
+
+.bancada {
+  /* a altura de um lingote: cabe a maior pilha no palco, do notebook à TV */
+  --lingote-h: clamp(21px, calc((100vh - var(--cab) - 57vh) / var(--max, 9) - var(--vao)), 50px);
+  --vao: 5px;
+  display: grid;
+  grid-template-columns: repeat(var(--colunas, 8), minmax(0, 1fr));
+  align-items: end;
+  gap: clamp(8px, 1.1vw, 22px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.coluna {
+  display: grid;
+  justify-items: stretch;
+  align-content: end;
+  min-width: 0;
+}
+
+/* ------------------------------------------------------------------ a conta e o emblema */
+
+.topo {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding-bottom: 6px;
+  /* sobe junto com a pilha: o tempo acompanha o número de lingotes */
+  transition: transform calc(0.45s + var(--n, 1) * 0.06s) cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.conta {
+  font-size: var(--num-m);
+  color: var(--ouro);
+  transition: color 0.4s ease;
+}
+.emblema {
+  width: clamp(48px, 5.6vw, 104px);
+  height: auto;
+  aspect-ratio: 1;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.7));
+}
+
+/* ------------------------------------------------------------------ a pilha de lingotes */
+
+.pilha {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: var(--vao);
+  margin: 0;
+  padding: 0 0 var(--vao);
+  list-style: none;
+  /* a bancada: cada pilha assenta na sua prateleira de bronze */
+  border-bottom: 4px solid var(--bronze-escuro);
+}
+
+.lingote {
+  position: relative;
+  height: var(--lingote-h);
+  transition: transform 0.5s cubic-bezier(0.34, 1.3, 0.5, 1);
+  transition-delay: calc(var(--k, 0) * 0.06s);
+}
+
+.lingoteLink {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  padding: 0 10px 0 0;
+  /* o lingote: trapézio de metal, mais claro em cima (a luz vem do alto) */
+  clip-path: polygon(3% 0, 97% 0, 100% 100%, 0 100%);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--elo) 62%, #fff) 0%,
+    var(--elo) 26%,
+    color-mix(in srgb, var(--elo) 74%, #000) 100%
+  );
+  color: var(--tinta-do-lingote, #14100a);
+  text-decoration: none;
+}
+.lingoteLink:hover,
+.lingoteLink:focus-visible {
+  background: linear-gradient(
+    180deg,
+    #fff 0%,
+    color-mix(in srgb, var(--elo) 70%, #fff) 30%,
+    var(--elo) 100%
+  );
+  color: #14100a;
+}
+.lingoteLink:focus-visible {
+  outline: 3px solid var(--branco-quente);
+  outline-offset: -3px;
+}
+/* a etiqueta sai do recorte do lingote: fica no <li>, que não é recortado */
+.lingote:has(.lingoteLink:hover),
+.lingote:has(.lingoteLink:focus-visible) {
+  z-index: 6;
+}
+.lingoteLink[data-dica]:hover,
+.lingoteLink[data-dica]:focus-visible {
+  clip-path: none;
+}
+
+/* a faixa da cor do time, na ponta do lingote */
+.enfTime {
+  align-self: stretch;
+  width: clamp(8px, 0.7vw, 12px);
+  flex-shrink: 0;
+  margin-left: 3%;
+  background: var(--cor, var(--bronze));
+  box-shadow: 0 0 0 2px rgba(11, 8, 5, 0.55);
+}
+
+.lingoteNick {
+  min-width: 0;
+  overflow: hidden;
+  font-size: clamp(13px, calc(var(--lingote-h) * 0.42), 18px);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nomeDoElo {
+  display: block;
+  padding: 12px 0 0;
+  font-size: var(--rotulo);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  text-align: center;
+  text-transform: uppercase;
+  /* clareado: o Ferro puro some no fundo escuro */
+  color: color-mix(in srgb, var(--elo) 68%, #fff);
+}
+
+/* ------------------------------------------------------------------ frio: antes da marca */
+
+/* os lingotes ainda não chegaram; o emblema espera na bancada, com a conta em zero */
+.coluna[data-aceso="0"] .lingote {
+  /* em fluxo (celular): achatado na bancada — nada voa por cima do ato de cima */
+  transform: scaleY(0);
+  transform-origin: 50% 100%;
+  transition-delay: 0s;
+  transition-duration: 0.25s;
+}
+/* com o ato fixo: no alto, fora do palco (que recorta), para CAIR um a um */
+:global([data-pinos="1"]) .coluna[data-aceso="0"] .lingote {
+  transform: translateY(-220vh);
+}
+.coluna[data-aceso="0"] .topo {
+  transform: translateY(calc(var(--n, 1) * (var(--lingote-h) + var(--vao))));
+  transition-duration: 0.3s;
+}
+.coluna[data-aceso="0"] .conta {
+  color: var(--ferro);
+}
+
+/* ------------------------------------------------------------------ telas menores */
+
+@media (max-width: 1023px) {
+  .bancada {
+    --lingote-h: 30px;
+    gap: 6px;
+  }
+  .lingoteNick {
+    display: none;
+  }
+  .enfTime {
+    width: 7px;
+  }
+  .lingoteLink {
+    padding: 0;
+  }
+  .nomeDoElo {
+    font-size: 11px;
+    letter-spacing: 0.04em;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lingote,
+  .topo {
+    transition: none;
+  }
+}

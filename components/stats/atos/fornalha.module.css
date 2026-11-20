@@ -1,0 +1,317 @@
+/*
+ * ATO I — A FORNALHA. Regras da casa em ../forja.module.css (repouso = revelado; conteúdo só
+ * anima transform e cor; enfeite = `.enf*`).
+ */
+
+.ato {
+  --trilho: 3.3;
+}
+
+.palco {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+/* ------------------------------------------------------------------ o título */
+
+.topo {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  justify-items: start;
+  transform-origin: 0 0;
+  /* o título acompanha o mouse de leve (parallax de 1ª camada) */
+  transform: translate(calc(var(--mx, 0) * -8px), calc(var(--my, 0) * -5px));
+}
+.sobre {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin: 0;
+  font-size: var(--rotulo);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ouro);
+}
+.sobreAto {
+  padding: 5px 10px 4px;
+  border: 2px solid var(--bronze);
+  border-radius: 2px;
+  color: var(--bronze);
+  letter-spacing: 0.28em;
+}
+
+.titulo {
+  /* vence o clamp padrão da .lob-h1: este é o maior título do site */
+  font-size: clamp(60px, 13.4vw, 258px);
+  line-height: 0.9;
+  margin-top: 6px;
+}
+
+.lema {
+  margin: 0;
+  max-width: 34ch;
+  font-size: clamp(17px, 1.5vw, 28px);
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--apoio);
+}
+.lema strong {
+  display: block;
+  font-weight: 700;
+  color: var(--tinta);
+}
+
+/* Com o ato fixo, o título encolhe um pouco quando as placas sobem (dá lugar ao medalhão). */
+:global([data-pinos="1"]) .topo {
+  --t0: clamp(0, calc((var(--p, 1) - 0.06) / 0.16), 1);
+  --t: calc(var(--t0) * var(--t0) * (3 - 2 * var(--t0)));
+  transform: translate(calc(var(--mx, 0) * -8px), calc(var(--my, 0) * -5px)) scale(calc(1 - var(--t) * 0.3));
+}
+
+/* ------------------------------------------------------------------ o medalhão em 2D (reserva) */
+
+.enfMedalhao2d {
+  position: absolute;
+  right: clamp(8px, 7vw, 150px);
+  top: 16%;
+  z-index: 0;
+  width: clamp(180px, 27vw, 480px);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  transform: translate(calc(var(--mx, 0) * 14px), calc(var(--my, 0) * 10px));
+}
+.enfMedalhao2d img {
+  position: relative;
+  width: 82%;
+  height: 82%;
+  object-fit: contain;
+}
+.enfBrasa2d {
+  position: absolute;
+  inset: -12%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 106, 43, 0.42) 0%, rgba(255, 106, 43, 0.14) 38%, transparent 68%);
+}
+/* A cena 3D no ar: o medalhão de verdade está no canvas. */
+:global([data-3d="1"]) .enfMedalhao2d {
+  display: none;
+}
+
+/* ------------------------------------------------------------------ as placas do resumo */
+
+.base {
+  position: relative;
+  z-index: 2;
+  align-self: end;
+  display: grid;
+  gap: clamp(10px, 1.8vh, 22px);
+}
+
+.placas {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.placa {
+  position: relative;
+  display: grid;
+  justify-items: start;
+  align-content: end;
+  gap: 4px;
+  padding: 0 clamp(12px, 1.6vw, 28px);
+  border-left: var(--traco) solid var(--bronze-escuro);
+  transform-origin: 20% 100%;
+}
+.placa:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.placaNumero {
+  font-size: var(--num-g);
+  color: var(--ouro);
+  transition: color 0.45s ease;
+}
+.placaRotulo {
+  font-size: var(--rotulo);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: 0.14em;
+  color: var(--tinta);
+  transition: color 0.45s ease;
+}
+.placaNota {
+  font-size: clamp(15px, 0.95vw, 18px);
+  line-height: 1.25;
+  color: var(--ferro-claro);
+  transition: color 0.45s ease;
+}
+
+/* O filete em brasa embaixo do número: acende na martelada e esfria no bronze. */
+.enfFilete {
+  width: min(100%, 4.4em);
+  height: 6px;
+  margin: 2px 0 6px;
+  border-radius: 1px;
+  background: var(--bronze);
+  transform-origin: 0 50%;
+  transition:
+    transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1),
+    background-color 0.5s ease;
+}
+
+/* frio: ferro, número no zero, filete recolhido */
+.placa[data-aceso="0"] .placaNumero {
+  color: var(--ferro);
+}
+.placa[data-aceso="0"] .placaRotulo {
+  color: var(--ferro);
+}
+.placa[data-aceso="0"] .placaNota {
+  color: var(--ferro-escuro);
+}
+.placa[data-aceso="0"] .enfFilete {
+  background: var(--ferro-escuro);
+  transform: scaleX(0.18);
+}
+
+/* a martelada */
+.placa[data-bateu] {
+  animation: placaBate 0.52s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.placa[data-bateu] .enfFilete {
+  animation: fileteEsfria 1.6s ease-out;
+}
+@keyframes placaBate {
+  0% {
+    transform: translateY(-18px) scale(1.16);
+  }
+  55% {
+    transform: translateY(3px) scale(0.98);
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes fileteEsfria {
+  0% {
+    background-color: #fff3dc;
+    box-shadow: 0 0 26px 6px rgba(255, 192, 97, 0.85);
+  }
+  30% {
+    background-color: #ff6a2b;
+    box-shadow: 0 0 22px 4px rgba(255, 106, 43, 0.6);
+  }
+  100% {
+    background-color: #c98a4b;
+    box-shadow: 0 0 0 0 rgba(255, 106, 43, 0);
+  }
+}
+
+/* ------------------------------------------------------------------ faixa e nota de conformidade */
+
+.faixa {
+  margin: 0;
+  font-size: var(--texto);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ouro);
+  transition: color 0.5s ease;
+}
+.faixa[data-aceso="0"] {
+  color: var(--ferro);
+}
+
+.aviso {
+  margin: 0;
+  max-width: 980px;
+  padding-left: 16px;
+  border-left: var(--traco) solid var(--teal);
+  font-size: clamp(15px, 0.98vw, 17px);
+  line-height: 1.55;
+  color: var(--apoio);
+  transition:
+    color 0.6s ease,
+    border-color 0.6s ease;
+}
+.aviso[data-aceso="0"] {
+  color: var(--ferro);
+  border-left-color: var(--ferro-escuro);
+}
+
+/* ------------------------------------------------------------------ «role para forjar» */
+
+.rolar {
+  display: none;
+}
+:global([data-pinos="1"]) .rolar {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(14px, 3vh, 34px);
+  z-index: 3;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--rotulo);
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  color: var(--ouro);
+  /* some por baixo do palco assim que a pessoa começa a rolar */
+  --r0: clamp(0, calc(var(--p, 1) / 0.05), 1);
+  transform: translate(-50%, calc(var(--r0) * 220px));
+}
+.enfSeta {
+  width: 16px;
+  height: 16px;
+  border-right: 3px solid var(--brasa);
+  border-bottom: 3px solid var(--brasa);
+  transform: rotate(45deg);
+  animation: setaDesce 1.5s ease-in-out infinite;
+}
+@keyframes setaDesce {
+  0%,
+  100% {
+    transform: translateY(-4px) rotate(45deg);
+  }
+  50% {
+    transform: translateY(5px) rotate(45deg);
+  }
+}
+
+/* ------------------------------------------------------------------ telas menores */
+
+@media (max-width: 1023px) {
+  .enfMedalhao2d {
+    position: relative;
+    right: auto;
+    top: auto;
+    justify-self: center;
+    width: min(62vw, 300px);
+    margin: 4px 0 8px;
+  }
+  .placas {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(18px, 4vw, 30px) 0;
+  }
+  .placa:nth-child(odd) {
+    padding-left: 0;
+    border-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enfSeta {
+    animation: none;
+  }
+}

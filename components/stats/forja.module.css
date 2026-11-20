@@ -1,0 +1,471 @@
+/*
+ * A FORJA (/stats) — base da página: as cores e medidas, o palco de cada ato, o cartão do ato e
+ * as peças que todo ato usa (odômetro, medalhão, rosto, nome do time).
+ *
+ * REGRAS (tests/stats/css-da-forja.test.ts):
+ *  - REPOUSO = REVELADO. Sem JavaScript, com movimento reduzido ou se o diretor parar, não existe
+ *    `--p` nem `data-aceso`, e tudo aparece no estado final. Os estados «frios» moram só em
+ *    `[data-aceso="0"]` e em `[data-pinos="1"]`, que o diretor (components/stats/diretor.ts) liga
+ *    enquanto está rodando.
+ *  - CONTEÚDO nunca anima opacidade nem filtro: só transform, cor e recorte. Opacidade/filtro
+ *    animados só em ENFEITE (`.enf*`, aria-hidden, sem texto).
+ *  - Nada de `translate:`/`rotate:`/`scale:` soltos: só `transform` (o minificador do build apaga
+ *    o `translate` que divide a regra com um `transform`).
+ *  - TRANSMISSÃO: traço de 2px para cima, texto de 15px para cima, nada de textura fina.
+ */
+
+.raiz {
+  /* a altura do cabeçalho fixo do site (o diretor mede e corrige) */
+  --cab: 70px;
+  --palco: calc(100vh - var(--cab));
+
+  /* metais e temperaturas */
+  --ouro: #f0c88a;
+  --ouro-claro: #f6d6a2;
+  --ouro-fundo: #a5692f;
+  --bronze: #c98a4b;
+  --bronze-escuro: #7c4e22;
+  --brasa: #ff6a2b;
+  --brasa-funda: #c8321a;
+  --quente: #ffc061;
+  --branco-quente: #fff3dc;
+  --ferro: #5d5446;
+  --ferro-claro: #8f8472;
+  --ferro-escuro: #2b241b;
+  --chapa: #17110a;
+  --breu: #0b0805;
+  --tinta: #f3ece0;
+  --apoio: #b8ab97;
+  --teal: #57d8cb;
+
+  /* medidas de transmissão */
+  --num-g: clamp(56px, 8.4vw, 160px);
+  --num-m: clamp(38px, 4.8vw, 92px);
+  --num-p: clamp(26px, 2.5vw, 46px);
+  --rotulo: clamp(15px, 1.02vw, 19px);
+  --texto: clamp(16px, 1.12vw, 21px);
+  --traco: 3px;
+  --margem: clamp(16px, 4vw, 72px);
+
+  position: relative;
+  isolation: isolate;
+  color: var(--apoio);
+}
+
+.conteudo {
+  position: relative;
+  z-index: 1;
+}
+
+/* O fundo da página: cobre as listras e o ruído do site (que viram bloco na compressão do
+   vídeo). É o fundo de reserva — a cena 3D, quando carrega, pinta por cima dele. */
+.enfFundo {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(90% 60% at 50% 112%, rgba(255, 106, 43, 0.26), transparent 62%),
+    radial-gradient(60% 50% at 88% -6%, rgba(87, 216, 203, 0.06), transparent 62%),
+    radial-gradient(70% 55% at 6% 0%, rgba(201, 138, 75, 0.14), transparent 64%),
+    linear-gradient(180deg, #120c07 0%, #0b0805 58%, #090604 100%);
+}
+
+/* As faíscas de tela (canvas 2D por cima do conteúdo, abaixo do cabeçalho). */
+.enfFaiscas {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  pointer-events: none;
+}
+
+.enfFiltros {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+/* Só para leitor de tela (o conteúdo fica na página, fora da vista — nunca por opacidade). */
+.soLeitor {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ------------------------------------------------------------------ o ato e o palco */
+
+.ato {
+  position: relative;
+  /* o respiro da âncora: o cabeçalho do site é fixo */
+  scroll-margin-top: var(--cab);
+}
+
+.palco {
+  position: relative;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: clamp(10px, 2vh, 26px);
+  width: 100%;
+  max-width: 1760px;
+  min-height: var(--palco);
+  margin: 0 auto;
+  padding: clamp(18px, 3.4vh, 46px) var(--margem) clamp(16px, 3vh, 40px);
+}
+
+/* No computador o ato vira um trilho alto e o palco fixa: a rolagem passa a contar a cena. */
+.raiz[data-pinos="1"] .ato[data-fixa] {
+  height: calc(var(--trilho, 2.6) * 100vh);
+}
+.raiz[data-pinos="1"] .ato[data-fixa] > .palco {
+  position: sticky;
+  top: var(--cab);
+  height: var(--palco);
+  min-height: 0;
+  overflow: clip;
+}
+
+/* A cena do ato: com o ato fixo, ela sobe depois que o cartão recolhe. */
+.cena {
+  position: relative;
+  min-height: 0;
+}
+.raiz[data-pinos="1"] .ato[data-fixa] .cena {
+  --c0: clamp(0, calc((var(--p, 1) - 0.05) / 0.12), 1);
+  --c: calc(var(--c0) * var(--c0) * (3 - 2 * var(--c0)));
+  transform: translateY(calc((1 - var(--c)) * 78vh));
+}
+
+/* ------------------------------------------------------------------ o cartão do ato */
+
+.cartao {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  justify-items: start;
+  gap: 2px;
+  transform-origin: 0 0;
+}
+.cartaoNumero {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  font-size: var(--rotulo);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.32em;
+  color: var(--bronze);
+}
+.cartaoNumero::before {
+  content: "";
+  width: 34px;
+  height: 3px;
+  background: var(--bronze);
+  flex-shrink: 0;
+}
+.cartaoNome {
+  margin: 8px 0 4px;
+  font-family: var(--font-display), "Anton", sans-serif;
+  font-size: clamp(34px, 4.3vw, 82px);
+  font-weight: 400;
+  line-height: 0.98;
+  letter-spacing: 0.012em;
+  color: var(--tinta);
+}
+.cartaoSub {
+  margin: 0;
+  font-size: var(--texto);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ferro-claro);
+}
+/* A abertura do ato: o cartão nasce grande, no meio do palco, e recolhe para o canto. */
+.raiz[data-pinos="1"] .ato[data-fixa] .cartao {
+  --k0: clamp(0, calc(1 - var(--p, 1) / 0.13), 1);
+  --k: calc(var(--k0) * var(--k0) * (3 - 2 * var(--k0)));
+  transform: translate(calc(var(--k) * var(--cartao-dx, 21vw)), calc(var(--k) * var(--cartao-dy, 27vh))) scale(calc(1 + var(--k) * 1.3));
+}
+
+/* A legenda do ato (o microtexto de humor, embaixo do palco). */
+.nota {
+  position: relative;
+  z-index: 2;
+  margin: 0;
+  max-width: 900px;
+  font-size: var(--texto);
+  line-height: 1.45;
+  color: var(--ferro-claro);
+}
+.nota strong {
+  color: var(--ouro);
+  font-weight: 700;
+}
+
+/* ------------------------------------------------------------------ o golpe */
+
+/* A peça que BATE no lugar quando a marca acende (só quando a pessoa viu acontecer:
+   `data-bateu`). Só transform, sem fill-mode: se não rodar, a peça já está no lugar. */
+@keyframes golpe {
+  0% {
+    transform: translateY(-14px) scale(1.14);
+  }
+  55% {
+    transform: translateY(2px) scale(0.985);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/* ------------------------------------------------------------------ odômetro */
+
+.odo {
+  display: inline-flex;
+  align-items: baseline;
+  font-family: var(--font-display), "Anton", sans-serif;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+}
+.odoCol {
+  position: relative;
+  display: inline-block;
+  width: var(--odo-l, 0.5em);
+  height: 1em;
+  overflow: clip;
+  text-align: center;
+}
+/* O número de verdade: ocupa o lugar e é o que se lê e copia. A fita pinta por cima. */
+.odoReal {
+  color: transparent;
+}
+.odoSep {
+  display: inline-block;
+}
+.enfFita {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  transform: translateY(calc(var(--d, 0) * -10%));
+  transition: transform var(--odo-t, 0.9s) cubic-bezier(0.16, 0.84, 0.3, 1);
+}
+.enfFita::before {
+  content: "0\A 1\A 2\A 3\A 4\A 5\A 6\A 7\A 8\A 9";
+  display: block;
+  white-space: pre;
+  line-height: 1;
+}
+[data-aceso="0"] .enfFita {
+  transform: translateY(0);
+}
+@media (forced-colors: active) {
+  .odoReal {
+    color: CanvasText;
+  }
+  .enfFita {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------------------------ medalhão do time */
+
+.medalhao {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: var(--tam, 96px);
+  aspect-ratio: 1;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+.enfAura {
+  position: absolute;
+  inset: -22%;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, color-mix(in srgb, var(--neon, #c98a4b) 46%, transparent) 0%, transparent 68%);
+}
+.enfMoeda {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(from 215deg, #6a4420, #f3d08a 12%, #c88a45 24%, #4f3013 38%, #e8b878 54%, #8a5a2a 68%, #f6dfae 82%, #6a4420);
+  box-shadow:
+    0 6px 16px rgba(0, 0, 0, 0.62),
+    inset 0 0 0 2px rgba(20, 12, 5, 0.55);
+}
+.enfMoeda::after {
+  content: "";
+  position: absolute;
+  inset: 8.5%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 26%, #36261a 0%, #1c130b 62%, #120b06 100%);
+  box-shadow:
+    inset 0 4px 9px rgba(0, 0, 0, 0.85),
+    inset 0 -2px 3px rgba(240, 200, 138, 0.22);
+}
+.medalhaoEscudo {
+  position: relative;
+  width: 74%;
+  height: 74%;
+  object-fit: contain;
+}
+.medalhaoCunhado {
+  filter: url(#lob-cunho);
+}
+.medalhaoSigla {
+  position: relative;
+  font-family: var(--font-display), "Anton", sans-serif;
+  font-size: calc(var(--tam, 96px) * 0.3);
+  color: var(--ouro);
+}
+.enfReflexo {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(255, 243, 220, 0.3) 0%, transparent 34%, transparent 70%, rgba(0, 0, 0, 0.3) 100%);
+  mix-blend-mode: soft-light;
+}
+
+/* ------------------------------------------------------------------ rosto do jogador */
+
+.rosto {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: var(--tam, 56px);
+  height: var(--tam, 56px);
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--abismo, #1a1108);
+  box-shadow:
+    0 0 0 var(--aro, 3px) var(--cor, var(--bronze)),
+    0 5px 12px rgba(0, 0, 0, 0.6);
+  text-decoration: none;
+  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.rosto img {
+  /* fora do fluxo: a foto (retrato, deitada, quadrada) nunca estica o aro */
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.rosto[data-medalhao] img {
+  object-fit: contain;
+}
+.rosto:hover,
+.rosto:focus-visible {
+  z-index: 5;
+  transform: scale(1.14);
+}
+.rosto:focus-visible {
+  outline: 3px solid var(--branco-quente);
+  outline-offset: 4px;
+}
+/* A etiqueta com o nick (e o time), ao passar o mouse ou focar. Vale para o rosto e para
+   qualquer peça que leve `.dica` + `data-dica` (o lingote de um jogador, o jogo na régua). */
+.rosto[data-dica]:hover::after,
+.rosto[data-dica]:focus-visible::after,
+.dica[data-dica]:hover::after,
+.dica[data-dica]:focus-visible::after {
+  content: attr(data-dica);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  z-index: 9;
+  transform: translateX(-50%);
+  padding: 7px 12px;
+  border-radius: 3px;
+  background: #0b0805;
+  border: 2px solid var(--cor, var(--bronze));
+  color: var(--tinta);
+  font-family: var(--font-body), "Chakra Petch", sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------------ nome do time */
+
+.nomeDoTime {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 0.28em;
+  font-family: var(--tm-fonte-titulo, var(--font-display)), var(--font-display), "Anton", sans-serif;
+  font-weight: var(--peso-nome, 400);
+  font-style: var(--estilo-nome, normal);
+  line-height: 1;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  color: var(--metal-solido, var(--ouro));
+}
+.nomeMarca {
+  background: var(--metal, linear-gradient(180deg, #f6d6a2, #dc9f57 46%, #a5692f));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  /* folga para o gradiente pintar acentos e pernas (mesmo cuidado do .lob-h1) */
+  padding: 0.14em 0.06em 0.16em 0;
+  margin: -0.14em 0 -0.16em;
+}
+.nomeAssinatura {
+  font-family: var(--font-body), "Chakra Petch", sans-serif;
+  font-size: 0.42em;
+  font-weight: 700;
+  font-style: normal;
+  letter-spacing: 0.2em;
+  color: var(--cor, var(--bronze));
+}
+
+/* ------------------------------------------------------------------ faixas de cinema (viagem) */
+
+/* Enquanto a página viaja de um ato a outro (← →), duas faixas fecham o quadro. */
+.enfFaixa {
+  position: fixed;
+  left: 0;
+  right: 0;
+  z-index: 26;
+  height: 5.5vh;
+  pointer-events: none;
+  background: #050302;
+  transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.enfFaixaDeCima {
+  top: var(--cab);
+  transform: translateY(-101%);
+}
+.enfFaixaDeBaixo {
+  bottom: 0;
+  transform: translateY(101%);
+}
+.raiz[data-viajando="1"] .enfFaixaDeCima,
+.raiz[data-viajando="1"] .enfFaixaDeBaixo {
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rosto,
+  .enfFita,
+  .enfFaixa {
+    transition: none;
+  }
+}
