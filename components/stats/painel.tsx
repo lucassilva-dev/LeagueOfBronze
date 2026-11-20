@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { CSSProperties } from "react";
 
-import { ATOS_DA_FORJA } from "./constantes";
+import { ATOS_DA_FORJA, type AtoDaForja } from "./constantes";
 import s from "./camadas.module.css";
 import { useForja, useRetratoDoDiretor } from "./provedor";
 
@@ -18,6 +18,8 @@ import { useForja, useRetratoDoDiretor } from "./provedor";
  * números. Os atalhos (← → e M) são do provedor; aqui estão os mesmos comandos como botões, para
  * quem não conhece atalho nenhum.
  */
+
+const ehAto = (id: string): id is AtoDaForja => (ATOS_DA_FORJA as readonly string[]).includes(id);
 
 function IconeDeSom({ ligado }: Readonly<{ ligado: boolean }>) {
   return (
@@ -52,8 +54,13 @@ export function PainelDeBordo() {
   const { t, diretor, som, versus, ocupado } = useForja();
   const { f } = t;
   const retrato = useRetratoDoDiretor();
-  const total = Math.max(1, retrato.total || ATOS_DA_FORJA.length);
-  const atoDaVez = ATOS_DA_FORJA[Math.min(ATOS_DA_FORJA.length - 1, Math.max(0, retrato.atoAtual))]!;
+  // Os atos que existem na página (um ato sem dado não é renderizado): o diretor conta por eles,
+  // e o trilho tem de contar igual. Antes de o diretor montar — e no HTML do servidor — vale a
+  // lista dos nove.
+  const presentes = retrato.ids.filter(ehAto);
+  const atos: readonly AtoDaForja[] = presentes.length > 0 ? presentes : ATOS_DA_FORJA;
+  const total = atos.length;
+  const atoDaVez = atos[Math.min(total - 1, Math.max(0, retrato.atoAtual))]!;
   const viajar = (delta: 1 | -1) => {
     if (diretor.viajar(delta)) som.tocar((x) => x.sopro(delta === 1));
   };
@@ -66,7 +73,7 @@ export function PainelDeBordo() {
           <Seta para="cima" />
         </button>
         <ol style={{ "--feito": (retrato.atoAtual / Math.max(1, total - 1)).toFixed(3) } as CSSProperties}>
-          {ATOS_DA_FORJA.map((id, i) => (
+          {atos.map((id, i) => (
             <li key={id}>
               <a
                 href={`#ato-${id}`}

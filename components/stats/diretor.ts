@@ -57,6 +57,12 @@ export type EstadoDoDiretor = {
 export type RetratoDoDiretor = Readonly<{
   atoAtual: number;
   total: number;
+  /**
+   * Os ids dos atos que EXISTEM na página, na ordem. Um ato sem dado não é renderizado (sem jogo
+   * com duração não há Têmpera; sem ninguém em jogo não há Canais): o painel e a cena contam por
+   * esta lista, nunca pela lista fixa dos nove.
+   */
+  ids: readonly string[];
   armado: boolean;
   pinos: boolean;
   viajando: boolean;
@@ -126,7 +132,9 @@ export class Diretor {
   private ouvintes = new Set<(ev: EventoDoDiretor) => void>();
   private quadros = new Set<(dt: number, estado: EstadoDoDiretor) => void>();
   private assinantes = new Set<() => void>();
-  private retratoAtual: RetratoDoDiretor = { atoAtual: 0, total: 0, armado: false, pinos: false, viajando: false };
+  private retratoAtual: RetratoDoDiretor = { atoAtual: 0, total: 0, ids: [], armado: false, pinos: false, viajando: false };
+  /** A lista dos ids (a mesma referência enquanto os atos não mudam: o retrato compara por ela). */
+  private idsAtuais: readonly string[] = [];
   private observador: ResizeObserver | null = null;
   /** O vigia desarmou (o laço ficou tempo demais sem rodar): se o laço voltar, a página rearma. */
   private suspenso = false;
@@ -151,9 +159,9 @@ export class Diretor {
 
   retrato = (): RetratoDoDiretor => this.retratoAtual;
 
-  /** Os ids dos atos, na ordem da página (para o painel de bordo). */
-  idsDosAtos(): string[] {
-    return this.atos.map((ato) => ato.id);
+  /** Os ids dos atos que existem na página, na ordem. */
+  idsDosAtos(): readonly string[] {
+    return this.idsAtuais;
   }
 
   // ------------------------------------------------------------------ ciclo de vida
@@ -318,6 +326,8 @@ export class Diretor {
       camadas: [...el.querySelectorAll<HTMLElement>("[data-paralaxe]")],
     }));
     this.estado.progresso = this.atos.map(() => 0);
+    const ids = this.atos.map((ato) => ato.id);
+    if (ids.length !== this.idsAtuais.length || ids.some((id, i) => id !== this.idsAtuais[i])) this.idsAtuais = ids;
   }
 
   /** Quem entrou na página depois de montada (lista que expandiu) é recolhido aqui. */
@@ -534,8 +544,17 @@ export class Diretor {
   private publicar(): void {
     const e = this.estado;
     const r = this.retratoAtual;
-    if (r.atoAtual === e.atoAtual && r.total === this.atos.length && r.armado === e.armado && r.pinos === e.pinos && r.viajando === e.viajando) return;
-    this.retratoAtual = { atoAtual: e.atoAtual, total: this.atos.length, armado: e.armado, pinos: e.pinos, viajando: e.viajando };
+    if (
+      r.atoAtual === e.atoAtual &&
+      r.total === this.atos.length &&
+      r.ids === this.idsAtuais &&
+      r.armado === e.armado &&
+      r.pinos === e.pinos &&
+      r.viajando === e.viajando
+    ) {
+      return;
+    }
+    this.retratoAtual = { atoAtual: e.atoAtual, total: this.atos.length, ids: this.idsAtuais, armado: e.armado, pinos: e.pinos, viajando: e.viajando };
     for (const f of this.assinantes) f();
   }
 

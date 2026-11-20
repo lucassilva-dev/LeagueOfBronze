@@ -86,7 +86,8 @@ export function FundoDaForja() {
         cena = new modulo.CenaDaForja(
           tela,
           {
-            atos: ATOS_DA_FORJA,
+            // os atos que existem na página, na ordem em que o diretor os numera
+            atos: diretor.idsDosAtos().length > 0 ? diretor.idsDosAtos() : ATOS_DA_FORJA,
             elos: dados.elos.map((elo) => elo.cor),
             times: dados.times.map((time) => ({ id: time.id, escudo: time.escudo })),
             rotas: dados.rotas.map((rota) => rota.cor),
