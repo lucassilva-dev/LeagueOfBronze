@@ -197,6 +197,7 @@ export function Forja({
     [desbloquear],
   );
   const alternar = useCallback(() => ligar(!ligadoRef.current), [ligar]);
+  const obterFaiscas = useCallback(() => apiFaiscas.current, []);
 
   const definirVolume = useCallback((v: number) => {
     const novo = Math.max(0, Math.min(1, v));
@@ -403,13 +404,13 @@ export function Forja({
       fontes,
       diretor,
       som: { ligado, desbloqueado, volume, alternar, ligar, definirVolume, tocar },
-      faiscas: () => apiFaiscas.current,
+      faiscas: obterFaiscas,
       holofote: { aberto: holofoteAberto, lista: listaDoHolofote, abrir: abrirHolofote, fechar: fecharHolofote },
       versus: { pedido: pedidoDeVs, abrir: abrirVs, fechar: fecharVs },
       ocupado,
       definirPortaFechada: setPorta,
     }),
-    [abrirHolofote, abrirVs, alternar, dados, definirVolume, desbloqueado, diretor, fecharHolofote, fecharVs, fontes, holofoteAberto, ligado, ligar, listaDoHolofote, ocupado, pedidoDeVs, t, tocar, volume],
+    [abrirHolofote, abrirVs, alternar, dados, definirVolume, desbloqueado, diretor, fecharHolofote, fecharVs, fontes, holofoteAberto, ligado, ligar, listaDoHolofote, obterFaiscas, ocupado, pedidoDeVs, t, tocar, volume],
   );
 
   return (
@@ -422,7 +423,9 @@ export function Forja({
         </div>
         <span className={`${s.enfFaixa} ${s.enfFaixaDeCima}`} aria-hidden />
         <span className={`${s.enfFaixa} ${s.enfFaixaDeBaixo}`} aria-hidden />
-        {camadas}
+        {/* Embrulhado: solto entre os irmãos, um elemento que vem do servidor conta como item de
+            lista para o React, que pede chave. */}
+        <div className={s.camadas}>{camadas}</div>
       </div>
     </ContextoDaForja.Provider>
   );

@@ -128,6 +128,8 @@ export class Diretor {
   private assinantes = new Set<() => void>();
   private retratoAtual: RetratoDoDiretor = { atoAtual: 0, total: 0, armado: false, pinos: false, viajando: false };
   private observador: ResizeObserver | null = null;
+  /** O vigia desarmou (o laço ficou tempo demais sem rodar): se o laço voltar, a página rearma. */
+  private suspenso = false;
   private limpezas: (() => void)[] = [];
 
   // ------------------------------------------------------------------ assinaturas
@@ -219,7 +221,12 @@ export class Diretor {
     this.laco = requestAnimationFrame(this.quadro);
     this.vigia = setInterval(() => {
       if (!this.estado.armado || document.visibilityState !== "visible") return;
-      if (performance.now() - this.ultimoQuadro > 2500) this.desarmar();
+      // Quatro segundos sem um quadro, com a aba à vista: algo travou. A página volta ao estado
+      // final (tudo revelado) — e rearma sozinha se o laço retomar (`quadro`).
+      if (performance.now() - this.ultimoQuadro > 4000) {
+        this.desarmar();
+        this.suspenso = true;
+      }
     }, 1000);
     this.publicar();
   }
@@ -234,8 +241,27 @@ export class Diretor {
     for (const limpar of this.limpezas) limpar();
     this.limpezas = [];
     if (this.raiz) this.desarmar();
+    this.suspenso = false;
     this.raiz = null;
     this.atos = [];
+  }
+
+  /** O laço voltou depois de o vigia desarmar: liga de novo, acertando tudo em silêncio. */
+  private rearmar(): void {
+    this.suspenso = false;
+    if (!this.raiz || this.estado.reduzido) return;
+    this.estado.armado = true;
+    this.raiz.dataset.cine = "armado";
+    for (const ato of this.atos) {
+      ato.escrito = -1;
+      ato.visivel = null;
+      for (const cena of ato.cenas) cena.escrito = -1;
+    }
+    this.sincronizando = true;
+    this.definirModo();
+    this.medir();
+    this.ultimoQuadro = performance.now();
+    this.publicar();
   }
 
   /** Volta tudo ao estado final do HTML: sem `--p`, sem marcas apagadas, sem pinos. */
@@ -342,6 +368,7 @@ export class Diretor {
   private quadro = (agora: number): void => {
     this.laco = requestAnimationFrame(this.quadro);
     try {
+      if (this.suspenso) this.rearmar();
       this.passo(agora);
     } catch (erro) {
       // Um erro aqui não pode deixar a página presa num estado «frio».

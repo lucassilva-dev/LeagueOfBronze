@@ -71,6 +71,26 @@
     linear-gradient(180deg, #120c07 0%, #0b0805 58%, #090604 100%);
 }
 
+/* O invólucro das camadas do cliente (cena 3D, painel, holofote, VS, porta): não ocupa lugar. */
+.camadas {
+  display: contents;
+}
+
+/* A cena 3D (components/stats/cena): um canvas só, fixo, atrás do conteúdo. */
+.enfPalco3d {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.enfCena {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 /* As faíscas de tela (canvas 2D por cima do conteúdo, abaixo do cabeçalho). */
 .enfFaiscas {
   position: fixed;

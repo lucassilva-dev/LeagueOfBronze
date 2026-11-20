@@ -45,7 +45,7 @@
 
 .titulo {
   /* vence o clamp padrão da .lob-h1: este é o maior título do site */
-  font-size: clamp(60px, 13.4vw, 258px);
+  font-size: clamp(60px, 12.4vw, 240px);
   line-height: 0.9;
   margin-top: 6px;
 }

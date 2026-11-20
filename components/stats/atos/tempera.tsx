@@ -106,8 +106,10 @@ export function AtoDaTempera({ dados, t }: Readonly<{ dados: DadosDaForja; t: Te
   );
 
   return (
+    // As chaves não são enfeite: este fragmento chega ao provedor (um componente do cliente) como
+    // LISTA, e o React pede chave em cada item.
     <>
-      <section id="ato-tempera" className={`${b.ato} ${s.ato}`} data-ato="tempera" data-fixa="" aria-labelledby="titulo-da-tempera">
+      <section key="palco" id="ato-tempera" className={`${b.ato} ${s.ato}`} data-ato="tempera" data-fixa="" aria-labelledby="titulo-da-tempera">
         <div className={b.palco}>
           <CartaoDoAto numero={f.atos.tempera.numero} nome={f.atos.tempera.nome} sub={f.atos.tempera.sub} id="titulo-da-tempera" />
 
@@ -172,7 +174,7 @@ export function AtoDaTempera({ dados, t }: Readonly<{ dados: DadosDaForja; t: Te
       </section>
 
       {/* As listas de sempre, fora do palco fixo: é o respiro para ler. */}
-      <div className={s.listas}>
+      <div key="listas" className={s.listas}>
         {lista(st.duracaoMaisLongas, st.duracaoMaisLongasDesc, jogos.slice(0, LIMITE))}
         {lista(st.duracaoMaisCurtas, st.duracaoMaisCurtasDesc, [...jogos].reverse().slice(0, LIMITE))}
       </div>

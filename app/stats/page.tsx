@@ -12,6 +12,7 @@ import { AtoDaLiga } from "@/components/stats/atos/liga";
 import { AtoDosMoldes } from "@/components/stats/atos/moldes";
 import { AtoDasPecasRaras } from "@/components/stats/atos/raras";
 import { AtoDaTempera } from "@/components/stats/atos/tempera";
+import { FundoDaForja } from "@/components/stats/cena/fundo";
 import { COOKIE_DO_SOM, lerPedidoDeVs } from "@/components/stats/constantes";
 import { FiltrosDaForja, type TimeDe } from "@/components/stats/pecas";
 import { Forja, type TextosDaTela } from "@/components/stats/provedor";
@@ -62,17 +63,25 @@ export default async function EstatisticasPage({ searchParams }: Readonly<{ sear
   const vsInicial = lerPedidoDeVs(primeiro(parametros.vs));
 
   return (
-    <Forja dados={dados} t={t} fontes={fontes} somInicial={somInicial} vsInicial={vsInicial} portaFechada={false}>
-      <FiltrosDaForja />
-      <AtoDaFornalha dados={dados} t={t} edicao={edicao} aviso={mensagens.conformidade.eloAviso} />
-      <AtoDaLiga dados={dados} t={t} timeDe={timeDe} />
-      <AtoDosMoldes dados={dados} t={t} fontes={fontes} />
-      <AtoDasPecasRaras dados={dados} t={t} timeDe={timeDe} />
-      <AtoDosCanais dados={dados} t={t} timeDe={timeDe} />
-      <AtoDaBigorna />
-      <AtoDoArsenal />
-      <AtoDaTempera dados={dados} t={t} />
-      <AtoDoFecho dados={dados} t={t} lema={mensagens.comum.rodapeLema} />
+    <Forja
+      dados={dados}
+      t={t}
+      fontes={fontes}
+      somInicial={somInicial}
+      vsInicial={vsInicial}
+      portaFechada={false}
+      camadas={<FundoDaForja />}
+    >
+      <FiltrosDaForja key="filtros" />
+      <AtoDaFornalha key="fornalha" dados={dados} t={t} edicao={edicao} aviso={mensagens.conformidade.eloAviso} />
+      <AtoDaLiga key="liga" dados={dados} t={t} timeDe={timeDe} />
+      <AtoDosMoldes key="moldes" dados={dados} t={t} fontes={fontes} />
+      <AtoDasPecasRaras key="pecas" dados={dados} t={t} timeDe={timeDe} />
+      <AtoDosCanais key="canais" dados={dados} t={t} timeDe={timeDe} />
+      <AtoDaBigorna key="bigorna" />
+      <AtoDoArsenal key="arsenal" />
+      <AtoDaTempera key="tempera" dados={dados} t={t} />
+      <AtoDoFecho key="fecho" dados={dados} t={t} lema={mensagens.comum.rodapeLema} />
     </Forja>
   );
 }
