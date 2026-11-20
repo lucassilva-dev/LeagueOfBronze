@@ -358,7 +358,22 @@ export class CenaDaForja {
         await new Promise((ok) => setTimeout(ok, 120));
         if (this.morta) return;
         try {
-          this.relevos.set(time.id, await relevoDe(time.escudo, "esmalte"));
+          const relevo = await relevoDe(time.escudo, "esmalte");
+          if (this.morta) {
+            relevo.descartar();
+            return;
+          }
+          // As texturas sobem para a placa AGORA, uma por quadro — e não na primeira vez que o
+          // escudo aparece, no meio da rolagem dos Moldes (eram engasgos de 50–80 ms por time).
+          for (const textura of [relevo.cor, relevo.alfa, relevo.altura, relevo.normal]) {
+            this.renderer.initTexture(textura);
+            await new Promise((ok) => requestAnimationFrame(ok));
+            if (this.morta) {
+              relevo.descartar();
+              return;
+            }
+          }
+          this.relevos.set(time.id, relevo);
         } catch {
           /* escudo que não carregou: a peça fica com o emblema */
         }
@@ -373,14 +388,17 @@ export class CenaDaForja {
     if (!r) return;
     this.relevoAtual = chave;
     const m = this.frente.material;
+    // Só a PRIMEIRA vez muda o programa do material (de sem mapa para com mapa); dali em diante
+    // é troca de textura, que não pede recompilação.
+    const primeiraVez = m.map === null;
     m.map = r.cor;
     m.alphaMap = r.alfa;
     m.displacementMap = r.altura;
     m.normalMap = r.normal;
-    m.needsUpdate = true;
+    if (primeiraVez) m.needsUpdate = true;
     for (const costa of this.costas) {
       costa.material.alphaMap = r.alfa;
-      costa.material.needsUpdate = true;
+      if (primeiraVez) costa.material.needsUpdate = true;
     }
   }
 

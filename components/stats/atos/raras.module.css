@@ -72,6 +72,10 @@
   scroll-snap-type: none;
   transform: translateX(calc(var(--av) * -1 * var(--curso)));
 }
+/* a esteira corre com a rolagem: em camada própria enquanto o ato está na tela */
+:global([data-pinos="1"]) :global([data-visivel="1"]) .esteira {
+  will-change: transform;
+}
 :global([data-pinos="1"]) .carta {
   --carta-l: calc(var(--carta-h) / 1.42);
 }

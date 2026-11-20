@@ -184,6 +184,13 @@
   transform: translateY(calc((1 - var(--c)) * 78vh));
 }
 
+/* Só o ato que está na tela ganha camada própria para a cena: ela sobe sem ser repintada a cada
+   quadro (o relevo dos escudos e as fotos custam caro para pintar de novo — eram quadros de
+   30–90 ms na subida dos Moldes). Fora da tela a camada é devolvida. */
+.raiz[data-pinos="1"] .ato[data-fixa][data-visivel="1"] .cena {
+  will-change: transform;
+}
+
 /* ------------------------------------------------------------------ o cartão do ato */
 
 .cartao {
