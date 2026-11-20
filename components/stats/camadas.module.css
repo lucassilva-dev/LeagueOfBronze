@@ -364,6 +364,11 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  /* os botões nunca encolhem (40×44 de toque): quem cede é o nome do ato */
+  .item,
+  .atoMovel .passo {
+    flex-shrink: 0;
+  }
   .atoMovel .passo {
     width: 40px;
     height: 44px;
@@ -385,6 +390,18 @@
   }
   .volume input {
     width: 150px;
+  }
+}
+
+/* celular bem estreito (320px): na barra fica só o número do ato — o nome não cabe inteiro */
+@media (max-width: 350px) {
+  .atoMovelNome b {
+    display: none;
+  }
+  .atoMovelNome span {
+    font-size: 15px;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
   }
 }
 
