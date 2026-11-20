@@ -1,4 +1,7 @@
 // @vitest-environment jsdom
+import { existsSync } from "node:fs";
+import path from "node:path";
+
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
@@ -168,6 +171,15 @@ describe("a página, como o servidor a entrega", () => {
   it("sem porta e sem tela cheia quando ninguém pediu", () => {
     expect(html).not.toContain('role="dialog"');
     expect(html).not.toContain("<dialog");
+  });
+});
+
+describe("a rota", () => {
+  // Com um loading.tsx, o Next entrega a página dentro de um bloco escondido que só um script
+  // revela: sem JavaScript sobraria o «carregando» para sempre, e a porta — que funciona por
+  // âncora — não teria o que mostrar. A /stats sai inteira no HTML, na ordem do documento.
+  it("não tem loading.tsx (o conteúdo não pode depender de script para aparecer)", () => {
+    expect(existsSync(path.join(process.cwd(), "app", "stats", "loading.tsx"))).toBe(false);
   });
 });
 

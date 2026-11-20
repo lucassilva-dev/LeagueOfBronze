@@ -153,7 +153,6 @@ describe("PUB-13 — landmarks e 'pular para o conteúdo'", () => {
       await import("@/app/calendario/loading"),
       await import("@/app/cartas/loading"),
       await import("@/app/regras/loading"),
-      await import("@/app/stats/loading"),
       await import("@/app/tabela/loading"),
     ];
     for (const { default: Loading } of carregando) {
