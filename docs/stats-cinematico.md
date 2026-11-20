@@ -1,0 +1,214 @@
+# /stats cinemático — «A Forja»
+
+> Documento de direção da nova página de estatísticas. Conceito, storyboard ato a ato,
+> decisões técnicas e orçamento de performance. Escrito ANTES do código (20/11/2026) e
+> atualizado ao fim com o que mudou no caminho (seção «O que mudou na implementação»).
+
+## 0. O que foi conferido antes de desenhar
+
+| Item apontado | O que há de fato (produção, 20/11) | O que a página nova faz |
+| --- | --- | --- |
+| Força dos times: «EQUIPE RX sem pontuação, QUEIJO MINAS ausente» | **Não é falha de dado.** Os 8 times estão na tela, RX e Queijo Minas com 27 pts cada. Três times seguidos têm o mesmo «27 pts», e um leitor de texto que junta linhas repetidas perde duas delas. | Cada molde tem nome + número próprios e `aria-label` completo («EQUIPE RX: 27 pontos de elenco»); a visão em tabela lista os 8, um por linha. |
+| Top jogadores: valor do gabriel bontempo não aparece | **Não é falha de dado.** Ele aparece com 8 pts (5º). Mesma causa: cinco «8» seguidos. | Cada carta leva o valor num selo próprio, com rótulo acessível. |
+| Ranking com 39 linhas para 40 jogadores | **Real, e correto:** só entra quem já jogou. Falta o Lelei de Ozorio (Queijo Minas), que ainda não entrou em jogo. | Vai escrito na tela: «39 de 40 já entraram em jogo · ainda no banco: …», com o nome clicável. |
+| 5 rotas em Melhor por rota | **Confirmado:** Topo, Selva, Meio, Atirador, Suporte. | As cinco viram os cinco canais do Rift. |
+| (achado extra) Sobretítulo «pré-torneio» | Desatualizado: há 26 jogos lançados. | O sobretítulo passa a sair do dado (jogos e séries disputados). |
+
+Dados lidos: `getServerDataset()` → `tournament_state` (Supabase, `DATA_PROVIDER=supabase` em
+produção; `local` no dev lê `leagueofbronze.json`). A rota é `force-dynamic` (exigência da CSP
+com nonce), sem cache nem revalidação: cada visita lê o banco uma vez (`cache()` do React
+junta metadados e página). Nada disso muda — a página nova só troca a camada visual.
+
+## 1. Conceito
+
+**A FORJA.** Tudo que acontece no campeonato é cunhado em bronze. A página é uma oficina de
+fundição: o metal sai da fornalha branco de quente, é batido na bigorna, escorre pelos canais,
+enche os moldes dos times e esfria. Visual, movimento e som contam essa mesma história:
+
+- **o que ainda não foi revelado está FRIO** (ferro escuro, baixo contraste) — nunca invisível;
+- **a revelação é uma MARTELADA**: a peça esquenta (ferro → brasa → ouro), bate no lugar e solta
+  faísca, com um «clang»;
+- **o respiro é o metal ESFRIANDO**: o brilho baixa, o número fica.
+
+É a identidade atual do site (Bronze Hextech: carvão `#100d07`, bronze `#c98a4b`, ouro
+`#f0c88a`, Anton + Chakra Petch) com a temperatura que faltava: brasa `#ff6a2b`, branco-quente
+`#fff3dc` e o teal `#57d8cb` só onde o metal encontra a água.
+
+**O protagonista 3D é um só: o medalhão.** Uma moeda de bronze que nasce derretida na abertura,
+leva o emblema do campeonato a marteladas, muda de metal conforme os elos sobem (Ferro → Mestre)
+e é recunhada com o escudo de cada time quando o time entra em cena. Um objeto bem feito em vez
+de oito cenas medianas.
+
+**Humor.** Os microtextos seguem o «MECÂNICA DUVIDOSA · ENTRETENIMENTO IMACULADO»: «só 2 Bronzes
+de verdade num campeonato chamado League of Bronze», «fidelidade zero a campeão»… Sempre tirados
+do dado, nunca de uma pessoa.
+
+## 2. Regras de transmissão (valem na página inteira)
+
+A página passa ao vivo, comprimida. Não existe modo de transmissão: é a mesma página.
+
+1. **Número-chave enorme**: Anton, `clamp(64px, 9vw, 168px)`; nada importante abaixo de 15px.
+2. **Sem traço de 1px**: contornos de 2px (3px nos que carregam informação).
+3. **Sem granulado**: nada de ruído nem partícula fina em tela cheia. Brasas são poucas, grandes
+   e lentas; faíscas são rajadas curtas e locais. As listras e o ruído do fundo do site ficam
+   cobertos nesta rota.
+4. **Nada pisca mais de 3×/s**: marteladas têm intervalo mínimo de 340 ms; contagem é rolagem
+   de dígito, não pisca-pisca.
+5. **Texto e número saem no HTML**, com o valor final. Animação é enfeite.
+6. **Controles óbvios**: rolar funciona; ←/→ e M são atalho, não requisito.
+
+## 3. Storyboard
+
+Cada ato é um palco de uma tela. No computador o palco **fixa** (CSS `position: sticky`) e a
+cena acontece amarrada à rolagem (`--p` de 0 a 1); no celular não fixa — a cena dispara quando
+entra na tela. Ritmo de todo ato: **cartão do ato (tensão) → cena (revelação) → dado parado
+(respiro)**.
+
+### Entrada — «A porta da fornalha» (só na 1ª visita)
+
+- **Tela**: duas folhas de ferro fechadas com uma fresta de luz; emblema; «ENTRAR COM SOM» /
+  «ENTRAR SEM SOM».
+- **Ao clicar**: clang + grave, as folhas abrem para os lados, a abertura começa.
+- **Lembrada**: cookie `lob_stats_som` (o servidor sabe na hora se desenha a porta — sem piscar);
+  volume no `localStorage`.
+- **Não atrasa nem esconde conteúdo**: o HTML da página inteira vem junto, embaixo. Sem JavaScript
+  a porta abre por âncora (`:target`). A porta vem DEPOIS do conteúdo no HTML e marcada com
+  `data-nosnippet`.
+
+### Ato I — A FORNALHA (resumo)
+
+- **Dado**: jogadores, pts no pool, média por time, mono champions + a nota de que pontos por elo
+  são moeda de draft (texto de conformidade, legível, sempre presente).
+- **Rolagem**: título «ESTATÍSTICAS» e o medalhão derretido na bigorna. Quatro marteladas: cada
+  uma crava uma placa (ferro frio → ouro), o número rola do zero e o emblema ganha relevo.
+- **Som**: clang por martelada, tique na contagem, chiado curto quando a nota aparece.
+- **3D**: medalhão + bigorna + martelo + faíscas; câmera reage a rolagem e mouse.
+
+### Ato II — A LIGA (distribuição por elo)
+
+- **Dado**: jogadores por elo, de Ferro a Mestre, com os emblemas oficiais.
+- **Rolagem**: os lingotes sobem um a um, da esquerda para a direita; o emblema sobe em cima
+  do lingote e o número conta junto.
+- **Som**: tique por unidade, baque surdo quando o lingote assenta.
+- **Interação**: passar o mouse num lingote mostra QUEM é daquele elo (clicável → holofote).
+- **3D**: o medalhão troca de metal a cada elo que sobe.
+
+### Ato III — OS MOLDES (força dos times)
+
+- **Dado**: pts de elenco dos 8 times + campanha (séries V–D) e o elenco de cada um.
+- **Rolagem**: o bronze derretido enche o molde de cada time até a pontuação; ao encher, esfria
+  na cor do time.
+- **Som**: despejo (ruído grave que afina), chiado ao esfriar.
+- **Identidade**: escudo cunhado num medalhão, nome na fonte e no metal do tema do time, aura
+  na cor dele, os 5 jogadores em volta.
+- **3D**: o medalhão é recunhado com o escudo de cada time.
+
+### Ato IV — AS PEÇAS RARAS (top jogadores por valor)
+
+- **Dado**: os 8 mais caros do draft (mesma regra de hoje).
+- **Rolagem**: um molde de areia selado trinca, racha e solta as 8 cartas, que chegam em brasa
+  e esfriam no foil do time.
+- **Som**: trinca, estalo, sopro de carta, clang no nº 1.
+- **Interação**: carta 3D holográfica (inclina com o mouse, foil nas cores do time); clique vira
+  a carta: estatísticas + arte do campeão mais jogado; botão de holofote e de VS.
+
+### Ato V — OS CANAIS (melhor por rota)
+
+- **Dado**: melhor KDA de cada rota entre quem jogou (top 3 por rota).
+- **Rolagem**: o Rift como molde visto de cima; o metal corre pelos canais e acende uma rota por
+  vez — Topo, Selva, Meio, Atirador, Suporte —, e o craque de cada uma surge no nó.
+- **Som**: sopro do metal correndo, clang quando o nó acende.
+
+### Ato VI — A BIGORNA (ranking de jogadores)
+
+- **Dado**: ranking por Abates / KDA / MVPs / Assistências / Mortes, com inversão de ordem.
+- **Sem fixar**: é lista para ler. Pódio do top 3 com tratamento próprio; do 4º em diante,
+  linhas que **trocam de lugar animadas (FLIP)** ao mudar o critério; os números rolam como
+  odômetro.
+- **Na tela**: «39 de 40 já entraram em jogo · ainda no banco: …».
+- **Som**: catraca na reordenação, clang ao assentar.
+
+### Ato VII — O ARSENAL (campeões)
+
+- **Dado**: Mais jogados / Mais banidos / Presença / Winrate / KDA (ícones do Data Dragon).
+- **Cena**: órbita 3D (CSS) com os ícones dimensionados pela métrica; o nº 1 no centro com a
+  splash art em parallax ao fundo. A lista ranqueada fica ao lado, legível.
+- **Interação**: trocar de aba reorganiza a órbita; passar o mouse pausa e mostra o campeão.
+
+### Ato VIII — A TÊMPERA (duração das partidas)
+
+- **Dado**: todos os jogos com tempo, numa régua de minutos — «O ATROPELO» numa ponta, «O ÉPICO»
+  na outra — e as listas de mais longas / mais rápidas.
+- **Rolagem**: uma frente de calor varre a régua e acende os jogos na cor de quem venceu.
+- **Som**: tique por jogo, clang nas pontas, chiado final (o metal na água).
+
+### Fecho — O RESFRIAMENTO
+
+- Portas para `/jogadores`, `/times`, `/partidas`; «ver como tabela»; assinatura do campeonato.
+- **3D**: o medalhão mergulha, sobe vapor.
+
+### Interações novas (prioridade 2)
+
+- **Holofote**: clicar em qualquer jogador abre a carta dele em destaque (View Transitions API,
+  com queda para animação simples), posições no ranking, campeões e link para a ficha.
+- **Modo VS**: 2 jogadores ou 2 times lado a lado, como tela de luta. Atalho das próximas séries
+  do calendário e link compartilhável (`?vs=`), pensado para o caster abrir antes da partida.
+- **Atalhos**: ← / → viajam entre os atos (a cena se monta sozinha no caminho); M liga/desliga o
+  som; Esc fecha. Nenhuma tecla do navegador é tomada (Espaço, PageDown, Alt+← seguem livres).
+
+## 4. Identidade dos times
+
+A paleta de cada time **já existe** em `lib/temas/<slug>.ts` (cores, metal, fontes, escudo) e é
+a mesma da página do time e do show do sorteio. A /stats lê dali (`identidadeDoTime`), não cria
+outro mapa. Onde o jogador aparece, ele carrega: anel e aura na cor do time, escudo cunhado,
+foil da carta nas cores `cor / neon / arco`, e o nome do time na fonte do tema.
+
+Para ajustar a cor de um time: `lib/temas/<slug>.ts` (`cor`, `cores.neon`, `cores.arco`,
+`metal`). Vale para o site todo.
+
+## 5. Decisões técnicas
+
+| Decisão | Por quê |
+| --- | --- |
+| **Uma dependência nova: `three`** (sem R3F, drei, postprocessing à parte) | A cena é UM canvas fixo de fundo, dirigido pela rolagem, com um laço próprio. Em three puro eu controlo esse laço (pausa, DPR, degraus de qualidade) sem reconciliador por cima, e o bloom vem dos `examples/jsm` do próprio pacote. R3F + drei + postprocessing somariam ~3 pacotes e ~90 KB gz para uma árvore que não é declarativa. O «PerformanceMonitor» é um amostrador de 40 linhas. |
+| **Sem GSAP e sem Lenis** | O projeto já tem `framer-motion` (FLIP do ranking, microinterações). Fixar é CSS `sticky` (funciona sem JS). O «scrub» é um diretor próprio (um `requestAnimationFrame`) que escreve `--p` suavizado nos atos visíveis. Rolagem continua NATIVA — nada de scroll-jacking, barra de rolagem e busca do navegador intactas. |
+| **Dado = DOM/SVG/CSS; WebGL = palco** | Texto e número no HTML (LCP, SEO, leitor de tela, nitidez no stream). Se o WebGL faltar ou cair de qualidade, a página perde clima, não conteúdo. |
+| **Estado de repouso = revelado** | Regra da casa (animar opacidade já apagou o site 4×). Sem JS, com movimento reduzido ou se o diretor travar, tudo aparece no estado final. Os estados «frios» só existem sob `[data-cine="armado"]`, ligado por um diretor que está rodando; um vigia desarma se o laço parar. Conteúdo nunca anima opacidade: só transform, cor e recorte. |
+| **Som 100% sintetizado** | Web Audio sobre a mesa que o show do sorteio já usa (`lib/series/mesa-de-som.ts`): nenhum arquivo, nada para a CSP (`media-src 'self'`) barrar. |
+| **Sem modelo 3D nem HDR** | `connect-src 'self'` e `img-src` sem `blob:` barram loaders de glTF/HDR de CDN. Geometria procedural; ambiente gerado por PMREM de uma cena de softboxes; relevo do emblema e dos escudos tirado das próprias imagens do site (mapa de altura → normal map em canvas). |
+| **Cartas e órbita em CSS 3D** | Nítidas, acessíveis (cada carta/ícone é um botão), aceleradas por compositor e iguais com ou sem WebGL. A arte dos campeões entra como `<img>` (CSP já libera o Data Dragon). |
+| **Tela de entrada por cookie** | Só o servidor consegue decidir ANTES do primeiro quadro se a porta aparece; com `localStorage` a página piscaria. |
+| **Visão em tabela = `?modo=tabela`** | Renderizada no servidor, sem 3D, linkável, funciona sem JS. |
+
+### Carta de jogador
+
+Já existem `components/lob/player-card.tsx` (carta 4:5 de /jogadores e /times) e
+`components/lob/tcg-card.tsx` (inclinação + brilho das cartinhas de /cartas). A carta
+holográfica **evolui as duas**: o motor de inclinação sai do `TcgCard` para um gancho
+compartilhado (`components/lob/inclinacao.ts`), que o `TcgCard` passa a usar, e a carta nova
+(`components/stats/carta-do-jogador.tsx`) mantém a anatomia do `PlayerCard` (rota, elo, capitão,
+nick em Anton, time no rodapé) com foil, verso e arte do campeão.
+
+## 6. Orçamento de performance
+
+| Item | Meta |
+| --- | --- |
+| FPS | 60 a 1080p em notebook gamer de entrada; nunca abaixo de 45 sem cair um degrau |
+| LCP | texto do título (HTML); não depende de 3D nem de fonte de time |
+| CLS | ~0 (palcos com altura fixa; fontes de time com caixa reservada) |
+| JS da rota (sem three) | ≤ 90 KB gz além do que o site já carrega |
+| `three` | só nesta rota, `import()` depois do primeiro quadro, e só se houver WebGL2, largura ≥ 768 e movimento liberado |
+| Canvas | 1 só; DPR ≤ 1,5; pausa com aba oculta e nos atos de leitura |
+| Degraus | **alta** (DPR 1,5, bloom, 4×MSAA) → **média** (DPR 1,25, bloom) → **baixa** (DPR 1, sem pós) → **2D** (fundo CSS + faíscas em canvas 2D). O monitor mede o quadro e desce sozinho; sobe no máximo uma vez. |
+| Partículas | faíscas ≤ 400 (rajada), brasas ≤ 120, todas ≥ 4 px na tela |
+| DOM por quadro | só `--p` nos atos visíveis; nada de `filter`/`box-shadow` animado em área grande |
+| Imagens | fotos e ícones com `loading="lazy"` e tamanho declarado; arte de campeão só quando a carta vira |
+| Som | 0 bytes de rede |
+
+Celular e máquina fraca: mesmo conteúdo e mesmo desenho; sem fixar, sem 3D pesado (2D), menos
+partículas. `prefers-reduced-motion`: estado final de tudo, sem scrub, sem câmera, sem contagem;
+som continua disponível.
+
+## 7. Onde está cada coisa
+
+Preenchido ao fim da implementação — ver «O que mudou na implementação».
