@@ -88,3 +88,100 @@ describe("logo do cabeçalho: transparente sem apagar nada do emblema", () => {
     expect(logo.data[i + 3]).toBeGreaterThan(0);
   });
 });
+
+describe("emblema recortado: sem fundo de verdade, e inteiro", () => {
+  const RECORTADO = "public/emblema-recortado.png";
+
+  it("o fundo saiu: os cantos e a moldura são transparentes (nada de véu virando caixa)", async () => {
+    const img = await rgba(RECORTADO);
+    expect([img.width, img.height]).toEqual([512, 512]);
+    const a = (x: number, y: number) => img.data[(y * img.width + x) * 4 + 3]!;
+    for (const [x, y] of [[0, 0], [511, 0], [0, 511], [511, 511], [256, 6], [6, 256], [505, 256], [256, 505]] as const) {
+      expect(a(x, y), `alfa em (${x},${y})`).toBe(0);
+    }
+    // A moldura de 6% inteira: zero. No logo do cabeçalho ela é um véu de ~4% (cor para alfa).
+    let maior = 0;
+    for (let y = 0; y < 512; y++) {
+      for (let x = 0; x < 512; x++) {
+        if (x > 30 && x < 481 && y > 30 && y < 481) continue;
+        maior = Math.max(maior, a(x, y));
+      }
+    }
+    expect(maior).toBe(0);
+  });
+
+  it("o interior escuro do escudo é OPACO e é o do original (o que o flood-fill de julho apagava)", async () => {
+    const img = await rgba(RECORTADO);
+    const original = await sobre(ORIGINAL, { r: 0, g: 0, b: 0 }, 512);
+    // (256,360) fica no corpo do escudo, abaixo do cristal: escuro, e cercado pelo contorno.
+    for (const [x, y] of [[256, 360], [200, 250], [312, 250], [256, 200]] as const) {
+      const i = (y * 512 + x) * 4;
+      expect(img.data[i + 3], `alfa em (${x},${y})`).toBe(255);
+      const j = (y * 512 + x) * 3;
+      for (let c = 0; c < 3; c++) expect(Math.abs(img.data[i + c]! - original.data[j + c]!)).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it("não tem buraco: todo pixel transparente se liga à borda da imagem", async () => {
+    const img = await rgba(RECORTADO);
+    const L = img.width;
+    const vazio = (i: number) => img.data[i * 4 + 3]! < 128;
+    const visto = new Uint8Array(L * L);
+    const pilha: number[] = [];
+    const visitar = (x: number, y: number) => {
+      if (x < 0 || y < 0 || x >= L || y >= L) return;
+      const i = y * L + x;
+      if (visto[i] || !vazio(i)) return;
+      visto[i] = 1;
+      pilha.push(i);
+    };
+    for (let k = 0; k < L; k++) {
+      visitar(k, 0);
+      visitar(k, L - 1);
+      visitar(0, k);
+      visitar(L - 1, k);
+    }
+    while (pilha.length > 0) {
+      const i = pilha.pop()!;
+      const x = i % L;
+      const y = (i - x) / L;
+      visitar(x + 1, y);
+      visitar(x - 1, y);
+      visitar(x, y + 1);
+      visitar(x, y - 1);
+    }
+    let presos = 0;
+    for (let i = 0; i < L * L; i++) if (vazio(i) && !visto[i]) presos++;
+    expect(presos).toBe(0);
+  });
+
+  it("é UMA peça só (sem pontinho solto) e a borda é suave", async () => {
+    const img = await rgba(RECORTADO);
+    const L = img.width;
+    const cheio = (i: number) => img.data[i * 4 + 3]! >= 128;
+    const rotulo = new Uint8Array(L * L);
+    let pecas = 0;
+    for (let inicio = 0; inicio < L * L; inicio++) {
+      if (!cheio(inicio) || rotulo[inicio]) continue;
+      pecas++;
+      const fila = [inicio];
+      rotulo[inicio] = 1;
+      for (let k = 0; k < fila.length; k++) {
+        const i = fila[k]!;
+        const x = i % L;
+        const y = (i - x) / L;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+          const xx = x + dx;
+          const yy = y + dy;
+          if (xx < 0 || yy < 0 || xx >= L || yy >= L) continue;
+          const j = yy * L + xx;
+          if (!cheio(j) || rotulo[j]) continue;
+          rotulo[j] = 1;
+          fila.push(j);
+        }
+      }
+    }
+    expect(pecas).toBe(1);
+    expect(alfas(img).filter((a) => a > 0 && a < 255).length).toBeGreaterThan(2_000);
+  });
+});
