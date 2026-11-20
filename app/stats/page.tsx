@@ -14,8 +14,13 @@ import { AtoDasPecasRaras } from "@/components/stats/atos/raras";
 import { AtoDaTempera } from "@/components/stats/atos/tempera";
 import { FundoDaForja } from "@/components/stats/cena/fundo";
 import { COOKIE_DO_SOM, lerPedidoDeVs } from "@/components/stats/constantes";
+import { Holofote } from "@/components/stats/holofote";
+import { PainelDeBordo } from "@/components/stats/painel";
+import { Planilha } from "@/components/stats/planilha";
 import { FiltrosDaForja, type TimeDe } from "@/components/stats/pecas";
+import { PortaDaFornalha } from "@/components/stats/porta";
 import { Forja, type TextosDaTela } from "@/components/stats/provedor";
+import { ModoVs } from "@/components/stats/versus";
 import { FONTES_DOS_TEMAS } from "@/components/times/fontes-dos-temas";
 import { semTemporadaAoVivo } from "@/lib/fase-do-site";
 import { metadadosDaPagina } from "@/lib/i18n/metadados";
@@ -48,6 +53,11 @@ export default async function EstatisticasPage({ searchParams }: Readonly<{ sear
   const dados = montarDadosDaForja(dataset, { elos: st.elos, rotas: st.rotas, reserva: textosElenco[locale].reserva });
   const edicao = nomeDaTemporada(dados.edicao, localeTag);
 
+  // «Ver como tabela»: os mesmos dados, crus, sem cena nenhuma (e sem JavaScript de cliente).
+  if (primeiro(parametros.modo) === "tabela") {
+    return <Planilha dados={dados} t={t} edicao={edicao} aviso={mensagens.conformidade.eloAviso} />;
+  }
+
   // A fonte do tema de cada time vira classe do next/font AQUI, no servidor.
   const fontes: Record<string, string> = {};
   for (const time of dados.times) {
@@ -61,6 +71,7 @@ export default async function EstatisticasPage({ searchParams }: Readonly<{ sear
   const cookieDoSom = biscoitos.get(COOKIE_DO_SOM)?.value;
   const somInicial = cookieDoSom === "1" ? true : cookieDoSom === "0" ? false : null;
   const vsInicial = lerPedidoDeVs(primeiro(parametros.vs));
+  const portaFechada = somInicial === null;
 
   return (
     <Forja
@@ -69,8 +80,16 @@ export default async function EstatisticasPage({ searchParams }: Readonly<{ sear
       fontes={fontes}
       somInicial={somInicial}
       vsInicial={vsInicial}
-      portaFechada={false}
-      camadas={<FundoDaForja />}
+      portaFechada={portaFechada}
+      camadas={
+        <>
+          <FundoDaForja />
+          <PainelDeBordo />
+          <Holofote />
+          <ModoVs />
+          {portaFechada ? <PortaDaFornalha edicao={edicao} /> : null}
+        </>
+      }
     >
       <FiltrosDaForja key="filtros" />
       <AtoDaFornalha key="fornalha" dados={dados} t={t} edicao={edicao} aviso={mensagens.conformidade.eloAviso} />
