@@ -1,8 +1,9 @@
 # /stats cinemático — «A Forja»
 
 > Documento de direção da nova página de estatísticas. Conceito, storyboard ato a ato,
-> decisões técnicas e orçamento de performance. Escrito ANTES do código (20/11/2026) e
-> atualizado ao fim com o que mudou no caminho (seção «O que mudou na implementação»).
+> decisões técnicas e orçamento de performance. As seções 0 a 6 foram escritas ANTES do código
+> (20/11/2026) e ficam como o plano original; as seções 7 a 10 foram escritas ao fim: onde está
+> cada coisa, o que mudou no caminho, o que foi verificado, as limitações e as próximas ideias.
 
 ## 0. O que foi conferido antes de desenhar
 
@@ -197,10 +198,10 @@ nick em Anton, time no rodapé) com foil, verso e arte do campeão.
 | LCP | texto do título (HTML); não depende de 3D nem de fonte de time |
 | CLS | ~0 (palcos com altura fixa; fontes de time com caixa reservada) |
 | JS da rota (sem three) | ≤ 90 KB gz além do que o site já carrega |
-| `three` | só nesta rota, `import()` depois do primeiro quadro, e só se houver WebGL2, largura ≥ 768 e movimento liberado |
+| `three` | só nesta rota, `import()` depois do primeiro quadro, e só se houver WebGL, janela de 1280×560 para cima (onde há roteiro de rolagem) e movimento liberado |
 | Canvas | 1 só; DPR ≤ 1,5; pausa com aba oculta e nos atos de leitura |
 | Degraus | **alta** (DPR 1,5, bloom, 4×MSAA) → **média** (DPR 1,25, bloom) → **baixa** (DPR 1, sem pós) → **2D** (fundo CSS + faíscas em canvas 2D). O monitor mede o quadro e desce sozinho; sobe no máximo uma vez. |
-| Partículas | faíscas ≤ 400 (rajada), brasas ≤ 120, todas ≥ 4 px na tela |
+| Partículas | faíscas em rajadas curtas e grossas (até 64 por golpe); brasas: 8 a 14, grandes e lentas, só no terço de baixo da tela |
 | DOM por quadro | só `--p` nos atos visíveis; nada de `filter`/`box-shadow` animado em área grande |
 | Imagens | fotos e ícones com `loading="lazy"` e tamanho declarado; arte de campeão só quando a carta vira |
 | Som | 0 bytes de rede |
@@ -252,26 +253,119 @@ som continua disponível.
 
 ## 8. O que mudou na implementação
 
-- **O protagonista 3D é o próprio emblema**, recortado e fundido em relevo (altura e normal
-  tiradas da imagem), e não uma moeda com o emblema cunhado. Sem bigorna, martelo nem chão na
-  cena: viravam polígono solto. O canvas é transparente e compõe sobre o fundo da página.
+- **O protagonista 3D é o próprio emblema**, recortado e fundido em relevo (altura, normal e um
+  mapa de brasa tirados da imagem), e não uma moeda com o emblema cunhado. Sem bigorna, martelo
+  nem chão na cena: viravam polígono solto. O canvas é transparente e compõe sobre o fundo da
+  página. A peça acompanha a história inteira: derrete e leva as marteladas (I), troca de metal
+  (II), é recunhada com cada escudo (III), esquenta com o molde que trinca (IV), pega a cor da
+  rota que acende (V), é temperada com a régua (VIII) e termina fria (fecho).
+- **O roteiro de rolagem vale de 1280×560 para cima** (o plano dizia 1024). Abaixo disso as oito
+  pilhas da Liga e as linhas dos Canais não cabem sem cortar nome: a página corre em fluxo, com o
+  desenho de tablet. A cena 3D só carrega onde há roteiro.
 - **As Peças Raras** saem do molde numa esteira horizontal que corre com a rolagem.
 - **Holofote e modo VS são `<dialog>` modais** (camada de cima do navegador): cobrem o cabeçalho
   do site, prendem o foco e fecham no Esc sem código próprio. A porta da fornalha é uma camada
   comum, porque precisa vir no HTML do servidor.
+- **O painel de bordo é uma âncora `sticky` no fim da página.** No computador ela não tem altura
+  (o trilho dos atos e os comandos se penduram nela, nas margens); no celular e no tablet é uma
+  barra encaixada no pé da tela — som, VS, tabela, o ato em que a pessoa está e as setas de ato.
+  Vai embora junto com a página: nunca cobre o rodapé do site.
+- **No celular e no tablet**: a Liga deita (uma faixa por elo, com os nicks por extenso), a
+  régua da Têmpera corre de lado, as cartas ocupam quase a tela, critérios e abas viram fileiras
+  que correm de lado. Sem roteiro de rolagem e sem 3D; o conteúdo é o mesmo.
 - **O monitor de desempenho mede por tempo de relógio** (janelas de 1,5 s), não por quadros.
-- **No celular**: a Liga deita (uma faixa por elo, com os nicks), a régua da Têmpera corre de
-  lado, e os comandos viram uma barrinha no pé da tela. Sem trilho de atos e sem 3D.
+- **A rota não tem `loading.tsx`.** Com ele, o Next entrega a página dentro de um bloco escondido
+  que só um script revela: sem JavaScript sobraria o «carregando» para sempre. A /stats sai
+  inteira no HTML, na ordem do documento (é o que faz a porta abrir por âncora).
+- **No modo VS**, valor de draft e pontos de elenco ficam fora da luta (moeda de draft não é
+  quesito), e nos times a metade direita da tela é o rota a rota.
 - **A cartinha de /cartas** passou a usar o motor de inclinação compartilhado e ganhou foil.
 
-### Verificação — onde parou (20/11/2026)
+### Verificação (20/11/2026)
 
-Feito: typecheck e lint limpos (o lint só acusa os scripts locais de `.sim/`, fora do
-repositório); `tests/stats` com 157 testes passando; prints ato a ato em 1920×1080, 1280×720 e
-390×844, com movimento reduzido e em inglês, sem erro de console; primeira rodada de crítica de
-direção de arte, com as correções aplicadas.
+- **Build, lint e typecheck**: `next build` passa; `tsc --noEmit` limpo; `eslint` limpo no
+  repositório (o `npm run lint` local só acusa os scripts de `.sim/`, que não são versionados).
+- **Testes**: a suíte inteira passa (274 arquivos, 3389 testes), 168 deles da /stats: dados,
+  regras de CSS (nada de opacidade animada em conteúdo, nada de `translate:` solto, nenhum texto
+  abaixo de 15px fora das telas pequenas) e a página como o servidor a entrega, em PT e em EN.
+- **Console**: nenhum erro e nenhum aviso (de hidratação inclusive) no build de produção, em
+  todos os percursos — página, porta, holofote, VS, tabela, celular, inglês. Com movimento
+  reduzido, só no modo de desenvolvimento, o framer-motion escreve um aviso informativo.
+- **Quadros por segundo** (`.sim/stats/fps.cjs`): build de produção, 1920×1080, Chromium com a
+  placa de verdade (GeForce RTX 3050 de notebook, tela a 75 Hz), rolando cada ato por 5 s com a
+  cena 3D no degrau «alta»:
 
-Falta: conferir o `next build`; medir quadros por segundo no build de produção
-(`.sim/stats/fps.cjs`); a segunda rodada de crítica, por um agente que só vê os prints; rodar a
-suíte inteira com a máquina livre (em duas rodadas completas, testes pesados do painel
-administrativo estouraram os 20 s; isolados, passam).
+  | Ato | qps médio | p95 | pior quadro |
+  | --- | --- | --- | --- |
+  | Fornalha | 74 | 13,5 ms | 67 ms |
+  | Liga | 74 | 13,5 ms | 40 ms |
+  | Moldes | 71 | 13,5 ms | 80 ms |
+  | Peças Raras | 72 | 13,5 ms | 53 ms |
+  | Canais | 73 | 13,5 ms | 53 ms |
+  | Bigorna, Arsenal, Têmpera, Fecho | 75 | 13,5 ms | 13,8 ms |
+  | Carta 3D com o ponteiro em cima | 75 | 13,5 ms | 13,5 ms |
+
+  Os quadros lentos que sobram são da PRIMEIRA vez que um ato com muitas fotos entra na tela
+  (ver «Limitações»).
+- **Interações no computador** (`.sim/stats/interacoes.cjs`, 34 conferências no build): ← →
+  viajam entre os atos, o trilho salta para qualquer ato, Espaço continua sendo do navegador, M
+  liga e desliga o som e lembra no cookie; o holofote abre no clique, → passa para o vizinho,
+  Esc fecha e o foco volta para quem abriu; o VS abre pelo botão e pelo endereço, monta a luta
+  num clique a partir das próximas séries e limpa o endereço ao fechar; a porta aparece só na
+  primeira visita; sem JavaScript o conteúdo aparece e a âncora tira a porta; a tabela funciona
+  sem JavaScript.
+- **Interações no celular** (`.sim/stats/interacoes-celular.cjs`, 18 conferências com toque): a
+  barra encaixada no pé da tela com botões de 44px, as setas de ato, o som, o holofote abrindo
+  no topo, a luta do VS cabendo na largura sem nome cortado, a porta com os dois botões à vista,
+  a barra acima do rodapé no fim da página, e nenhuma rolagem lateral.
+- **Texto cortado** (`.sim/stats/cortes.cjs` e `celular.cjs`): nenhuma reticência e nenhum
+  elemento fora da tela em 320, 360, 390, 820, 1024, 1100, 1280, 1366, 1536, 1920 e 2560 px.
+- **Prints** ato a ato em 1920×1080, 1280×720 e 390×844, com movimento reduzido e em inglês.
+- **Duas rodadas de crítica de direção de arte**: a primeira minha; a segunda de um agente que
+  só viu os prints (34 telas, 25 achados). O que procedia está nos commits
+  `fix(stats): … rodada de crítica`; o que ficou de fora está logo abaixo.
+
+## 9. Limitações conhecidas
+
+- **Fotos dos jogadores são pesadas** (cerca de 7 MB somadas, sem miniaturas). Na primeira vez
+  que os Moldes ou as Peças Raras entram na tela, decodificar as fotos custa alguns quadros.
+  O conserto de verdade é gerar miniaturas no envio da foto; `next/image` resolveria, mas gasta
+  a cota de otimização de imagem da Vercel.
+- **A forja é mais forte nos atos I a V.** Do ranking em diante (Bigorna, Arsenal, Têmpera) o
+  dado manda e a metáfora fica no acabamento — barra de metal, vergalhão, duotom de bronze. A
+  crítica pediu cada dado como um objeto forjado; isso é redesenho de ato, não ajuste.
+- **O emblema 3D é um relevo tirado da imagem**, não uma malha modelada: de perto, a borda da
+  silhueta tem a resolução da textura (512px). Martelo e bigorna não existem na cena.
+- **A cena 3D não roda** abaixo de 1280×560, com movimento reduzido, com economia de dados ou
+  sem WebGL: fica o fundo 2D e o emblema em imagem. O conteúdo é o mesmo.
+- **Não existe «modo transmissão»** (decisão do pedido: é a mesma página para todos). O
+  cabeçalho do site e o painel de bordo aparecem no vídeo.
+- **Os quatro números da abertura são os do pedido** (jogadores, pontos no pool, média por time,
+  mono champions). A crítica preferia jogos e abates ali; eles estão na faixa logo abaixo.
+- **O som precisa de um gesto.** Quem volta com o som ligado só ouve depois do primeiro clique
+  ou tecla (regra dos navegadores); o painel avisa («CLIQUE PARA O SOM»).
+- **View Transitions** (o rosto que vira a carta do holofote) só existem em navegadores
+  recentes; nos outros o holofote abre direto.
+- **Os números rolam do zero.** Quem para a rolagem no meio de uma cena vê, apagado, o zero de
+  um número que ainda não foi cravado.
+- **O modo VS compara totais**, não médias por jogo: quem jogou mais séries leva vantagem em
+  abates e assistências.
+- **Nick muito largo ainda leva reticências.** Os quarenta de hoje cabem; um nick de 16 letras
+  maiúsculas e largas numa edição futura seria cortado no lingote (o toque ou o ponteiro mostra
+  o nome inteiro).
+- **O fps foi medido numa máquina só** (a de cima). Em placa integrada vale o monitor de
+  desempenho, que baixa a qualidade sozinho e, no limite, desliga o 3D.
+- **/tabela e /cartas ainda têm `loading.tsx`**: sem JavaScript elas mostram só o esqueleto.
+  Era assim antes e ficou fora deste trabalho.
+
+## 10. Próximas ideias
+
+- Miniaturas das fotos geradas no envio (resolve a primeira limitação e alivia o celular).
+- Cada dado do ranking em diante como objeto forjado: pódio em lingotes numerados, arsenal como
+  peças na parede da oficina, moedas maiores na Têmpera.
+- VS com médias por jogo e o confronto direto jogo a jogo (campeões, durações).
+- Momentos do Hall da Fama (viradas, recordes) como um ato próprio.
+- Um «modo narrador»: a mesma página com as viagens entre atos temporizadas, para o caster só
+  falar.
+- Emblema modelado em malha (chanfro de verdade), com martelo e bigorna.
+- Levar a carta holográfica para /jogadores e /times.
