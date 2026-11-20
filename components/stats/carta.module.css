@@ -63,6 +63,8 @@
 .janela {
   position: absolute;
   inset: 0 0 25% 0;
+  /* a foto (ampliada para o parallax) não passa do véu: sobrava uma faixa clara acima do nome */
+  overflow: hidden;
   background: radial-gradient(120% 90% at 50% 20%, color-mix(in srgb, var(--cor) 34%, #1a1108), var(--abismo) 70%);
 }
 .foto {
@@ -170,7 +172,7 @@
   margin: 0;
   font-family: var(--font-display), "Anton", sans-serif;
   /* o nick cabe numa linha: o tamanho sai da largura estimada dele na Anton */
-  font-size: clamp(15px, calc(72cqi / var(--nick-em, 6)), 15cqi);
+  font-size: clamp(15px, calc(66cqi / var(--nick-em, 6)), 15cqi);
   font-weight: 400;
   line-height: 1.04;
   letter-spacing: 0.01em;
@@ -370,7 +372,7 @@
   position: absolute;
   left: 5cqi;
   right: 5cqi;
-  bottom: 43cqi;
+  bottom: 45cqi;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 2.6cqi 4cqi;
@@ -383,7 +385,7 @@
   border-left: 0.8cqi solid var(--cor);
 }
 .numeros dt {
-  font-size: max(11px, 3.7cqi);
+  font-size: max(12px, 4.3cqi);
   font-weight: 700;
   letter-spacing: 0.12em;
   line-height: 1.1;
@@ -412,7 +414,7 @@
   display: block;
   margin-top: 0.8cqi;
   font-family: var(--font-body), "Chakra Petch", sans-serif;
-  font-size: max(10px, 3.2cqi);
+  font-size: max(11px, 3.9cqi);
   font-weight: 700;
   letter-spacing: 0.08em;
   color: #a99e8b;
@@ -435,7 +437,7 @@
 }
 .assinaturaRotulo {
   display: block;
-  font-size: max(10px, 3.2cqi);
+  font-size: max(11px, 3.9cqi);
   font-weight: 700;
   letter-spacing: 0.12em;
   color: var(--cor);
@@ -470,7 +472,7 @@
   min-height: 11cqi;
   padding: 0 1.5cqi;
   border-radius: 2px;
-  font-size: max(11px, 3.6cqi);
+  font-size: max(11px, 3.9cqi);
   font-weight: 700;
   letter-spacing: 0.08em;
   line-height: 1.1;

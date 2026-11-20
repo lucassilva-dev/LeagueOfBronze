@@ -50,6 +50,8 @@ export function AtoDaLiga({ dados, t, timeDe }: Readonly<{ dados: DadosDaForja; 
                 <li
                   key={elo.chave}
                   className={s.coluna}
+                  // a piada do ato é sobre ESTA coluna: ela leva a luz
+                  data-destaque={elo.chave === "bronze" ? "" : undefined}
                   style={{ "--elo": elo.cor, "--n": elo.quantidade, "--tinta-do-lingote": escuro ? "#f3ece0" : "#14100a" } as CSSProperties}
                   data-marca={(0.2 + i * 0.085).toFixed(3)}
                   data-som="baque"
@@ -88,9 +90,7 @@ export function AtoDaLiga({ dados, t, timeDe }: Readonly<{ dados: DadosDaForja; 
           </ol>
         </div>
 
-        <p className={b.nota}>
-          <strong>{fraseDoBronze}</strong> {f.ligaDica}
-        </p>
+        <p className={`${b.nota} ${s.piada}`}>{fraseDoBronze}</p>
       </div>
     </section>
   );

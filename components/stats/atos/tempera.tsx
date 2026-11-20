@@ -10,7 +10,16 @@ import s from "./tempera.module.css";
 /** Quantas linhas em cada lista (mais longas / mais curtas) — o mesmo recorte da página antiga. */
 const LIMITE = 8;
 
-type Nomes = Readonly<{ a: string; b: string; vencedor: string }>;
+type Nomes = Readonly<{ a: string; b: string; vencedor: string; corA: string; corB: string }>;
+
+/** «TIME A × TIME B», cada nome na cor do time (o × é enfeite: o leitor de tela ouve «contra»). */
+function Confronto({ n, className }: Readonly<{ n: Nomes; className?: string }>) {
+  return (
+    <span className={className}>
+      <span style={{ color: n.corA }}>{n.a}</span> <span aria-hidden>×</span> <span style={{ color: n.corB }}>{n.b}</span>
+    </span>
+  );
+}
 
 /**
  * ATO VIII — A TÊMPERA. A duração das partidas: todos os jogos com tempo numa régua de minutos
@@ -28,6 +37,8 @@ export function AtoDaTempera({ dados, t }: Readonly<{ dados: DadosDaForja; t: Te
     a: timePorId.get(jogo.timeA)?.nome ?? jogo.timeA,
     b: timePorId.get(jogo.timeB)?.nome ?? jogo.timeB,
     vencedor: timePorId.get(jogo.vencedor)?.nome ?? jogo.vencedor,
+    corA: timePorId.get(jogo.timeA)?.cor ?? "#f3ece0",
+    corB: timePorId.get(jogo.timeB)?.cor ?? "#f3ece0",
   });
 
   const epico = jogos[0]!;
@@ -66,9 +77,7 @@ export function AtoDaTempera({ dados, t }: Readonly<{ dados: DadosDaForja; t: Te
           <Odometro texto={String(jogo.min)} className={s.pontaNumero} />
           <span>{f.temperaMin}</span>
         </span>
-        <span className={s.pontaJogo}>
-          {n.a} <span aria-hidden>×</span> {n.b}
-        </span>
+        <Confronto n={n} className={s.pontaJogo} />
         <span className={s.pontaDetalhe}>
           {st.duracaoJogo} {jogo.jogo} · {st.duracaoVitoria} <strong>{n.vencedor}</strong>
         </span>
@@ -88,8 +97,8 @@ export function AtoDaTempera({ dados, t }: Readonly<{ dados: DadosDaForja; t: Te
               <a href={`/partidas/${encodeURIComponent(jogo.serieId)}`} className={s.linha} style={coresDoTime(timePorId.get(jogo.vencedor) ?? null)}>
                 <span className={s.linhaPosicao}>{i + 1}</span>
                 <span className={s.linhaJogo}>
-                  {n.a} <span aria-hidden>×</span> {n.b}
-                  <span>
+                  <Confronto n={n} className={s.linhaConfronto} />
+                  <span className={s.linhaDetalhe}>
                     {st.duracaoJogo} {jogo.jogo} · {st.duracaoVitoria} {n.vencedor}
                   </span>
                 </span>
@@ -172,7 +181,9 @@ export function AtoDaTempera({ dados, t }: Readonly<{ dados: DadosDaForja; t: Te
             </div>
           </div>
 
-          <p className={b.nota}>{preencher(f.temperaNota, { n: jogos.length })}</p>
+          <p className={b.nota}>
+            <strong>{f.temperaLegenda}</strong> {preencher(f.temperaNota, { n: jogos.length })}
+          </p>
         </div>
       </section>
 

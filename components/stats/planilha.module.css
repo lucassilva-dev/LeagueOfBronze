@@ -157,6 +157,11 @@
   background: #0f0b07;
 }
 
+/* tabela de duas colunas (o resumo): de ponta a ponta, o item ficava a um metro do número */
+.molduraCurta {
+  width: min(100%, 560px);
+}
+
 .tabela {
   width: 100%;
   border-collapse: collapse;

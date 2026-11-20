@@ -20,7 +20,13 @@ import type { TextosDaTela } from "./provedor";
 
 const TRACO = "—";
 
-function Secao({ id, titulo, nota, children }: Readonly<{ id: string; titulo: string; nota?: string; children: ReactNode }>) {
+function Secao({
+  id,
+  titulo,
+  nota,
+  curta = false,
+  children,
+}: Readonly<{ id: string; titulo: string; nota?: string; /** Tabela de duas colunas: a moldura abraça o conteúdo. */ curta?: boolean; children: ReactNode }>) {
   return (
     <section className={s.secao} aria-labelledby={id}>
       <h2 id={id} className={s.secaoTitulo}>
@@ -28,7 +34,7 @@ function Secao({ id, titulo, nota, children }: Readonly<{ id: string; titulo: st
       </h2>
       {nota ? <p className={s.secaoNota}>{nota}</p> : null}
       {/* A moldura rola de lado; com foco, as setas do teclado rolam a tabela. */}
-      <div className={s.moldura} role="region" aria-labelledby={id} tabIndex={0}>
+      <div className={`${s.moldura} ${curta ? s.molduraCurta : ""}`} role="region" aria-labelledby={id} tabIndex={0}>
         {children}
       </div>
     </section>
@@ -99,7 +105,7 @@ export function Planilha({
       </header>
 
       {/* ------------------------------------------------ resumo */}
-      <Secao id="tabela-resumo" titulo={f.tabelaResumo} nota={preencher(f.resumoFaixa, { jogos: r.jogos, abates: r.abates, series: r.seriesCompletas, total: r.seriesTotal })}>
+      <Secao id="tabela-resumo" titulo={f.tabelaResumo} curta nota={preencher(f.resumoFaixa, { jogos: r.jogos, abates: r.abates, series: r.seriesCompletas, total: r.seriesTotal })}>
         <table className={s.tabela}>
           <thead>
             <tr>

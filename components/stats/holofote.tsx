@@ -52,18 +52,24 @@ export function Holofote() {
     }
   };
 
-  const numeros: { rotulo: string; valor: string; forte?: boolean }[] = jogou
+  // Três números-herói (os que o narrador fala primeiro) e o resto numa segunda fileira.
+  type Numero = Readonly<{ rotulo: string; valor: string }>;
+  const herois: Numero[] = jogou
     ? [
-        { rotulo: "KDA", valor: formatKda(jogador.kda, localeTag), forte: true },
+        { rotulo: "KDA", valor: formatKda(jogador.kda, localeTag) },
         { rotulo: f.cartaAbates, valor: String(jogador.abates) },
+        { rotulo: "MVPs", valor: String(jogador.mvps) },
+      ]
+    : [{ rotulo: f.cartaValor, valor: String(jogador.pts) }];
+  const numeros: Numero[] = jogou
+    ? [
         { rotulo: f.cartaMortes, valor: String(jogador.mortes) },
         { rotulo: f.cartaAssist, valor: String(jogador.assistencias) },
-        { rotulo: "MVPs", valor: String(jogador.mvps) },
         { rotulo: f.cartaJogos, valor: String(jogador.jogos) },
         { rotulo: f.cartaVitorias, valor: String(jogador.vitorias) },
         { rotulo: f.cartaValor, valor: String(jogador.pts) },
       ]
-    : [{ rotulo: f.cartaValor, valor: String(jogador.pts), forte: true }];
+    : [];
 
   return (
     <TelaCheia
@@ -103,14 +109,24 @@ export function Holofote() {
         </p>
         <h2 className={s.nick}>{jogador.nick}</h2>
 
-        <dl className={s.numeros}>
-          {numeros.map((n) => (
-            <div key={n.rotulo} data-forte={n.forte ? "" : undefined}>
+        <dl className={s.herois}>
+          {herois.map((n) => (
+            <div key={n.rotulo}>
               <dt>{n.rotulo}</dt>
               <dd>{n.valor}</dd>
             </div>
           ))}
         </dl>
+        {numeros.length > 0 ? (
+          <dl className={s.numeros}>
+            {numeros.map((n) => (
+              <div key={n.rotulo}>
+                <dt>{n.rotulo}</dt>
+                <dd>{n.valor}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : null}
 
         {jogou ? null : <p className={s.semJogo}>{f.cartaSemJogo}</p>}
 

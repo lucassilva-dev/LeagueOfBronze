@@ -53,6 +53,8 @@
 .lema {
   margin: 0;
   max-width: 34ch;
+  /* as linhas se equilibram: «…cunhado em / bronze.» deixava a palavra-chave sozinha */
+  text-wrap: balance;
   font-size: clamp(17px, 1.5vw, 28px);
   font-weight: 500;
   line-height: 1.3;
@@ -150,9 +152,9 @@
   transition: color 0.45s ease;
 }
 .placaNota {
-  font-size: clamp(15px, 0.95vw, 18px);
+  font-size: clamp(15px, 1.12vw, 22px);
   line-height: 1.25;
-  color: var(--ferro-claro);
+  color: var(--apoio);
   transition: color 0.45s ease;
 }
 
@@ -219,11 +221,14 @@
 
 /* ------------------------------------------------------------------ faixa e nota de conformidade */
 
+/* jogos, abates e séries: o que o narrador mais cita — em letra de título, não de rodapé */
 .faixa {
   margin: 0;
-  font-size: var(--texto);
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  font-family: var(--font-display), "Anton", sans-serif;
+  font-size: clamp(20px, 1.8vw, 36px);
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
   text-transform: uppercase;
   color: var(--ouro);
   transition: color 0.5s ease;
@@ -259,10 +264,11 @@
   left: 50%;
   bottom: clamp(14px, 3vh, 34px);
   z-index: 3;
-  display: grid;
-  justify-items: center;
-  gap: 8px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
   margin: 0;
+  white-space: nowrap;
   font-size: var(--rotulo);
   font-weight: 700;
   letter-spacing: 0.3em;
@@ -272,6 +278,8 @@
   transform: translate(-50%, calc(var(--r0) * 220px));
 }
 .atalhos {
+  /* depois da seta: «ROLE PARA FORJAR ↓  ← → atos · M som» */
+  order: 3;
   padding: 5px 12px 4px;
   border: 2px solid var(--bronze-escuro);
   border-radius: 3px;
@@ -305,7 +313,7 @@
 
 /* ------------------------------------------------------------------ telas menores */
 
-@media (max-width: 1023px) {
+@media (max-width: 1279px) {
   .enfMedalhao2d {
     position: relative;
     right: auto;

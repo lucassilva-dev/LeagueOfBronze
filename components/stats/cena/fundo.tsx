@@ -14,7 +14,7 @@ import type { CenaDaForja, Qualidade } from "./cena-da-forja";
  * A cena só entra onde faz sentido. Fica o fundo 2D (o gradiente da página e o emblema em
  * imagem) quando:
  *  - a pessoa pediu movimento reduzido;
- *  - a tela é de celular ou tablet (menor que 1024×560, onde a página não tem o roteiro de
+ *  - a tela é de celular ou tablet (menor que 1280×560, onde a página não tem o roteiro de
  *    rolagem): bateria e GPU pequena, e a peça não teria cena para contar;
  *  - o navegador avisou economia de dados;
  *  - não há WebGL, ou ele cai (contexto perdido);
@@ -24,6 +24,9 @@ import type { CenaDaForja, Qualidade } from "./cena-da-forja";
  */
 
 const DEGRAUS: readonly Qualidade[] = ["alta", "media", "baixa"];
+
+/** A altura do cabeçalho fixo do site (o mesmo elemento que o diretor mede). */
+const alturaDoCabecalho = () => document.getElementById("lob-cabecalho")?.getBoundingClientRect().height ?? 70;
 
 type ComOcioso = Window & {
   requestIdleCallback?: (f: () => void, o?: { timeout: number }) => number;
@@ -49,9 +52,9 @@ export function FundoDaForja() {
     const travado = DEGRAUS.find((q) => q === pedido) ?? null;
     const reduzido = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
     const economia = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData === true;
-    // Só onde a página tem o roteiro de rolagem (os pinos: 1024×560 para cima): sem ele a peça
+    // Só onde a página tem o roteiro de rolagem (os pinos: 1280×560 para cima): sem ele a peça
     // 3D não tem cena para contar, e em tablet ela só gastava bateria atrás de uma página comum.
-    const semRoteiro = window.innerWidth < 1024 || window.innerHeight < 560;
+    const semRoteiro = window.innerWidth < 1280 || window.innerHeight < 560;
     if (pedido === "0" || (!travado && (reduzido || economia || semRoteiro))) return;
 
     let cena: CenaDaForja | null = null;
@@ -86,6 +89,7 @@ export function FundoDaForja() {
             atos: ATOS_DA_FORJA,
             elos: dados.elos.map((elo) => elo.cor),
             times: dados.times.map((time) => ({ id: time.id, escudo: time.escudo })),
+            rotas: dados.rotas.map((rota) => rota.cor),
             emblema: "/emblema-recortado.png",
           },
           {
@@ -107,6 +111,7 @@ export function FundoDaForja() {
           travado,
         );
         cena.redimensionar(window.innerWidth, window.innerHeight);
+        cena.definirCabecalho(alturaDoCabecalho());
         raiz.dataset["3d"] = "1";
         soltarQuadro = diretor.aCadaQuadro((dt, estado) => {
           if (!coberta.current) cena?.quadro(dt, estado);
@@ -122,7 +127,10 @@ export function FundoDaForja() {
     const idOcioso = janela.requestIdleCallback ? janela.requestIdleCallback(() => void iniciar(), { timeout: 1200 }) : null;
     const idTempo = idOcioso === null ? window.setTimeout(() => void iniciar(), 250) : null;
 
-    const aoRedimensionar = () => cena?.redimensionar(window.innerWidth, window.innerHeight);
+    const aoRedimensionar = () => {
+      cena?.redimensionar(window.innerWidth, window.innerHeight);
+      cena?.definirCabecalho(alturaDoCabecalho());
+    };
     window.addEventListener("resize", aoRedimensionar);
 
     return () => {
@@ -133,7 +141,7 @@ export function FundoDaForja() {
       desligar();
       delete raiz.dataset["3d"];
     };
-  }, [dados.elos, dados.times, diretor, faiscas]);
+  }, [dados.elos, dados.rotas, dados.times, diretor, faiscas]);
 
   return <div ref={caixa} className={s.enfPalco3d} aria-hidden />;
 }

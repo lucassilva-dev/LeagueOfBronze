@@ -43,12 +43,14 @@ export function AtoDoFecho({ dados, t, lema }: Readonly<{ dados: DadosDaForja; t
           ))}
         </ul>
 
-        <div className={s.pe}>
+        {/* a assinatura do campeonato fecha o espetáculo, sozinha na linha */}
+        <p className={s.lema}>{lema}</p>
+
+        <p className={s.pe}>
           <Link href="/stats?modo=tabela" className={s.tabela}>
             {f.fechoTabela}
           </Link>
-          <p className={s.lema}>{lema}</p>
-        </div>
+        </p>
       </div>
     </section>
   );

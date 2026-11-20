@@ -38,9 +38,10 @@ import { relevoDe, type Relevo } from "./relevo";
  *
  * O protagonista é UMA peça: o emblema do campeonato forjado em relevo de metal (sem fundo: a
  * silhueta é recortada da própria imagem). Ele nasce derretido na abertura, ganha relevo a cada
- * martelada, troca de metal conforme os elos sobem e é recunhado com o escudo de cada time. Em
- * volta: a bigorna, a luz da fornalha, brasas subindo. Nenhum dado mora aqui — se a cena não
- * carregar, a página perde clima, não conteúdo.
+ * martelada, troca de metal conforme os elos sobem, é recunhado com o escudo de cada time,
+ * esquenta quando o molde das peças raras trinca, pega a cor de cada rota, é temperado junto com
+ * a régua dos jogos e termina FRIO, no fecho. Em volta: a luz da fornalha e brasas subindo.
+ * Nenhum dado mora aqui — se a cena não carregar, a página perde clima, não conteúdo.
  *
  * Tudo procedural (nenhum modelo, nenhum HDR): a CSP do site não deixa buscar nada fora.
  *
@@ -59,31 +60,38 @@ export type DadosDaCena = Readonly<{
   elos: readonly string[];
   /** Os times, na ordem dos moldes (ato «moldes»). */
   times: readonly Readonly<{ id: string; escudo: string | null }>[];
+  /** As cores das rotas, na ordem em que os canais acendem (ato «canais»). */
+  rotas: readonly string[];
   emblema: string;
 }>;
 
 type Nivel = Readonly<{ nome: Qualidade; dpr: number; bloom: boolean; brasas: number; amostras: number }>;
 const NIVEIS: readonly Nivel[] = [
-  { nome: "baixa", dpr: 1, bloom: false, brasas: 18, amostras: 0 },
-  { nome: "media", dpr: 1.25, bloom: true, brasas: 30, amostras: 0 },
-  { nome: "alta", dpr: 1.5, bloom: true, brasas: 44, amostras: 4 },
+  { nome: "baixa", dpr: 1, bloom: false, brasas: 8, amostras: 0 },
+  { nome: "media", dpr: 1.25, bloom: true, brasas: 11, amostras: 0 },
+  { nome: "alta", dpr: 1.5, bloom: true, brasas: 14, amostras: 4 },
 ];
 
 /** Onde a peça fica em cada ato: centro (em fração da tela, −1 a 1), altura (fração da tela),
  *  quanto a cena aparece e quanto a boca da fornalha está acesa. */
 type Pose = Readonly<{ x: number; y: number; tam: number; presenca: number; fornalha: number }>;
 const FORA: Pose = { x: 0.84, y: 1.75, tam: 0.19, presenca: 0.28, fornalha: 0.3 };
+/** O canto de cima, à direita: onde a peça espera nos atos em que o palco é do dado. */
+const CANTO: Pose = { x: 0.82, y: 0.71, tam: 0.19, presenca: 0.55, fornalha: 0.5 };
 const POSES: Readonly<Record<string, Pose>> = {
   fornalha: { x: 0.63, y: 0.12, tam: 0.52, presenca: 1, fornalha: 1 },
   liga: { x: 0.8, y: 0.68, tam: 0.21, presenca: 0.6, fornalha: 0.5 },
-  moldes: { x: 0.82, y: 0.71, tam: 0.19, presenca: 0.55, fornalha: 0.6 },
-  pecas: FORA,
-  canais: FORA,
+  moldes: { ...CANTO, fornalha: 0.6 },
+  pecas: CANTO,
+  canais: CANTO,
   bigorna: FORA,
   arsenal: { ...FORA, presenca: 0.12, fornalha: 0 },
-  tempera: FORA,
-  fecho: { x: 0.62, y: 0.42, tam: 0.36, presenca: 0.85, fornalha: 0.25 },
+  tempera: CANTO,
+  // no fecho o bronze ESFRIOU: a boca da fornalha apaga
+  fecho: { x: 0.62, y: 0.42, tam: 0.36, presenca: 0.85, fornalha: 0 },
 };
+/** Em que ponto do ato «canais» cada rota acende (o mesmo roteiro do HTML). */
+const CANAIS_ACESOS = [0.22, 0.36, 0.5, 0.66, 0.78] as const;
 
 /** As marteladas da abertura (o `p` do ato em que cada placa bate — o mesmo roteiro do HTML). */
 const GOLPES = [0.2, 0.35, 0.5, 0.65] as const;
@@ -93,6 +101,8 @@ const RELEVO_POR_GOLPE = [0.1, 0.36, 0.6, 0.82, 1] as const;
 
 const FOV = 32;
 const DISTANCIA = 9;
+/** Até que altura (em unidades da cena; 0 = meio da tela) as brasas sobem antes de apagar. */
+const TETO_DAS_BRASAS = -0.55;
 const limitar = (v: number, min = 0, max = 1) => (v < min ? min : v > max ? max : v);
 const misturar = (a: number, b: number, t: number) => a + (b - a) * t;
 
@@ -168,6 +178,11 @@ export class CenaDaForja {
   private clarao = 0;
   private vaporVivo = 0;
   private mergulhou = false;
+  private temperou = false;
+  /** 0 = oficina acesa; 1 = o fecho (peça fria, luz fria, brasas quase apagadas). */
+  private frioFinal = 0;
+  /** A altura do cabeçalho fixo do site, em px: a peça nunca fica debaixo dele. */
+  private cabecalho = 70;
 
   private readonly corTemp = new Color();
   private readonly vetorTemp = new Vector3();
@@ -235,6 +250,8 @@ export class CenaDaForja {
       metalness: 0.92,
       roughness: 0.36,
       alphaTest: 0.5,
+      // com multiamostragem, o recorte da silhueta sai liso (sem ela, não muda nada)
+      alphaToCoverage: true,
       emissive: new Color(0, 0, 0),
       displacementScale: 0.02,
       normalScale: new Vector2(0.1, 0.1),
@@ -246,7 +263,7 @@ export class CenaDaForja {
     const geoCostas = new PlaneGeometry(2, 2);
     this.descartaveis.push(geoCostas);
     for (let k = 1; k <= 5; k += 1) {
-      const m = new MeshStandardMaterial({ color: 0x3a2412, metalness: 0.9, roughness: 0.5, alphaTest: 0.5, side: DoubleSide });
+      const m = new MeshStandardMaterial({ color: 0x3a2412, metalness: 0.9, roughness: 0.5, alphaTest: 0.5, alphaToCoverage: true, side: DoubleSide });
       const malha = new Mesh(geoCostas, m);
       malha.position.z = -0.014 * k;
       this.peca.add(malha);
@@ -259,7 +276,7 @@ export class CenaDaForja {
     // ---- o brilho atrás da peça (a boca da fornalha)
     const texBrilho = texturaDeBrilho();
     const geoBrilho = new PlaneGeometry(1, 1);
-    const matBrilho = new MeshBasicMaterial({ map: texBrilho, color: 0xff6a2b, blending: AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.6 });
+    const matBrilho = new MeshBasicMaterial({ map: texBrilho, color: 0xff5a1a, blending: AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.6 });
     this.brilho = new Mesh(geoBrilho, matBrilho);
     this.scene.add(this.brilho);
     this.descartaveis.push(texBrilho, geoBrilho, matBrilho);
@@ -292,9 +309,9 @@ export class CenaDaForja {
     const fase = new Float32Array(quantas);
     for (let i = 0; i < quantas; i += 1) {
       pos[i * 3] = (Math.random() * 2 - 1) * 8;
-      pos[i * 3 + 1] = brasa ? Math.random() * 7 - 3.2 : -50;
+      pos[i * 3 + 1] = brasa ? -3.3 + Math.random() * 2.6 : -50;
       pos[i * 3 + 2] = Math.random() * 6 - 4.5;
-      tam[i] = brasa ? 0.16 + Math.random() * 0.24 : 0.5 + Math.random() * 0.7;
+      tam[i] = brasa ? 0.24 + Math.random() * 0.26 : 0.5 + Math.random() * 0.7;
       fase[i] = Math.random() * Math.PI * 2;
     }
     geo.setAttribute("position", new BufferAttribute(pos, 3));
@@ -309,18 +326,24 @@ export class CenaDaForja {
         uEscala: { value: 800 },
         uCor: { value: new Color(brasa ? 0xff7a2a : 0xcfc6b8) },
         uOpacidade: { value: brasa ? 0.8 : 0 },
+        // até onde a partícula sobe antes de apagar (a brasa morre no terço de baixo da tela:
+        // subindo pela página inteira, ela passava por trás do texto e lia como pontuação)
+        uTeto: { value: brasa ? TETO_DAS_BRASAS : 100 },
       },
       vertexShader: /* glsl */ `
         attribute float aTam;
         attribute float aFase;
         uniform float uTempo;
         uniform float uEscala;
+        uniform float uTeto;
         varying float vPisca;
         void main() {
           vec4 mv = modelViewMatrix * vec4(position, 1.0);
           gl_Position = projectionMatrix * mv;
           gl_PointSize = aTam * uEscala / -mv.z;
-          vPisca = 0.6 + 0.4 * sin(uTempo * 1.3 + aFase);
+          // respira devagar e apaga ao chegar ao teto (smoothstep com as bordas na ordem certa:
+          // invertidas, o resultado é indefinido pela especificação do GLSL)
+          vPisca = (0.6 + 0.4 * sin(uTempo * 1.3 + aFase)) * (1.0 - smoothstep(uTeto - 1.2, uTeto, position.y));
         }
       `,
       fragmentShader: /* glsl */ `
@@ -348,7 +371,7 @@ export class CenaDaForja {
 
   private async carregarRelevos(): Promise<void> {
     try {
-      this.relevos.set("", await relevoDe(this.dados.emblema));
+      this.relevos.set("", await relevoDe(this.dados.emblema, "bronze", 512));
       if (this.morta) return;
       this.aplicarRelevo("");
       this.peca.visible = true;
@@ -395,6 +418,8 @@ export class CenaDaForja {
     m.alphaMap = r.alfa;
     m.displacementMap = r.altura;
     m.normalMap = r.normal;
+    // quente, a peça brilha mais no alto do relevo e menos nos sulcos: a forma se lê desde o começo
+    m.emissiveMap = r.brasa;
     if (primeiraVez) m.needsUpdate = true;
     for (const costa of this.costas) {
       costa.material.alphaMap = r.alfa;
@@ -489,6 +514,11 @@ export class CenaDaForja {
 
   // ------------------------------------------------------------------ comandos
 
+  /** A altura do cabeçalho fixo do site (px): a peça fica sempre abaixo dele. */
+  definirCabecalho(px: number): void {
+    if (Number.isFinite(px) && px >= 0) this.cabecalho = px;
+  }
+
   redimensionar(largura: number, altura: number): void {
     this.largura = Math.max(1, largura);
     this.altura = Math.max(1, altura);
@@ -506,6 +536,11 @@ export class CenaDaForja {
     if (this.mergulhou) return;
     this.mergulhou = true;
     this.calor = Math.max(this.calor, 0.55);
+    this.soltarVapor();
+  }
+
+  /** Uma baforada de vapor em volta da peça (o metal quente encontrando a água). */
+  private soltarVapor(): void {
     this.vaporVivo = 2.4;
     this.vapor.visible = true;
     const pos = this.vapor.geometry.getAttribute("position") as BufferAttribute;
@@ -543,9 +578,32 @@ export class CenaDaForja {
     // ---- o que o roteiro pede agora (tudo sai do `p`: recarregar no meio dá o estado certo)
     let golpes: number = GOLPES.length;
     let escudo = "";
+    /** O calor que o ato pede; null = o das marteladas (frio depois da abertura). */
+    let calorDoAto: number | null = null;
     this.tintaAlvo.setRGB(1, 1, 1);
     if (ato === "fornalha") {
       golpes = GOLPES.filter((em) => p >= em).length;
+    } else if (ato === "pecas") {
+      // o molde das peças raras trinca: a peça esquenta junto, e esfria quando ele racha
+      calorDoAto = p < 0.4 ? limitar((p - 0.12) / 0.26) * 0.72 : 0.04;
+    } else if (ato === "canais") {
+      // a peça pega a cor da rota que acabou de acender
+      const acesas = CANAIS_ACESOS.filter((em) => p >= em).length;
+      const cor = this.dados.rotas[acesas - 1];
+      if (cor) this.tintaAlvo.set(cor).lerp(this.corTemp.setRGB(1, 1, 1), 0.3);
+    } else if (ato === "tempera") {
+      // a têmpera: a peça entra em brasa e esfria com a frente de calor que varre a régua
+      const frente = limitar((p - 0.2) / 0.58);
+      calorDoAto = 0.04 + 0.74 * (1 - frente);
+      if (frente >= 1 && !this.temperou) {
+        this.temperou = true;
+        this.soltarVapor();
+      } else if (frente < 0.9) {
+        this.temperou = false;
+      }
+    } else if (ato === "fecho") {
+      // bronze frio, com pátina
+      this.tintaAlvo.setRGB(0.66, 0.68, 0.7);
     } else if (ato === "liga") {
       const i = Math.floor((p - 0.2) / 0.085);
       const cor = this.dados.elos[Math.min(this.dados.elos.length - 1, i)];
@@ -585,13 +643,17 @@ export class CenaDaForja {
     const k = (tau: number) => 1 - Math.exp(-dt / tau);
     const meiaAltura = Math.tan((FOV * Math.PI) / 360) * DISTANCIA;
     const alvoX = pose.x * meiaAltura * this.camera.aspect;
-    const alvoY = pose.y * meiaAltura;
+    // o topo da peça fica sempre abaixo do cabeçalho do site (em 720p ele come 9% da tela)
+    const baseDoCabecalho = meiaAltura * (1 - (2 * this.cabecalho) / Math.max(1, this.altura));
+    // (só para pose que está NA tela: a de fora da tela — y acima de 1 — continua fora)
+    const alvoY = pose.y > 1 ? pose.y * meiaAltura : Math.min(pose.y * meiaAltura, baseDoCabecalho - pose.tam * meiaAltura - 0.05);
     this.posicao.x = misturar(this.posicao.x, alvoX, k(0.5));
     this.posicao.y = misturar(this.posicao.y, alvoY, k(0.5));
     this.tamanho = misturar(this.tamanho, pose.tam * meiaAltura, k(0.5));
     this.presenca = misturar(this.presenca, pose.presenca, k(0.6));
     this.fornalhaAcesa = misturar(this.fornalhaAcesa, pose.fornalha, k(0.7));
-    this.calor = misturar(this.calor, CALOR_POR_GOLPE[golpes]!, k(golpes === 0 ? 0.2 : 0.9));
+    this.frioFinal = misturar(this.frioFinal, ato === "fecho" ? 1 : 0, k(1.1));
+    this.calor = misturar(this.calor, calorDoAto ?? CALOR_POR_GOLPE[golpes]!, k(golpes === 0 ? 0.2 : 0.9));
     this.relevo = misturar(this.relevo, RELEVO_POR_GOLPE[golpes]!, k(0.35));
     this.tinta.lerp(this.tintaAlvo, k(0.45));
     this.tranco = Math.max(0, this.tranco - dt / 0.42);
@@ -608,19 +670,21 @@ export class CenaDaForja {
       Math.sin(this.tempo * 0.33) * 0.02 + sacode * 0.05,
     );
     const mf = this.frente.material;
-    // O derretido é amarelo-laranja, não branco: a forma da peça tem de se ler desde o começo.
+    // O derretido tem FORMA: o mapa de brasa deixa o alto do relevo quase branco e os sulcos em
+    // laranja fundo (com um emissivo liso, a peça em brasa era uma silhueta chapada de luz).
     const quente = limitar(this.calor + this.clarao * 0.25);
-    corDoCalor(quente * 0.8, mf.emissive);
-    mf.emissiveIntensity = Math.pow(quente, 1.5) * 1.75;
+    corDoCalor(0.4 + quente * 0.34, mf.emissive);
+    mf.emissiveIntensity = Math.pow(quente, 1.4) * 3.1;
     // o metal quente não reflete: a cor (e o reflexo) aparecem conforme ele esfria
     const frio = 1 - limitar(this.calor * 1.15);
-    mf.color.copy(this.tinta).multiplyScalar(0.12 + 0.88 * frio);
-    mf.envMapIntensity = 0.2 + 1.15 * frio;
+    mf.color.copy(this.tinta).multiplyScalar((0.12 + 0.88 * frio) * (1 - 0.22 * this.frioFinal));
+    mf.envMapIntensity = (0.2 + 1.15 * frio) * (1 - 0.4 * this.frioFinal);
     mf.displacementScale = 0.02 + 0.13 * this.relevo;
     mf.normalScale.setScalar(0.1 + 1.25 * this.relevo);
     for (const costa of this.costas) {
-      corDoCalor(quente * 0.62, costa.material.emissive);
-      costa.material.emissiveIntensity = Math.pow(quente, 1.5) * 1.1;
+      // a espessura é sombra: acesa, ela lia como um segundo contorno deslocado da peça
+      corDoCalor(quente * 0.4, costa.material.emissive);
+      costa.material.emissiveIntensity = Math.pow(quente, 1.5) * 0.5;
     }
 
     // ---- a luz e o brilho da fornalha acompanham o calor
@@ -628,12 +692,17 @@ export class CenaDaForja {
     this.luzDaPeca.position.set(this.posicao.x, this.posicao.y - 0.2, 1.3);
     // Fria, a peça é iluminada por uma luz morna (é o que a faz BRONZE, e não vermelha);
     // quente, a luz é a do próprio metal.
-    this.luzDaPeca.intensity = (14 + forca * 34) * this.presenca;
+    this.luzDaPeca.intensity = (14 + forca * 34) * this.presenca * (1 - 0.55 * this.frioFinal);
     corDoCalor(0.45 + forca * 0.3, this.corTemp);
     this.luzDaPeca.color.set(0xffe0b4).lerp(this.corTemp, limitar(forca * 1.4));
-    this.brilho.position.set(this.posicao.x, this.posicao.y - this.tamanho * 0.1, -1.1);
-    this.brilho.scale.setScalar(this.tamanho * (2.5 + forca * 0.9));
-    this.brilho.material.opacity = (0.1 + forca * 0.3) * this.presenca;
+    // no fecho a luz esfria (o teal da água)
+    this.luzDaPeca.color.lerp(this.corTemp.set(0xa8d8d2), 0.6 * this.frioFinal);
+    // O halo fica 1,1 atrás da peça, NA LINHA DA CÂMERA: sem a correção de perspectiva, com a
+    // peça num canto ele aparecia deslocado para o meio da tela, como uma mancha solta.
+    const fundo = (DISTANCIA + 1.1) / DISTANCIA;
+    this.brilho.position.set(this.posicao.x * fundo, this.posicao.y * fundo, -1.1);
+    this.brilho.scale.setScalar(this.tamanho * (2.1 + forca * 0.55));
+    this.brilho.material.opacity = (0.07 + forca * 0.2) * this.presenca * (1 - 0.9 * this.frioFinal);
 
     // ---- a boca da fornalha respira (devagar: nada pisca) e apaga nos atos de leitura
     this.fornalha.material.opacity = (0.16 + Math.sin(this.tempo * 0.7) * 0.03 + forca * 0.14) * this.fornalhaAcesa;
@@ -655,14 +724,14 @@ export class CenaDaForja {
   private moverBrasas(dt: number): void {
     const u = this.brasas.material.uniforms;
     (u.uTempo as { value: number }).value = this.tempo;
-    (u.uOpacidade as { value: number }).value = 0.3 + this.presenca * 0.5;
+    (u.uOpacidade as { value: number }).value = (0.3 + this.presenca * 0.5) * (1 - 0.85 * this.frioFinal);
     const pos = this.brasas.geometry.getAttribute("position") as BufferAttribute;
     const fase = this.brasas.geometry.getAttribute("aFase") as BufferAttribute;
     const quantas = NIVEIS[this.nivel]!.brasas;
     for (let i = 0; i < quantas; i += 1) {
       let y = pos.getY(i) + (0.16 + (fase.getX(i) % 1) * 0.3) * dt;
       let x = pos.getX(i) + Math.sin(this.tempo * 0.6 + fase.getX(i)) * 0.12 * dt;
-      if (y > 4.2) {
+      if (y > TETO_DAS_BRASAS) {
         y = -3.4;
         x = (Math.random() * 2 - 1) * 8;
       }

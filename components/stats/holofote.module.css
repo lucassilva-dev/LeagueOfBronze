@@ -35,13 +35,14 @@
   object-position: 62% 18%;
   pointer-events: none;
 }
-/* o véu que devolve a leitura ao texto: escuro à esquerda e embaixo */
+/* o véu que devolve a leitura ao texto: escuro à esquerda e embaixo; à direita ele abre, e a
+   arte do campeão assinatura ocupa o lado que ficava vazio */
 .enfVeu {
   position: absolute;
   inset: 0;
   pointer-events: none;
   background:
-    linear-gradient(90deg, #0b0805 26%, rgba(11, 8, 5, 0.9) 46%, rgba(11, 8, 5, 0.78) 74%, rgba(11, 8, 5, 0.86) 100%),
+    linear-gradient(90deg, #0b0805 24%, rgba(11, 8, 5, 0.92) 44%, rgba(11, 8, 5, 0.86) 62%, rgba(11, 8, 5, 0.4) 100%),
     linear-gradient(180deg, rgba(11, 8, 5, 0.55) 0%, transparent 30%, rgba(11, 8, 5, 0.82) 100%);
 }
 /* o facho: um cone largo de luz na cor do time, do alto sobre a carta */
@@ -132,7 +133,7 @@
 .nick {
   margin: 0;
   font-family: var(--font-display), "Anton", sans-serif;
-  font-size: clamp(44px, 7.2vw, 132px);
+  font-size: clamp(44px, min(7.2vw, 11vh), 132px);
   font-weight: 400;
   line-height: 0.96;
   letter-spacing: 0.01em;
@@ -141,35 +142,52 @@
   text-shadow: 0 4px 18px rgba(0, 0, 0, 0.8);
 }
 
+/* os três números-herói: enormes, em ouro (é o que se lê de longe e num vídeo comprimido) */
+.herois,
 .numeros {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, max-content));
-  gap: clamp(10px, 2vh, 22px) clamp(18px, 2.8vw, 54px);
-  margin: clamp(2px, 1vh, 10px) 0 0;
+  margin: 0;
 }
+.herois {
+  grid-template-columns: repeat(3, minmax(0, max-content));
+  gap: 6px clamp(22px, 3.4vw, 70px);
+  margin-top: clamp(2px, 1vh, 10px);
+}
+.numeros {
+  grid-template-columns: repeat(5, minmax(0, max-content));
+  gap: 8px clamp(16px, 2.2vw, 44px);
+}
+.herois div,
 .numeros div {
   display: grid;
   gap: 2px;
-  padding-left: 14px;
-  border-left: 4px solid var(--cor);
 }
+.herois div {
+  padding-left: 16px;
+  border-left: 6px solid var(--cor);
+}
+.herois dt,
 .numeros dt {
   font-size: var(--rotulo);
   font-weight: 700;
   letter-spacing: 0.16em;
   line-height: 1.1;
-  color: var(--ferro-claro);
+  color: var(--apoio);
 }
+.herois dd,
 .numeros dd {
   margin: 0;
   font-family: var(--font-display), "Anton", sans-serif;
-  font-size: clamp(34px, 3.9vw, 72px);
   font-variant-numeric: tabular-nums;
   line-height: 0.98;
-  color: var(--tinta);
 }
-.numeros div[data-forte] dd {
+.herois dd {
+  font-size: clamp(50px, min(7.6vw, 12vh), 140px);
   color: var(--ouro);
+}
+.numeros dd {
+  font-size: clamp(28px, min(3.2vw, 5.4vh), 58px);
+  color: var(--tinta);
 }
 .semJogo {
   margin: 0;
@@ -247,19 +265,19 @@
 .campeoes img,
 .semIcone {
   grid-row: 1 / 3;
-  width: 46px;
-  height: 46px;
+  width: clamp(46px, 3vw, 58px);
+  height: clamp(46px, 3vw, 58px);
   border-radius: 3px;
   background: #2b241b;
 }
 .campeaoNome {
-  font-size: 16px;
+  font-size: clamp(16px, 1.1vw, 21px);
   font-weight: 700;
   line-height: 1.15;
   color: var(--tinta);
 }
 .campeaoConta {
-  font-size: 15px;
+  font-size: clamp(15px, 1vw, 19px);
   font-weight: 600;
   line-height: 1.15;
   color: var(--ferro-claro);
@@ -363,12 +381,6 @@
 
 /* ------------------------------------------------------------------ telas menores */
 
-@media (max-width: 1099px) {
-  .numeros {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    column-gap: 14px;
-  }
-}
 
 @media (max-width: 860px) {
   .holofote[open] {
@@ -397,8 +409,16 @@
     justify-self: stretch;
     align-content: start;
   }
+  .herois {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: 12px;
+  }
+  .herois dd {
+    font-size: clamp(40px, 13vw, 72px);
+  }
   .numeros {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px 12px;
   }
   .vizinhos {
     grid-row: 3;

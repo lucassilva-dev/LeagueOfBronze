@@ -80,7 +80,7 @@ type Ato = {
 };
 
 /** Largura e altura mínimas para os atos fixarem (abaixo disso a página corre em fluxo). */
-const LARGURA_DOS_PINOS = 1024;
+const LARGURA_DOS_PINOS = 1280;
 const ALTURA_DOS_PINOS = 560;
 /** Constante de tempo da suavização do `p` (ms): tira o tranco do degrau da roda do mouse. */
 const TAU = 115;

@@ -41,6 +41,8 @@ export function AtoDaBigorna() {
   const texto = (linha: LinhaDoRanking) => (metrica === "kda" ? formatKda(linha.valor, localeTag) : String(linha.valor));
   const info = st.metricasJogador[metrica];
   const jogaram = dados.resumo.jogadores - dados.semJogo.length;
+  // a barra de cada linha: o número dela na proporção do maior da régua
+  const maior = Math.max(0.0001, ...dados.ranking[metrica].map((linha) => linha.valor));
 
   const trocar = (nova: MetricaDeJogador) => {
     if (nova === metrica) return;
@@ -179,15 +181,20 @@ export function AtoDaBigorna() {
                       initial={false}
                       transition={{ type: "spring", stiffness: 420, damping: 40, mass: 0.9 }}
                       className={s.linha}
-                      style={coresDoTime(time) as CSSProperties}
+                      style={{ ...coresDoTime(time), "--f": Math.min(1, Math.max(0, linha.valor / maior)).toFixed(3) } as CSSProperties}
                     >
                       <span className={s.posicao}>{linha.posicao}</span>
                       <Rosto jogador={jogador} time={time} rotulo={preencher(f.cartaAbrir, { nick: jogador.nick })} className={s.rostoDaLinha} dica={false} />
                       <a href={`/jogadores/${encodeURIComponent(jogador.slug)}`} data-jogador={jogador.slug} className={s.nickDaLinha}>
                         {jogador.nick}
-                        <span>{jogador.rota.rotulo}</span>
+                        {/* a rota e o time, logo abaixo do nick (numa coluna à parte o time ficava solto) */}
+                        <span>
+                          {jogador.rota.rotulo}
+                          {time ? <em> · {time.nome}</em> : null}
+                        </span>
                       </a>
-                      <span className={s.timeDaLinha}>{time?.nome ?? ""}</span>
+                      {/* o número da linha em metal, na proporção do líder da régua */}
+                      <span className={s.enfBarraDaLinha} aria-hidden />
                       <Odometro texto={texto(linha)} className={s.numeroDaLinha} />
                     </motion.li>
                   );

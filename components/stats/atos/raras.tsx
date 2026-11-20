@@ -8,12 +8,20 @@ import { CartaoDoAto, preencher, type TimeDe } from "../pecas";
 import type { TextosDaTela } from "../provedor";
 import s from "./raras.module.css";
 
-/** As trincas do molde: quatro riscos que saem do meio (coordenadas numa caixa 100×100). */
+/**
+ * As trincas do molde (coordenadas numa caixa 100×100). As duas verticais correm EXATAMENTE
+ * pela emenda das duas metades (o mesmo zigue-zague do recorte, no CSS): o molde racha onde
+ * trincou. As outras são os ramos que abrem para os lados.
+ */
 const TRINCAS = [
-  "M50 50 L44 38 L48 27 L41 14 L45 2",
-  "M50 50 L58 61 L54 73 L61 86 L57 98",
-  "M50 50 L36 54 L27 49 L14 55 L3 51",
-  "M50 50 L63 45 L73 51 L86 44 L97 49",
+  "M55 47 L45 31 L54 16 L46 0",
+  "M55 47 L46 63 L54 80 L47 100",
+  "M55 47 L40 53 L28 48 L14 55 L3 51",
+  "M55 47 L66 44 L76 51 L88 45 L97 50",
+  "M45 31 L36 26 L31 17",
+  "M46 63 L57 68 L63 77",
+  "M28 48 L24 39",
+  "M76 51 L80 60",
 ] as const;
 
 /** O que vai gravado no molde (duas vezes: uma metade de cada lado da rachadura). */
@@ -25,8 +33,12 @@ function FaceDoMolde({ selo, aviso }: Readonly<{ selo: string; aviso: string }>)
       <img className={s.faceEmblema} src="/emblema-recortado.png" alt="" width={512} height={512} decoding="async" loading="lazy" />
       <span className={s.faceAviso}>{aviso}</span>
       <svg className={s.enfTrincas} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden focusable="false">
+        {/* cada trinca são dois traços: a luz que vaza (larga) e o veio branco de quente (fino) */}
         {TRINCAS.map((d) => (
-          <path key={d} d={d} pathLength={100} />
+          <path key={`halo-${d}`} d={d} pathLength={100} data-camada="halo" />
+        ))}
+        {TRINCAS.map((d) => (
+          <path key={`veio-${d}`} d={d} pathLength={100} data-camada="veio" />
         ))}
       </svg>
     </span>
@@ -44,6 +56,10 @@ export function AtoDasPecasRaras({ dados, t, timeDe }: Readonly<{ dados: DadosDa
   const { f } = t;
   const n = dados.topValor.length;
   const selo = preencher(f.pecasSelo, { n });
+  // Quem custou o mesmo divide o lugar (10, 10, 10, 8… → #1, #1, #1, #4…): a ordem entre
+  // empatados é só a do cadastro, e um «#5» numa carta que vale o mesmo que a «#4» mentia.
+  const valores = dados.topValor.map((slug) => dados.jogadores[slug]?.pts ?? 0);
+  const lugarDe = (i: number) => 1 + valores.filter((v) => v > valores[i]!).length;
 
   return (
     <section id="ato-pecas" className={`${b.ato} ${s.ato}`} data-ato="pecas" data-fixa="" aria-labelledby="titulo-das-pecas">
@@ -78,7 +94,7 @@ export function AtoDasPecasRaras({ dados, t, timeDe }: Readonly<{ dados: DadosDa
               if (!jogador) return null;
               return (
                 <li key={slug} className={s.vaga} style={{ "--i": i } as CSSProperties} data-marca="0.4">
-                  <CartaDoJogador jogador={jogador} time={timeDe(jogador)} t={t} posicao={i + 1} className={s.carta} />
+                  <CartaDoJogador jogador={jogador} time={timeDe(jogador)} t={t} posicao={lugarDe(i)} className={s.carta} />
                 </li>
               );
             })}

@@ -54,10 +54,10 @@
   scroll-margin-top: var(--cab);
 }
 /* No computador as margens guardam o painel de bordo (o trilho dos atos à direita, os comandos à
-   esquerda): nunca menos de 60px, para os botões de 44px não encostarem no conteúdo. */
-@media (min-width: 1024px) {
+   esquerda): nunca menos de 68px, para os botões de 44px não encostarem no conteúdo. */
+@media (min-width: 1280px) {
   .raiz {
-    --margem: clamp(60px, 4vw, 72px);
+    --margem: clamp(68px, 4vw, 76px);
   }
 }
 /* Com a porta da fornalha fechada, a página passa por cima do rodapé do site (que é posicionado
@@ -213,8 +213,9 @@
   flex-shrink: 0;
 }
 .cartaoNome {
-  /* a folga de cima é para o acento de maiúscula (A TÊMPERA) não encostar no «ATO N» */
-  margin: 0.24em 0 4px;
+  /* a folga de cima é para o acento de maiúscula (A TÊMPERA) não encostar no «ATO N»; a de
+     baixo, para a cedilha (AS PEÇAS RARAS) não entrar no subtítulo */
+  margin: 0.24em 0 0.16em;
   font-family: var(--font-display), "Anton", sans-serif;
   font-size: clamp(34px, 4.3vw, 82px);
   font-weight: 400;
@@ -508,7 +509,7 @@
 
 /* Sem pinos a página é rolagem comum: cada ato abraça o próprio conteúdo (um palco de tela inteira
    deixava vazios entre o título, a cena e a legenda) e o título ganha corpo de capítulo. */
-@media (max-width: 1023px) {
+@media (max-width: 1279px) {
   .palco {
     min-height: 0;
     gap: 18px;

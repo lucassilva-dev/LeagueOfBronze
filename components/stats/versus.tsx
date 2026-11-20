@@ -11,7 +11,7 @@ import { confrontoDireto, proximasSeries, type DadosDaForja, type JogadorDaForja
 
 import { CartaDoJogador } from "./carta-do-jogador";
 import { escreverPedidoDeVs, type PedidoDeVs } from "./constantes";
-import { Medalhao, NomeDoTime, Rosto, coresDoTime, preencher } from "./pecas";
+import { Medalhao, NomeDoTime, Rosto, coresDoTime, larguraDaMarca, larguraNaAnton, preencher } from "./pecas";
 import { useForja, type TextosDaTela } from "./provedor";
 import { TelaCheia } from "./tela-cheia";
 import s from "./versus.module.css";
@@ -22,9 +22,13 @@ import s from "./versus.module.css";
  * lados e apertar LUTAR.
  *
  * A tela de luta lê linha a linha quem leva cada número (o maior, ou o menor quando «menos é
- * melhor») e fecha com o veredito. Valor de draft e pontos de elenco aparecem, mas NÃO contam
- * para ninguém: são moeda de draft, não medida de habilidade (é o que a página inteira repete).
- * Quem ainda não jogou aparece com traço — zero abate não é «menos mortes».
+ * melhor») e fecha com o veredito — «FULANO leva 6 de 8 quesitos»: toda linha da tela é um
+ * quesito. Valor de draft e pontos de elenco ficam FORA da luta: são moeda de draft, não medida
+ * de habilidade (é o que a página inteira repete). Quem ainda não jogou aparece com traço — zero
+ * abate não é «menos mortes».
+ *
+ * Nos times, a segunda metade da tela é o ROTA A ROTA: os cinco duelos, jogador contra jogador
+ * da mesma rota, pelo KDA.
  *
  * O confronto mora no endereço (`?vs=t:a,b` / `?vs=j:a,b`): dá para abrir o link antes da partida.
  */
@@ -44,13 +48,13 @@ type Linha = Readonly<{
   /** Quanto da barra cada lado enche (0–1). */
   fracA: number;
   fracB: number;
-  criterio: "maior" | "menor" | "neutra";
+  criterio: "maior" | "menor";
 }>;
 
 const TRACO = "—";
 
 function vencedorDa(linha: Linha): Lado | "empate" | null {
-  if (linha.criterio === "neutra" || linha.a === null || linha.b === null) return null;
+  if (linha.a === null || linha.b === null) return null;
   if (linha.a === linha.b) return "empate";
   const aLeva = linha.criterio === "maior" ? linha.a > linha.b : linha.a < linha.b;
   return aLeva ? "a" : "b";
@@ -102,7 +106,6 @@ function linhasDosTimes(a: TimeDaForja, b: TimeDaForja, t: TextosDaTela, totalDe
   const jogouA = a.jogos.v + a.jogos.d > 0;
   const jogouB = b.jogos.v + b.jogos.d > 0;
   const se = (jogou: boolean, v: number) => (jogou ? v : null);
-  const minutos = new Intl.NumberFormat(localeTag, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   const placar = (lado: Readonly<{ v: number; d: number }>) => `${lado.v}–${lado.d}`;
   /** Vitórias valem mais; com vitórias iguais, menos derrotas. */
   const campanha = (lado: Readonly<{ v: number; d: number }>) => lado.v * 1000 - lado.d;
@@ -143,7 +146,6 @@ function linhasDosTimes(a: TimeDaForja, b: TimeDaForja, t: TextosDaTela, totalDe
   };
 
   return [
-    linha("pts", f.moldesPts, a.pontos, b.pontos, "neutra"),
     posicao,
     series,
     mapas,
@@ -152,7 +154,6 @@ function linhasDosTimes(a: TimeDaForja, b: TimeDaForja, t: TextosDaTela, totalDe
     linha("assist", f.cartaAssist, se(jogouA, a.assistencias), se(jogouB, b.assistencias), "maior"),
     linha("kda", "KDA", se(jogouA, a.kda), se(jogouB, b.kda), "maior", (v) => formatKda(v, localeTag)),
     linha("mvps", "MVPs", se(jogouA, a.mvps), se(jogouB, b.mvps), "maior"),
-    linha("duracao", `${f.vsDuracao} (${f.temperaMin})`, a.duracaoMedia, b.duracaoMedia, "neutra", (v) => minutos.format(v)),
   ];
 }
 
@@ -160,8 +161,6 @@ function linhasDosJogadores(a: JogadorDaForja, b: JogadorDaForja, t: TextosDaTel
   const { f, localeTag } = t;
   const se = (j: JogadorDaForja, v: number) => (j.jogos > 0 ? v : null);
   return [
-    linha("valor", f.cartaValor, a.pts, b.pts, "neutra"),
-    linha("jogos", f.cartaJogos, a.jogos, b.jogos, "neutra"),
     linha("vitorias", f.cartaVitorias, se(a, a.vitorias), se(b, b.vitorias), "maior"),
     linha("abates", f.cartaAbates, se(a, a.abates), se(b, b.abates), "maior"),
     linha("mortes", f.cartaMortes, se(a, a.mortes), se(b, b.mortes), "menor", String, f.vsMenosMelhor),
@@ -169,6 +168,27 @@ function linhasDosJogadores(a: JogadorDaForja, b: JogadorDaForja, t: TextosDaTel
     linha("kda", "KDA", se(a, a.kda), se(b, b.kda), "maior", (v) => formatKda(v, localeTag)),
     linha("mvps", "MVPs", se(a, a.mvps), se(b, b.mvps), "maior"),
   ];
+}
+
+type Duelo = Readonly<{ a: JogadorDaForja | null; b: JogadorDaForja | null }>;
+
+/**
+ * Os duelos do rota a rota: cada jogador do time A diante do adversário da MESMA rota. Quem não
+ * tem par de rota (elenco com duas pessoas na mesma função) enfrenta quem sobrou do outro lado.
+ */
+function duelosPorRota(a: TimeDaForja, b: TimeDaForja, dados: DadosDaForja): Duelo[] {
+  const doA = a.elenco.map((slug) => dados.jogadores[slug]).filter((j): j is JogadorDaForja => Boolean(j));
+  const restoDoB = b.elenco.map((slug) => dados.jogadores[slug]).filter((j): j is JogadorDaForja => Boolean(j));
+  const duelos: { a: JogadorDaForja | null; b: JogadorDaForja | null }[] = [];
+  const semPar: JogadorDaForja[] = [];
+  for (const ja of doA) {
+    const i = restoDoB.findIndex((jb) => jb.rota.sigla === ja.rota.sigla);
+    if (i >= 0) duelos.push({ a: ja, b: restoDoB.splice(i, 1)[0]! });
+    else semPar.push(ja);
+  }
+  for (const ja of semPar) duelos.push({ a: ja, b: restoDoB.shift() ?? null });
+  for (const jb of restoDoB) duelos.push({ a: null, b: jb });
+  return duelos;
 }
 
 // ------------------------------------------------------------------------------------ a tela
@@ -348,6 +368,37 @@ function TelaDoVs({ pedido }: Readonly<{ pedido: PedidoDeVs }>) {
       "--n": luta.linhas.length,
     } as CSSProperties;
 
+    const asLinhas = (
+      <ol className={s.linhas}>
+        {luta.linhas.map((l, i) => {
+          const leva = placar.resultados[i];
+          return (
+            <li key={l.chave} className={s.linha} style={{ "--i": i, "--fa": l.fracA.toFixed(3), "--fb": l.fracB.toFixed(3) } as CSSProperties} data-leva={leva ?? undefined}>
+              <span className={s.soLeitor}>
+                {l.rotulo}: {luta.nomeA} {l.textoA}, {luta.nomeB} {l.textoB}
+              </span>
+              <span className={s.valor} data-lado="a" aria-hidden>
+                {l.textoA}
+              </span>
+              <span className={s.trilho} data-lado="a" aria-hidden>
+                <span className={s.enfBarra} />
+              </span>
+              <span className={s.rotulo} aria-hidden>
+                {l.rotulo}
+                {l.nota ? <small>{l.nota}</small> : null}
+              </span>
+              <span className={s.trilho} data-lado="b" aria-hidden>
+                <span className={s.enfBarra} />
+              </span>
+              <span className={s.valor} data-lado="b" aria-hidden>
+                {l.textoB}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    );
+
     return (
       <TelaCheia rotulo={rotuloDaTela} rotuloDeFechar={f.holofoteFechar} aoFechar={versus.fechar} className={s.versus} inerte={holofote.aberto !== null}>
         <div key={rodada} ref={cena} className={s.luta} style={estilo} data-tipo={luta.tipo} data-leva={quemLeva ?? undefined} tabIndex={-1}>
@@ -381,49 +432,21 @@ function TelaDoVs({ pedido }: Readonly<{ pedido: PedidoDeVs }>) {
             )}
           </div>
 
-          {/* ------------------------------------------------ o miolo: elencos e números */}
-          <div className={s.miolo}>
-            {luta.tipo === "times" ? (
-              <Elenco time={luta.a} outro={luta.b} lado="a" dados={dados} t={t} />
-            ) : (
+          {/* ------------------------------------------------ o miolo */}
+          {luta.tipo === "times" ? (
+            // times: os quesitos de um lado, os cinco duelos de rota do outro
+            <div className={s.miolo} data-tipo="times">
+              {asLinhas}
+              <RotaARota a={luta.a} b={luta.b} dados={dados} t={t} />
+            </div>
+          ) : (
+            // jogadores: os quesitos no meio, os campeões de cada um nas laterais
+            <div className={s.miolo} data-tipo="jogadores">
               <Campeoes jogador={luta.a} lado="a" t={t} />
-            )}
-
-            <ol className={s.linhas}>
-              {luta.linhas.map((l, i) => {
-                const leva = placar.resultados[i];
-                return (
-                  <li key={l.chave} className={s.linha} style={{ "--i": i, "--fa": l.fracA.toFixed(3), "--fb": l.fracB.toFixed(3) } as CSSProperties} data-leva={leva ?? undefined}>
-                    <span className={s.soLeitor}>
-                      {l.rotulo}: {luta.nomeA} {l.textoA}, {luta.nomeB} {l.textoB}
-                    </span>
-                    <span className={s.valor} data-lado="a" aria-hidden>
-                      {l.textoA}
-                    </span>
-                    <span className={s.trilho} data-lado="a" aria-hidden>
-                      <span className={s.enfBarra} />
-                    </span>
-                    <span className={s.rotulo} aria-hidden>
-                      {l.rotulo}
-                      {l.nota ? <small>{l.nota}</small> : null}
-                    </span>
-                    <span className={s.trilho} data-lado="b" aria-hidden>
-                      <span className={s.enfBarra} />
-                    </span>
-                    <span className={s.valor} data-lado="b" aria-hidden>
-                      {l.textoB}
-                    </span>
-                  </li>
-                );
-              })}
-            </ol>
-
-            {luta.tipo === "times" ? (
-              <Elenco time={luta.b} outro={luta.a} lado="b" dados={dados} t={t} />
-            ) : (
+              {asLinhas}
               <Campeoes jogador={luta.b} lado="b" t={t} />
-            )}
-          </div>
+            </div>
+          )}
 
           {/* ------------------------------------------------ o veredito e os comandos */}
           <div className={s.pe}>
@@ -559,10 +582,12 @@ function TelaDoVs({ pedido }: Readonly<{ pedido: PedidoDeVs }>) {
                 <li key={serie.id}>
                   <button type="button" className={s.proxima} onClick={() => lutar({ a: serie.a.slug, b: serie.b.slug }, "times")}>
                     <Medalhao time={serie.a} className={s.proximaMedalha} rotulo="" cunhado={false} />
+                    {/* sempre em duas linhas: um time em cima, «× o outro» embaixo */}
                     <span className={s.proximaNomes}>
                       <span style={{ color: serie.a.cor }}>{serie.a.nome}</span>
-                      <em>×</em>
-                      <span style={{ color: serie.b.cor }}>{serie.b.nome}</span>
+                      <span className={s.proximaContra}>
+                        <em aria-hidden>×</em> <span style={{ color: serie.b.cor }}>{serie.b.nome}</span>
+                      </span>
                     </span>
                     <Medalhao time={serie.b} className={s.proximaMedalha} rotulo="" cunhado={false} />
                     <span className={s.proximaData}>{serie.data}</span>
@@ -646,84 +671,106 @@ function FotoDoJogador({ jogador, className }: Readonly<{ jogador: JogadorDaForj
   );
 }
 
+/** O canto de um time: o medalhão e o nome (que é o link para a página do time), numa linha só. */
 function CantoDoTime({ time, lado, fonte, t }: Readonly<{ time: TimeDaForja; lado: Lado; fonte: string | null; t: TextosDaTela }>) {
-  const { f, s: st } = t;
+  const { f } = t;
   const estreou = time.series.v + time.series.d > 0 || time.jogos.v + time.jogos.d > 0;
   return (
     <div className={s.canto2} data-lado={lado} style={coresDoTime(time)}>
       <Medalhao time={time} className={s.medalha} rotulo="" />
-      <div className={s.cantoTexto}>
-        <NomeDoTime time={time} fonteClasse={fonte} className={s.nome} como="p" />
-        <p className={s.campanha}>
-          {estreou ? `${time.series.v}${st.siglaVitoria} · ${time.series.d}${st.siglaDerrota} ${f.moldesSeries}` : f.moldesSemJogo}
-          {time.posicao !== null && estreou ? <span> · {preencher(f.moldesLugar, { n: time.posicao })}</span> : null}
-        </p>
-        <a className={s.ficha} href={`/times/${encodeURIComponent(time.slug)}`}>
-          {f.moldesVerTime} <span aria-hidden>→</span>
+      <div className={s.cantoTexto} style={{ "--nome-em": larguraDaMarca(time).toFixed(2) } as CSSProperties}>
+        <a className={s.nomeLink} href={`/times/${encodeURIComponent(time.slug)}`} title={f.moldesVerTime}>
+          <NomeDoTime time={time} fonteClasse={fonte} className={s.nome} />
         </a>
+        <p className={s.campanha}>
+          {/* duas linhas, iguais dos dois lados: a campanha em cima, a posição embaixo */}
+          <span>{estreou ? preencher(f.campanhaSeries, { v: time.series.v, d: time.series.d }) : f.moldesSemJogo}</span>
+          {time.posicao !== null && estreou ? <span>{preencher(f.moldesLugar, { n: time.posicao })}</span> : null}
+        </p>
       </div>
     </div>
   );
 }
 
+/** O canto de um jogador: a carta e o nick (o link para a ficha), que nunca quebra no meio. */
 function CantoDoJogador({ jogador, time, lado, t }: Readonly<{ jogador: JogadorDaForja; time: TimeDaForja | null; lado: Lado; t: TextosDaTela }>) {
-  const { f } = t;
+  const { f, s: st } = t;
   return (
     <div className={s.canto2} data-lado={lado} style={coresDoTime(time)}>
       <div className={s.cartaDoCanto} aria-hidden>
         <CartaDoJogador jogador={jogador} time={time} t={t} viraSozinha={false} className={s.carta} />
       </div>
-      <div className={s.cantoTexto}>
-        <p className={s.nomeDoJogador}>{jogador.nick}</p>
-        <p className={s.campanha}>
-          {time ? time.nome : jogador.rota.rotulo}
-          {time ? <span> · {jogador.rota.rotulo}</span> : null}
-        </p>
-        {jogador.jogos === 0 ? <p className={s.campanha}>{f.cartaSemJogo}</p> : null}
-        <a className={s.ficha} href={`/jogadores/${encodeURIComponent(jogador.slug)}`}>
-          {f.cartaFicha} <span aria-hidden>→</span>
+      <div className={s.cantoTexto} style={{ "--nome-em": larguraNaAnton(jogador.nick).toFixed(2) } as CSSProperties}>
+        <a className={`${s.nomeLink} ${s.nomeDoJogador}`} href={`/jogadores/${encodeURIComponent(jogador.slug)}`} title={f.cartaFicha}>
+          {jogador.nick}
         </a>
+        {time ? <p className={s.campanha}>{time.nome}</p> : null}
+        {/* dois pedaços: lado a lado (com o ponto entre eles) ou um em cima do outro, sem ponto solto */}
+        <p className={s.contexto}>
+          <span>{jogador.rota.rotulo}</span>
+          <span>{jogador.jogos > 0 ? `${jogador.jogos} ${st.rotaJogos}` : f.moldesSemJogo}</span>
+        </p>
       </div>
     </div>
   );
 }
 
-/** O elenco de um time na luta, rota a rota: cada um diante do adversário da mesma rota. */
-function Elenco({
-  time,
-  outro,
-  lado,
-  dados,
-  t,
-}: Readonly<{ time: TimeDaForja; outro: TimeDaForja; lado: Lado; dados: DadosDaForja; t: TextosDaTela }>) {
+/**
+ * O ROTA A ROTA: os duelos de rota no meio da tela, um jogador diante do outro (foto, nick e KDA),
+ * com a placa na cor do lado em quem tem o KDA maior.
+ */
+function RotaARota({ a, b, dados, t }: Readonly<{ a: TimeDaForja; b: TimeDaForja; dados: DadosDaForja; t: TextosDaTela }>) {
   const { f, localeTag } = t;
-  const rival = new Map(outro.elenco.map((slug) => [dados.jogadores[slug]?.rota.sigla ?? "", dados.jogadores[slug]] as const));
+  const duelos = duelosPorRota(a, b, dados);
+  const kdaDe = (j: JogadorDaForja | null) => (j && j.jogos > 0 ? formatKda(j.kda, localeTag) : TRACO);
+
   return (
-    <div className={s.elenco} data-lado={lado} style={coresDoTime(time)}>
-      <p className={s.elencoTitulo} aria-hidden={lado === "b" ? true : undefined}>
-        {f.vsRotaARota}
-      </p>
-      <ul data-grupo-de-jogadores="">
-        {time.elenco.map((slug) => {
-          const jogador = dados.jogadores[slug];
-          if (!jogador) return null;
-          const oposto = rival.get(jogador.rota.sigla);
-          const leva = jogador.jogos > 0 && oposto && oposto.jogos > 0 && jogador.kda > oposto.kda;
+    <section className={s.rotas} aria-labelledby="vs-rota-a-rota">
+      <h3 id="vs-rota-a-rota" className={s.rotasTitulo}>
+        {f.vsRotaARota} <span>KDA</span>
+      </h3>
+      <ol className={s.duelos} data-grupo-de-jogadores="">
+        {duelos.map((d, i) => {
+          const rota = (d.a ?? d.b)!.rota;
+          const jogaram = d.a !== null && d.b !== null && d.a.jogos > 0 && d.b.jogos > 0;
+          const leva = jogaram ? (d.a!.kda === d.b!.kda ? "empate" : d.a!.kda > d.b!.kda ? "a" : "b") : undefined;
           return (
-            <li key={slug} data-leva={leva ? "" : undefined}>
-              <span className={s.elencoRota} style={{ color: jogador.rota.cor }}>
-                {jogador.rota.sigla}
+            <li key={`${d.a?.slug ?? "-"}:${d.b?.slug ?? "-"}`} className={s.duelo} data-leva={leva} style={{ "--i": i } as CSSProperties}>
+              <span className={s.soLeitor}>
+                {rota.rotulo}: {d.a ? `${d.a.nick} ${kdaDe(d.a)}` : TRACO}, {d.b ? `${d.b.nick} ${kdaDe(d.b)}` : TRACO}
               </span>
-              <Rosto jogador={jogador} time={time} rotulo={preencher(f.cartaAbrir, { nick: jogador.nick })} className={s.elencoRosto} dica={false} />
-              <span className={s.elencoTexto}>
-                <span className={s.elencoNick}>{jogador.nick}</span>
-                <span className={s.elencoKda}>{jogador.jogos > 0 ? `KDA ${formatKda(jogador.kda, localeTag)}` : f.moldesSemJogo}</span>
+              <LadoDoDuelo jogador={d.a} time={a} lado="a" kda={kdaDe(d.a)} t={t} />
+              <span className={s.dueloRota} style={{ color: rota.cor }} aria-hidden>
+                <span className={s.dueloRotaLonga}>{rota.rotulo}</span>
+                <span className={s.dueloRotaCurta}>{rota.sigla}</span>
               </span>
+              <LadoDoDuelo jogador={d.b} time={b} lado="b" kda={kdaDe(d.b)} t={t} />
             </li>
           );
         })}
-      </ul>
-    </div>
+      </ol>
+    </section>
+  );
+}
+
+function LadoDoDuelo({
+  jogador,
+  time,
+  lado,
+  kda,
+  t,
+}: Readonly<{ jogador: JogadorDaForja | null; time: TimeDaForja; lado: Lado; kda: string; t: TextosDaTela }>) {
+  if (!jogador) return <span className={s.dueloLado} data-lado={lado} aria-hidden />;
+  return (
+    <span className={s.dueloLado} data-lado={lado} style={coresDoTime(time)}>
+      <Rosto jogador={jogador} time={time} rotulo={preencher(t.f.cartaAbrir, { nick: jogador.nick })} className={s.dueloRosto} dica={false} />
+      <span className={s.dueloNick} aria-hidden>
+        {jogador.nick}
+      </span>
+      <span className={s.dueloKda} aria-hidden>
+        {kda}
+      </span>
+    </span>
   );
 }
 

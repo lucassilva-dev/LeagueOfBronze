@@ -5,7 +5,7 @@ import { formatKda } from "@/lib/format";
 import { arteDoCampeao, type JogadorDaForja, type TimeDaForja } from "@/lib/stats/forja";
 
 import s from "./carta.module.css";
-import { EmblemaDoElo, coresDoTime, preencher } from "./pecas";
+import { EmblemaDoElo, coresDoTime, larguraNaAnton, preencher } from "./pecas";
 import type { TextosDaTela } from "./provedor";
 
 /**
@@ -22,20 +22,6 @@ import type { TextosDaTela } from "./provedor";
  *  - `data-vira`     → o clique vira a carta (`data-virada`) e pede a arte do verso;
  *  - `data-jogador`  → abre o holofote (é um link para a ficha: funciona sem JavaScript).
  */
-
-/** A largura aproximada de um texto na Anton, em em (para o nick caber na carta). */
-function larguraNaAnton(texto: string): number {
-  let soma = 0;
-  for (const c of texto) {
-    if (c === " ") soma += 0.2;
-    else if (c >= "0" && c <= "9") soma += 0.47;
-    else if (c === c.toLowerCase() && c !== c.toUpperCase()) soma += 0.43;
-    else if ("IÍÌÎ1.,'!".includes(c)) soma += 0.26;
-    else if ("MWÆ".includes(c)) soma += 0.66;
-    else soma += 0.5;
-  }
-  return Math.max(2.4, soma);
-}
 
 function Foto({ jogador, time }: Readonly<{ jogador: JogadorDaForja; time: TimeDaForja | null }>) {
   if (!jogador.foto) {

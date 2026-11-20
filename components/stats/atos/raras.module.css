@@ -79,6 +79,25 @@
 :global([data-pinos="1"]) .carta {
   --carta-l: calc(var(--carta-h) / 1.42);
 }
+/* as duas bordas do palco: a carta que entra ou sai some no escuro, em vez de ser fatiada a seco */
+:global([data-pinos="1"]) .cena::before,
+:global([data-pinos="1"]) .cena::after {
+  content: "";
+  position: absolute;
+  top: -4%;
+  bottom: -4%;
+  z-index: 5;
+  width: calc(var(--margem) + clamp(40px, 5vw, 100px));
+  pointer-events: none;
+}
+:global([data-pinos="1"]) .cena::before {
+  left: calc(var(--margem) * -1);
+  background: linear-gradient(90deg, #0c0906 0%, #0c0906 28%, transparent 100%);
+}
+:global([data-pinos="1"]) .cena::after {
+  right: calc(var(--margem) * -1);
+  background: linear-gradient(270deg, #0c0906 0%, #0c0906 28%, transparent 100%);
+}
 :global([data-pinos="1"]) .vaga[data-aceso="0"] .carta {
   transform: none;
 }
@@ -114,7 +133,8 @@
   left: 50%;
   z-index: 4;
   display: block;
-  width: min(74cqh, 520px);
+  /* o molde é o momento do ato: quase a altura inteira do palco */
+  width: min(88cqh, 680px);
   aspect-ratio: 1 / 1.08;
   transform: translate(-50%, -50%);
   pointer-events: none;
@@ -180,7 +200,7 @@
   letter-spacing: 0.12em;
   line-height: 1;
   text-align: center;
-  color: #a5692f;
+  color: #e0b276;
   /* gravado: a luz de cima deixa a borda de baixo clara */
   text-shadow:
     0 2px 0 rgba(255, 220, 160, 0.18),
@@ -191,9 +211,10 @@
   white-space: nowrap;
 }
 .faceAviso {
-  font-size: clamp(15px, 2.8cqh, 20px);
+  font-size: clamp(15px, 3.2cqh, 26px);
   letter-spacing: 0.26em;
   white-space: nowrap;
+  color: #d9c7a4;
 }
 .faceEmblema {
   width: auto;
@@ -215,19 +236,39 @@
 }
 .enfTrincas path {
   fill: none;
-  stroke: #ffc061;
-  /* em unidades da caixa 100×100: ~6px num molde de 500px */
-  stroke-width: 1.3;
-  stroke-linejoin: bevel;
-  stroke-linecap: round;
+  stroke-linejoin: miter;
+  stroke-linecap: butt;
   stroke-dasharray: 100;
   stroke-dashoffset: calc((1 - var(--trinca, 1)) * 100px);
+}
+/* a luz da fornalha vazando pela fenda (em unidades da caixa 100×100: ~22px num molde de 640px) */
+.enfTrincas path[data-camada="halo"] {
+  stroke: rgba(255, 106, 43, 0.62);
+  stroke-width: 3.4;
+}
+/* o veio: branco de quente, fino — a fenda propriamente dita */
+.enfTrincas path[data-camada="veio"] {
+  stroke: #fff3dc;
+  stroke-width: 1.1;
 }
 
 /* o molde treme enquanto trinca */
 :global([data-pinos="1"]) .selado[data-aceso="0"] .metade {
   transform: translate(calc(sin(var(--p, 0) * 700) * var(--trinca, 0) * 5px), calc(cos(var(--p, 0) * 900) * var(--trinca, 0) * 3px));
   transition: none;
+}
+
+/* Computador sem pinos (movimento reduzido, janela baixa): as oito cartas numa grade, todas à
+   vista — a fileira de arrastar escondia três delas sem avisar. */
+@media (min-width: 1024px) {
+  :global([data-pinos="0"]) .esteira {
+    flex-wrap: wrap;
+    justify-content: center;
+    overflow: visible;
+  }
+  :global([data-pinos="0"]) .carta {
+    --carta-l: clamp(210px, 19vw, 300px);
+  }
 }
 
 /* No celular a esteira vai de borda a borda e a carta ocupa quase a tela: é a peça do ato. */

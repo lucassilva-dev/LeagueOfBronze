@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { RoleIcon } from "@/components/lob/ui";
 import { eloSvgUrl } from "@/lib/design";
 import type { JogadorDaForja, TimeDaForja } from "@/lib/stats/forja";
+import { METRICAS, larguraEm } from "@/lib/temas/metricas";
 
 import s from "./forja.module.css";
 
@@ -15,6 +16,35 @@ import s from "./forja.module.css";
 /** Troca cada `{chave}` do texto pelo valor; chave sem valor fica como está. */
 export function preencher(modelo: string, valores: Readonly<Record<string, string | number>>): string {
   return modelo.replace(/\{(\w+)\}/g, (inteiro, chave: string) => (chave in valores ? String(valores[chave]) : inteiro));
+}
+
+/**
+ * A largura aproximada de um texto na Anton, em em — para um nick caber numa linha (a fonte de
+ * título do site não tem métrica medida; os avanços abaixo erram para mais, nunca para menos).
+ */
+export function larguraNaAnton(texto: string): number {
+  let soma = 0;
+  for (const c of texto) {
+    if (c === " ") soma += 0.2;
+    else if (c >= "0" && c <= "9") soma += 0.47;
+    else if (c === c.toLowerCase() && c !== c.toUpperCase()) soma += 0.43;
+    else if ("IÍÌÎ1.,'!".includes(c)) soma += 0.26;
+    else if ("MWÆ".includes(c)) soma += 0.66;
+    else soma += 0.5;
+  }
+  return Math.max(2.4, soma);
+}
+
+/**
+ * A largura da MARCA do time em `em`, na fonte do tema dele — para o nome caber no maior tamanho
+ * possível. Fonte medida (lib/temas/metricas.ts) dá a largura exata; as duas sem medição (Exo 2
+ * da RX, Bungee do Queijo Minas) e o time sem tema entram por um avanço médio.
+ */
+const AVANCO_MEDIO: Readonly<Record<string, number>> = { "exo2-italico": 0.66, bungee: 0.72 };
+export function larguraDaMarca(time: Pick<TimeDaForja, "marca" | "fonteTitulo">): number {
+  const metricas = time.fonteTitulo ? METRICAS[time.fonteTitulo] : undefined;
+  if (metricas) return larguraEm(time.marca, metricas);
+  return Math.max(1, time.marca.length * (time.fonteTitulo ? (AVANCO_MEDIO[time.fonteTitulo] ?? 0.6) : 0.5));
 }
 
 /** O time de um jogador, com a identidade dele — ou null para o reserva (sem time). */

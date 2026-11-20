@@ -46,7 +46,7 @@
 }
 /* No computador o emblema 3D fica à direita do título: a frase quebra antes de chegar nele
    (em inglês ela é mais comprida — «THE BRONZE HAS / COOLED.»). */
-@media (min-width: 1024px) {
+@media (min-width: 1280px) {
   .titulo {
     max-width: 7.7em;
   }
@@ -76,24 +76,33 @@
   gap: 4px;
   padding: clamp(18px, 2vw, 36px);
   padding-right: clamp(50px, 5vw, 90px);
-  border: 3px solid var(--bronze-escuro);
-  border-radius: 3px;
-  background: linear-gradient(180deg, #1c150c, #0f0b07);
+  /* uma placa de bronze: moldura de metal e um rebite em cada canto (a caixa de contorno fino
+     era o bloco mais genérico da página) */
+  border: 5px solid transparent;
+  border-radius: 4px;
+  background:
+    radial-gradient(circle, #d9b57a 0 3px, #6a4420 4px 6px, transparent 7px) 9px 9px / 16px 16px no-repeat padding-box,
+    radial-gradient(circle, #d9b57a 0 3px, #6a4420 4px 6px, transparent 7px) calc(100% - 9px) 9px / 16px 16px no-repeat padding-box,
+    radial-gradient(circle, #d9b57a 0 3px, #6a4420 4px 6px, transparent 7px) 9px calc(100% - 9px) / 16px 16px no-repeat padding-box,
+    radial-gradient(circle, #d9b57a 0 3px, #6a4420 4px 6px, transparent 7px) calc(100% - 9px) calc(100% - 9px) / 16px 16px no-repeat padding-box,
+    linear-gradient(180deg, #211a10, #100c07) padding-box,
+    linear-gradient(155deg, #f3d08a 0%, #8a5a2a 34%, #4f3013 62%, #c88a45 100%) border-box;
   text-decoration: none;
-  transition:
-    transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1),
-    border-color 0.2s ease;
+  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .porta:hover,
 .porta:focus-visible {
-  border-color: var(--ouro);
   transform: translateY(-6px);
+}
+.porta:focus-visible {
+  outline: 3px solid var(--branco-quente);
+  outline-offset: 4px;
 }
 .portaNumero {
   font-family: var(--font-display), "Anton", sans-serif;
   font-size: var(--num-m);
   line-height: 0.95;
-  color: var(--bronze);
+  color: var(--ouro);
 }
 .portaTitulo {
   font-family: var(--font-display), "Anton", sans-serif;
@@ -122,11 +131,7 @@
 }
 
 .pe {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px 30px;
+  margin: 0;
 }
 .tabela {
   display: inline-flex;
@@ -150,17 +155,26 @@
   background: var(--ouro);
   color: #160f06;
 }
+/* a assinatura: sozinha, grande, com um fio de bronze em cima */
 .lema {
   margin: 0;
+  padding-top: clamp(14px, 2.4vh, 28px);
+  border-top: 4px solid var(--bronze-escuro);
   font-family: var(--font-display), "Anton", sans-serif;
-  font-size: clamp(18px, 1.9vw, 36px);
-  letter-spacing: 0.08em;
-  color: var(--bronze);
+  font-size: clamp(22px, 3vw, 58px);
+  line-height: 1.08;
+  letter-spacing: 0.06em;
+  text-wrap: balance;
+  color: var(--ouro);
 }
 
 @media (max-width: 700px) {
   .portas {
     grid-template-columns: minmax(0, 1fr);
+  }
+  /* a folga afasta o número do rebite do canto */
+  .porta {
+    padding: 24px 58px 22px 28px;
   }
 }
 

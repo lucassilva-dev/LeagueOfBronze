@@ -253,7 +253,7 @@ describe("o modo VS pelo endereço", () => {
     expect(lido).toContain(t.f.vsRotaARota);
     expect(lido).toContain(`${t.f.cartaAbates}: ${a.nome} ${a.abates}, ${b.nome} ${b.abates}`);
     // quem venceu os dois jogos leva o veredito
-    expect(lido).toMatch(new RegExp(`${a.nome} leva em \\d+ de \\d+`));
+    expect(lido).toMatch(new RegExp(`${a.nome} leva \\d+ de \\d+ quesitos`));
   });
 
   it("time que não existe: cai no seletor, sem inventar adversário", () => {
@@ -271,7 +271,7 @@ describe("o modo VS pelo endereço", () => {
     const html = pagina("pt", { vs: { tipo: "jogadores", a: comJogo.slug, b: semJogo.slug } });
     const lido = texto(html.slice(html.indexOf("<dialog")));
     expect(lido).toContain(`${t.f.cartaAbates}: ${comJogo.nick} ${comJogo.abates}, ${semJogo.nick} —`);
-    expect(lido).not.toMatch(/leva em \d+ de \d+/);
+    expect(lido).not.toMatch(/leva \d+ de \d+/);
   });
 });
 

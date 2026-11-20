@@ -4,6 +4,8 @@
  * As cores da luta chegam em variáveis: --a / --b (a cor de cada lado, escolhidas para se
  * distinguirem de longe) e --a-tinta / --b-tinta (o texto que se lê em cima delas).
  * Tudo mede pela ALTURA da janela (vh): a tela de luta cabe inteira em 1080p e em 720p, sem rolar.
+ * Os nomes medem pela LARGURA do próprio canto (cqi) e pela largura estimada do texto
+ * (--nome-em): o nick e a marca do time cabem numa linha, nunca quebram no meio.
  *
  * Regras da casa: conteúdo só anima transform e cor, sem fill-mode e sem animation-delay (a
  * espera mora DENTRO do keyframe); opacidade só em enfeite (`.enf*`).
@@ -64,7 +66,8 @@
   }
 }
 
-/* as duas metades: a cor de cada lado, apagando para o meio (onde ficam os números) */
+/* as duas metades: a cor de cada lado, apagando para o meio (onde ficam os números). A mistura é
+   com um marrom quente, em oklab: o amarelo dissolvido em preto virava verde-oliva. */
 .enfMetade {
   position: absolute;
   top: 0;
@@ -75,14 +78,14 @@
 .enfMetadeA {
   left: 0;
   background:
-    radial-gradient(90% 70% at 0% 12%, color-mix(in srgb, var(--a) 52%, transparent) 0%, transparent 70%),
-    linear-gradient(90deg, color-mix(in srgb, var(--a) 26%, #0b0805) 0%, #0b0805 86%);
+    radial-gradient(90% 70% at 0% 12%, color-mix(in oklab, var(--a) 48%, transparent) 0%, transparent 70%),
+    linear-gradient(90deg, color-mix(in oklab, var(--a) 26%, #1a0e06) 0%, #0b0805 84%);
 }
 .enfMetadeB {
   right: 0;
   background:
-    radial-gradient(90% 70% at 100% 12%, color-mix(in srgb, var(--b) 52%, transparent) 0%, transparent 70%),
-    linear-gradient(270deg, color-mix(in srgb, var(--b) 26%, #0b0805) 0%, #0b0805 86%);
+    radial-gradient(90% 70% at 100% 12%, color-mix(in oklab, var(--b) 48%, transparent) 0%, transparent 70%),
+    linear-gradient(270deg, color-mix(in oklab, var(--b) 26%, #1a0e06) 0%, #0b0805 84%);
 }
 .enfFaiscas {
   position: absolute;
@@ -100,9 +103,8 @@
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: clamp(10px, 2vw, 40px);
-  /* o lugar do botão de fechar */
-  padding-right: clamp(0px, 14vw, 200px);
-  padding-left: clamp(0px, 14vw, 200px);
+  /* o lugar do botão de fechar (no canto de cima, à direita), espelhado para o VS ficar no meio */
+  padding-inline: clamp(60px, 9vw, 170px);
 }
 .canto2 {
   display: flex;
@@ -139,52 +141,69 @@
   }
 }
 .medalha {
-  --tam: clamp(76px, 17vh, 196px);
+  --tam: clamp(76px, 15.5vh, 176px);
 }
+/* o texto do canto mede a si mesmo: o nome sai da largura que sobrou */
 .cantoTexto {
+  flex: 1 1 0;
   display: grid;
   gap: clamp(2px, 0.7vh, 8px);
   min-width: 0;
+  container-type: inline-size;
 }
 .canto2[data-lado="b"] .cantoTexto {
   justify-items: end;
 }
+/* o nome é o link para a página do time / a ficha do jogador */
+.nomeLink {
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+.nomeLink:focus-visible {
+  outline: 3px solid var(--branco-quente);
+  outline-offset: 4px;
+  border-radius: 3px;
+}
 .nome {
-  font-size: clamp(22px, min(3.5vw, 6.6vh), 68px);
+  font-size: clamp(22px, calc(96cqi / var(--nome-em, 8)), min(7vh, 68px));
 }
 .canto2[data-lado="b"] .nome {
   justify-content: flex-end;
 }
 .nomeDoJogador {
-  margin: 0;
   font-family: var(--font-display), "Anton", sans-serif;
-  font-size: clamp(26px, min(4.4vw, 8vh), 84px);
-  line-height: 0.98;
+  font-size: clamp(22px, calc(96cqi / var(--nome-em, 6)), min(8.4vh, 88px));
+  line-height: 1;
   letter-spacing: 0.01em;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
   color: var(--tinta);
 }
+.nomeDoJogador:hover {
+  color: var(--cor, var(--ouro));
+}
 .campanha {
+  display: grid;
+}
+.campanha,
+.contexto {
   margin: 0;
-  font-size: clamp(15px, 2vh, 22px);
+  font-size: clamp(15px, 2.1vh, 22px);
   font-weight: 700;
   letter-spacing: 0.08em;
-  line-height: 1.25;
-  text-transform: uppercase;
-  color: var(--cor, var(--apoio));
-}
-.ficha {
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
   line-height: 1.2;
   text-transform: uppercase;
-  text-decoration: none;
-  color: var(--ferro-claro);
+  text-wrap: balance;
 }
-.ficha:hover,
-.ficha:focus-visible {
-  color: var(--branco-quente);
+.campanha {
+  color: var(--cor, var(--apoio));
+}
+.contexto {
+  color: var(--apoio);
+}
+.contexto span + span::before {
+  content: "·";
+  margin: 0 0.5em;
 }
 .cartaDoCanto {
   flex-shrink: 0;
@@ -248,41 +267,57 @@
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.9fr) minmax(0, 0.72fr);
-  align-items: center;
-  gap: clamp(12px, 1.8vw, 36px);
+  gap: clamp(14px, 2.4vw, 52px);
   min-height: 0;
 }
+/* times: os quesitos numa metade, o rota a rota na outra */
+.miolo[data-tipo="times"] {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: stretch;
+}
+/* jogadores: os quesitos no meio, os campeões de cada um nas laterais */
+.miolo[data-tipo="jogadores"] {
+  grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.9fr) minmax(0, 0.72fr);
+  align-items: center;
+}
 
-/* os números, linha a linha */
+/* os quesitos, linha a linha */
 .linhas {
   display: grid;
+  align-content: space-evenly;
   gap: clamp(2px, 0.75vh, 9px);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 .linha {
+  --rotulo-l: clamp(150px, 13.4vw, 258px);
   position: relative;
   display: grid;
-  grid-template-columns: 3.1em minmax(0, 1fr) clamp(150px, 13.4vw, 258px) minmax(0, 1fr) 3.1em;
+  grid-template-columns: 3.2em minmax(0, 1fr) var(--rotulo-l) minmax(0, 1fr) 3.2em;
   align-items: center;
   gap: clamp(6px, 0.8vw, 14px);
-  min-height: clamp(30px, 4.5vh, 54px);
+  min-height: clamp(32px, 5.4vh, 64px);
   /* o tamanho do número; o resto da linha mede por ele */
-  font-size: clamp(22px, 3.9vh, 46px);
+  font-size: clamp(24px, 4.5vh, 52px);
 }
-.valor {
-  justify-self: start;
+.miolo[data-tipo="times"] .linha {
+  --rotulo-l: clamp(104px, 9vw, 190px);
+}
+.valor,
+.dueloKda {
   padding: 0.06em 0.26em 0.02em;
   border-radius: 3px;
   font-family: var(--font-display), "Anton", sans-serif;
   font-variant-numeric: tabular-nums;
   line-height: 1.05;
   white-space: nowrap;
-  color: var(--ferro-claro);
+  color: var(--apoio);
   /* cada linha crava na sua vez: a duração cresce com a ordem e a espera mora no keyframe */
   animation: cravaValor calc(0.95s + var(--i) * 0.105s) cubic-bezier(0.2, 0.9, 0.25, 1);
+}
+.valor {
+  justify-self: start;
 }
 .valor[data-lado="a"] {
   justify-self: end;
@@ -302,19 +337,19 @@
   }
 }
 /* quem leva a linha: o número numa placa da cor do lado */
-.linha[data-leva="a"] .valor[data-lado="a"] {
+.linha[data-leva="a"] .valor[data-lado="a"],
+.duelo[data-leva="a"] .dueloLado[data-lado="a"] .dueloKda {
   background-color: var(--a);
   color: var(--a-tinta);
 }
-.linha[data-leva="b"] .valor[data-lado="b"] {
+.linha[data-leva="b"] .valor[data-lado="b"],
+.duelo[data-leva="b"] .dueloLado[data-lado="b"] .dueloKda {
   background-color: var(--b);
   color: var(--b-tinta);
 }
-.linha[data-leva="empate"] .valor {
+.linha[data-leva="empate"] .valor,
+.duelo[data-leva="empate"] .dueloKda {
   color: var(--tinta);
-}
-.linha:not([data-leva]) .valor {
-  color: var(--apoio);
 }
 
 .rotulo {
@@ -372,7 +407,109 @@
   background: #5d5446;
 }
 
-/* ------------------------------------------------------------------ os elencos (rota a rota) */
+/* ------------------------------------------------------------------ o rota a rota (times) */
+
+.rotas {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: clamp(4px, 1vh, 10px);
+  min-width: 0;
+}
+.rotasTitulo {
+  margin: 0;
+  font-size: clamp(15px, 1.9vh, 19px);
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  line-height: 1.1;
+  text-align: center;
+  color: var(--bronze);
+}
+.rotasTitulo span {
+  margin-left: 0.6em;
+  letter-spacing: 0.14em;
+  color: var(--ferro-claro);
+}
+.duelos {
+  display: grid;
+  grid-auto-rows: minmax(0, 1fr);
+  gap: clamp(3px, 0.9vh, 10px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* um duelo: jogador, nick e KDA de um lado; a rota no meio; o espelho do outro lado */
+.duelo {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(56px, 7.4vw, 142px) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(6px, 0.8vw, 14px);
+  min-height: clamp(44px, 7.4vh, 92px);
+  padding: 0 clamp(8px, 0.8vw, 16px);
+  border-radius: 3px;
+  background: rgba(11, 8, 5, 0.72);
+  box-shadow:
+    inset 5px 0 0 #3a3024,
+    inset -5px 0 0 #3a3024;
+}
+.duelo[data-leva="a"] {
+  box-shadow:
+    inset 5px 0 0 var(--a),
+    inset -5px 0 0 #3a3024;
+}
+.duelo[data-leva="b"] {
+  box-shadow:
+    inset 5px 0 0 #3a3024,
+    inset -5px 0 0 var(--b);
+}
+.dueloLado {
+  display: flex;
+  align-items: center;
+  gap: clamp(8px, 0.8vw, 14px);
+  min-width: 0;
+}
+.dueloLado[data-lado="b"] {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+.dueloRosto {
+  --tam: clamp(34px, 5.8vh, 66px);
+}
+.dueloNick {
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: clamp(15px, 2.3vh, 24px);
+  font-weight: 700;
+  line-height: 1.12;
+  overflow-wrap: anywhere;
+  color: var(--tinta);
+}
+.dueloKda {
+  flex-shrink: 0;
+  font-size: clamp(22px, 4vh, 46px);
+}
+.dueloRota {
+  font-size: clamp(15px, 2vh, 20px);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  line-height: 1.1;
+  text-align: center;
+  text-transform: uppercase;
+}
+.dueloRotaCurta {
+  display: none;
+}
+/* em tela mais estreita «ATIRADOR» não cabe entre os dois KDAs: fica a sigla */
+@media (max-width: 1500px) {
+  .dueloRotaLonga {
+    display: none;
+  }
+  .dueloRotaCurta {
+    display: inline;
+  }
+}
+
+/* ------------------------------------------------------------------ os campeões (jogadores) */
 
 .elenco {
   display: grid;
@@ -406,29 +543,12 @@
   padding: 0 clamp(8px, 0.8vw, 14px);
   border-radius: 3px;
   background: rgba(11, 8, 5, 0.72);
-  box-shadow: inset 4px 0 0 #3a3024;
+  box-shadow: inset 5px 0 0 var(--a);
 }
 .elenco[data-lado="b"] li {
   flex-direction: row-reverse;
   text-align: right;
-  box-shadow: inset -4px 0 0 #3a3024;
-}
-.elenco[data-lado="a"] li[data-leva] {
-  box-shadow: inset 4px 0 0 var(--a);
-}
-.elenco[data-lado="b"] li[data-leva] {
-  box-shadow: inset -4px 0 0 var(--b);
-}
-.elencoRota {
-  flex-shrink: 0;
-  width: 2.6em;
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  line-height: 1;
-}
-.elencoRosto {
-  --tam: clamp(32px, 5.4vh, 60px);
+  box-shadow: inset -5px 0 0 var(--b);
 }
 .campeaoIcone {
   flex-shrink: 0;
@@ -451,14 +571,11 @@
   color: var(--tinta);
 }
 .elencoKda {
-  font-size: 15px;
+  font-size: clamp(15px, 1.9vh, 19px);
   font-weight: 600;
   letter-spacing: 0.04em;
   line-height: 1.15;
-  color: var(--ferro-claro);
-}
-.elenco li[data-leva] .elencoKda {
-  color: var(--ouro);
+  color: var(--apoio);
 }
 .elencoVazio {
   margin: 0;
@@ -862,11 +979,10 @@
 .proximaMedalha {
   --tam: 42px;
 }
+/* sempre duas linhas: um time em cima, «× o outro» embaixo */
 .proximaNomes {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 2px 8px;
+  display: grid;
+  gap: 1px;
   min-width: 0;
   font-size: 16px;
   font-weight: 700;
@@ -874,7 +990,7 @@
   line-height: 1.15;
   text-transform: uppercase;
 }
-.proximaNomes em {
+.proximaContra em {
   font-style: normal;
   color: var(--ferro-claro);
 }
@@ -1073,39 +1189,31 @@
   .times {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .topo {
-    padding-right: 0;
-    padding-left: 0;
-    padding-top: 58px;
-  }
 }
 
+/* celular e tablet em pé: a luta vira página (rola), com cada bloco de largura inteira */
 @media (max-width: 900px) {
   .luta {
     min-height: 0;
+    padding-bottom: 28px;
     overflow: visible;
     animation: none;
   }
-  .miolo {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  .topo {
     align-items: start;
-  }
-  .linhas {
-    grid-column: 1 / -1;
-    grid-row: 1;
-  }
-  .linha {
-    grid-template-columns: 4.4em minmax(0, 1fr) minmax(104px, 34vw) minmax(0, 1fr) 4.4em;
-    min-height: 44px;
-    font-size: 24px;
+    gap: 8px;
+    /* o botão de fechar fica por cima: o conteúdo começa abaixo dele */
+    padding: 58px 0 0;
   }
   .canto2,
   .canto2[data-lado="b"] {
     flex-direction: column;
     text-align: center;
   }
-  .canto2 .cantoTexto,
+  .cantoTexto,
   .canto2[data-lado="b"] .cantoTexto {
+    flex: none;
+    width: 100%;
     justify-items: center;
   }
   .canto2 .nome,
@@ -1118,17 +1226,84 @@
   .cartaDoCanto .carta {
     --carta-l: clamp(88px, 26vw, 140px);
   }
+  /* canto estreito: a rota em cima, os jogos embaixo (o ponto do meio ficava no fim da linha) */
+  .contexto {
+    display: grid;
+  }
+  .contexto span + span::before {
+    content: none;
+  }
   .marca {
     width: clamp(54px, 15vw, 96px);
+    margin-top: 12px;
   }
   .marcaTexto {
     font-size: clamp(36px, 11vw, 72px);
   }
+  .miolo[data-tipo="times"] {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 22px;
+  }
+  .miolo[data-tipo="jogadores"] {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+    gap: 22px 12px;
+  }
+  .miolo[data-tipo="jogadores"] .linhas {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+  .linhas {
+    gap: 6px;
+  }
+  .linha,
+  .miolo[data-tipo="times"] .linha {
+    grid-template-columns: 4.2em minmax(0, 1fr) minmax(96px, 30vw) minmax(0, 1fr) 4.2em;
+    min-height: 46px;
+    font-size: 26px;
+  }
+  /* o duelo no celular: a foto ao lado, o nick em cima do KDA; a rota vira sigla */
+  .duelos {
+    gap: 6px;
+  }
+  .duelo {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    min-height: 0;
+    padding: 8px 12px;
+  }
+  .dueloLado {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "rosto nick"
+      "rosto kda";
+    gap: 2px 8px;
+  }
+  .dueloLado[data-lado="b"] {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "nick rosto"
+      "kda rosto";
+    justify-items: end;
+  }
+  .dueloRosto {
+    grid-area: rosto;
+    --tam: 44px;
+  }
+  .dueloNick {
+    grid-area: nick;
+    font-size: 15px;
+  }
+  .dueloKda {
+    grid-area: kda;
+    justify-self: start;
+    font-size: 26px;
+  }
+  .dueloLado[data-lado="b"] .dueloKda {
+    justify-self: end;
+  }
   .elenco li {
     min-height: 52px;
-  }
-  .elencoRosto {
-    --tam: 38px;
   }
   .campeaoIcone {
     width: 38px;
@@ -1154,12 +1329,10 @@
   .trilho {
     display: none;
   }
-  .linha {
+  .linha,
+  .miolo[data-tipo="times"] .linha {
     grid-template-columns: 4.2em minmax(0, 1fr) 4.2em;
     gap: 8px;
-  }
-  .elencoRota {
-    display: none;
   }
 }
 
@@ -1168,6 +1341,7 @@
   .canto2,
   .marcaTexto,
   .valor,
+  .dueloKda,
   .enfBarra,
   .veredito,
   .lutar:not(:disabled) .enfPulso {

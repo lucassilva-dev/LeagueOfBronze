@@ -22,10 +22,15 @@
   position: absolute;
   inset: -6% -4%;
   width: 108%;
+  /* a regra global do site limita toda imagem a 100% de largura: sem isto a arte acabava numa
+     aresta seca antes da borda direita */
+  max-width: none;
   height: 112%;
   object-fit: cover;
   object-position: 50% 22%;
-  filter: saturate(0.8) brightness(0.36) contrast(1.1);
+  /* duotom de bronze: a arte de cada campeão entra na paleta da forja (o verde-água da Karma
+     tirava a tela inteira do tom) */
+  filter: grayscale(1) sepia(1) saturate(2.1) hue-rotate(-14deg) brightness(0.4) contrast(1.15);
   transform: translate(calc(var(--mx, 0) * -18px), calc(var(--my, 0) * -12px + (var(--p, 1) - 0.5) * -70px));
 }
 
@@ -49,6 +54,27 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+/* a manchete do ato: o número primeiro */
+.manchete {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 12px;
+  margin: clamp(8px, 1.4vh, 16px) 0 0;
+  font-size: clamp(17px, 1.5vw, 28px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+  text-transform: uppercase;
+  color: var(--tinta);
+}
+.manchete strong {
+  font-family: var(--font-display), "Anton", sans-serif;
+  font-size: clamp(40px, 4.4vw, 84px);
+  font-weight: 400;
+  line-height: 0.95;
+  color: var(--ouro);
 }
 .aba,
 .verTodos {
@@ -452,7 +478,7 @@
 
 /* ------------------------------------------------------------------ telas menores */
 
-@media (max-width: 1023px) {
+@media (max-width: 1279px) {
   .ato {
     padding-top: 0;
   }
@@ -475,6 +501,9 @@
     grid-template-columns: minmax(0, 1fr);
   }
   .orbita {
+    /* em fluxo a órbita não cresce com a janela: num tablet deitado ela tomava a tela inteira */
+    justify-self: center;
+    width: min(100%, 640px);
     aspect-ratio: 1 / 1.2;
   }
   .anel,

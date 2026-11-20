@@ -48,21 +48,16 @@
 }
 .enfRio {
   fill: none;
-  stroke: rgba(87, 216, 203, 0.14);
+  stroke: rgba(87, 216, 203, 0.3);
   stroke-width: 34;
   stroke-linecap: round;
 }
-.enfSulco,
-.enfSulcoApagado {
+.enfSulco {
   fill: none;
   stroke: #2b2118;
   stroke-width: 26;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-.enfSulcoApagado {
-  stroke: #1d160f;
-  stroke-width: 18;
 }
 .enfHalo,
 .enfVeio {
@@ -170,8 +165,9 @@
   gap: 0 clamp(10px, 1.2vw, 20px);
   min-height: 0;
   padding: clamp(4px, 0.8vh, 10px) clamp(10px, 1vw, 18px);
-  border-left: var(--traco) solid var(--rota);
-  background: linear-gradient(90deg, color-mix(in srgb, var(--rota) 16%, transparent), transparent 70%);
+  /* a linha carrega a cor do TIME do craque; a rota fica na etiqueta (ícone e nome) */
+  border-left: 5px solid var(--cor, var(--rota));
+  background: linear-gradient(90deg, color-mix(in srgb, var(--cor, var(--rota)) 18%, transparent), transparent 72%);
   transition: border-color 0.5s ease;
 }
 /* com o ato fixo, a linha mede a si mesma: nick e KDA saem da ALTURA dela (cabem no 720p) */
@@ -276,7 +272,7 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  font-size: clamp(15px, 0.95vw, 17px);
+  font-size: clamp(15px, 1.05vw, 20px);
   line-height: 1.2;
   white-space: nowrap;
 }
@@ -332,7 +328,7 @@
 /* ------------------------------------------------------------------ telas menores */
 
 /* tablet: o mapa do Rift fica ao lado das linhas, menor */
-@media (min-width: 701px) and (max-width: 1023px) {
+@media (min-width: 701px) and (max-width: 1279px) {
   .cena {
     grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr);
     align-items: start;
@@ -352,7 +348,7 @@
     width: min(100%, 440px);
   }
 }
-@media (max-width: 1023px) {
+@media (max-width: 1279px) {
   /* o rótulo da rota ganha a linha inteira (ao lado do KDA ele batia no número) e o nome do
      time quebra em duas linhas em vez de ser cortado */
   .linha {

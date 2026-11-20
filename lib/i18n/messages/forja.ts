@@ -45,15 +45,15 @@ export type TextosDaForja = {
   ligaBronzeMuitos: string;
   ligaJogador: string;
   ligaJogadores: string;
-  ligaDica: string;
 
   // ---------- ato III
   moldesPts: string;
   moldesSemJogo: string;
   moldesNota: string;
   moldesLugar: string;
+  /** A campanha em séries como placar ({v}–{d}): «2V · 0D» lia-se «OD». */
+  campanhaSeries: string;
   moldesVerTime: string;
-  moldesSeries: string;
 
   // ---------- ato IV e a carta
   pecasNota: string;
@@ -89,6 +89,8 @@ export type TextosDaForja = {
 
   // ---------- ato VII
   arsenalNota: string;
+  /** A manchete do ato, depois do número: «118 campeões diferentes em 26 jogos». */
+  arsenalManchete: string;
   arsenalLider: string;
   arsenalVerTodos: string;
   arsenalVerMenos: string;
@@ -100,6 +102,7 @@ export type TextosDaForja = {
   temperaMedia: string;
   temperaNota: string;
   temperaMin: string;
+  temperaLegenda: string;
   temperaVerPartida: string;
 
   // ---------- fecho
@@ -236,14 +239,13 @@ export const forja = definir<TextosDaForja>({
     ligaBronzeMuitos: "{n} Bronzes de verdade: o nome do campeonato não mente.",
     ligaJogador: "jogador",
     ligaJogadores: "jogadores",
-    ligaDica: "Passe o mouse (ou toque) num lingote para ver quem é.",
 
     moldesPts: "PTS DE ELENCO",
     moldesSemJogo: "ainda não estreou",
     moldesNota: "Todo mundo saiu do draft com a carteira parecida. O resto é mecânica.",
     moldesLugar: "{n}º na tabela",
+    campanhaSeries: "{v}–{d} em séries",
     moldesVerTime: "Página do time",
-    moldesSeries: "séries",
 
     pecasNota: "Os {n} mais caros do draft. Preço não é promessa.",
     pecasSelo: "TOP {n} · VALOR DE DRAFT",
@@ -275,6 +277,7 @@ export const forja = definir<TextosDaForja>({
     bigornaCriterio: "Critério do ranking",
 
     arsenalNota: "{n} campeões diferentes em {jogos} jogos.",
+    arsenalManchete: "campeões diferentes em {jogos} jogos",
     arsenalLider: "Nº 1",
     arsenalVerTodos: "VER TODOS ({n})",
     arsenalVerMenos: "SÓ O TOPO",
@@ -285,6 +288,7 @@ export const forja = definir<TextosDaForja>({
     temperaMedia: "MÉDIA",
     temperaNota: "{n} jogos com tempo registrado. O mais rápido mal esquentou a cadeira.",
     temperaMin: "min",
+    temperaLegenda: "Cada moeda é um jogo, com o escudo de quem venceu.",
     temperaVerPartida: "Ver a partida",
 
     fechoTitulo: "O BRONZE ESFRIOU.",
@@ -338,7 +342,7 @@ export const forja = definir<TextosDaForja>({
     vsNovo: "NOVO CONFRONTO",
     vsCopiar: "COPIAR LINK",
     vsCopiado: "LINK COPIADO",
-    vsVantagem: "{nome} leva em {n} de {total}",
+    vsVantagem: "{nome} leva {n} de {total} quesitos",
     vsEmpate: "EMPATE TÉCNICO",
     vsConfronto: "CONFRONTO DIRETO",
     vsSemConfronto: "Ainda não se enfrentaram nesta edição.",
@@ -414,14 +418,13 @@ export const forja = definir<TextosDaForja>({
     ligaBronzeMuitos: "{n} real Bronzes: the tournament's name doesn't lie.",
     ligaJogador: "player",
     ligaJogadores: "players",
-    ligaDica: "Hover (or tap) an ingot to see who's in it.",
 
     moldesPts: "ROSTER PTS",
     moldesSemJogo: "yet to debut",
     moldesNota: "Everyone left the draft with a similar wallet. The rest is mechanics.",
     moldesLugar: "#{n} in the standings",
+    campanhaSeries: "{v}–{d} in series",
     moldesVerTime: "Team page",
-    moldesSeries: "series",
 
     pecasNota: "The {n} priciest picks of the draft. Price is not a promise.",
     pecasSelo: "TOP {n} · DRAFT VALUE",
@@ -453,6 +456,7 @@ export const forja = definir<TextosDaForja>({
     bigornaCriterio: "Ranking criterion",
 
     arsenalNota: "{n} different champions in {jogos} games.",
+    arsenalManchete: "different champions in {jogos} games",
     arsenalLider: "No. 1",
     arsenalVerTodos: "SHOW ALL ({n})",
     arsenalVerMenos: "TOP ONLY",
@@ -463,6 +467,7 @@ export const forja = definir<TextosDaForja>({
     temperaMedia: "AVERAGE",
     temperaNota: "{n} games with a recorded time. The fastest barely warmed the chair.",
     temperaMin: "min",
+    temperaLegenda: "Each coin is a game, stamped with the winner's crest.",
     temperaVerPartida: "See the match",
 
     fechoTitulo: "THE BRONZE HAS COOLED.",
@@ -516,7 +521,7 @@ export const forja = definir<TextosDaForja>({
     vsNovo: "NEW MATCHUP",
     vsCopiar: "COPY LINK",
     vsCopiado: "LINK COPIED",
-    vsVantagem: "{nome} leads {n} of {total}",
+    vsVantagem: "{nome} takes {n} of {total} categories",
     vsEmpate: "DEAD HEAT",
     vsConfronto: "HEAD TO HEAD",
     vsSemConfronto: "They haven't met yet this edition.",

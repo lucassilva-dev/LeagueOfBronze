@@ -22,6 +22,9 @@ const CANAIS = {
   BOT: { d: "M 122 514 L 450 514 Q 514 514 514 450 L 514 122", no: [504, 504] },
 } as const;
 
+/** A selva de baixo: o segundo arco, que enche junto com o de cima (é a mesma rota). */
+const SELVA_DE_BAIXO = "M 148 496 Q 300 488 394 394 Q 488 300 496 148";
+
 /** Em que canal e em que ponto do roteiro cada rota acende (o `p` do ato). */
 const ROTEIRO: Readonly<Record<string, { canal: keyof typeof CANAIS; no: readonly [number, number]; em: number }>> = {
   TOP: { canal: "TOP", no: CANAIS.TOP.no, em: 0.22 },
@@ -112,9 +115,8 @@ export function AtoDosCanais({ dados, t, timeDe }: Readonly<{ dados: DadosDaForj
               {/* a caixa do molde e o rio */}
               <rect className={s.enfCaixa} x="14" y="14" width="572" height="572" rx="26" />
               <path className={s.enfRio} d="M 150 150 L 450 450" />
-              {/* a selva de baixo (só cenário) */}
-              <path className={s.enfSulcoApagado} d="M 148 496 Q 300 488 394 394 Q 488 300 496 148" />
               {/* os sulcos por onde o metal vai correr */}
+              <path className={s.enfSulco} d={SELVA_DE_BAIXO} />
               {Object.entries(CANAIS).map(([chave, canal]) => (
                 <path key={`sulco-${chave}`} className={s.enfSulco} d={canal.d} />
               ))}
@@ -125,6 +127,11 @@ export function AtoDosCanais({ dados, t, timeDe }: Readonly<{ dados: DadosDaForj
                   <path className={s.enfVeio} d={canal.d} pathLength={100} />
                 </g>
               ))}
+              {/* a selva é dos dois lados do rio: o arco de baixo acende com o de cima */}
+              <g className={s.enfCanalSEL}>
+                <path className={s.enfHalo} d={SELVA_DE_BAIXO} pathLength={100} />
+                <path className={s.enfVeio} d={SELVA_DE_BAIXO} pathLength={100} />
+              </g>
               {/* as bases */}
               <circle className={s.enfBaseAzul} cx="86" cy="514" r="30" />
               <circle className={s.enfBaseVermelha} cx="514" cy="86" r="30" />

@@ -177,7 +177,8 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.18fr) minmax(0, 1fr);
   align-items: end;
   gap: clamp(10px, 1.4vw, 26px);
-  margin: 0;
+  /* a etiqueta do 1º lugar sobe acima do degrau: a folga impede que encoste nos critérios */
+  margin: clamp(18px, 2.6vh, 32px) 0 0;
   padding: 0;
   list-style: none;
 }
@@ -350,7 +351,7 @@
   gap: 10px;
 }
 .outros dt {
-  font-size: 15px;
+  font-size: clamp(15px, 0.95vw, 18px);
   font-weight: 700;
   letter-spacing: 0.16em;
   line-height: 1.1;
@@ -379,11 +380,11 @@
 .linha {
   position: relative;
   display: grid;
-  grid-template-columns: clamp(40px, 3.4vw, 64px) auto minmax(0, 1.2fr) minmax(0, 1fr) auto;
+  grid-template-columns: clamp(40px, 3.4vw, 64px) auto minmax(0, 1fr) minmax(0, 1.5fr) auto;
   align-items: center;
   gap: clamp(10px, 1.2vw, 22px);
   padding: clamp(8px, 1vh, 12px) clamp(8px, 1vw, 18px);
-  border-bottom: 2px solid rgba(201, 138, 75, 0.2);
+  border-bottom: 3px solid #1c1610;
   /* fundo opaco: as linhas passam umas por cima das outras enquanto trocam de lugar */
   background: #0f0b07;
 }
@@ -419,11 +420,35 @@
   inset: 0;
 }
 .nickDaLinha span {
-  font-size: clamp(15px, 0.9vw, 17px);
+  overflow: hidden;
+  font-size: clamp(15px, 0.95vw, 18px);
   font-weight: 600;
   letter-spacing: 0.06em;
+  text-overflow: ellipsis;
   text-transform: uppercase;
   color: var(--ferro-claro);
+}
+.nickDaLinha span em {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--cor);
+}
+/* a barra de metal: o valor da linha na proporção do líder (cresce e encolhe ao trocar a régua) */
+.enfBarraDaLinha {
+  position: relative;
+  height: clamp(8px, 1.3vh, 14px);
+  border-radius: 2px;
+  background: #1c1610;
+  overflow: hidden;
+}
+.enfBarraDaLinha::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #7c4e22, #c98a4b 55%, #f0c88a);
+  transform: scaleX(var(--f, 0));
+  transform-origin: 0 50%;
+  transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .nickDaLinha:focus-visible {
   outline: none;
@@ -431,17 +456,6 @@
 .nickDaLinha:focus-visible::after {
   outline: 3px solid var(--branco-quente);
   outline-offset: -3px;
-}
-.timeDaLinha {
-  min-width: 0;
-  overflow: hidden;
-  font-size: clamp(15px, 1vw, 18px);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-overflow: ellipsis;
-  text-transform: uppercase;
-  white-space: nowrap;
-  color: var(--cor);
 }
 .numeroDaLinha {
   justify-self: end;
@@ -477,7 +491,7 @@
 
 /* ------------------------------------------------------------------ telas menores */
 
-@media (max-width: 1023px) {
+@media (max-width: 1279px) {
   .ato {
     padding-top: 0;
   }
@@ -519,12 +533,17 @@
   .linha {
     grid-template-columns: 34px auto minmax(0, 1fr) auto;
   }
-  .timeDaLinha {
+  .enfBarraDaLinha {
     display: none;
+  }
+  /* sem a barra, a linha de baixo (rota e time) quebra em vez de ser cortada */
+  .nickDaLinha,
+  .nickDaLinha span {
+    white-space: normal;
   }
 }
 /* tablet: três degraus estreitos — a foto sobe para cima do nick, que pode quebrar */
-@media (min-width: 701px) and (max-width: 1023px) {
+@media (min-width: 701px) and (max-width: 1279px) {
   .degrau {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
@@ -555,5 +574,8 @@
   .enfPulso,
   .degrau[data-bate] {
     animation: none;
+  }
+  .enfBarraDaLinha::after {
+    transition: none;
   }
 }

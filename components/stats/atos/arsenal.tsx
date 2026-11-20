@@ -57,11 +57,14 @@ export function AtoDoArsenal() {
     return formatKda(v, localeTag);
   };
   // As mesmas legendas da tabela antiga, por aba.
+  // «picks» e «bans» por extenso, e vitórias–derrotas como placar: «6V · 0D» lia-se «OD».
+  const picks = f.colPicks.toLowerCase();
+  const bans = f.colBans.toLowerCase();
   const sub = (c: CampeaoDaForja): string => {
-    if (metrica === "jogados") return `${c.vitorias}${st.siglaVitoria} · ${c.derrotas}${st.siglaDerrota}`;
+    if (metrica === "jogados") return `${st.siglaVitoria}–${st.siglaDerrota} ${c.vitorias}–${c.derrotas}`;
     if (metrica === "banidos") return `${Math.round(c.banRate)}% ${st.siglaDosJogos}`;
-    if (metrica === "presenca") return `${c.picks}${st.siglaPick} · ${c.bans}${st.siglaBan}`;
-    if (metrica === "winrate") return `${c.vitorias}${st.siglaVitoria}/${c.picks}${st.siglaJogo}`;
+    if (metrica === "presenca") return `${c.picks} ${picks} · ${c.bans} ${bans}`;
+    if (metrica === "winrate") return `${st.siglaVitoria}/${st.siglaJogo} ${c.vitorias}/${c.picks}`;
     return `${c.abates}/${c.mortes}/${c.assistencias}`;
   };
 
@@ -96,7 +99,12 @@ export function AtoDoArsenal() {
 
       <div className={`${b.palco} ${s.palco}`}>
         <div className={s.topo}>
-          <CartaoDoAto numero={f.atos.arsenal.numero} nome={f.atos.arsenal.nome} sub={f.atos.arsenal.sub} id="titulo-do-arsenal" />
+          <CartaoDoAto numero={f.atos.arsenal.numero} nome={f.atos.arsenal.nome} sub={f.atos.arsenal.sub} id="titulo-do-arsenal">
+            {/* a história do ato num número: quantos campeões diferentes já entraram em jogo */}
+            <p className={s.manchete}>
+              <strong>{distintos}</strong> {preencher(f.arsenalManchete, { jogos: dados.resumo.jogos })}
+            </p>
+          </CartaoDoAto>
           <div className={s.abas} role="group" aria-label={f.arsenalAbas}>
             {METRICAS_DE_CAMPEAO.map((chave) => (
               <button key={chave} type="button" className={s.aba} aria-pressed={chave === metrica} onClick={() => trocar(chave)}>
@@ -157,12 +165,10 @@ export function AtoDoArsenal() {
                 <p className={s.focoQuem}>
                   <span className={s.focoLugar}>{foco.chave === lider.chave ? f.arsenalLider : `${campeoes.indexOf(foco) + 1}º`}</span>
                   <span className={s.focoNome}>{foco.nome}</span>
+                  {/* por extenso: «6P · 0B · 6V/0D» era sopa de letras (e o zero lia-se «O») */}
                   <span className={s.focoSub}>
-                    {foco.picks}
-                    {st.siglaPick} · {foco.bans}
-                    {st.siglaBan} · {foco.vitorias}
-                    {st.siglaVitoria}/{foco.derrotas}
-                    {st.siglaDerrota} · KDA {formatKda(foco.kda, localeTag)}
+                    {foco.picks} {picks} · {foco.bans} {bans} · {st.siglaVitoria}–{st.siglaDerrota} {foco.vitorias}–{foco.derrotas} · KDA{" "}
+                    {formatKda(foco.kda, localeTag)}
                   </span>
                 </p>
                 <p className={s.focoValor}>
@@ -192,9 +198,7 @@ export function AtoDoArsenal() {
                 ))}
               </ol>
               <div className={s.pe}>
-                <p className={s.descricao}>
-                  {info.desc} {preencher(f.arsenalNota, { n: distintos, jogos: dados.resumo.jogos })}
-                </p>
+                <p className={s.descricao}>{info.desc}</p>
                 {campeoes.length > TOPO ? (
                   <button type="button" className={s.verTodos} aria-expanded={aberto} onClick={() => setAberto((v) => !v)}>
                     {aberto ? f.arsenalVerMenos : preencher(f.arsenalVerTodos, { n: campeoes.length })}

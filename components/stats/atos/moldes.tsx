@@ -1,24 +1,11 @@
 import type { CSSProperties } from "react";
 
-import type { DadosDaForja, TimeDaForja } from "@/lib/stats/forja";
-import { METRICAS, larguraEm } from "@/lib/temas/metricas";
+import type { DadosDaForja } from "@/lib/stats/forja";
 
 import b from "../forja.module.css";
-import { CartaoDoAto, Medalhao, NomeDoTime, Odometro, Rosto, coresDoTime, preencher } from "../pecas";
+import { CartaoDoAto, Medalhao, NomeDoTime, Odometro, Rosto, coresDoTime, larguraDaMarca, preencher } from "../pecas";
 import type { TextosDaTela } from "../provedor";
 import s from "./moldes.module.css";
-
-/**
- * A largura da MARCA do time em `em`, na fonte do tema dele — para o nome caber na célula no
- * maior tamanho possível. Fonte medida (lib/temas/metricas.ts) dá a largura exata; as duas sem
- * medição (Exo 2 da RX, Bungee do Queijo Minas) e o time sem tema entram por um avanço médio.
- */
-const AVANCO_MEDIO: Readonly<Record<string, number>> = { "exo2-italico": 0.66, bungee: 0.72 };
-function larguraDaMarca(time: TimeDaForja): number {
-  const metricas = time.fonteTitulo ? METRICAS[time.fonteTitulo] : undefined;
-  if (metricas) return larguraEm(time.marca, metricas);
-  return Math.max(1, time.marca.length * (time.fonteTitulo ? (AVANCO_MEDIO[time.fonteTitulo] ?? 0.6) : 0.5));
-}
 
 /**
  * ATO III — OS MOLDES. A força dos times: o bronze derretido enche o molde (um escudo) de cada
@@ -34,7 +21,7 @@ export function AtoDosMoldes({
   t,
   fontes,
 }: Readonly<{ dados: DadosDaForja; t: TextosDaTela; fontes: Readonly<Record<string, string>> }>) {
-  const { f, s: st } = t;
+  const { f } = t;
   const maior = Math.max(1, ...dados.times.map((time) => time.pontos));
 
   return (
@@ -46,9 +33,8 @@ export function AtoDosMoldes({
           <ol className={s.grade}>
             {dados.times.map((time, i) => {
               const estreou = time.series.v + time.series.d > 0 || time.jogos.v + time.jogos.d > 0;
-              const campanha = estreou
-                ? `${time.series.v}${st.siglaVitoria} · ${time.series.d}${st.siglaDerrota} ${f.moldesSeries}`
-                : f.moldesSemJogo;
+              // placar («2–0 em séries»): «2V · 0D» lia-se «OD»
+              const campanha = estreou ? preencher(f.campanhaSeries, { v: time.series.v, d: time.series.d }) : f.moldesSemJogo;
               return (
                 <li
                   key={time.id}

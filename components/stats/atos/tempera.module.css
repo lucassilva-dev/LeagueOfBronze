@@ -22,10 +22,12 @@
 .regua {
   --jogo: 40px;
   --vao: 6px;
+  /* a grossura da barra de calor: um vergalhão em brasa, não um fio */
+  --barra: 30px;
   /* até onde a frente de calor já chegou (sai do `p`; sem `p`, a régua inteira) */
   --frente: clamp(0, calc((var(--p, 1) - 0.2) / 0.58), 1);
   position: relative;
-  min-height: calc(var(--pilha, 3) * (var(--jogo) + var(--vao)) + 86px);
+  min-height: calc(var(--pilha, 3) * (var(--jogo) + var(--vao)) + 64px + var(--barra));
   margin: 0 clamp(18px, 3%, 46px);
 }
 :global([data-pinos="1"]) .regua {
@@ -33,7 +35,8 @@
   min-height: 0;
   /* o jogo mede pelo palco: a maior pilha cabe inteira (altura) e dois minutos vizinhos não se
      atropelam (largura de um minuto na régua) */
-  --jogo: clamp(24px, min(calc((100cqh - 92px) / var(--pilha, 3) - var(--vao)), calc(100cqi / var(--faixa, 30) - 5px)), 58px);
+  --barra: clamp(26px, 9cqh, 52px);
+  --jogo: clamp(24px, min(calc((100cqh - 70px - var(--barra)) / var(--pilha, 3) - var(--vao)), calc(100cqi / var(--faixa, 30) - 5px)), 58px);
 }
 
 .barra {
@@ -41,9 +44,14 @@
   left: 0;
   right: 0;
   bottom: 44px;
-  height: 22px;
-  border-radius: 3px;
+  height: var(--barra);
+  border-radius: 4px;
   background: var(--ferro-escuro);
+  /* o volume do vergalhão: luz por cima, sombra por baixo */
+  box-shadow:
+    inset 0 4px 0 rgba(255, 243, 220, 0.2),
+    inset 0 -5px 0 rgba(0, 0, 0, 0.38),
+    0 6px 14px rgba(0, 0, 0, 0.6);
   overflow: hidden;
 }
 /* o lingote: branco de quente na ponta rápida, já escuro na ponta longa */
@@ -114,7 +122,7 @@
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 76px;
+  bottom: calc(54px + var(--barra));
   top: 0;
   margin: 0;
   padding: 0;
@@ -218,12 +226,9 @@
 }
 .pontaJogo {
   max-width: 100%;
-  overflow: hidden;
   font-size: clamp(16px, 1.25vw, 24px);
   font-weight: 700;
   line-height: 1.2;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   color: var(--tinta);
 }
 .pontaDetalhe {
@@ -330,20 +335,20 @@
 }
 .linhaJogo {
   display: grid;
+  gap: 2px;
   min-width: 0;
-  overflow: hidden;
   font-size: clamp(16px, 1.2vw, 22px);
   font-weight: 700;
   line-height: 1.2;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   color: var(--tinta);
 }
-.linhaJogo > span:last-child {
-  overflow: hidden;
+/* o confronto quebra entre palavras se precisar: nome de time nunca é cortado */
+.linhaConfronto {
+  min-width: 0;
+}
+.linhaDetalhe {
   font-size: clamp(15px, 0.92vw, 17px);
   font-weight: 600;
-  text-overflow: ellipsis;
   color: var(--ferro-claro);
 }
 .linhaTempo {
@@ -365,7 +370,7 @@
 
 /* ------------------------------------------------------------------ telas menores */
 
-@media (max-width: 1023px) {
+@media (max-width: 1279px) {
   .regua {
     --jogo: 30px;
   }
@@ -412,11 +417,6 @@
     --jogo: 32px;
     width: max(100%, calc(var(--faixa, 30) * 30px));
     margin: 0 18px;
-  }
-  .pontaJogo,
-  .linhaJogo,
-  .linhaJogo > span:last-child {
-    white-space: normal;
   }
 }
 
