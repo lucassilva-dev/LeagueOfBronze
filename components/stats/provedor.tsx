@@ -48,10 +48,19 @@ type Contexto = Readonly<{
     tocar: (f: (som: SomDaForja) => void) => void;
   }>;
   faiscas: () => ApiFaiscas | null;
-  holofote: Readonly<{ aberto: string | null; lista: readonly string[]; abrir: (slug: string, origem?: Element | null) => void; fechar: () => void }>;
+  holofote: Readonly<{
+    aberto: string | null;
+    lista: readonly string[];
+    abrir: (slug: string, origem?: Element | null) => void;
+    /** Troca o jogador em destaque sem mexer na fila (anterior / próximo). */
+    mostrar: (slug: string) => void;
+    fechar: () => void;
+  }>;
   versus: Readonly<{ pedido: PedidoDeVs | null; abrir: (pedido?: PedidoDeVs) => void; fechar: () => void }>;
   /** Alguma camada cheia está aberta (porta, holofote, VS): os atalhos de ato ficam em espera. */
   ocupado: boolean;
+  /** A porta da fornalha ainda está fechada (primeira visita). */
+  portaFechada: boolean;
   definirPortaFechada: (fechada: boolean) => void;
 }>;
 
@@ -137,6 +146,7 @@ export function Forja({
   camadas?: ReactNode;
 }>) {
   const raiz = useRef<HTMLDivElement | null>(null);
+  const conteudo = useRef<HTMLDivElement | null>(null);
   const apiFaiscas = useRef<ApiFaiscas | null>(null);
   const instanciaDoSom = useRef<SomDaForja | null>(null);
   const [diretor] = useState(() => new Diretor());
@@ -239,6 +249,14 @@ export function Forja({
     },
     [dados.jogadores, tocar],
   );
+  const mostrarNoHolofote = useCallback(
+    (slug: string) => {
+      if (!dados.jogadores[slug]) return;
+      setHolofoteAberto(slug);
+      tocar((som) => som.carta());
+    },
+    [dados.jogadores, tocar],
+  );
   const fecharHolofote = useCallback(() => setHolofoteAberto(null), []);
 
   const abrirVs = useCallback(
@@ -287,7 +305,17 @@ export function Forja({
         const cores = d.faisca === "time" && d.cor ? [d.cor, "#fff3dc", "#ffc061"] : quente;
         const forte = d.faisca === "forte";
         // Poucas e grossas: faísca fina em tela cheia vira bloco na compressão do vídeo.
-        apiFaiscas.current?.explosao({ x: ev.x, y: ev.y, cores, quantidade: forte ? 54 : 28, forca: forte ? 0.8 : 0.55, espessura: 2.4 });
+        // E somem cedo, ainda acesas: o fim de vida delas (finas e apagadas, caindo) lia como chuva.
+        apiFaiscas.current?.explosao({
+          x: ev.x,
+          y: ev.y,
+          cores,
+          quantidade: forte ? 46 : 24,
+          forca: forte ? 0.8 : 0.55,
+          espessura: 3,
+          vida: 0.8,
+          apagaEm: 0.6,
+        });
       }
     });
 
@@ -391,11 +419,23 @@ export function Forja({
     if (!ocupado) return;
     const raizDoDocumento = document.documentElement;
     const antes = raizDoDocumento.style.overflow;
+    const recuoDeAntes = raizDoDocumento.style.paddingRight;
+    // A barra de rolagem some com a trava: o recuo guarda o lugar dela, e o cabeçalho não pula.
+    const barra = window.innerWidth - raizDoDocumento.clientWidth;
     raizDoDocumento.style.overflow = "hidden";
+    if (barra > 0) raizDoDocumento.style.paddingRight = `${barra}px`;
     return () => {
       raizDoDocumento.style.overflow = antes;
+      raizDoDocumento.style.paddingRight = recuoDeAntes;
     };
   }, [ocupado]);
+
+  // Atrás da porta fechada a página não recebe foco nem clique. (O holofote e o modo VS são
+  // <dialog> modais: o navegador já cuida disso.) Só depois de montar: sem JavaScript a porta
+  // sai pelo CSS (`:target`), e a página tem de continuar clicável.
+  useEffect(() => {
+    if (conteudo.current) conteudo.current.inert = porta;
+  }, [porta]);
 
   const valor = useMemo<Contexto>(
     () => ({
@@ -405,19 +445,54 @@ export function Forja({
       diretor,
       som: { ligado, desbloqueado, volume, alternar, ligar, definirVolume, tocar },
       faiscas: obterFaiscas,
-      holofote: { aberto: holofoteAberto, lista: listaDoHolofote, abrir: abrirHolofote, fechar: fecharHolofote },
+      holofote: { aberto: holofoteAberto, lista: listaDoHolofote, abrir: abrirHolofote, mostrar: mostrarNoHolofote, fechar: fecharHolofote },
       versus: { pedido: pedidoDeVs, abrir: abrirVs, fechar: fecharVs },
       ocupado,
+      portaFechada: porta,
       definirPortaFechada: setPorta,
     }),
-    [abrirHolofote, abrirVs, alternar, dados, definirVolume, desbloqueado, diretor, fecharHolofote, fecharVs, fontes, holofoteAberto, ligado, ligar, listaDoHolofote, obterFaiscas, ocupado, pedidoDeVs, t, tocar, volume],
+    [
+      abrirHolofote,
+      abrirVs,
+      alternar,
+      dados,
+      definirVolume,
+      desbloqueado,
+      diretor,
+      fecharHolofote,
+      fecharVs,
+      fontes,
+      holofoteAberto,
+      ligado,
+      ligar,
+      listaDoHolofote,
+      mostrarNoHolofote,
+      obterFaiscas,
+      ocupado,
+      pedidoDeVs,
+      porta,
+      t,
+      tocar,
+      volume,
+    ],
   );
 
   return (
     <ContextoDaForja.Provider value={valor}>
-      <div ref={raiz} className={s.raiz} data-forja="" data-cine="desarmado" data-pinos="0" data-som={ligado ? "1" : "0"}>
+      <div
+        ref={raiz}
+        id="forja"
+        className={s.raiz}
+        data-forja=""
+        data-cine="desarmado"
+        data-pinos="0"
+        data-som={ligado ? "1" : "0"}
+        data-porta={porta ? "1" : undefined}
+      >
         <div className={s.enfFundo} aria-hidden />
-        <div className={s.conteudo}>{children}</div>
+        <div ref={conteudo} className={s.conteudo}>
+          {children}
+        </div>
         <div className={s.enfFaiscas} aria-hidden>
           <Faiscas ref={apiFaiscas} />
         </div>

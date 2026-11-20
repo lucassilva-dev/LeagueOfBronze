@@ -30,8 +30,14 @@ type ComOcioso = Window & {
 };
 
 export function FundoDaForja() {
-  const { dados, diretor, faiscas } = useForja();
+  const { dados, diretor, faiscas, holofote, versus } = useForja();
   const caixa = useRef<HTMLDivElement | null>(null);
+
+  // Com o holofote ou o modo VS por cima (telas cheias, opacas), a cena não desenha: ninguém a vê.
+  const coberta = useRef(false);
+  useEffect(() => {
+    coberta.current = holofote.aberto !== null || versus.pedido !== null;
+  }, [holofote.aberto, versus.pedido]);
 
   useEffect(() => {
     const onde = caixa.current;
@@ -98,7 +104,9 @@ export function FundoDaForja() {
         );
         cena.redimensionar(window.innerWidth, window.innerHeight);
         raiz.dataset["3d"] = "1";
-        soltarQuadro = diretor.aCadaQuadro((dt, estado) => cena?.quadro(dt, estado));
+        soltarQuadro = diretor.aCadaQuadro((dt, estado) => {
+          if (!coberta.current) cena?.quadro(dt, estado);
+        });
       } catch (erro) {
         // Sem WebGL (ou qualquer tropeço na cena): a página segue com o fundo 2D.
         console.warn("[forja] cena 3D indisponível:", erro);

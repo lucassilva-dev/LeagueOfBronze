@@ -271,6 +271,20 @@
   --r0: clamp(0, calc(var(--p, 1) / 0.05), 1);
   transform: translate(-50%, calc(var(--r0) * 220px));
 }
+.atalhos {
+  padding: 5px 12px 4px;
+  border: 2px solid var(--bronze-escuro);
+  border-radius: 3px;
+  background: rgba(11, 8, 5, 0.86);
+  font-size: 15px;
+  letter-spacing: 0.14em;
+  color: var(--apoio);
+}
+@media (hover: none), (pointer: coarse) {
+  .atalhos {
+    display: none;
+  }
+}
 .enfSeta {
   width: 16px;
   height: 16px;

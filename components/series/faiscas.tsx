@@ -23,7 +23,20 @@ export type ApiFaiscas = Readonly<{
    * Explosão radial de faíscas. `x`/`y` em fração da tela (0,5 = centro). `espessura` multiplica
    * o traço (padrão 1): a /stats usa faíscas mais grossas, que sobrevivem à compressão do vídeo.
    */
-  explosao: (o: Readonly<{ x: number; y: number; cores: readonly string[]; quantidade?: number; forca?: number; espessura?: number }>) => void;
+  explosao: (
+    o: Readonly<{
+      x: number;
+      y: number;
+      cores: readonly string[];
+      quantidade?: number;
+      forca?: number;
+      espessura?: number;
+      /** Multiplica quanto cada faísca dura (padrão 1). */
+      vida?: number;
+      /** Fração da vida em que a faísca some de vez (padrão 1: apaga até o fim). */
+      apagaEm?: number;
+    }>,
+  ) => void;
   /** Anel de choque que se expande a partir do ponto. */
   onda: (o: Readonly<{ x: number; y: number; cor: string; raio?: number; espessura?: number; duracao?: number }>) => void;
   /** Confete caindo do alto da tela. */
@@ -48,6 +61,8 @@ type Particula = {
   vgiro: number;
   arrasto: number;
   gravidade: number;
+  /** Fração da vida em que a partícula some (1 = vive até o fim). */
+  corte?: number;
 };
 
 type Onda = { x: number; y: number; cor: string; raio: number; espessura: number; vida: number; duracao: number };
@@ -143,7 +158,7 @@ export function Faiscas({ ref, reduzido = false }: Readonly<{ ref?: Ref<ApiFaisc
     const vivas: Particula[] = [];
     for (const p of particulas.current) {
       p.vida += dt;
-      if (p.vida >= p.duracao) continue;
+      if (p.vida >= p.duracao * (p.corte ?? 1)) continue;
       const s = p.vida / p.duracao;
       if (p.tipo === "brasa") {
         p.giro += p.vgiro * dt;
@@ -229,7 +244,7 @@ export function Faiscas({ ref, reduzido = false }: Readonly<{ ref?: Ref<ApiFaisc
   useImperativeHandle(
     ref,
     (): ApiFaiscas => ({
-      explosao: ({ x, y, cores, quantidade = 120, forca = 1, espessura = 1 }) => {
+      explosao: ({ x, y, cores, quantidade = 120, forca = 1, espessura = 1, vida = 1, apagaEm = 1 }) => {
         if (reduzido) return;
         const { w, h } = tamanho.current;
         const escala = Math.min(w, h) / 900;
@@ -244,7 +259,8 @@ export function Faiscas({ ref, reduzido = false }: Readonly<{ ref?: Ref<ApiFaisc
             vx: Math.cos(angulo) * velocidade,
             vy: Math.sin(angulo) * velocidade - 60,
             vida: 0,
-            duracao: sorteioEnfeite(0.5, 1.35),
+            duracao: sorteioEnfeite(0.5, 1.35) * vida,
+            corte: apagaEm,
             cor: cores[i % cores.length] ?? "#fff",
             tamanho: sorteioEnfeite(1.2, 3.2) * espessura,
             giro: 0,

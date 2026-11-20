@@ -50,6 +50,13 @@
   position: relative;
   isolation: isolate;
   color: var(--apoio);
+  /* a âncora `#forja` (os botões da porta, sem JavaScript) para sob o cabeçalho */
+  scroll-margin-top: var(--cab);
+}
+/* Com a porta da fornalha fechada, a página passa por cima do rodapé do site (que é posicionado
+   e vem depois no documento): a porta cobre tudo, menos o cabeçalho. */
+.raiz[data-porta="1"] {
+  z-index: 2;
 }
 
 .conteudo {

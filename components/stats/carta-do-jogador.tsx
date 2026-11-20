@@ -116,15 +116,19 @@ export function CartaDoJogador({
                   {posicao}
                 </span>
               ) : null}
-              <span className={s.rota} style={{ "--rota": jogador.rota.cor } as CSSProperties}>
-                <RoleIcon role={jogador.rota.chave} size={16} color="#120d06" />
-                {jogador.rota.rotulo}
+              {/* a rota e, embaixo dela, a braçadeira de capitão (no pé ela empurrava o nick para
+                  baixo do selo de pontos) */}
+              <span className={s.etiquetas}>
+                <span className={s.rota} style={{ "--rota": jogador.rota.cor } as CSSProperties}>
+                  <RoleIcon role={jogador.rota.chave} size={16} color="#120d06" />
+                  {jogador.rota.rotulo}
+                </span>
+                {jogador.capitao ? <span className={s.capitao}>{f.cartaCapitao}</span> : null}
               </span>
               {jogador.elo ? <EmblemaDoElo chave={jogador.elo.chave} rotulo={jogador.elo.rotulo} className={s.elo} /> : null}
             </div>
 
             <div className={s.pe}>
-              {jogador.capitao ? <span className={s.capitao}>{f.cartaCapitao}</span> : null}
               <Titulo className={s.nick}>{jogador.nick}</Titulo>
               {time ? (
                 <p className={s.time}>

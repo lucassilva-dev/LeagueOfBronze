@@ -146,7 +146,8 @@ export class CenaDaForja {
   private altura = 1;
   private tempo = 0;
   private quadros = 0;
-  private somaDeTempo = 0;
+  private nascimento = 0;
+  private inicioDaJanela = 0;
   private janelasRuins = 0;
   private janelasBoas = 0;
   private jaSubiu = false;
@@ -411,19 +412,38 @@ export class CenaDaForja {
     this.brasas.geometry.setDrawRange(0, nivel.brasas);
   }
 
-  private medir(dt: number): void {
+  /**
+   * O monitor de desempenho. Mede em janelas de TEMPO DE RELÓGIO (1,5 s), não de quadros: numa
+   * máquina que faz 3 quadros por segundo, contar 75 quadros levaria meio minuto por degrau.
+   *
+   *   média > 21 ms (menos de ~48 qps)  duas janelas seguidas → desce um degrau;
+   *   média > 66 ms (menos de 15 qps)   desce na hora;
+   *   no degrau mais baixo e ainda > 30 ms → a cena desiste (fica o fundo 2D);
+   *   média < 10,5 ms por seis janelas → sobe um degrau, uma vez só.
+   */
+  private medir(): void {
     if (this.fixo) return;
+    const agora = performance.now();
+    if (this.nascimento === 0) this.nascimento = agora;
+    if (this.inicioDaJanela === 0) {
+      this.inicioDaJanela = agora;
+      this.quadros = 0;
+      return;
+    }
     this.quadros += 1;
-    this.somaDeTempo += dt;
-    if (this.quadros < 75) return;
-    const media = this.somaDeTempo / this.quadros;
+    const passou = agora - this.inicioDaJanela;
+    if (passou < 1500) return;
+    const media = passou / this.quadros;
+    const quadros = this.quadros;
+    this.inicioDaJanela = agora;
     this.quadros = 0;
-    this.somaDeTempo = 0;
-    if (this.tempo < 2.5) return; // o aquecimento (compilar shaders, subir texturas) não conta
+    // O aquecimento (compilar shaders, subir texturas) não conta; nem a janela que atravessou
+    // uma pausa (aba escondida, holofote ou VS por cima: o laço parou, não a máquina).
+    if (agora - this.nascimento < 2500 || passou > 3200 + quadros * 8) return;
 
     if (media > 21) {
       this.janelasBoas = 0;
-      this.janelasRuins += 1;
+      this.janelasRuins += media > 66 ? 2 : 1;
       if (this.janelasRuins >= 2) {
         this.janelasRuins = 0;
         if (this.nivel > 0) {
@@ -489,7 +509,7 @@ export class CenaDaForja {
     if (this.morta) return;
     const dt = Math.min(0.064, dtMs / 1000);
     this.tempo += dt;
-    this.medir(dtMs);
+    this.medir();
 
     const ato = this.dados.atos[estado.atoAtual] ?? "fornalha";
     const p = estado.progresso[estado.atoAtual] ?? 0;

@@ -118,11 +118,16 @@
   font-size: 0.6em;
   color: var(--cor);
 }
+.etiquetas {
+  display: grid;
+  justify-items: start;
+  gap: 1.4cqi;
+  margin-top: 0.6cqi;
+}
 .rota {
   display: inline-flex;
   align-items: center;
   gap: 1.4cqi;
-  margin-top: 0.6cqi;
   padding: 1.2cqi 2.4cqi 1cqi;
   border-radius: 2px;
   background: var(--rota, #c98a4b);

@@ -82,6 +82,8 @@ export function AtoDaFornalha({
 
         <p className={s.rolar}>
           {f.rolar}
+          {/* os atalhos, para quem está no teclado (no toque não há tecla: o CSS esconde) */}
+          <span className={s.atalhos}>{f.hudAtalhos}</span>
           <span className={s.enfSeta} aria-hidden />
         </p>
       </div>
