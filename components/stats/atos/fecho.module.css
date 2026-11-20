@@ -1,0 +1,166 @@
+/*
+ * FECHO — O RESFRIAMENTO. Regras da casa em ../forja.module.css.
+ */
+
+.ato {
+  padding-top: clamp(30px, 6vh, 90px);
+}
+
+.palco {
+  grid-template-rows: none;
+  align-content: center;
+  gap: clamp(22px, 4vh, 56px);
+  min-height: min(var(--palco), 900px);
+}
+
+.cabeca {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+}
+.numero {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  font-size: var(--rotulo);
+  font-weight: 700;
+  letter-spacing: 0.32em;
+  line-height: 1;
+  color: var(--teal);
+}
+.numero::before {
+  content: "";
+  width: 34px;
+  height: 3px;
+  background: var(--teal);
+}
+.titulo {
+  margin: 8px 0 0;
+  font-family: var(--font-display), "Anton", sans-serif;
+  font-size: clamp(44px, 8.4vw, 168px);
+  font-weight: 400;
+  line-height: 0.95;
+  color: var(--tinta);
+  transition: color 1.2s ease;
+}
+.texto {
+  margin: 6px 0 0;
+  font-size: clamp(18px, 1.6vw, 30px);
+  color: var(--apoio);
+}
+/* frio ao contrário: aqui o metal chega QUENTE e esfria quando a seção entra */
+.cabeca[data-aceso="0"] .titulo {
+  color: var(--brasa);
+  transition-duration: 0.1s;
+}
+
+.portas {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(12px, 1.6vw, 30px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.porta {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  padding: clamp(18px, 2vw, 36px);
+  padding-right: clamp(50px, 5vw, 90px);
+  border: 3px solid var(--bronze-escuro);
+  border-radius: 3px;
+  background: linear-gradient(180deg, #1c150c, #0f0b07);
+  text-decoration: none;
+  transition:
+    transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 0.2s ease;
+}
+.porta:hover,
+.porta:focus-visible {
+  border-color: var(--ouro);
+  transform: translateY(-6px);
+}
+.portaNumero {
+  font-family: var(--font-display), "Anton", sans-serif;
+  font-size: var(--num-m);
+  line-height: 0.95;
+  color: var(--bronze);
+}
+.portaTitulo {
+  font-family: var(--font-display), "Anton", sans-serif;
+  font-size: clamp(26px, 2.8vw, 54px);
+  line-height: 1;
+  color: var(--tinta);
+}
+.portaSub {
+  font-size: var(--texto);
+  color: var(--apoio);
+}
+.enfSeta {
+  position: absolute;
+  right: clamp(18px, 2vw, 36px);
+  top: 50%;
+  width: clamp(18px, 1.6vw, 28px);
+  height: clamp(18px, 1.6vw, 28px);
+  border-top: 5px solid var(--ouro);
+  border-right: 5px solid var(--ouro);
+  transform: translateY(-50%) rotate(45deg);
+  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.porta:hover .enfSeta,
+.porta:focus-visible .enfSeta {
+  transform: translate(8px, -50%) rotate(45deg);
+}
+
+.pe {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 30px;
+}
+.tabela {
+  display: inline-flex;
+  align-items: center;
+  padding: 14px 24px 13px;
+  border: 2px solid var(--ouro);
+  border-radius: 2px;
+  background: rgba(240, 200, 138, 0.08);
+  font-size: clamp(15px, 1.05vw, 19px);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  line-height: 1.1;
+  text-decoration: none;
+  color: var(--ouro);
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+.tabela:hover,
+.tabela:focus-visible {
+  background: var(--ouro);
+  color: #160f06;
+}
+.lema {
+  margin: 0;
+  font-family: var(--font-display), "Anton", sans-serif;
+  font-size: clamp(18px, 1.9vw, 36px);
+  letter-spacing: 0.08em;
+  color: var(--bronze);
+}
+
+@media (max-width: 860px) {
+  .portas {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .porta,
+  .enfSeta,
+  .titulo {
+    transition: none;
+  }
+}

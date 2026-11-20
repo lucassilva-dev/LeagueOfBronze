@@ -1,0 +1,479 @@
+/*
+ * ATO VII — O ARSENAL. A órbita dos campeões (CSS 3D), o campeão em foco e a lista ranqueada.
+ * Regras da casa em ../forja.module.css.
+ */
+
+.ato {
+  position: relative;
+  overflow: clip;
+  padding-top: clamp(40px, 8vh, 110px);
+}
+
+/* a splash art do campeão em foco: escurecida, em parallax (mouse e rolagem) */
+.enfFundo {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 22%, #000 70%, transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0%, #000 22%, #000 70%, transparent 100%);
+}
+.enfFundo img {
+  position: absolute;
+  inset: -6% -4%;
+  width: 108%;
+  height: 112%;
+  object-fit: cover;
+  object-position: 50% 22%;
+  filter: saturate(0.8) brightness(0.36) contrast(1.1);
+  transform: translate(calc(var(--mx, 0) * -18px), calc(var(--my, 0) * -12px + (var(--p, 1) - 0.5) * -70px));
+}
+
+.palco {
+  position: relative;
+  z-index: 1;
+  min-height: 0;
+  grid-template-rows: none;
+  gap: clamp(14px, 2.4vh, 30px);
+  align-content: start;
+}
+
+.topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px 24px;
+}
+.abas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.aba,
+.verTodos {
+  padding: 12px 20px 11px;
+  border: 2px solid var(--bronze-escuro);
+  border-radius: 2px;
+  background: rgba(11, 8, 5, 0.72);
+  color: var(--apoio);
+  font-family: var(--font-body), "Chakra Petch", sans-serif;
+  font-size: clamp(15px, 1.05vw, 19px);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  line-height: 1.1;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+.aba:hover,
+.verTodos:hover {
+  border-color: var(--ouro);
+  color: var(--tinta);
+}
+.aba[aria-pressed="true"] {
+  border-color: var(--ouro);
+  background: linear-gradient(180deg, #f0c88a, #b97e40);
+  color: #160f06;
+}
+
+.cena {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  align-items: start;
+  gap: clamp(16px, 3vw, 60px);
+}
+
+/* ------------------------------------------------------------------ a órbita */
+
+.orbita {
+  --inclinacao: 71deg;
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 0.8;
+  container-type: inline-size;
+  perspective: 1300px;
+  perspective-origin: 50% 30%;
+}
+.orbita[data-gira="a"] {
+  animation: orbitaTrocaA 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.orbita[data-gira="b"] {
+  animation: orbitaTrocaB 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+/* dois nomes para o mesmo movimento: trocar de aba faz a órbita «respirar» de novo */
+@keyframes orbitaTrocaA {
+  0% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes orbitaTrocaB {
+  0% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+.anel {
+  position: absolute;
+  top: 31%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  transform-style: preserve-3d;
+  transform: rotateX(var(--inclinacao)) rotateZ(0deg);
+  animation: anelGira var(--dur, 120s) linear infinite;
+}
+.anel[data-anel="0"] {
+  --raio: 29cqi;
+  --dur: 96s;
+  --planeta: 12.5cqi;
+}
+.anel[data-anel="1"] {
+  --raio: 45cqi;
+  --dur: 150s;
+  --planeta: 10.5cqi;
+  animation-direction: reverse;
+}
+@keyframes anelGira {
+  from {
+    transform: rotateX(var(--inclinacao)) rotateZ(0deg);
+  }
+  to {
+    transform: rotateX(var(--inclinacao)) rotateZ(360deg);
+  }
+}
+/* o trilho da órbita */
+.anel::before {
+  content: "";
+  position: absolute;
+  top: calc(-1 * var(--raio));
+  left: calc(-1 * var(--raio));
+  width: calc(2 * var(--raio));
+  height: calc(2 * var(--raio));
+  box-sizing: border-box;
+  border: 6px solid rgba(201, 138, 75, 0.3);
+  border-radius: 50%;
+}
+
+.orbitante {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-style: preserve-3d;
+  transform: rotateZ(var(--ang)) translateX(var(--raio));
+}
+/* o contragiro mantém o ícone de frente para quem olha, em qualquer ponto da volta */
+.contra {
+  display: block;
+  transform-style: preserve-3d;
+  transform: rotateZ(calc(-1 * var(--ang))) rotateX(calc(-1 * var(--inclinacao)));
+  animation: contraGira var(--dur, 120s) linear infinite;
+}
+.anel[data-anel="1"] .contra {
+  animation-direction: reverse;
+}
+@keyframes contraGira {
+  from {
+    transform: rotateZ(calc(-1 * var(--ang))) rotateX(calc(-1 * var(--inclinacao)));
+  }
+  to {
+    transform: rotateZ(calc(-1 * var(--ang) - 360deg)) rotateX(calc(-1 * var(--inclinacao)));
+  }
+}
+
+.planeta {
+  position: absolute;
+  top: calc(var(--planeta) / -2);
+  left: calc(var(--planeta) / -2);
+  width: var(--planeta);
+  height: var(--planeta);
+  padding: 0;
+  border: 4px solid var(--bronze);
+  border-radius: 50%;
+  background: #17110a;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.7);
+  cursor: pointer;
+  /* o tamanho do ícone é a métrica da aba */
+  transform: scale(var(--escala, 1));
+  transition:
+    transform 0.5s cubic-bezier(0.34, 1.4, 0.5, 1),
+    border-color 0.2s ease;
+}
+.planeta img,
+.planeta .iniciais {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.planeta:hover,
+.planeta:focus-visible,
+.planeta[aria-pressed="true"] {
+  border-color: var(--branco-quente);
+  transform: scale(calc(var(--escala, 1) * 1.18));
+}
+.planeta:focus-visible {
+  outline: 3px solid var(--branco-quente);
+  outline-offset: 4px;
+}
+.iniciais {
+  display: grid;
+  place-items: center;
+  background: #2b241b;
+  color: var(--ouro);
+  font-family: var(--font-display), "Anton", sans-serif;
+  font-size: 1.1em;
+}
+
+/* a órbita para quando a pessoa aponta para ela (dá para escolher) e fora da tela */
+.orbita:hover .anel,
+.orbita:hover .contra,
+.orbita:focus-within .anel,
+.orbita:focus-within .contra,
+:global([data-visivel="0"]) .anel,
+:global([data-visivel="0"]) .contra {
+  animation-play-state: paused;
+}
+
+/* ------------------------------------------------------------------ o campeão em foco */
+
+.centro {
+  position: absolute;
+  top: 31%;
+  left: 0;
+  right: 0;
+  display: grid;
+  justify-items: center;
+  gap: 0;
+  text-align: center;
+  pointer-events: none;
+}
+.medalha {
+  display: grid;
+  place-items: center;
+  width: 17cqi;
+  aspect-ratio: 1;
+  margin-top: -8.5cqi;
+  border-radius: 50%;
+  border: 1cqi solid transparent;
+  background:
+    linear-gradient(#17110a, #17110a) padding-box,
+    conic-gradient(from 215deg, #6a4420, #f3d08a 14%, #8a5a2a 40%, #f6dfae 62%, #6a4420) border-box;
+  box-shadow:
+    0 0 0 6px rgba(11, 8, 5, 0.7),
+    0 0 60px 10px rgba(255, 106, 43, 0.35);
+}
+.medalhaIcone {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+/* o terço inferior: fica ABAIXO da órbita (os planetas do lado de cá nunca passam por cima) */
+.foco {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 4cqi;
+  padding: 2.4cqi 3cqi 2.2cqi;
+  border-left: 6px solid var(--ouro);
+  background: linear-gradient(90deg, rgba(11, 8, 5, 0.88), rgba(11, 8, 5, 0.4));
+}
+.focoQuem {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  margin: 0;
+}
+.focoLugar {
+  font-size: var(--rotulo);
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  color: var(--bronze);
+}
+.focoNome {
+  overflow: hidden;
+  font-family: var(--font-display), "Anton", sans-serif;
+  font-size: clamp(34px, 9.5cqi, 104px);
+  line-height: 1;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--tinta);
+}
+.focoSub {
+  font-size: var(--texto);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--apoio);
+}
+.focoValor {
+  display: grid;
+  justify-items: end;
+  margin: 0;
+}
+.focoNumero {
+  font-size: clamp(48px, 13cqi, 150px);
+  color: var(--ouro);
+}
+.focoValor > span:last-child {
+  font-size: var(--rotulo);
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: var(--ferro-claro);
+}
+
+/* ------------------------------------------------------------------ a lista */
+
+.painel {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+.lista {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.linha {
+  border-bottom: 2px solid rgba(201, 138, 75, 0.2);
+}
+.linhaBotao {
+  display: grid;
+  grid-template-columns: clamp(30px, 2.4vw, 46px) auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: clamp(10px, 1vw, 18px);
+  width: 100%;
+  padding: clamp(7px, 0.9vh, 11px) clamp(8px, 0.8vw, 14px);
+  border: 0;
+  background: rgba(11, 8, 5, 0.62);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.linhaBotao:hover,
+.linhaBotao:focus-visible,
+.linhaBotao[aria-pressed="true"] {
+  background: rgba(201, 138, 75, 0.2);
+}
+.linhaBotao[aria-pressed="true"] {
+  box-shadow: inset 5px 0 0 var(--ouro);
+}
+.posicao {
+  font-family: var(--font-display), "Anton", sans-serif;
+  font-size: clamp(20px, 1.7vw, 32px);
+  line-height: 1;
+  color: var(--ferro-claro);
+}
+.linhaIcone {
+  display: block;
+  width: clamp(40px, 3.2vw, 58px);
+  aspect-ratio: 1;
+  border: 3px solid var(--bronze-escuro);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.linhaIcone img,
+.linhaIcone .iniciais {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.linhaNome {
+  display: grid;
+  min-width: 0;
+  overflow: hidden;
+  font-size: clamp(17px, 1.35vw, 26px);
+  font-weight: 700;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--tinta);
+}
+.linhaNome span {
+  font-size: clamp(15px, 0.9vw, 17px);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ferro-claro);
+}
+.linhaValor {
+  font-family: var(--font-display), "Anton", sans-serif;
+  font-size: clamp(26px, 2.3vw, 44px);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--ouro);
+}
+.pe {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+}
+.descricao {
+  flex: 1 1 280px;
+  margin: 0;
+  font-size: var(--texto);
+  line-height: 1.4;
+  color: var(--apoio);
+}
+
+.vazio {
+  padding: 40px 24px;
+  border: 2px dashed var(--bronze-escuro);
+  text-align: center;
+  font-size: var(--texto);
+}
+.vazioTitulo {
+  margin: 0 0 8px;
+  font-family: var(--font-display), "Anton", sans-serif;
+  font-size: clamp(22px, 2vw, 34px);
+  color: var(--tinta);
+}
+
+/* ------------------------------------------------------------------ telas menores */
+
+@media (max-width: 1023px) {
+  .cena {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .orbita {
+    aspect-ratio: 1 / 0.94;
+  }
+  .foco {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .focoValor {
+    justify-items: start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anel,
+  .contra,
+  .orbita[data-gira] {
+    animation: none;
+  }
+  .planeta {
+    transition: none;
+  }
+}

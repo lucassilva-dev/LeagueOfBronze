@@ -19,8 +19,11 @@ import { useCallback, useEffect, useImperativeHandle, useRef, type Ref } from "r
  */
 
 export type ApiFaiscas = Readonly<{
-  /** Explosão radial de faíscas. `x`/`y` em fração da tela (0,5 = centro). */
-  explosao: (o: Readonly<{ x: number; y: number; cores: readonly string[]; quantidade?: number; forca?: number }>) => void;
+  /**
+   * Explosão radial de faíscas. `x`/`y` em fração da tela (0,5 = centro). `espessura` multiplica
+   * o traço (padrão 1): a /stats usa faíscas mais grossas, que sobrevivem à compressão do vídeo.
+   */
+  explosao: (o: Readonly<{ x: number; y: number; cores: readonly string[]; quantidade?: number; forca?: number; espessura?: number }>) => void;
   /** Anel de choque que se expande a partir do ponto. */
   onda: (o: Readonly<{ x: number; y: number; cor: string; raio?: number; espessura?: number; duracao?: number }>) => void;
   /** Confete caindo do alto da tela. */
@@ -226,7 +229,7 @@ export function Faiscas({ ref, reduzido = false }: Readonly<{ ref?: Ref<ApiFaisc
   useImperativeHandle(
     ref,
     (): ApiFaiscas => ({
-      explosao: ({ x, y, cores, quantidade = 120, forca = 1 }) => {
+      explosao: ({ x, y, cores, quantidade = 120, forca = 1, espessura = 1 }) => {
         if (reduzido) return;
         const { w, h } = tamanho.current;
         const escala = Math.min(w, h) / 900;
@@ -243,7 +246,7 @@ export function Faiscas({ ref, reduzido = false }: Readonly<{ ref?: Ref<ApiFaisc
             vida: 0,
             duracao: sorteioEnfeite(0.5, 1.35),
             cor: cores[i % cores.length] ?? "#fff",
-            tamanho: sorteioEnfeite(1.2, 3.2),
+            tamanho: sorteioEnfeite(1.2, 3.2) * espessura,
             giro: 0,
             vgiro: 0,
             arrasto: sorteioEnfeite(1.6, 3.2),

@@ -273,13 +273,20 @@ export function Forja({
       if (ev.tipo !== "marca" || !ev.acesa || !ev.frente) return;
       const d = ev.el.dataset;
       const pan = ev.x * 1.2 - 0.6;
-      if (d.som) tocar((som) => tocarEfeito(som, d.som!, pan));
+      // `data-som` aceita uma sequência: "estalo carta@180 carta@320" (o @ é o atraso em ms).
+      for (const parte of (d.som ?? "").split(/\s+/).filter(Boolean)) {
+        const [nome, atraso] = parte.split("@");
+        const ms = Number(atraso) || 0;
+        if (ms > 0) window.setTimeout(() => tocar((som) => tocarEfeito(som, nome!, pan)), ms);
+        else tocar((som) => tocarEfeito(som, nome!, pan));
+      }
       if (d.conta) tocar((som) => som.contagem(Number(d.conta) || 1, 900));
       if (d.faisca) {
         const quente = ["#fff3dc", "#ffc061", "#ff6a2b", "#f0c88a"];
         const cores = d.faisca === "time" && d.cor ? [d.cor, "#fff3dc", "#ffc061"] : quente;
         const forte = d.faisca === "forte";
-        apiFaiscas.current?.explosao({ x: ev.x, y: ev.y, cores, quantidade: forte ? 90 : 44, forca: forte ? 0.85 : 0.6 });
+        // Poucas e grossas: faísca fina em tela cheia vira bloco na compressão do vídeo.
+        apiFaiscas.current?.explosao({ x: ev.x, y: ev.y, cores, quantidade: forte ? 54 : 28, forca: forte ? 0.8 : 0.55, espessura: 2.4 });
       }
     });
 

@@ -172,7 +172,8 @@
   flex-shrink: 0;
 }
 .cartaoNome {
-  margin: 8px 0 4px;
+  /* a folga de cima é para o acento de maiúscula (A TÊMPERA) não encostar no «ATO N» */
+  margin: 0.24em 0 4px;
   font-family: var(--font-display), "Anton", sans-serif;
   font-size: clamp(34px, 4.3vw, 82px);
   font-weight: 400;

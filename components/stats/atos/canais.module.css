@@ -1,0 +1,355 @@
+/*
+ * ATO V — OS CANAIS. O Rift como molde: o metal corre pelos canais e acende uma rota por vez.
+ * Regras da casa em ../forja.module.css.
+ */
+
+.ato {
+  --trilho: 3;
+}
+
+.cena {
+  display: grid;
+  grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+  align-items: center;
+  gap: clamp(14px, 3vw, 64px);
+}
+
+/* ------------------------------------------------------------------ o mapa */
+
+.mapa {
+  position: relative;
+  justify-self: center;
+  width: min(100%, 62vh);
+  aspect-ratio: 1;
+  /* quanto de cada canal já encheu (sai do `p` do ato; sem `p`, tudo cheio) */
+  --topo: clamp(0, calc((var(--p, 1) - 0.14) / 0.12), 1);
+  --selva: clamp(0, calc((var(--p, 1) - 0.28) / 0.12), 1);
+  --meio: clamp(0, calc((var(--p, 1) - 0.42) / 0.12), 1);
+  --baixo: clamp(0, calc((var(--p, 1) - 0.56) / 0.26), 1);
+}
+:global([data-pinos="1"]) .mapa {
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.enfRift {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.enfCaixa {
+  fill: #120c06;
+  stroke: #6a4420;
+  stroke-width: 6;
+}
+.enfRio {
+  fill: none;
+  stroke: rgba(87, 216, 203, 0.14);
+  stroke-width: 34;
+  stroke-linecap: round;
+}
+.enfSulco,
+.enfSulcoApagado {
+  fill: none;
+  stroke: #2b2118;
+  stroke-width: 26;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.enfSulcoApagado {
+  stroke: #1d160f;
+  stroke-width: 18;
+}
+.enfHalo,
+.enfVeio {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 100;
+}
+.enfHalo {
+  stroke: rgba(255, 106, 43, 0.42);
+  stroke-width: 34;
+}
+.enfVeio {
+  stroke: #ffb44f;
+  stroke-width: 14;
+}
+/* cada canal enche pelo seu trecho da rolagem */
+.enfCanalTOP path {
+  stroke-dashoffset: calc((1 - var(--topo)) * 100px);
+}
+.enfCanalSEL path {
+  stroke-dashoffset: calc((1 - var(--selva)) * 100px);
+}
+.enfCanalMID path {
+  stroke-dashoffset: calc((1 - var(--meio)) * 100px);
+}
+.enfCanalBOT path {
+  stroke-dashoffset: calc((1 - var(--baixo)) * 100px);
+}
+.enfBaseAzul {
+  fill: #ffc061;
+  stroke: #fff3dc;
+  stroke-width: 5;
+}
+.enfBaseVermelha {
+  fill: #2b2118;
+  stroke: #6a4420;
+  stroke-width: 5;
+}
+
+/* ------------------------------------------------------------------ os nós (o craque no mapa) */
+
+.no {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 17%;
+  aspect-ratio: 1;
+  margin: -8.5% 0 0 -8.5%;
+  transition: transform 0.45s cubic-bezier(0.34, 1.5, 0.5, 1);
+}
+.noRosto {
+  --tam: 100%;
+  --aro: 4px;
+  width: 100%;
+  height: 100%;
+}
+.noRota {
+  position: absolute;
+  right: -6%;
+  bottom: -6%;
+  display: grid;
+  place-items: center;
+  width: 36%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--rota, var(--bronze));
+  box-shadow: 0 0 0 3px #0b0805;
+  pointer-events: none;
+}
+/* frio: o nó ainda não brotou */
+.no[data-aceso="0"] {
+  transform: scale(0);
+}
+
+/* ------------------------------------------------------------------ a lista das cinco rotas */
+
+.lista {
+  display: grid;
+  gap: clamp(6px, 1.2vh, 16px);
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+:global([data-pinos="1"]) .lista {
+  height: 100%;
+  grid-auto-rows: minmax(0, 1fr);
+}
+
+.linha {
+  --rosto: clamp(44px, 4.4vw, 78px);
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "rosto rotulo kda"
+    "rosto quem kda"
+    "rosto detalhe vices";
+  align-items: center;
+  align-content: center;
+  gap: 0 clamp(10px, 1.2vw, 20px);
+  min-height: 0;
+  padding: clamp(4px, 0.8vh, 10px) clamp(10px, 1vw, 18px);
+  border-left: var(--traco) solid var(--rota);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--rota) 16%, transparent), transparent 70%);
+  transition: border-color 0.5s ease;
+}
+/* com o ato fixo, a linha mede a si mesma: nick e KDA saem da ALTURA dela (cabem no 720p) */
+:global([data-pinos="1"]) .linha {
+  container-type: size;
+  --rosto: min(62cqh, 84px);
+  --nick: clamp(21px, 33cqh, 46px);
+  --kda: clamp(32px, 56cqh, 84px);
+}
+
+.rosto {
+  grid-area: rosto;
+  --tam: var(--rosto);
+}
+.rotulo {
+  grid-area: rotulo;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--rotulo);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  line-height: 1.05;
+  white-space: nowrap;
+  text-transform: uppercase;
+  color: var(--rota);
+  transition: color 0.5s ease;
+}
+.quem {
+  grid-area: quem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 12px;
+  min-width: 0;
+}
+.nick {
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--font-display), "Anton", sans-serif;
+  font-size: var(--nick, clamp(24px, 2.5vw, 46px));
+  line-height: 1.06;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--tinta);
+  transition: color 0.5s ease;
+}
+.nick:hover,
+.nick:focus-visible {
+  color: var(--cor);
+}
+.time {
+  font-size: clamp(15px, 1vw, 18px);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--cor);
+}
+.detalhe {
+  grid-area: detalhe;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 14px;
+  margin: 0;
+  font-size: clamp(15px, 0.98vw, 18px);
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--ferro-claro);
+}
+.kda {
+  grid-area: kda;
+  display: grid;
+  justify-items: end;
+  margin: 0;
+}
+.kdaNumero {
+  font-size: var(--kda, clamp(38px, 4.2vw, 84px));
+  color: var(--ouro);
+  transition: color 0.45s ease;
+}
+.kdaRotulo {
+  font-size: var(--rotulo);
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  line-height: 1;
+  color: var(--ferro-claro);
+}
+
+/* o 2º e o 3º da rota */
+.vices {
+  grid-area: vices;
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: clamp(15px, 0.95vw, 17px);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.vices li {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.vicePosicao {
+  font-weight: 700;
+  color: var(--ferro-claro);
+}
+.viceNick {
+  max-width: 13ch;
+  overflow: hidden;
+  font-weight: 600;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  color: var(--apoio);
+}
+.viceNick:hover,
+.viceNick:focus-visible {
+  color: var(--tinta);
+  text-decoration: underline;
+}
+.viceKda {
+  font-family: var(--font-display), "Anton", sans-serif;
+  font-size: 1.15em;
+  color: var(--bronze);
+}
+
+/* frio: a rota ainda não acendeu */
+.linha[data-aceso="0"] {
+  border-left-color: var(--ferro-escuro);
+}
+.linha[data-aceso="0"] .rotulo,
+.linha[data-aceso="0"] .nick,
+.linha[data-aceso="0"] .kdaNumero {
+  color: var(--ferro);
+}
+.linha[data-bateu] {
+  animation: linhaAcende 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes linhaAcende {
+  0% {
+    transform: translateX(26px);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/* ------------------------------------------------------------------ telas menores */
+
+@media (max-width: 1023px) {
+  .cena {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .mapa {
+    width: min(100%, 440px);
+  }
+  .linha {
+    grid-template-areas:
+      "rosto rotulo kda"
+      "rosto quem kda"
+      "detalhe detalhe detalhe"
+      "vices vices vices";
+    row-gap: 2px;
+  }
+  .vices {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .no {
+    transition: none;
+  }
+}

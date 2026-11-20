@@ -1,0 +1,394 @@
+/*
+ * ATO VIII — A TÊMPERA. A régua de minutos, as duas pontas (atropelo e épico) e as listas.
+ * Regras da casa em ../forja.module.css.
+ */
+
+.ato {
+  --trilho: 2.5;
+}
+
+.cena {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: clamp(12px, 2.4vh, 30px);
+}
+
+/* ------------------------------------------------------------------ a régua */
+
+.regua {
+  --jogo: 40px;
+  --vao: 6px;
+  /* até onde a frente de calor já chegou (sai do `p`; sem `p`, a régua inteira) */
+  --frente: clamp(0, calc((var(--p, 1) - 0.2) / 0.58), 1);
+  position: relative;
+  min-height: calc(var(--pilha, 3) * (var(--jogo) + var(--vao)) + 86px);
+  margin: 0 clamp(18px, 3%, 46px);
+}
+:global([data-pinos="1"]) .regua {
+  container-type: size;
+  min-height: 0;
+  /* o jogo mede pelo palco: a maior pilha cabe inteira (altura) e dois minutos vizinhos não se
+     atropelam (largura de um minuto na régua) */
+  --jogo: clamp(24px, min(calc((100cqh - 92px) / var(--pilha, 3) - var(--vao)), calc(100cqi / var(--faixa, 30) - 5px)), 58px);
+}
+
+.barra {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 44px;
+  height: 22px;
+  border-radius: 3px;
+  background: var(--ferro-escuro);
+  overflow: hidden;
+}
+/* o lingote: branco de quente na ponta rápida, já escuro na ponta longa */
+.enfCalor {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #fff3dc 0%, #ffc061 14%, #ff6a2b 46%, #c8321a 78%, #6a2a14 100%);
+  transform-origin: 0 50%;
+  transform: scaleX(var(--frente));
+}
+.enfFrente {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 10px;
+  background: #fff3dc;
+  box-shadow: 0 0 24px 8px rgba(255, 192, 97, 0.9);
+  transform: translateX(calc(var(--frente) * (100cqi - 10px)));
+}
+:global([data-pinos="0"]) .enfFrente,
+:global([data-cine="desarmado"]) .enfFrente {
+  display: none;
+}
+
+.minutos {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 36px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.minutos li {
+  position: absolute;
+  left: calc(var(--x) * 1%);
+  bottom: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-family: var(--font-display), "Anton", sans-serif;
+  font-size: clamp(20px, 1.6vw, 30px);
+  line-height: 1;
+  color: var(--apoio);
+  transform: translateX(-50%);
+}
+.minutos li span {
+  font-family: var(--font-body), "Chakra Petch", sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ferro-claro);
+}
+/* o risco de cada marca de 5 minutos */
+.minutos li::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  width: 3px;
+  height: 10px;
+  margin-left: -1.5px;
+  background: var(--bronze-escuro);
+}
+
+.jogos {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 76px;
+  top: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.vaga {
+  position: absolute;
+  left: calc(var(--x) * 1%);
+  bottom: calc(var(--k) * (var(--jogo) + var(--vao)));
+  width: var(--jogo);
+  height: var(--jogo);
+  margin-left: calc(var(--jogo) / -2);
+}
+.jogo {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--abismo);
+  box-shadow: 0 0 0 3px var(--cor);
+  color: var(--cor);
+  font-family: var(--font-display), "Anton", sans-serif;
+  font-size: calc(var(--jogo) * 0.34);
+  text-decoration: none;
+  transition: transform 0.4s cubic-bezier(0.34, 1.5, 0.5, 1);
+}
+.jogo img {
+  width: 78%;
+  height: 78%;
+  object-fit: contain;
+}
+.jogo:hover,
+.jogo:focus-visible {
+  z-index: 6;
+  transform: scale(1.28);
+}
+.jogo:focus-visible {
+  outline: 3px solid var(--branco-quente);
+  outline-offset: 4px;
+}
+/* frio: o jogo ainda não foi alcançado pelo calor */
+.jogo[data-aceso="0"] {
+  transform: scale(0);
+}
+
+/* ------------------------------------------------------------------ as pontas e a média */
+
+.pontas {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: end;
+  gap: clamp(12px, 2vw, 40px);
+}
+.ponta {
+  display: grid;
+  justify-items: start;
+  gap: 2px;
+  min-width: 0;
+  padding: clamp(10px, 1.4vh, 18px) clamp(12px, 1.2vw, 22px);
+  border-left: 6px solid var(--quente);
+  background: linear-gradient(90deg, rgba(255, 192, 97, 0.14), transparent 80%);
+  text-decoration: none;
+  transform-origin: 0 100%;
+}
+.pontaEpico {
+  justify-items: end;
+  border-left: 0;
+  border-right: 6px solid var(--brasa-funda);
+  background: linear-gradient(270deg, rgba(200, 50, 26, 0.2), transparent 80%);
+  text-align: right;
+  transform-origin: 100% 100%;
+}
+.ponta:hover,
+.ponta:focus-visible {
+  background-color: rgba(201, 138, 75, 0.12);
+}
+.pontaRotulo {
+  font-family: var(--font-display), "Anton", sans-serif;
+  font-size: clamp(22px, 2.1vw, 40px);
+  letter-spacing: 0.04em;
+  line-height: 1;
+  color: var(--tinta);
+}
+.pontaTempo {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.pontaNumero {
+  font-size: var(--num-g);
+  color: var(--ouro);
+  transition: color 0.45s ease;
+}
+.pontaTempo > span:last-child {
+  font-size: clamp(18px, 1.6vw, 30px);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--ferro-claro);
+}
+.pontaJogo {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: clamp(16px, 1.25vw, 24px);
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--tinta);
+}
+.pontaDetalhe {
+  font-size: clamp(15px, 1vw, 18px);
+  line-height: 1.3;
+  color: var(--apoio);
+}
+.pontaDetalhe strong {
+  color: var(--cor);
+}
+.ponta[data-aceso="0"] .pontaNumero {
+  color: var(--ferro);
+}
+.ponta[data-bateu] {
+  animation: pontaBate 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes pontaBate {
+  0% {
+    transform: translateY(-16px) scale(1.1);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+.media {
+  display: grid;
+  justify-items: center;
+  gap: 0;
+  margin: 0;
+  padding-bottom: clamp(10px, 1.4vh, 18px);
+}
+.mediaRotulo,
+.mediaMin {
+  font-size: var(--rotulo);
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  line-height: 1.1;
+  color: var(--ferro-claro);
+}
+.mediaNumero {
+  font-size: var(--num-m);
+  color: var(--tinta);
+  transition: color 0.45s ease;
+}
+.media[data-aceso="0"] .mediaNumero {
+  color: var(--ferro);
+}
+
+/* ------------------------------------------------------------------ as listas (fora do palco) */
+
+.listas {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(18px, 3vw, 56px);
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1760px;
+  margin: 0 auto;
+  padding: clamp(20px, 5vh, 70px) var(--margem) clamp(30px, 7vh, 100px);
+}
+.coluna {
+  min-width: 0;
+}
+.colunaTitulo {
+  margin: 0;
+  font-family: var(--font-display), "Anton", sans-serif;
+  font-size: clamp(26px, 2.6vw, 48px);
+  font-weight: 400;
+  line-height: 1;
+  color: var(--tinta);
+}
+.colunaDescricao {
+  margin: 8px 0 12px;
+  font-size: var(--texto);
+  color: var(--ferro-claro);
+}
+.linhas {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.linha {
+  display: grid;
+  grid-template-columns: clamp(30px, 2.4vw, 46px) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: clamp(10px, 1vw, 18px);
+  padding: clamp(8px, 1vh, 12px) clamp(8px, 0.8vw, 14px);
+  border-bottom: 2px solid rgba(201, 138, 75, 0.2);
+  border-left: 5px solid var(--cor);
+  background: rgba(11, 8, 5, 0.5);
+  text-decoration: none;
+  transition: background-color 0.15s ease;
+}
+.linha:hover,
+.linha:focus-visible {
+  background: color-mix(in srgb, var(--cor) 16%, #0f0b07);
+}
+.linhaPosicao {
+  font-family: var(--font-display), "Anton", sans-serif;
+  font-size: clamp(20px, 1.7vw, 32px);
+  line-height: 1;
+  color: var(--ferro-claro);
+}
+.linhaJogo {
+  display: grid;
+  min-width: 0;
+  overflow: hidden;
+  font-size: clamp(16px, 1.2vw, 22px);
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--tinta);
+}
+.linhaJogo > span:last-child {
+  overflow: hidden;
+  font-size: clamp(15px, 0.92vw, 17px);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  color: var(--ferro-claro);
+}
+.linhaTempo {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-family: var(--font-display), "Anton", sans-serif;
+  font-size: clamp(26px, 2.3vw, 44px);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--ouro);
+}
+.linhaTempo span {
+  font-family: var(--font-body), "Chakra Petch", sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ferro-claro);
+}
+
+/* ------------------------------------------------------------------ telas menores */
+
+@media (max-width: 1023px) {
+  .regua {
+    --jogo: 30px;
+  }
+  .pontas {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+  .pontaEpico {
+    justify-items: start;
+    border-right: 0;
+    border-left: 6px solid var(--brasa-funda);
+    background: linear-gradient(90deg, rgba(200, 50, 26, 0.2), transparent 80%);
+    text-align: left;
+  }
+  .media {
+    justify-items: start;
+    grid-auto-flow: column;
+    align-items: baseline;
+    gap: 10px;
+  }
+  .listas {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jogo {
+    transition: none;
+  }
+}
